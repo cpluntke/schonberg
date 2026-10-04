@@ -6,13 +6,13 @@ import { IconBack } from '../icons';
 import { loadCycle } from '../../progress/store';
 import { WEEKDAYS } from '../../progress/rehearsal';
 import {
-  apiBase, cachedChoir, checkAdmin, checkLead, choirPieceId, deleteChoirPiece, fetchSection, joinChoir, leaveChoir,
+  apiBase, cachedChoir, checkAdmin, checkLead, choirPieceId, deleteChoirPiece, fetchChoir, fetchSection, joinChoir, leaveChoir, ChoirApiError,
   saveChoirCycle, sessionSecret, setSectionLead, superCreate, superDelete, superList, superUpdate, uploadChoirPiece,
   withdrawProgress, type ChoirInfo, type ChoirSummary, type SectionView,
 } from '../../progress/choir';
 import { PieceMap } from '../components/PieceMap';
 import type { BarMap } from '../../progress/bars';
-import { shareMyProgress } from '../play/shareProgress';
+import { shareMyProgress, shareError } from '../play/shareProgress';
 
 const VOICE_NAME: Record<string, string> = { S: 'Sopranos', A: 'Altos', T: 'Tenors', B: 'Basses' };
 const inputStyle: React.CSSProperties = { minHeight: 44, borderRadius: 10, border: '1px solid var(--line)', background: 'var(--surface)', padding: '0 12px' };
@@ -68,10 +68,10 @@ export function ChoirScreen() {
   const [syncMsg, setSyncMsg] = useState('');
   const choir = cachedChoir();
   const joined = !!profile.choirCode && choir?.code === profile.choirCode;
+  if (!apiBase()) return <main className="screen"><Top title="Your choir" /><Offline /></main>;
   return (
     <main className="screen">
       <Top title="Your choir" />
-      {!apiBase() && <Offline />}
       {!joined ? (
         <div className="card">
           <strong>Join your choir</strong>
@@ -101,11 +101,12 @@ export function ChoirScreen() {
               <input type="checkbox" checked={!!profile.shareProgress} onChange={async (e) => {
                 const on = e.target.checked;
                 update({ shareProgress: on });
-                if (on) void shareMyProgress(true);
-                else if (profile.name) withdrawProgress(profile.choirCode!, profile.name).catch(() => {});
+                if (on) void shareMyProgress(true).then(() => update({}));
+                else if (profile.name.trim()) withdrawProgress(profile.choirCode!, profile.name.trim()).catch(() => {});
               }} />
             </label>
-            {!profile.name && profile.shareProgress && <span className="small" style={{ color: 'var(--accent-text)' }}>Add your name in Voice setup first.</span>}
+            {!profile.name.trim() && profile.shareProgress && <span className="small" style={{ color: 'var(--accent-text)' }}>Add your name in Voice setup first.</span>}
+            {profile.name.trim() && profile.shareProgress && shareError() && <span className="small" role="alert" style={{ color: 'var(--accent-text)' }}>Not shared yet: {shareError()}</span>}
           </div>
           <div className="card flat">
             <strong>Roles</strong>
@@ -152,6 +153,13 @@ export function ChoirAdmin() {
   const code = profile.choirCode;
   const [admin, setAdmin] = useState<string | null>(() => sessionSecret('admin'));
   const [info, setInfo] = useState<ChoirInfo | null>(() => cachedChoir());
+  // Start from the choir's current state, not from this phone's last sync (another admin may have changed it).
+  useEffect(() => {
+    if (!code || !apiBase()) return;
+    let alive = true;
+    fetchChoir(code).then((i) => { if (alive) setInfo(i); }).catch(() => { /* keep the cached copy */ });
+    return () => { alive = false; };
+  }, [code]);
   if (!apiBase()) return <main className="screen"><Top title="Choir admin" /><Offline /></main>;
   if (!code) return <main className="screen"><Top title="Choir admin" /><div className="notice">Join your choir first (Settings → Your choir).</div></main>;
   if (!admin) {
@@ -173,15 +181,17 @@ export function ChoirAdmin() {
     <main className="screen">
       <Top title="Choir admin" />
       <span className="small muted">{info?.name ?? code} · <button className="linklike" onClick={() => { sessionSecret('admin', null); setAdmin(null); }}>Log out</button></span>
-      <ProgrammeEditor code={code} admin={admin} info={info} onSaved={(i) => { setInfo(i); void refresh(); }} />
+      <ProgrammeEditor key={`${info?.code}:${info?.cycleUpdatedAt ?? 0}`} code={code} admin={admin} info={info}
+        onSaved={(i) => { setInfo(i); void refresh(); }} onConflict={(i) => setInfo(i)} />
       <ScoresEditor code={code} admin={admin} info={info} onChanged={refresh} />
       <LeadsEditor code={code} admin={admin} info={info} onChanged={refresh} />
     </main>
   );
 }
 
-function ProgrammeEditor({ code, admin, info, onSaved }: { code: string; admin: string; info: ChoirInfo | null; onSaved: (i: ChoirInfo) => void }) {
-  const start = info?.cycle ?? loadCycle();
+function ProgrammeEditor({ code, admin, info, onSaved, onConflict }: { code: string; admin: string; info: ChoirInfo | null; onSaved: (i: ChoirInfo) => void; onConflict: (i: ChoirInfo) => void }) {
+  // A new programme starts empty (not from this admin's own phone, which may hold private scores).
+  const start: Partial<NonNullable<ChoirInfo['cycle']>> = info?.cycle ?? { name: 'This cycle', pieceIds: [] };
   const [name, setName] = useState(start.name ?? 'This cycle');
   const [ids, setIds] = useState<string[]>(start.pieceIds ?? []);
   const [focus, setFocus] = useState<string[]>(start.focusPieceIds ?? []);
@@ -189,7 +199,7 @@ function ProgrammeEditor({ code, admin, info, onSaved }: { code: string; admin: 
   const [time, setTime] = useState(start.rehearsalTime ?? '19:30');
   const [rehearsalDate, setRehearsalDate] = useState(start.rehearsalDate ?? '');
   const [concert, setConcert] = useState(start.concertDate ?? '');
-  const [wanted, setWanted] = useState<{ title: string; composer: string; note?: string }[]>(start.wanted ?? []);
+  const [wanted, setWanted] = useState<{ title: string; composer: string; note?: string }[]>((start.wanted ?? []).map((w) => ({ ...w, composer: w.composer ?? '' })));
   const [busy, setBusy] = useState(false);
   // Choose from built-in pieces and the choir's own scores (scores on one phone only can't be shared).
   const choices = allPieces().filter((p) => p.builtin && !p.id.includes('~') || p.id.startsWith(`choir-${code}-`));
@@ -241,11 +251,13 @@ function ProgrammeEditor({ code, admin, info, onSaved }: { code: string; admin: 
             ...(weekday >= 0 ? { rehearsalWeekday: weekday, rehearsalTime: time } : rehearsalDate ? { rehearsalDate } : {}),
             ...(concert ? { concertDate: concert } : {}),
             wanted: wanted.filter((w) => w.title.trim()),
+            base: info?.cycleUpdatedAt ?? 0,
           });
           toast('Programme published: members get it the next time they open the app');
           onSaved(i);
         } catch (e) {
           toast((e as Error).message);
+          if (e instanceof ChoirApiError && e.status === 409) fetchChoir(code).then(onConflict).catch(() => {});
         } finally {
           setBusy(false);
         }
@@ -333,32 +345,54 @@ export function SectionLead() {
   const [profile] = useProfile();
   const code = profile.choirCode;
   const [voice, setVoice] = useState<string>(['S', 'A', 'T', 'B'].includes(profile.voice) ? profile.voice : 'S');
-  const [auth, setAuth] = useState<{ lead?: string; admin?: string } | null>(() => {
+  // A section lead's password opens their own voice part only; a choir admin sees every section.
+  const [auth, setAuth] = useState<{ lead: string; voice: string } | { admin: string } | null>(() => {
     const lead = sessionSecret('lead');
+    const leadVoice = sessionSecret('leadVoice');
     const admin = sessionSecret('admin');
-    return lead ? { lead } : admin ? { admin } : null;
+    return lead && leadVoice ? { lead, voice: leadVoice } : admin ? { admin } : null;
   });
+  const shown = auth && 'lead' in auth ? auth.voice : voice;
   const [view, setView] = useState<SectionView | null>(null);
   const [err, setErr] = useState('');
   useEffect(() => {
     if (!auth || !code) return;
+    let alive = true;
     setErr('');
-    fetchSection(code, voice, auth).then(setView).catch((e) => { setView(null); setErr((e as Error).message); });
-  }, [auth, code, voice]);
+    setView(null);
+    fetchSection(code, shown, 'lead' in auth ? { lead: auth.lead } : { admin: auth.admin })
+      .then((v) => { if (alive) setView(v); })
+      .catch((e) => { if (alive) setErr((e as Error).message); });
+    return () => { alive = false; };
+  }, [auth, code, shown]);
   if (!apiBase()) return <main className="screen"><Top title="Section lead" /><Offline /></main>;
   if (!code) return <main className="screen"><Top title="Section lead" /><div className="notice">Join your choir first (Settings → Your choir).</div></main>;
+  const logout = () => { sessionSecret('lead', null); sessionSecret('leadVoice', null); if (auth && 'admin' in auth) sessionSecret('admin', null); setAuth(null); };
   return (
     <main className="screen">
       <Top title="Your section" />
-      <div className="chips" role="group" aria-label="Section">
-        {['S', 'A', 'T', 'B'].map((v) => <button key={v} className="chip" aria-pressed={voice === v} onClick={() => setVoice(v)}>{VOICE_NAME[v]}</button>)}
-      </div>
+      {auth && 'lead' in auth ? (
+        <span className="small muted">{VOICE_NAME[auth.voice]} · <button className="linklike" onClick={logout}>Log out</button></span>
+      ) : (
+        <>
+          {!auth && <span className="small">Which section do you lead?</span>}
+          <div className="chips" role="group" aria-label="Section">
+            {['S', 'A', 'T', 'B'].map((v) => <button key={v} className="chip" aria-pressed={voice === v} onClick={() => setVoice(v)}>{VOICE_NAME[v]}</button>)}
+          </div>
+          {auth && <span className="small muted">As choir admin you see every section · <button className="linklike" onClick={logout}>Log out</button></span>}
+        </>
+      )}
       {!auth ? (
-        <Gate label="Section-lead password" onSubmit={async (pw) => { await checkLead(code, voice, pw); sessionSecret('lead', pw); setAuth({ lead: pw }); }}>
+        <Gate label="Section-lead password" onSubmit={async (pw) => {
+          await checkLead(code, voice, pw);
+          sessionSecret('lead', pw);
+          sessionSecret('leadVoice', voice);
+          setAuth({ lead: pw, voice });
+        }}>
           <span className="small muted">Your choir admin gives each section lead a password.</span>
         </Gate>
       ) : err ? (
-        <div className="notice" role="alert">{err} <button className="linklike" onClick={() => { sessionSecret('lead', null); setAuth(null); }}>Log in again</button></div>
+        <div className="notice" role="alert">{err} <button className="linklike" onClick={logout}>Log in again</button></div>
       ) : !view ? (
         <span className="muted">Loading…</span>
       ) : (

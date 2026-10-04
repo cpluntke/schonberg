@@ -465,9 +465,15 @@ export class LiveScorer {
         if (Math.abs(median(jD)!) <= tolN) hitTime = jW.reduce((x, y) => x + y, 0) + excused;
       }
     }
-    const hitRatio = clamp(hitTime / Math.max(1e-3, bodyDur - excused), 0, 1);
+    let hitRatio = clamp(hitTime / Math.max(1e-3, bodyDur - excused), 0, 1);
     const voicedRatio = clamp(a.voicedTime / Math.max(1e-3, w.bodyEnd - w.bodyStart), 0, 1);
-    const medDev = jD.length ? median(jD) : median(a.devs);
+    let medDev = jD.length ? median(jD) : median(a.devs);
+    // Very short notes: what was sung is the median of the note's own readings (see shortNoteDev).
+    const shortDev = w.short ? shortNoteDev(a, tolN, this.opts.octaveTolerant) : null;
+    if (shortDev !== null) {
+      medDev = shortDev;
+      if (Math.abs(shortDev) <= tolN) hitRatio = 1;
+    }
     const tol = tolN;
     let grade: Grade =
       hitRatio >= 0.8 && medDev !== null && Math.abs(medDev) <= tol / 2 ? 'perfect'
@@ -548,6 +554,40 @@ export function judgedSpan(a: { w: NoteWindow; bT: number[]; bD: number[]; bW: n
     }
   }
   return { k0, k1, from, to: Math.max(to, from + 1e-3) };
+}
+
+/**
+ * Very short notes (fast passages). In ~0.1 s the voice rarely settles: it glides in, overshoots, and
+ * the next syllable's consonant cuts it off, so only one or two readings fall in the body (after
+ * the grace and tail), often mid-transition. What was sung for the note is better told by the median
+ * of all of its own readings from the written start to the written end (widened by SHORT_SLACK where
+ * a neighbour has another pitch): leading readings still nearer the previous pitch and trailing ones
+ * already nearer the next pitch are the transitions and are excused, up to the same caps as in
+ * judgedSpan (so a singer who stays on the previous pitch through the note is not excused).
+ * Returns the median deviation (cents), or null without readings inside the written note.
+ */
+export function shortNoteDev(a: { w: NoteWindow; nT: number[]; nD: number[] }, tol: number, octaveTolerant: boolean): number | null {
+  const w = a.w;
+  const end = w.start + w.note.dur;
+  const fold = (d: number) => (octaveTolerant ? d - 1200 * Math.round(d / 1200) : d);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const X = ((globalThis as any).__FAST ?? {}) as { side?: boolean; capS?: number; capE?: number };
+  // Out of tolerance, and nearer the neighbour's pitch than this note's.
+  const nearer = (d: number, other: number | null) => {
+    if (other === null || other === w.note.midi) return false;
+    const x = fold(d);
+    if (X.side) return Math.abs(x) > tol && Math.sign(x) === Math.sign(other - w.target);
+    return Math.abs(x) > tol && Math.abs(fold(d - 100 * (other - w.target))) < Math.abs(x);
+  };
+  const capStart = w.start + Math.min(TRANSITION_MAX, (X.capS ?? 0.35) * w.note.dur);
+  const capEnd = end - Math.min(RELEASE_MAX, (X.capE ?? 0.2) * w.note.dur);
+  let k0 = 0;
+  let k1 = a.nT.length;
+  while (k0 < k1 && a.nT[k0] <= capStart && nearer(a.nD[k0], w.legatoFrom)) k0++;
+  while (k1 > k0 && a.nT[k1 - 1] >= capEnd && nearer(a.nD[k1 - 1], w.legatoTo)) k1--;
+  let inside = false;
+  for (let k = k0; k < k1; k++) if (a.nT[k] >= w.start && a.nT[k] < end) inside = true;
+  return inside ? median(a.nD.slice(k0, k1)) : null;
 }
 
 /** Centred moving average whose window is shifted (not truncated) to stay inside the samples. */

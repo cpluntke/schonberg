@@ -228,7 +228,7 @@ function ChoirStep({ profile, update, onNext }: { profile: Profile; update: (p: 
         </div>
       ) : (
         <div className="card">
-          <span className="muted">Got a code from your choir? It brings in your choir's programme, its scores and its leaderboard.</span>
+          <span className="muted">Got a code from your choir? It brings in your choir's programme, its scores and its leaderboard (where your first name and progress are shown to the choir).</span>
           <JoinChoir onJoined={() => update({})} />
         </div>
       )}

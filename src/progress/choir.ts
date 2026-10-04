@@ -12,6 +12,8 @@ export interface ChoirInfo {
   cycle: (Omit<Cycle, 'preset'> & { name: string }) | null;
   pieces: ChoirPiece[];
   updatedAt: number;
+  /** When an admin last published the programme (score uploads don't change it). */
+  cycleUpdatedAt?: number;
   leads: string[];
 }
 
@@ -23,7 +25,8 @@ export class ChoirApiError extends Error {
 export function apiBase(): string | null {
   try {
     const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
-    const v = env?.VITE_LEADERBOARD_URL;
+    // Only builds served next to the choir server set this (the plain leaderboard server has no choirs).
+    const v = env?.VITE_CHOIR_URL;
     return v && v.trim() ? v.trim().replace(/\/$/, '') : null;
   } catch {
     return null;
@@ -33,13 +36,30 @@ export function apiBase(): string | null {
 /** Local id of a choir score (stable across phones). */
 export const choirPieceId = (code: string, serverId: string) => `choir-${code}-${serverId}`;
 
-async function call<T>(path: string, init: RequestInit & { admin?: string; superAdmin?: string; lead?: string } = {}): Promise<T> {
+/** Random id of this phone, so only this phone can update or withdraw the progress it shares. */
+export function memberToken(): string {
+  try {
+    let t = localStorage.getItem('sh:memberToken');
+    if (!t || t.length < 16) {
+      const a = new Uint8Array(16);
+      crypto.getRandomValues(a);
+      t = Array.from(a, (b) => b.toString(16).padStart(2, '0')).join('');
+      localStorage.setItem('sh:memberToken', t);
+    }
+    return t;
+  } catch {
+    return 'no-storage-' + Math.random().toString(16).slice(2).padEnd(16, '0');
+  }
+}
+
+async function call<T>(path: string, init: RequestInit & { admin?: string; superAdmin?: string; lead?: string; member?: boolean } = {}): Promise<T> {
   const base = apiBase();
   if (!base) throw new ChoirApiError(0, 'Choirs need the online version of the app.');
   const headers: Record<string, string> = { ...(init.headers as Record<string, string> | undefined) };
   if (init.admin) headers['X-Choir-Admin'] = init.admin;
   if (init.superAdmin) headers['X-Super-Admin'] = init.superAdmin;
   if (init.lead) headers['X-Section-Lead'] = init.lead;
+  if (init.member) headers['X-Member-Token'] = memberToken();
   let res: Response;
   try {
     res = await fetch(base + path, { ...init, headers });
@@ -77,9 +97,13 @@ export async function joinChoir(code: string): Promise<ChoirInfo> {
 
 export function leaveChoir(): void {
   const p = loadProfile();
-  saveProfile({ ...p, choirCode: undefined });
+  if (p.choirCode && p.shareProgress && p.name.trim()) withdrawProgress(p.choirCode, p.name.trim()).catch(() => {});
+  saveProfile({ ...p, choirCode: undefined, shareProgress: false });
   writeJSON(CACHE, null);
   try { localStorage.removeItem('sh:choirApplied'); } catch { /* ignore */ }
+  // The programme stays as the singer's own (no longer tied to the choir).
+  const c = loadCycle();
+  if (c.preset?.startsWith('choir:')) saveCycle({ ...c, preset: undefined });
 }
 
 /**
@@ -87,7 +111,9 @@ export function leaveChoir(): void {
  * programme when the choir changed it. Returns what happened. Never throws on a bad connection.
  */
 export async function syncChoir(importFile: (name: string, data: ArrayBuffer, meta: { id: string; title: string; composer: string }) => Promise<void>,
-  hasPiece: (id: string) => boolean): Promise<{ ok: boolean; newPieces: number; programme: boolean; error?: string }> {
+  hasPiece: (id: string) => boolean,
+  /** Pieces the singer imported on this phone: they stay in the cycle when the choir's programme arrives. */
+  isOwnPiece: (id: string) => boolean = () => false): Promise<{ ok: boolean; newPieces: number; programme: boolean; error?: string }> {
   const code = loadProfile().choirCode;
   if (!code || !apiBase()) return { ok: false, newPieces: 0, programme: false };
   let info: ChoirInfo;
@@ -98,9 +124,12 @@ export async function syncChoir(importFile: (name: string, data: ArrayBuffer, me
   }
   writeJSON(CACHE, info);
   let newPieces = 0;
+  let failed: string[] = [];
+  try { failed = JSON.parse(localStorage.getItem('sh:choirBadScores') ?? '[]'); } catch { /* ignore */ }
   for (const p of info.pieces) {
     const id = choirPieceId(info.code, p.id);
-    if (hasPiece(id)) continue;
+    // A score that didn't import once isn't downloaded again on every start.
+    if (hasPiece(id) || failed.includes(id)) continue;
     try {
       const res = await fetch(`${apiBase()}/choirs/${enc(info.code)}/pieces/${enc(p.id)}/file`);
       if (!res.ok) continue;
@@ -108,17 +137,20 @@ export async function syncChoir(importFile: (name: string, data: ArrayBuffer, me
       newPieces++;
     } catch (e) {
       console.warn('choir score', p.id, e);
+      failed = [...failed, id].slice(-50);
+      try { localStorage.setItem('sh:choirBadScores', JSON.stringify(failed)); } catch { /* ignore */ }
     }
   }
   // The programme: applied when the choir published a new version (local tweaks last until then).
   let programme = false;
-  const stamp = `${info.code}:${info.updatedAt}`;
+  const stamp = `${info.code}:${info.cycleUpdatedAt ?? info.updatedAt}`;
   let applied: string | null = null;
   try { applied = localStorage.getItem('sh:choirApplied'); } catch { /* ignore */ }
   if (info.cycle && applied !== stamp) {
     const c = info.cycle;
+    const own = loadCycle().pieceIds.filter((id) => isOwnPiece(id) && !c.pieceIds.includes(id));
     saveCycle({
-      ...loadCycle(), name: c.name, pieceIds: c.pieceIds, focusPieceIds: c.focusPieceIds ?? [],
+      ...loadCycle(), name: c.name, pieceIds: [...c.pieceIds, ...own], focusPieceIds: c.focusPieceIds ?? [],
       rehearsalWeekday: c.rehearsalWeekday, rehearsalTime: c.rehearsalTime, rehearsalDate: c.rehearsalDate,
       concertDate: c.concertDate, wanted: c.wanted ?? [], preset: `choir:${info.code}`,
     });
@@ -162,9 +194,9 @@ export function shareProgress(code: string, name: string, voice: string, pieces:
     for (const [m, s] of Object.entries(p.bars)) bars[m] = Math.round(s.ema * 100) / 100;
     body[id] = { readiness: p.readiness, level: p.level, bars };
   }
-  return call(`/choirs/${enc(code)}/progress/${enc(name)}`, { method: 'PUT', ...json({ voice, pieces: body }) });
+  return call(`/choirs/${enc(code)}/progress/${enc(name)}`, { method: 'PUT', member: true, ...json({ voice, pieces: body }) });
 }
-export const withdrawProgress = (code: string, name: string) => call(`/choirs/${enc(code)}/progress/${enc(name)}`, { method: 'DELETE' });
+export const withdrawProgress = (code: string, name: string) => call(`/choirs/${enc(code)}/progress/${enc(name)}`, { method: 'DELETE', member: true });
 
 // ------------------------------------------------------------------ super admin
 
@@ -178,7 +210,7 @@ export const superDelete = (pw: string, code: string) => call(`/super/choirs/${e
 
 // ------------------------------------------------------------------ remembered passwords (this tab only)
 
-export function sessionSecret(key: 'admin' | 'super' | 'lead', value?: string | null): string | null {
+export function sessionSecret(key: 'admin' | 'super' | 'lead' | 'leadVoice', value?: string | null): string | null {
   try {
     if (value === null) sessionStorage.removeItem(`sh:pw:${key}`);
     else if (value !== undefined) sessionStorage.setItem(`sh:pw:${key}`, value);

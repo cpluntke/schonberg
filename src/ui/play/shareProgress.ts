@@ -8,14 +8,34 @@ import { shareProgress, apiBase } from '../../progress/choir';
 import { getPiece, chosenPartId, singableSections } from '../library';
 
 const MIN_GAP_MS = 60_000;
+const ERR_KEY = 'sh:shareError';
+
+/** Why the last share didn't reach the choir (shown under the share switch), or null. */
+export function shareError(): string | null {
+  try { return localStorage.getItem(ERR_KEY); } catch { return null; }
+}
+function setShareError(msg: string | null) {
+  try {
+    if (msg) localStorage.setItem(ERR_KEY, msg);
+    else localStorage.removeItem(ERR_KEY);
+  } catch { /* ignore */ }
+}
 let last = 0;
 let timer: ReturnType<typeof setTimeout> | null = null;
 
 async function send(): Promise<void> {
   const p = loadProfile();
   if (!p.choirCode || !p.shareProgress || !p.name.trim() || !apiBase()) return;
+  if (!['S', 'A', 'T', 'B'].includes(p.voice)) {
+    setShareError('Choose soprano, alto, tenor or bass in Voice setup so your section lead can see your progress.');
+    return;
+  }
+  if (/[/\\?#%]/.test(p.name)) {
+    setShareError('Your name can’t contain / \\ ? # or %. Change it in Voice setup.');
+    return;
+  }
   const pieces: Record<string, { readiness: number; level: number; bars: BarMap }> = {};
-  for (const id of loadCycle().pieceIds.slice(0, 40)) {
+  for (const id of loadCycle().pieceIds.slice(0, 30)) {
     const piece = getPiece(id);
     if (!piece) continue;
     const partId = chosenPartId(piece, p.voice);
@@ -28,8 +48,10 @@ async function send(): Promise<void> {
   last = Date.now();
   try {
     await shareProgress(p.choirCode, p.name.trim(), p.voice, pieces);
+    setShareError(null);
   } catch (e) {
     console.warn('share progress', e);
+    setShareError((e as Error).message);
   }
 }
 

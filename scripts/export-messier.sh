@@ -7,7 +7,7 @@ here="$(cd "$(dirname "$0")/.." && pwd)"
 target="${1:-$here/../messiermarathon}"
 [ -f "$target/app.py" ] || { echo "messiermarathon checkout not found at $target" >&2; exit 1; }
 cd "$here"
-VITE_LEADERBOARD_URL=/schonberg/api npm run build
+VITE_LEADERBOARD_URL=/schonberg/api VITE_CHOIR_URL=/schonberg/api npm run build
 rm -rf "$target/schonberg_dist"
 mkdir -p "$target/schonberg_dist"
 cp -a dist/. "$target/schonberg_dist/"

@@ -218,7 +218,7 @@ export function syncChoirNow(): Promise<Awaited<ReturnType<typeof syncChoir>>> {
       await saveImportedScore(score);
       pieces.set(score.id, makePiece(score));
       emit();
-    }, (id) => pieces.has(id)).finally(() => { syncing = null; emit(); });
+    }, (id) => pieces.has(id), (id) => !!pieces.get(id) && !pieces.get(id)!.builtin && !id.startsWith('choir-')).finally(() => { syncing = null; emit(); });
   }
   return syncing;
 }
