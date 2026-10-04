@@ -87,7 +87,7 @@ export const measured = (ms: number): Profile => ({ latencyMs: ms, source: 'meas
 /** The scoring functions the AFTER pipeline uses (swap for variants, e.g. another TRANSITION_MAX). */
 export interface AfterImpl {
   scoreAttempt: Scorer;
-  scoreAligned: (ctx: ScoringContext, samples: PitchSample[], opts: ScoringOptions, run: { rate: number; latencyMs: number; calibrated: boolean; liftSubharmonics?: boolean }) => curAlign.AlignedResult;
+  scoreAligned: (ctx: ScoringContext, samples: PitchSample[], opts: ScoringOptions, run: { rate: number; latencyMs: number; calibrated: boolean; liftSubharmonics?: boolean; maxTotalMs?: number }) => curAlign.AlignedResult;
   medianOnsetMs: (result: AttemptResult, rate: number, part?: Part) => number | null;
 }
 export const AFTER_CURRENT: AfterImpl = {
@@ -116,6 +116,10 @@ export interface RunSetup {
   to: number;
   level: number;
   microSeed: number;
+  /** Analysis window override (a real recording's sidecar windowN); default as the pipeline chooses. */
+  windowN?: number;
+  /** Scoring options override (a real recording's sidecar); default from the level, standard strictness. */
+  scoring?: ScoringOptions;
 }
 
 export interface SessionOutcome {
@@ -171,12 +175,12 @@ export function runSession(spec: PipelineSpec, setup: RunSetup, profile: Profile
   const { take, part, ctx, level } = setup;
   const L = levelSetup(level);
   const rate = take.rate;
-  const opts: ScoringOptions = { toleranceCents: L.toleranceCents, tuning: 'equal', octaveTolerant: false };
+  const opts: ScoringOptions = setup.scoring ?? { toleranceCents: L.toleranceCents, tuning: 'equal', octaveTolerant: false };
   const latencyUsed = profile.latencyMs > 0 ? profile.latencyMs : spec.estimateMs;
   // The app stops listening min(700, latency + 120) ms after the player ends.
   const stopSec = (setup.to - take.scoreTimeAtSample0) / rate + Math.min(0.7, latencyUsed / 1000 + 0.12);
   const after = spec.id === 'after';
-  const N = after ? windowFor(part.low, take.sampleRate) : 2048;
+  const N = setup.windowN ?? (after ? windowFor(part.low, take.sampleRate) : 2048);
   const all = readingsFor(take, `${spec.id}:${N}`, () =>
     trackOffline(take.pcm, take.sampleRate, { windowN: N, jitterMs: 3, seed: hashSeed('hop', setup.microSeed), impl: after ? PITCH_CURRENT : PITCH_HEAD }));
   const readings = all.filter((r) => r.centreSec + N / 2 / take.sampleRate <= stopSec);
@@ -210,6 +214,8 @@ export function runSession(spec: PipelineSpec, setup: RunSetup, profile: Profile
     const idx = plain.notes.map((n) => n.index);
     const al = impl.scoreAligned({ ...ctx, range: [Math.min(...idx), Math.max(...idx)] }, samples, opts, {
       rate, latencyMs: latencyUsed, calibrated, ...(pol.liftSubharmonics ? { liftSubharmonics: !opts.octaveTolerant } : {}),
+      // Play.tsx: the lag search never looks past a plausible total device delay (guide on: estimate + cap).
+      maxTotalMs: pol.guideLearnMaxAbove !== null && L.guide ? spec.estimateMs + pol.guideLearnMaxAbove : 450,
     });
     result = al.result;
     alignedMs = al.shiftMs;

@@ -41,7 +41,7 @@ function read(name: string): Any | null {
 }
 
 export function writeCurrentReport(): boolean {
-  if (!existsSync(PARTS) || readdirSync(PARTS).filter((f) => f.endsWith('.json')).length === 0) return false;
+  if (!existsSync(PARTS) || readdirSync(PARTS).filter((f: string) => f.endsWith('.json')).length === 0) return false;
   const meta = read('meta');
   const grid = [...(read('grid-l1') ?? []), ...(read('grid-l4') ?? [])];
   const seqL2 = read('seq-l2');
@@ -52,7 +52,8 @@ export function writeCurrentReport(): boolean {
   const fid = read('fidelity');
   const bleed = read('bleed');
   const abl = read('ablation');
-  writeFileSync(resolve(ROOT, 'qa/realism/out/report-current.json'), JSON.stringify({ meta, grid, seqL2, rep, sanity, violations, tm, fid, bleed, abl }, null, 1));
+  const roundtrip = read('roundtrip');
+  writeFileSync(resolve(ROOT, 'qa/realism/out/report-current.json'), JSON.stringify({ meta, grid, seqL2, rep, sanity, violations, tm, fid, bleed, abl, roundtrip }, null, 1));
 
   const L: string[] = [];
   L.push('# Realism: before / after the scoring fixes');
@@ -107,6 +108,7 @@ export function writeCurrentReport(): boolean {
       L.push(`- **Live cents bubble after a note change (good singer, L1):** readout toward the previous note beyond tolerance in ${pct(b('before', 'lagShare'))} → ${pct(b('after', 'lagShare'))} of changes (calibrated), ${pct(u('before', 'lagShare'))} → ${pct(u('after', 'lagShare'))} at true 280 ms uncalibrated (run 1); beyond the new note ${pct(b('before', 'overShare'))} → ${pct(b('after', 'overShare'))}; out of tolerance until ${f0(b('before', 'settleMs'))} → ${f0(b('after', 'settleMs'))} ms.`);
     }
   }
+  if (roundtrip) L.push(`- **Real-recording path** (16-bit WAV + current-app sidecar → \`scoreRecordingApp\`): accuracy ${pct(roundtrip.direct)} direct vs ${pct(roundtrip.viaWav)} via the file (shift ${roundtrip.alignedDirect} / ${roundtrip.alignedWav} ms).`);
   if (violations) L.push(`- **Sanity guard (current app):** ${violations.length ? `**${violations.length} violation(s)**: ${violations.join('; ')}` : 'all must-fail runs fail'}.`);
   L.push('');
 

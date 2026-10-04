@@ -5,35 +5,35 @@ The earlier synthetic tests used idealised singers: steady pitch, instant note c
 ## Run
 
 ```sh
-npx vitest run --config vitest.realism.config.ts                         # baseline: frozen HEAD scorer + tracker
-REALISM_IMPL=current npx vitest run --config vitest.realism.config.ts    # working tree (src/game/scoring.ts, src/audio/pitch.ts)
-REALISM_SEEDS=5 npx vitest run --config vitest.realism.config.ts         # fewer repeatability seeds (default 10)
+npx vitest run --config vitest.realism.config.ts                       # before/after comparison → docs/qa/realism-current.md
+REALISM_SEEDS=5 npx vitest run --config vitest.realism.config.ts       # fewer repeatability seeds (default 10)
+REALISM_BASELINE=1 npx vitest run --config vitest.realism.config.ts qa/realism/run.test.ts   # baseline-only report
 ```
 
-A full run takes about 4 minutes on 4 cores. All randomness is seeded, so a run is reproducible. Outputs:
+The default run takes about 2.5 minutes on 4 cores. It runs the `cmp-*.test.ts` files in parallel, and each writes a part to `out/parts/`. The global teardown (`global-setup.ts` → `report-current.ts`) merges the parts into `qa/realism/out/report-current.json` and `docs/qa/realism-current.md`. Hand-written notes in `observations-current.md` are spliced into that doc. Every take is rendered once and scored by both pipelines (`pipeline.ts`):
 
-| impl | JSON | Markdown |
-|---|---|---|
-| `head` (default) | `qa/realism/out/report.json` | `docs/qa/realism-baseline.md` |
-| `current` | `qa/realism/out/report-current.json` | `docs/qa/realism-current.md` |
+- **before**: the baseline app (frozen copies in `baseline/`, delay estimate 80 ms).
+- **after**: the current app in `src/`, used live with no copies. The `Play.tsx`/`session.ts` end-of-run policy (timing gate, learn cap, subharmonic lift) is read from the source by regex, so the emulation follows edits. The doc lists what was detected.
 
-It also writes an example take, `qa/realism/out/example-dieu-1-5-alto-L1-uncal200.wav`, with its `.json` sidecar. The take is scored again through `scoreRecording` as a round-trip check.
+`cmp-sanity.test.ts` fails when a bad or adversarial singer passes where it must not. That is the regression guard for exploits.
 
-The test fails only when a bad singer passes. One exception follows from the level design: a −40¢ flat singer may pass L1, because −40¢ is inside L1's ±50¢ window.
+`run.test.ts` (baseline only) writes `qa/realism/out/report.json` and `docs/qa/realism-baseline.md`. Generated files under `out/` (`parts/`, `variants/`, `*.wav`) are git-ignored.
 
 ## Files
 
 | file | what |
 |---|---|
-| `singer.ts` | `renderSinger(opts)`: the singer and channel model, 48 kHz mono Float32, plus the ground-truth f0 (`truthMidi` at 1 kHz). Defines the `SINGERS` and `CHANNELS` presets. |
-| `tracker.ts` | `trackOffline(pcm, sampleRate, { windowN, hopMs, jitterMs, quantum, untilSec, impl })`: the browser `PitchTracker`, run offline. |
-| `harness.ts` | `scorePcm`, `scoreRecording(wavPath, sidecar, scorer?)`, `readingsToSamples`, `oracleSamples`, `emulateLatencyLearn` (port of the Play.tsx delay learning), `gradeLetter`, `levelSetup`, the `Scorer` type and `SCORE_HEAD` / `SCORE_CURRENT`. |
-| `fidelity.ts` | Tracker vs truth error statistics, overshoot (voice vs tracker), per-note loss breakdown, and an emulation of the live cents bubble. |
-| `experiment.ts` | `runTake(cfg)`: one take end to end (render → track → score, plus oracle, loss and bubble). |
-| `run.test.ts` | The experiments and the report writers. |
-| `scores.ts` | Loads built-in pieces exactly as `library.ts` does: `noteRangeFor`, `findPart`. |
-| `wav.ts` | WAV reader (16/24-bit PCM, 32-bit float, any channel count mixed to mono) and a 16-bit writer. |
-| `baseline/` | Frozen copies of `src/game/scoring.ts`, `analysis.ts` and `src/audio/pitch.ts` at the baseline commit, so the baseline numbers do not move while `src/` changes. |
+| `singer.ts` | `renderSinger(opts)`: the singer and channel model, plus ground-truth f0. Presets in `SINGERS`, including adversarial ones (echo 300 ms, one note behind, late pitch arrival, exact 40 % wrong notes, flat −40¢) and `CHANNELS`. |
+| `tracker.ts` | `trackOffline(pcm, sampleRate, { windowN, hopMs, jitterMs, quantum, untilSec, impl })`. |
+| `pipeline.ts` | `runSession(BEFORE / AFTER, setup, profile)`: one practice run through the whole app pipeline. A `Profile` (stored delay, source, hint) carries over between runs. Also `PLAY_POLICY` and `afterScorerView`. |
+| `compare.ts`, `cmp-experiments.ts`, `cmp-*.test.ts` | Before/after experiments on shared renders. |
+| `report-current.ts`, `global-setup.ts`, `observations-current.md` | Merges the parts into the before/after doc. |
+| `variants.ts` | Generates copies of `src/game/scoring.ts` and `align.ts` with another `TRANSITION_MAX` (the sweep). |
+| `harness.ts` | `scoreRecording` (raw scorer path), `scoreRecordingApp` (current app end of run), `scorePcm`, `readingsToSamples`, `oracleSamples`, `emulateLatencyLearn` (old learning), `gradeLetter`, `levelSetup`, the `Scorer` type. |
+| `fidelity.ts` | Tracker vs truth, overshoot, loss breakdown, and the cents bubble (`reference: 'playhead' | 'sample'`). |
+| `experiment.ts`, `run.test.ts` | The original baseline experiments. |
+| `scores.ts`, `wav.ts`, `dsp.ts`, `prng.ts` | Piece loading, WAV I/O, DSP and the seeded RNG. |
+| `baseline/` | Frozen `scoring.ts`, `analysis.ts` and `pitch.ts` at the baseline commit 282d509. |
 
 ## Pipeline emulated
 
@@ -58,14 +58,18 @@ The app exports a 16-bit PCM WAV and a sidecar:
 ```json
 {"version":1,"pieceId":"debussy-dieu","partId":"P2","from":0.0,"to":15.0,"rate":0.7,"level":1,
  "toleranceCents":50,"tuning":"equal","octaveTolerant":true,"latencyMs":80,
- "sampleRate":48000,"scoreTimeAtSample0":-2.1}
+ "sampleRate":48000,"scoreTimeAtSample0":-2.1,"windowN":1024,"calibrated":false}
 ```
 
 `scoreTimeAtSample0` is the score time of the WAV's first sample, before latency compensation. Audio sample k plays at score time `scoreTimeAtSample0 + (k/sampleRate)·rate`.
 
 ```ts
 // e.g. in a scratch test file under qa/realism/ (run with the realism vitest config)
-import { scoreRecording, SCORE_HEAD, SCORE_CURRENT } from './harness';
+import { scoreRecording, scoreRecordingApp, SCORE_HEAD } from './harness';
+
+// Exactly what the current app shows (sidecar windowN, scoreAligned + subharmonic lift, timing gate):
+const app = await scoreRecordingApp('path/run.wav', 'path/run.json');
+console.log(app.letter, app.passed, app.alignedMs, app.timingFailMs, app.profile /* delay the app would store */);
 
 const r = await scoreRecording('path/take.wav', 'path/take.json');            // working-tree scorer
 const b = await scoreRecording('path/take.wav', 'path/take.json', SCORE_HEAD); // baseline scorer
@@ -86,9 +90,9 @@ const scorer: Scorer = (ctx, samples, opts) => scoreAttemptAligned(ctx, samples,
 await runTake({ target, singer: SINGERS.goodChoir, level: 4, latency: LATENCIES[1], performanceSeed: 1, microSeed: 1, scorer });
 ```
 
-`run.test.ts` takes its scorer and tracker from `REALISM_IMPL`. To compare a new end-of-run function, set `REALISM_IMPL=current` once it is the default `scoreAttempt`, or change the `SCORER` constant at the top of `run.test.ts`.
+For the full app end of run, pass an `AfterImpl` (`{ scoreAttempt, scoreAligned, medianOnsetMs }`) as `{ ...AFTER, impl }` to `runSession`. `variants.ts` does this for the TRANSITION_MAX sweep.
 
-## Experiments (run.test.ts)
+## Baseline experiments (run.test.ts)
 
 1. **Tracker fidelity:** good, operatic, control (no overshoot) and ringing voices, plus a speaker-bleed take, each with N=2048/hop 20, N=1024/hop 20 and N=1024/hop 10. Reports error statistics overall, near transitions and in steady parts; spikes > 50¢; octave errors; missed and false voicing; and overshoot (voice vs tracker).
 2. **Good singers** across 6 sections (warm-up chorale both halves, Debussy *Dieu!* Alto bars 1–5 and 6–13, *Tabourin* Alto solo bars 1–8 and 9–16) × L1/L4 × {calibrated, 200/80, 280/80}. Includes oracle scores, a loss breakdown, the cents bubble, and a bleed-level sweep (−18/−13/−8 dB).

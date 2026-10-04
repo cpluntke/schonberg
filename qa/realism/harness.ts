@@ -37,6 +37,10 @@ export interface Sidecar {
   sampleRate: number;
   /** Score time (before latency compensation) of the WAV's first sample. */
   scoreTimeAtSample0: number;
+  /** Analysis window the app used (current app exports it). */
+  windowN?: number;
+  /** The delay was measured with the delay check (current app exports it). */
+  calibrated?: boolean;
 }
 
 export interface LevelSetup {
@@ -135,7 +139,7 @@ export async function scorePcm(pcm: Float32Array, sc: Sidecar, o: ScoreOptions =
   if (!part) throw new Error(`Part ${sc.partId} not in ${sc.pieceId}`);
   const range = noteRangeFor(part, sc.from, sc.to);
   if (!range) throw new Error('No notes in the section');
-  const readings = o.samples ? [] : trackOffline(pcm, sc.sampleRate, { untilSec: o.untilSec, ...o.track });
+  const readings = o.samples ? [] : trackOffline(pcm, sc.sampleRate, { untilSec: o.untilSec, windowN: sc.windowN, ...o.track });
   const samples = o.samples ?? readingsToSamples(readings, sc);
   const ctx: ScoringContext = { score: piece.score, part, range };
   const opts: ScoringOptions = { toleranceCents: sc.toleranceCents, tuning: sc.tuning, octaveTolerant: sc.octaveTolerant };
@@ -198,3 +202,29 @@ export function emulateLatencyLearn(
 }
 
 export { TRUTH_HZ };
+
+/**
+ * Score a real recording exactly as the CURRENT app does at the end of a run: raw readings with
+ * the sidecar's window → scoreAttempt → scoreAligned (+ subharmonic lift) → timing gate (L≥2, measured
+ * delay). Returns the pipeline outcome (result, alignedMs, timingFailMs, the delay the app would store…).
+ */
+export async function scoreRecordingApp(wavPath: string, sidecar: Sidecar | string) {
+  const { runSession, AFTER, measured } = await import('./pipeline');
+  const sc: Sidecar = typeof sidecar === 'string' ? JSON.parse(readFileSync(sidecar, 'utf8')) : sidecar;
+  const buf = readFileSync(wavPath);
+  const wav = readWav(new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength));
+  const piece = await loadPiece(sc.pieceId);
+  const part = piece.score.parts.find((p) => p.id === sc.partId);
+  if (!part) throw new Error(`Part ${sc.partId} not in ${sc.pieceId}`);
+  const range = noteRangeFor(part, sc.from, sc.to);
+  if (!range) throw new Error('No notes in the section');
+  const take = {
+    pcm: wav.pcm, sampleRate: wav.sampleRate, scoreTimeAtSample0: sc.scoreTimeAtSample0, rate: sc.rate, trueLatencyMs: NaN,
+    stopSec: wav.pcm.length / wav.sampleRate, truthMidi: new Float32Array(0), truthCentre: new Float32Array(0), notes: [],
+  };
+  const profile = sc.calibrated ? measured(sc.latencyMs) : { latencyMs: sc.latencyMs };
+  return runSession(AFTER, {
+    take, part, ctx: { score: piece.score, part, range }, from: sc.from, to: sc.to, level: sc.level ?? 1, microSeed: 1, windowN: sc.windowN,
+    scoring: { toleranceCents: sc.toleranceCents, tuning: sc.tuning, octaveTolerant: sc.octaveTolerant },
+  }, profile);
+}

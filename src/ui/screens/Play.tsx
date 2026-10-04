@@ -142,7 +142,10 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
       const al = scoreAligned(
         { score: piece.score, part, range: [Math.min(...idx), Math.max(...idx)] },
         sess.samples, sess.cfg.scoring,
-        { rate: sess.cfg.rate, latencyMs: sess.latencyMs, calibrated, liftSubharmonics: !sess.cfg.scoring.octaveTolerant },
+        {
+          rate: sess.cfg.rate, latencyMs: sess.latencyMs, calibrated, liftSubharmonics: !sess.cfg.scoring.octaveTolerant,
+          maxTotalMs: sess.cfg.guide ? estimateLatencyMs() + GUIDE_LEARN_MAX_ABOVE : 450,
+        },
       );
       r = al.result;
       if (al.shiftMs !== 0) alignedMs = al.shiftMs;

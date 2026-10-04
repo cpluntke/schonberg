@@ -312,7 +312,8 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
       // Average over ~one vibrato cycle so the readout doesn't flicker.
       let sum = 0;
       let cnt = 0;
-      for (let k = s.samples.length - 1; k >= 0 && last.time - s.samples[k].time < 0.2; k--) {
+      // (only readings from this note: the previous pitch mustn't leak into the average)
+      for (let k = s.samples.length - 1; k >= 0 && last.time - s.samples[k].time < 0.2 && s.samples[k].time >= notes[heard].start; k--) {
         const mm = s.samples[k].midi;
         if (mm != null && Math.abs(mm - last.midi) < 1.5) { sum += mm; cnt++; }
       }

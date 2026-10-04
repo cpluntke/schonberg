@@ -21,7 +21,7 @@ This page is for singers and testers who want to know what the app is doing.
 For every note in your part:
 
 - **Intonation ("In tune").**
-  - Judging starts when your voice *arrives* within tolerance of the note: at most 0.25 s (and 35% of the note) after the written start. The glide into the note, the overshoot and a late consonant don't count.
+  - Judging starts when your voice *arrives* within tolerance of the note: at most 0.15 s (and 35% of the note) after the written start, plus the device delay the line-up corrects. The glide into the note, the overshoot and a late consonant don't count.
   - Judging stops when you head for the next note (at most 0.12 s early).
   - Vibrato is cancelled by two cascaded moving averages (≈180 ms and ≈220 ms). These remove vibratos from about 4 to 8 Hz almost completely, so a vibrato centred on the note counts as in tune.
   - A short dropout of the detector (up to 20% of the note) doesn't count against you.

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "pieceId": "debussy-dieu",
+  "partId": "P2",
+  "from": 0,
+  "to": 15,
+  "rate": 1,
+  "level": 2,
+  "toleranceCents": 35,
+  "tuning": "equal",
+  "octaveTolerant": false,
+  "latencyMs": 130,
+  "calibrated": false,
+  "sampleRate": 48000,
+  "scoreTimeAtSample0": -1,
+  "windowN": 1024
+}

@@ -120,13 +120,16 @@ export function scoreAligned(
   ctx: ScoringContext,
   samples: PitchSample[],
   opts: ScoringOptions,
-  run: { rate: number; latencyMs: number; calibrated: boolean; liftSubharmonics?: boolean },
+  run: { rate: number; latencyMs: number; calibrated: boolean; liftSubharmonics?: boolean; maxTotalMs?: number },
 ): AlignedResult {
   const rate = run.rate > 0 ? run.rate : 1;
   const prep = (xs: PitchSample[]) => (run.liftSubharmonics ? liftSubharmonics(ctx.part, xs) : xs);
   // Search a plausible range of device delays around the current setting (total ≥ ~20 ms).
   const lo = run.calibrated ? -0.08 : Math.max(-0.25, -(run.latencyMs - 20) / 1000);
-  const hi = run.calibrated ? 0.08 : 0.3;
+  // Never look further than a plausible total device delay (a singer one note behind mustn't be
+  // "lined up" with the next note).
+  const hiCap = run.maxTotalMs != null ? (run.maxTotalMs - run.latencyMs) / 1000 : 0.3;
+  const hi = run.calibrated ? 0.08 : Math.max(0, Math.min(0.3, hiCap));
   const estimate = estimateLag(ctx.part, ctx.range, samples, { minLag: Math.min(0, lo) * rate, maxLag: hi * rate, step: 0.01 * rate });
   const shiftMs = estimate.confident ? Math.round((estimate.lag / rate) * 1000) : 0;
   // Small shifts aren't worth second-guessing the delay setting for.

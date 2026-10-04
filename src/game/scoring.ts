@@ -30,10 +30,11 @@ export const DEFAULT_VIBRATO_WINDOW = 0.18;
 /**
  * A voice needs a moment to settle on a new pitch: it glides, overshoots and rings for ~0.1–0.3 s,
  * and the device delay is never exact. Intonation is judged from when the voice arrives within
- * tolerance, up to this many seconds (and 35% of the note) after the written start. Coming in
+ * tolerance, up to this many seconds (and 35% of the note) after the written start (plus
+ * whatever the line-up of the run corrects for the device delay). Coming in
  * late is a timing matter (onset), not an intonation one.
  */
-export const TRANSITION_MAX = 0.25;
+export const TRANSITION_MAX = 0.15;
 /** Likewise at the end of a note that leads into another: moving early / the next consonant. */
 export const RELEASE_MAX = 0.12;
 /** Gaps in the voiced readings shorter than this inside a note (tracker dropouts, an inner consonant) aren't penalised. */

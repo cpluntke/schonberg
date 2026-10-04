@@ -12,11 +12,13 @@ it('sanity and adversarial singers (before vs after)', async () => {
   for (const r of rows) {
     const after = r.chains.find((c) => c.label === 'after')!;
     after.runs.forEach((x, k) => {
+      void k;
       const mustFail =
         r.singer === SINGERS.wrongNotes.name || r.singer === SINGERS.oneBehind.name ||
         (r.singer === SINGERS.flat40.name && r.level >= 2) ||
-        // The echo singer must not pass L2+ once the delay is trusted (measured; or learned, run ≥ 3).
-        (r.singer === SINGERS.echo300.name && r.level >= 2 && (r.latency.startsWith('measured') || k >= 2));
+        // The echo singer must not pass L2+ when the delay is measured (a learned delay can't tell
+        // device delay from late singing, so passing there is by design).
+        (r.singer === SINGERS.echo300.name && r.level >= 2 && r.latency.startsWith('measured'));
       if (mustFail && x.passed) bad.push(`${r.singer} ${r.target} L${r.level} ${r.latency} run ${k + 1}`);
     });
   }
