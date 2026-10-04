@@ -9,6 +9,20 @@ import { LEVELS, pieceReadiness, nextStep, sectionStatus } from '../../progress/
 import { IconBack, IconEar, IconCube, IconPlay } from '../icons';
 import { voiceName } from './Home';
 
+/** First few words of the lyric in a section, to recognise the phrase. */
+function snippet(part: { notes: { start: number; lyric?: string; syllabic?: string }[] }, from: number, to: number): string {
+  let out = '';
+  let open = false;
+  for (const n of part.notes) {
+    if (n.start < from - 1e-6 || n.start >= to - 1e-6 || !n.lyric) continue;
+    const cont = open && (n.syllabic === 'middle' || n.syllabic === 'end');
+    out += (cont || !out ? '' : ' ') + n.lyric;
+    open = n.syllabic === 'begin' || n.syllabic === 'middle';
+    if (out.length > 26 && !open) break;
+  }
+  return out.trim();
+}
+
 const SHORT: Record<number, string> = { 1: 'Learn', 2: 'In time', 3: 'Alone', 4: 'Concert' };
 
 export function PieceScreen({ pieceId }: { pieceId: string }) {
@@ -110,6 +124,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
               <div className="row">
                 <div className="col grow" style={{ gap: 2 }}>
                   <span style={{ fontWeight: 700 }}>{s.label}</span>
+                  {snippet(part!, s.start, s.end) && <span className="small ellipsis" style={{ color: 'var(--accent-text)', fontStyle: 'italic' }}>“{snippet(part!, s.start, s.end)}…”</span>}
                   <span className="tiny muted">
                     {isDue ? 'Due for review' : status === 'new' ? 'Not started' : `Level ${lvl}${sp?.best?.[lvl] != null ? ` · best ${Math.round(sp.best[lvl] * 100)}%` : ''}`}
                   </span>
