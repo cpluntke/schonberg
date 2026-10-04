@@ -180,7 +180,7 @@ function Notice() {
   return (
     <div className="notice info row" role="status">
       <span className="grow small">{msg}</span>
-      <button className="btn ghost small" onClick={() => { localStorage.removeItem('sh:notice'); setMsg(null); }}>OK</button>
+      <button className="btn ghost small" onClick={() => { try { localStorage.removeItem('sh:notice'); } catch { /* blocked */ } setMsg(null); }}>OK</button>
     </div>
   );
 }

@@ -69,7 +69,9 @@ export function go(r: Route, replace = false) {
 }
 
 export function back(fallback: Route = { name: 'home' }) {
-  if (history.length > 1 && sessionStorage.getItem('sh:navd') === '1') history.back();
+  let navd = false;
+  try { navd = sessionStorage.getItem('sh:navd') === '1'; } catch { /* storage blocked */ }
+  if (history.length > 1 && navd) history.back();
   else go(fallback, true);
 }
 
@@ -77,7 +79,7 @@ export function useRoute(): Route {
   const [route, setRoute] = useState(() => parseHash(location.hash));
   useEffect(() => {
     const on = () => {
-      sessionStorage.setItem('sh:navd', '1');
+      try { sessionStorage.setItem('sh:navd', '1'); } catch { /* storage blocked */ }
       setRoute(parseHash(location.hash));
       window.scrollTo(0, 0);
     };

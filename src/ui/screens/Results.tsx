@@ -9,7 +9,7 @@ import type { Insight } from '../../game/types';
 
 /** Start a run from Results; replace the history entry so "back" from the run doesn't land on stale results. */
 function goPlay(r: Parameters<typeof go>[0]) {
-  sessionStorage.setItem('sh:fromResults', '1');
+  try { sessionStorage.setItem('sh:fromResults', '1'); } catch { /* storage blocked */ }
   go(r, true);
 }
 

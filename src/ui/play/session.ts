@@ -208,6 +208,11 @@ export class PracticeSession {
     this.simTimer = null;
   }
 
+  /** True when the microphone went away during this session (unplugged, taken by another app). */
+  get micLost(): boolean {
+    return !!this.tracker && !this.tracker.alive;
+  }
+
   /** Score time where the current/next playback starts (section start or resume point). */
   get resumePoint(): number {
     return this.resumeFrom;

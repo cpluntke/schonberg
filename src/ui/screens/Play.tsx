@@ -42,6 +42,7 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
   const [firstTime] = useState(() => {
     try {
       if (route.mode !== '2d' || route.level === 0) return false;
+      if (typeof matchMedia === 'function' && matchMedia('(max-height: 520px)').matches) return false; // hidden in landscape
       return localStorage.getItem('sh:seenHowto') !== '1';
     } catch { return false; }
   });
@@ -64,8 +65,12 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
   const fxRef = useRef(newFx());
   const fromResultsRef = useRef<boolean | null>(null);
   if (fromResultsRef.current === null) {
-    fromResultsRef.current = sessionStorage.getItem('sh:fromResults') === '1';
-    sessionStorage.removeItem('sh:fromResults');
+    try {
+      fromResultsRef.current = sessionStorage.getItem('sh:fromResults') === '1';
+      sessionStorage.removeItem('sh:fromResults');
+    } catch {
+      fromResultsRef.current = false;
+    }
   }
 
   const range = piece && part && section ? noteRangeFor(piece, part.id, section.start, section.end) : null;
@@ -127,7 +132,16 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
         .map((n) => n.onsetMs!)
         .sort((a, b) => a - b) as number[];
       // Few entries in this section? Every onset shifts with the delay, so use all of them.
-      const allOnsets = r.notes.filter((n) => n.onsetMs != null).map((n) => n.onsetMs!).sort((a, b) => a - b);
+      // (Skip repeated pitches sung legato: their "onset" is just the held voice, at ~0 ms.)
+      const allOnsets = r.notes
+        .filter((n) => {
+          if (n.onsetMs == null) return false;
+          const prev = n.index > 0 ? part.notes[n.index - 1] : null;
+          const cur = part.notes[n.index];
+          return !(prev && prev.midi === cur.midi && cur.start - (prev.start + prev.dur) < 0.25);
+        })
+        .map((n) => n.onsetMs!)
+        .sort((a, b) => a - b);
       const useAll = entryOnsets.length < 2 && allOnsets.length >= 6;
       if (useAll) entryOnsets.splice(0, entryOnsets.length, ...allOnsets);
       if (entryOnsets.length >= 2) {
@@ -241,6 +255,11 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
 
       if (ts - lastHud > 90) {
         lastHud = ts;
+        if (s && s.micLost && (s.phase === 'playing' || s.phase === 'countin')) {
+          s.pause();
+          setMicMsg('The microphone disconnected (headset unplugged or another app took it). Plug it back in and try again.');
+          setPhase('micError');
+        }
         let count = 0;
         if (s && s.phase === 'countin') {
           const target = sessionStartTarget(s, section.start);

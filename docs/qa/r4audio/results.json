@@ -1,0 +1,8931 @@
+{
+ "warmup-chorale|L2|ok": {
+  "piece": "warmup-chorale",
+  "part": "P2",
+  "section": "s1-m7-12",
+  "level": 2,
+  "case": "ok",
+  "wallSec": 24.608,
+  "passed": true,
+  "accuracy": 1,
+  "pitch": 1,
+  "rhythm": 1,
+  "score": 3900,
+  "counts": {
+   "perfect": 21,
+   "good": 0,
+   "ok": 0,
+   "miss": 0
+  },
+  "nNotes": 21,
+  "scheduled": 21,
+  "medOnsetMs": 48.435374149661925,
+  "medCents": 0.008795482921186704,
+  "insights": [
+   "great: Excellent run"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 60,
+  "banner": "Level 2 reached: In time! ",
+  "scoreText": "3,900",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.465260770975059,
+     "from": 20.833333333333332,
+     "to": 40.833333333333336,
+     "rate": 1,
+     "now": 0.03192743764172336,
+     "countIn": 4
+    }
+   ],
+   "scheduled": 21,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 7–12 · ALTO · L2 IN TIME Abendlied (Warm-up Chorale) Level 2 reached: In time! S 3,900 100% accuracy In tune 100% avg ±0¢ Rhythm 100% Best combo 21 perfect 21 · good 0 · ok 0 · miss 0 Bar by bar tap a bar to loop it 7 8 9 10 11 12 solid ok needs work bars 7–12 Coach notes Excellent run 100% accuracy across bars 7–12. Move on to the next level or the next section. Next: Upbeat–bar 6, level 1 Again All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    21,
+    "perfect",
+    0,
+    22,
+    1
+   ],
+   [
+    22,
+    "perfect",
+    0,
+    10,
+    1
+   ],
+   [
+    23,
+    "perfect",
+    0,
+    15,
+    1
+   ],
+   [
+    24,
+    "perfect",
+    0,
+    44,
+    1
+   ],
+   [
+    25,
+    "perfect",
+    0,
+    49,
+    1
+   ],
+   [
+    26,
+    "perfect",
+    0,
+    17,
+    1
+   ],
+   [
+    27,
+    "perfect",
+    0,
+    48,
+    1
+   ],
+   [
+    28,
+    "perfect",
+    0,
+    57,
+    1
+   ],
+   [
+    29,
+    "perfect",
+    0,
+    42,
+    1
+   ],
+   [
+    30,
+    "perfect",
+    0,
+    50,
+    1
+   ],
+   [
+    31,
+    "perfect",
+    0,
+    56,
+    1
+   ],
+   [
+    32,
+    "perfect",
+    0,
+    64,
+    1
+   ],
+   [
+    33,
+    "perfect",
+    0,
+    49,
+    1
+   ],
+   [
+    34,
+    "perfect",
+    0,
+    63,
+    1
+   ],
+   [
+    35,
+    "perfect",
+    0,
+    48,
+    1
+   ],
+   [
+    36,
+    "perfect",
+    0,
+    57,
+    1
+   ],
+   [
+    37,
+    "perfect",
+    0,
+    4,
+    1
+   ],
+   [
+    38,
+    "perfect",
+    0,
+    10,
+    1
+   ],
+   [
+    39,
+    "perfect",
+    0,
+    15,
+    1
+   ],
+   [
+    40,
+    "perfect",
+    0,
+    64,
+    1
+   ],
+   [
+    41,
+    "perfect",
+    0,
+    49,
+    1
+   ]
+  ]
+ },
+ "warmup-chorale|L2|flat30": {
+  "piece": "warmup-chorale",
+  "part": "P2",
+  "section": "s1-m7-12",
+  "level": 2,
+  "case": "flat30",
+  "wallSec": 24.619,
+  "passed": true,
+  "accuracy": 0.8499999999999999,
+  "pitch": 0.9369045348446414,
+  "rhythm": 1,
+  "score": 2730,
+  "counts": {
+   "perfect": 0,
+   "good": 21,
+   "ok": 0,
+   "miss": 0
+  },
+  "nNotes": 21,
+  "scheduled": 21,
+  "medOnsetMs": 52.24489795918075,
+  "medCents": -30.004093428811984,
+  "insights": [
+   "flat-overall: You tend to sing flat"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 60,
+  "banner": "Level 2 reached: In time! ",
+  "scoreText": "2,730",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.453650793650796,
+     "from": 20.833333333333332,
+     "to": 40.833333333333336,
+     "rate": 1,
+     "now": 0.03192743764172336,
+     "countIn": 4
+    }
+   ],
+   "scheduled": 21,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 7–12 · ALTO · L2 IN TIME Abendlied (Warm-up Chorale) Level 2 reached: In time! B 2,730 85% accuracy In tune 94% avg −30¢ Rhythm 100% Best combo 21 perfect 0 · good 21 · ok 0 · miss 0 Bar by bar tap a bar to loop it 7 8 9 10 11 12 solid ok needs work bars 7–12 Coach notes You tend to sing flat Overall you sat about 30 cents under the pitch, most clearly in bars 9–12. Keep the sound bright and the breath moving; think each note slightly higher than you feel it. Loop bars 9–12 slowly Next: Upbeat–bar 6, level 1 Again All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    21,
+    "good",
+    -30,
+    24,
+    0.92
+   ],
+   [
+    22,
+    "good",
+    -30,
+    21,
+    0.93
+   ],
+   [
+    23,
+    "good",
+    -30,
+    18,
+    0.94
+   ],
+   [
+    24,
+    "good",
+    -30,
+    64,
+    0.92
+   ],
+   [
+    25,
+    "good",
+    -30,
+    52,
+    0.93
+   ],
+   [
+    26,
+    "good",
+    -30,
+    17,
+    1
+   ],
+   [
+    27,
+    "good",
+    -30,
+    51,
+    0.93
+   ],
+   [
+    28,
+    "good",
+    -30,
+    57,
+    0.94
+   ],
+   [
+    29,
+    "good",
+    -30,
+    65,
+    0.93
+   ],
+   [
+    30,
+    "good",
+    -30,
+    50,
+    0.93
+   ],
+   [
+    31,
+    "good",
+    -30,
+    59,
+    0.94
+   ],
+   [
+    32,
+    "good",
+    -30,
+    64,
+    0.92
+   ],
+   [
+    33,
+    "good",
+    -30,
+    52,
+    1
+   ],
+   [
+    34,
+    "good",
+    -30,
+    63,
+    0.92
+   ],
+   [
+    35,
+    "good",
+    -30,
+    51,
+    0.93
+   ],
+   [
+    36,
+    "good",
+    -30,
+    57,
+    0.94
+   ],
+   [
+    37,
+    "good",
+    -30,
+    4,
+    0.92
+   ],
+   [
+    38,
+    "good",
+    -30,
+    13,
+    0.93
+   ],
+   [
+    39,
+    "good",
+    -30,
+    18,
+    0.94
+   ],
+   [
+    40,
+    "good",
+    -30,
+    64,
+    0.92
+   ],
+   [
+    41,
+    "good",
+    -30,
+    52,
+    1
+   ]
+  ]
+ },
+ "warmup-chorale|L2|late150": {
+  "piece": "warmup-chorale",
+  "part": "P2",
+  "section": "s1-m7-12",
+  "level": 2,
+  "case": "late150",
+  "wallSec": 24.584,
+  "passed": true,
+  "accuracy": 0.9357142857142856,
+  "pitch": 0.8523140322838794,
+  "rhythm": 0.813276104092436,
+  "score": 3390,
+  "counts": {
+   "perfect": 12,
+   "good": 9,
+   "ok": 0,
+   "miss": 0
+  },
+  "nNotes": 21,
+  "scheduled": 21,
+  "medOnsetMs": 203.53741496598232,
+  "medCents": 0.025152518335858076,
+  "insights": [
+   "scooping: Scooping up into notes",
+   "great: Excellent run"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 60,
+  "banner": "Level 2 reached: In time! ",
+  "scoreText": "3,390",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.453650793650796,
+     "from": 20.833333333333332,
+     "to": 40.833333333333336,
+     "rate": 1,
+     "now": 0.029024943310657598,
+     "countIn": 4
+    }
+   ],
+   "scheduled": 21,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 7–12 · ALTO · L2 IN TIME Abendlied (Warm-up Chorale) Level 2 reached: In time! A 3,390 94% accuracy In tune 85% avg ±0¢ Rhythm 81% Best combo 21 perfect 12 · good 9 · ok 0 · miss 0 Bar by bar tap a bar to loop it 7 8 9 10 11 12 solid ok needs work bars 7–12 Coach notes Scooping up into notes 33% of your notes started from below and slid up (e.g. bars 9–11). Aim for the centre of the pitch from the very start: hear it first, then sing it on the consonant. Loop bars 9–11 slowly Excellent run 94% accuracy across bars 7–12. Polish the point above, then move on. Next: Upbeat–bar 6, level 1 Again All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    21,
+    "perfect",
+    0,
+    164,
+    0.9
+   ],
+   [
+    22,
+    "perfect",
+    0,
+    13,
+    1
+   ],
+   [
+    23,
+    "perfect",
+    0,
+    18,
+    1
+   ],
+   [
+    24,
+    "perfect",
+    0,
+    203,
+    0.84
+   ],
+   [
+    25,
+    "perfect",
+    0,
+    212,
+    0.8
+   ],
+   [
+    26,
+    "perfect",
+    0,
+    17,
+    1
+   ],
+   [
+    27,
+    "good",
+    0,
+    211,
+    0.77
+   ],
+   [
+    28,
+    "good",
+    0,
+    199,
+    0.77
+   ],
+   [
+    29,
+    "perfect",
+    0,
+    204,
+    0.84
+   ],
+   [
+    30,
+    "good",
+    0,
+    210,
+    0.78
+   ],
+   [
+    31,
+    "good",
+    0,
+    218,
+    0.71
+   ],
+   [
+    32,
+    "good",
+    0,
+    204,
+    0.73
+   ],
+   [
+    33,
+    "perfect",
+    0,
+    212,
+    0.89
+   ],
+   [
+    34,
+    "good",
+    0,
+    205,
+    0.73
+   ],
+   [
+    35,
+    "good",
+    0,
+    211,
+    0.77
+   ],
+   [
+    36,
+    "good",
+    0,
+    199,
+    0.74
+   ],
+   [
+    37,
+    "perfect",
+    0,
+    4,
+    1
+   ],
+   [
+    38,
+    "perfect",
+    0,
+    13,
+    1
+   ],
+   [
+    39,
+    "perfect",
+    0,
+    18,
+    1
+   ],
+   [
+    40,
+    "good",
+    0,
+    204,
+    0.73
+   ],
+   [
+    41,
+    "perfect",
+    0,
+    212,
+    0.91
+   ]
+  ]
+ },
+ "warmup-chorale|L2|late150-uncal": {
+  "piece": "warmup-chorale",
+  "part": "P2",
+  "section": "s1-m7-12",
+  "level": 2,
+  "case": "late150-uncal",
+  "wallSec": 24.6,
+  "passed": true,
+  "accuracy": 0.9642857142857143,
+  "pitch": 0.8986406772091472,
+  "rhythm": 0.9028803584926112,
+  "score": 3570,
+  "counts": {
+   "perfect": 16,
+   "good": 5,
+   "ok": 0,
+   "miss": 0
+  },
+  "nNotes": 21,
+  "scheduled": 21,
+  "medOnsetMs": 152.58503401360102,
+  "medCents": 0.02184686171347039,
+  "insights": [
+   "scooping: Scooping up into notes",
+   "great: Excellent run"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 0,
+  "banner": "Level 2 reached: In time! ",
+  "scoreText": "3,570",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.465260770975059,
+     "from": 20.833333333333332,
+     "to": 40.833333333333336,
+     "rate": 1,
+     "now": 0.040634920634920635,
+     "countIn": 4
+    }
+   ],
+   "scheduled": 21,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 7–12 · ALTO · L2 IN TIME Abendlied (Warm-up Chorale) Level 2 reached: In time! S 3,570 96% accuracy In tune 90% avg ±0¢ Rhythm 90% Best combo 21 perfect 16 · good 5 · ok 0 · miss 0 Bar by bar tap a bar to loop it 7 8 9 10 11 12 solid ok needs work bars 7–12 Coach notes Scooping up into notes 33% of your notes started from below and slid up (e.g. bars 9–11). Aim for the centre of the pitch from the very start: hear it first, then sing it on the consonant. Loop bars 9–11 slowly Excellent run 96% accuracy across bars 7–12. Polish the point above, then move on. Next: Upbeat–bar 6, level 1 Again All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    21,
+    "perfect",
+    0,
+    113,
+    0.97
+   ],
+   [
+    22,
+    "perfect",
+    0,
+    20,
+    1
+   ],
+   [
+    23,
+    "perfect",
+    0,
+    8,
+    1
+   ],
+   [
+    24,
+    "perfect",
+    0,
+    153,
+    0.91
+   ],
+   [
+    25,
+    "perfect",
+    0,
+    161,
+    0.87
+   ],
+   [
+    26,
+    "perfect",
+    0,
+    7,
+    1
+   ],
+   [
+    27,
+    "perfect",
+    0,
+    160,
+    0.85
+   ],
+   [
+    28,
+    "perfect",
+    0,
+    145,
+    0.84
+   ],
+   [
+    29,
+    "perfect",
+    0,
+    154,
+    0.91
+   ],
+   [
+    30,
+    "perfect",
+    0,
+    159,
+    0.85
+   ],
+   [
+    31,
+    "good",
+    0,
+    167,
+    0.78
+   ],
+   [
+    32,
+    "good",
+    0,
+    153,
+    0.8
+   ],
+   [
+    33,
+    "perfect",
+    0,
+    161,
+    0.93
+   ],
+   [
+    34,
+    "good",
+    0,
+    152,
+    0.8
+   ],
+   [
+    35,
+    "perfect",
+    0,
+    160,
+    0.85
+   ],
+   [
+    36,
+    "good",
+    0,
+    166,
+    0.78
+   ],
+   [
+    37,
+    "perfect",
+    0,
+    14,
+    1
+   ],
+   [
+    38,
+    "perfect",
+    0,
+    20,
+    1
+   ],
+   [
+    39,
+    "perfect",
+    0,
+    5,
+    1
+   ],
+   [
+    40,
+    "good",
+    0,
+    153,
+    0.8
+   ],
+   [
+    41,
+    "perfect",
+    0,
+    161,
+    0.94
+   ]
+  ]
+ },
+ "warmup-chorale|L2|wrong": {
+  "piece": "warmup-chorale",
+  "part": "P2",
+  "section": "s1-m7-12",
+  "level": 2,
+  "case": "wrong",
+  "wallSec": 24.587,
+  "passed": false,
+  "accuracy": 0.5238095238095238,
+  "pitch": 0.5238095238095238,
+  "rhythm": 0.986902062412266,
+  "score": 1100,
+  "counts": {
+   "perfect": 11,
+   "good": 0,
+   "ok": 0,
+   "miss": 10
+  },
+  "nNotes": 21,
+  "scheduled": 21,
+  "medOnsetMs": 52.24489795918075,
+  "medCents": 0.01644313731077318,
+  "insights": [
+   "wrong-notes: Wrong notes in bars 8–11",
+   "leaps: Big leaps miss the target"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 60,
+  "banner": "Not yet: 52% of 80% needed. Use the tips below and try again.",
+  "scoreText": "1,100",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.453650793650796,
+     "from": 20.833333333333332,
+     "to": 40.833333333333336,
+     "rate": 1,
+     "now": 0.03192743764172336,
+     "countIn": 4
+    }
+   ],
+   "scheduled": 21,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 7–12 · ALTO · L2 IN TIME Abendlied (Warm-up Chorale) Not yet: 52% of 80% needed. Use the tips below and try again. C 1,100 52% accuracy In tune 52% avg ±0¢ Rhythm 99% Best combo 1 perfect 11 · good 0 · ok 0 · miss 10 Bar by bar tap a bar to loop it 7 8 9 10 11 12 solid ok needs work bars 7–12 Coach notes Wrong notes in bars 8–11 10 notes were sung clearly but too high, typically by about a semitone (bars 7, 8, 9, 10 and elsewhere). Learn the pitches first: loop these bars slowly with your part playing and note names on. Loop bars 8–11 slowly Big leaps miss the target 3 of 3 leaps of a fourth or more landed off the note, worst in bars 10 and 11. Practise the leap slowly: sing the interval, check it against the piano, then put it back in tempo. Loop bars 10–11 slowly Try again Easier: level 1 All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    21,
+    "perfect",
+    0,
+    24,
+    1
+   ],
+   [
+    22,
+    "miss",
+    100,
+    13,
+    0
+   ],
+   [
+    23,
+    "perfect",
+    0,
+    38,
+    1
+   ],
+   [
+    24,
+    "miss",
+    100,
+    64,
+    0
+   ],
+   [
+    25,
+    "perfect",
+    0,
+    52,
+    1
+   ],
+   [
+    26,
+    "miss",
+    100,
+    17,
+    0
+   ],
+   [
+    27,
+    "perfect",
+    0,
+    51,
+    1
+   ],
+   [
+    28,
+    "miss",
+    100,
+    57,
+    0
+   ],
+   [
+    29,
+    "perfect",
+    0,
+    4,
+    1
+   ],
+   [
+    30,
+    "miss",
+    100,
+    50,
+    0
+   ],
+   [
+    31,
+    "perfect",
+    0,
+    59,
+    1
+   ],
+   [
+    32,
+    "miss",
+    100,
+    64,
+    0
+   ],
+   [
+    33,
+    "perfect",
+    0,
+    52,
+    1
+   ],
+   [
+    34,
+    "miss",
+    100,
+    63,
+    0
+   ],
+   [
+    35,
+    "perfect",
+    0,
+    11,
+    1
+   ],
+   [
+    36,
+    "miss",
+    100,
+    57,
+    0
+   ],
+   [
+    37,
+    "perfect",
+    0,
+    45,
+    1
+   ],
+   [
+    38,
+    "miss",
+    100,
+    210,
+    0
+   ],
+   [
+    39,
+    "perfect",
+    0,
+    38,
+    1
+   ],
+   [
+    40,
+    "miss",
+    100,
+    64,
+    0
+   ],
+   [
+    41,
+    "perfect",
+    0,
+    52,
+    1
+   ]
+  ]
+ },
+ "warmup-chorale|L2|silence": {
+  "piece": "warmup-chorale",
+  "part": "P2",
+  "section": "s1-m7-12",
+  "level": 2,
+  "case": "silence",
+  "wallSec": 24.593,
+  "passed": false,
+  "accuracy": 0,
+  "pitch": 0,
+  "rhythm": 0,
+  "score": 0,
+  "counts": {
+   "perfect": 0,
+   "good": 0,
+   "ok": 0,
+   "miss": 21
+  },
+  "nNotes": 21,
+  "scheduled": 0,
+  "medOnsetMs": null,
+  "medCents": null,
+  "insights": [
+   "quiet: We could hardly hear you",
+   "missed-notes: Trouble spot: bars 7–10",
+   "leaps: Big leaps miss the target"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 60,
+  "banner": "Not yet: 0% of 80% needed. Use the tips below and try again.",
+  "scoreText": "0",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.453650793650796,
+     "from": 20.833333333333332,
+     "to": 40.833333333333336,
+     "rate": 1,
+     "now": 0.03192743764172336,
+     "countIn": 4
+    }
+   ],
+   "scheduled": 0,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 7–12 · ALTO · L2 IN TIME Abendlied (Warm-up Chorale) Not yet: 0% of 80% needed. Use the tips below and try again. D 0 0% accuracy In tune 0% Rhythm 0% Best combo 0 perfect 0 · good 0 · ok 0 · miss 21 Bar by bar tap a bar to loop it 7 8 9 10 11 12 solid ok needs work bars 7–12 Coach notes We could hardly hear you Your voice was detected on only a small part of the notes. Sing out at rehearsal volume, keep the phone 20–50 cm away, and check that the microphone isn’t blocked or muted. The Tuner in Settings shows whether your voice comes through. Trouble spot: bars 7–10 Only 0% of the notes in bars 7–10 landed. Loop these bars slowly with your part playing until the notes are secure, then take the support away. Loop bars 7–10 slowly Big leaps miss the target 3 of 3 leaps of a fourth or more landed off the note, worst in bars 10 and 11. Practise the leap slowly: sing the interval, check it against the piano, then put it back in tempo. Loop bars 10–11 slowly Try again Easier: level 1 All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    21,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    22,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    23,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    24,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    25,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    26,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    27,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    28,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    29,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    30,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    31,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    32,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    33,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    34,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    35,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    36,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    37,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    38,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    39,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    40,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    41,
+    "miss",
+    null,
+    null,
+    0
+   ]
+  ]
+ },
+ "warmup-chorale|L3|ok": {
+  "piece": "warmup-chorale",
+  "part": "P2",
+  "section": "s1-m7-12",
+  "level": 3,
+  "case": "ok",
+  "wallSec": 24.589,
+  "passed": true,
+  "accuracy": 1,
+  "pitch": 1,
+  "rhythm": 1,
+  "score": 3900,
+  "counts": {
+   "perfect": 21,
+   "good": 0,
+   "ok": 0,
+   "miss": 0
+  },
+  "nNotes": 21,
+  "scheduled": 21,
+  "medOnsetMs": 48.435374149661925,
+  "medCents": 0.008333995249643067,
+  "insights": [
+   "great: Excellent run"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 60,
+  "banner": "Level 3 reached: Independent! This section is rehearsal-ready.",
+  "scoreText": "3,900",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.465260770975059,
+     "from": 20.833333333333332,
+     "to": 40.833333333333336,
+     "rate": 1,
+     "now": 0.03192743764172336,
+     "countIn": 4
+    }
+   ],
+   "scheduled": 21,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 7–12 · ALTO · L3 INDEPENDENT Abendlied (Warm-up Chorale) Level 3 reached: Independent! This section is rehearsal-ready. S 3,900 100% accuracy In tune 100% avg ±0¢ Rhythm 100% Best combo 21 perfect 21 · good 0 · ok 0 · miss 0 Bar by bar tap a bar to loop it 7 8 9 10 11 12 solid ok needs work bars 7–12 Coach notes Excellent run 100% accuracy across bars 7–12. Move on to the next level or the next section. Next: Upbeat–bar 6, level 1 Again All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    21,
+    "perfect",
+    0,
+    22,
+    1
+   ],
+   [
+    22,
+    "perfect",
+    0,
+    10,
+    1
+   ],
+   [
+    23,
+    "perfect",
+    0,
+    15,
+    1
+   ],
+   [
+    24,
+    "perfect",
+    0,
+    44,
+    1
+   ],
+   [
+    25,
+    "perfect",
+    0,
+    49,
+    1
+   ],
+   [
+    26,
+    "perfect",
+    0,
+    17,
+    1
+   ],
+   [
+    27,
+    "perfect",
+    0,
+    48,
+    1
+   ],
+   [
+    28,
+    "perfect",
+    0,
+    57,
+    1
+   ],
+   [
+    29,
+    "perfect",
+    0,
+    42,
+    1
+   ],
+   [
+    30,
+    "perfect",
+    0,
+    50,
+    1
+   ],
+   [
+    31,
+    "perfect",
+    0,
+    56,
+    1
+   ],
+   [
+    32,
+    "perfect",
+    0,
+    64,
+    1
+   ],
+   [
+    33,
+    "perfect",
+    0,
+    49,
+    1
+   ],
+   [
+    34,
+    "perfect",
+    0,
+    63,
+    1
+   ],
+   [
+    35,
+    "perfect",
+    0,
+    48,
+    1
+   ],
+   [
+    36,
+    "perfect",
+    0,
+    57,
+    1
+   ],
+   [
+    37,
+    "perfect",
+    0,
+    4,
+    1
+   ],
+   [
+    38,
+    "perfect",
+    0,
+    10,
+    1
+   ],
+   [
+    39,
+    "perfect",
+    0,
+    15,
+    1
+   ],
+   [
+    40,
+    "perfect",
+    0,
+    64,
+    1
+   ],
+   [
+    41,
+    "perfect",
+    0,
+    49,
+    1
+   ]
+  ]
+ },
+ "warmup-chorale|L3|flat30": {
+  "piece": "warmup-chorale",
+  "part": "P2",
+  "section": "s1-m7-12",
+  "level": 3,
+  "case": "flat30",
+  "wallSec": 24.574,
+  "passed": false,
+  "accuracy": 0.49523809523809526,
+  "pitch": 0.4607717632423799,
+  "rhythm": 1,
+  "score": 1180,
+  "counts": {
+   "perfect": 0,
+   "good": 4,
+   "ok": 14,
+   "miss": 3
+  },
+  "nNotes": 21,
+  "scheduled": 21,
+  "medOnsetMs": 49.38775510203541,
+  "medCents": -30.006001268058924,
+  "insights": [
+   "leaps: Big leaps miss the target",
+   "missed-notes: Trouble spot: bars 9–12",
+   "flat-overall: You tend to sing flat"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 60,
+  "banner": "Not yet: 50% of 80% needed. Use the tips below and try again.",
+  "scoreText": "1,180",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.465260770975059,
+     "from": 20.833333333333332,
+     "to": 40.833333333333336,
+     "rate": 1,
+     "now": 0.03192743764172336,
+     "countIn": 4
+    }
+   ],
+   "scheduled": 21,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 7–12 · ALTO · L3 INDEPENDENT Abendlied (Warm-up Chorale) Not yet: 50% of 80% needed. Use the tips below and try again. D 1,180 50% accuracy In tune 46% avg −30¢ Rhythm 100% Best combo 15 perfect 0 · good 4 · ok 14 · miss 3 Bar by bar tap a bar to loop it 7 8 9 10 11 12 solid ok needs work bars 7–12 Coach notes Big leaps miss the target 2 of 3 leaps of a fourth or more landed off the note, worst in bars 10 and 11. Practise the leap slowly: sing the interval, check it against the piano, then put it back in tempo. Loop bars 10–11 slowly Trouble spot: bars 9–12 Only 44% of the notes in bars 9–12 landed. Loop these bars slowly with your part playing until the notes are secure, then take the support away. Loop bars 9–12 slowly You tend to sing flat Overall you sat about 30 cents under the pitch, most clearly in bars 9–12. Keep the sound bright and the breath moving; think each note slightly higher than you feel it. Loop bars 9–12 slowly Try again Easier: level 2 All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    21,
+    "good",
+    -30,
+    22,
+    0.63
+   ],
+   [
+    22,
+    "ok",
+    -30,
+    10,
+    0.48
+   ],
+   [
+    23,
+    "ok",
+    -30,
+    15,
+    0.46
+   ],
+   [
+    24,
+    "ok",
+    -30,
+    64,
+    0.45
+   ],
+   [
+    25,
+    "ok",
+    -30,
+    49,
+    0.42
+   ],
+   [
+    26,
+    "good",
+    -30,
+    17,
+    0.65
+   ],
+   [
+    27,
+    "ok",
+    -30,
+    48,
+    0.47
+   ],
+   [
+    28,
+    "ok",
+    -30,
+    57,
+    0.46
+   ],
+   [
+    29,
+    "good",
+    -30,
+    62,
+    0.63
+   ],
+   [
+    30,
+    "ok",
+    -30,
+    50,
+    0.42
+   ],
+   [
+    31,
+    "ok",
+    -30,
+    56,
+    0.48
+   ],
+   [
+    32,
+    "ok",
+    -30,
+    64,
+    0.46
+   ],
+   [
+    33,
+    "ok",
+    -30,
+    49,
+    0.44
+   ],
+   [
+    34,
+    "good",
+    -30,
+    63,
+    0.62
+   ],
+   [
+    35,
+    "ok",
+    -30,
+    48,
+    0.53
+   ],
+   [
+    36,
+    "miss",
+    -30,
+    57,
+    0.28
+   ],
+   [
+    37,
+    "ok",
+    -30,
+    4,
+    0.42
+   ],
+   [
+    38,
+    "miss",
+    -30,
+    10,
+    0.31
+   ],
+   [
+    39,
+    "miss",
+    -30,
+    15,
+    0.28
+   ],
+   [
+    40,
+    "ok",
+    -30,
+    64,
+    0.39
+   ],
+   [
+    41,
+    "ok",
+    -30,
+    49,
+    0.38
+   ]
+  ]
+ },
+ "warmup-chorale|L3|late150": {
+  "piece": "warmup-chorale",
+  "part": "P2",
+  "section": "s1-m7-12",
+  "level": 3,
+  "case": "late150",
+  "wallSec": 24.578,
+  "passed": true,
+  "accuracy": 0.9285714285714286,
+  "pitch": 0.847619577425988,
+  "rhythm": 0.813276104092436,
+  "score": 3360,
+  "counts": {
+   "perfect": 11,
+   "good": 10,
+   "ok": 0,
+   "miss": 0
+  },
+  "nNotes": 21,
+  "scheduled": 21,
+  "medOnsetMs": 203.53741496598232,
+  "medCents": 0.025152518335858076,
+  "insights": [
+   "scooping: Scooping up into notes",
+   "great: Excellent run"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 60,
+  "banner": "Level 3 reached: Independent! This section is rehearsal-ready.",
+  "scoreText": "3,360",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.453650793650796,
+     "from": 20.833333333333332,
+     "to": 40.833333333333336,
+     "rate": 1,
+     "now": 0.020317460317460317,
+     "countIn": 4
+    }
+   ],
+   "scheduled": 21,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 7–12 · ALTO · L3 INDEPENDENT Abendlied (Warm-up Chorale) Level 3 reached: Independent! This section is rehearsal-ready. A 3,360 93% accuracy In tune 85% avg ±0¢ Rhythm 81% Best combo 21 perfect 11 · good 10 · ok 0 · miss 0 Bar by bar tap a bar to loop it 7 8 9 10 11 12 solid ok needs work bars 7–12 Coach notes Scooping up into notes 33% of your notes started from below and slid up (e.g. bars 9–11). Aim for the centre of the pitch from the very start: hear it first, then sing it on the consonant. Loop bars 9–11 slowly Excellent run 93% accuracy across bars 7–12. Polish the point above, then move on. Next: Upbeat–bar 6, level 1 Again All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    21,
+    "perfect",
+    0,
+    164,
+    0.9
+   ],
+   [
+    22,
+    "perfect",
+    0,
+    13,
+    1
+   ],
+   [
+    23,
+    "perfect",
+    0,
+    18,
+    1
+   ],
+   [
+    24,
+    "perfect",
+    0,
+    203,
+    0.81
+   ],
+   [
+    25,
+    "good",
+    0,
+    212,
+    0.77
+   ],
+   [
+    26,
+    "perfect",
+    0,
+    17,
+    1
+   ],
+   [
+    27,
+    "good",
+    0,
+    211,
+    0.77
+   ],
+   [
+    28,
+    "good",
+    0,
+    199,
+    0.77
+   ],
+   [
+    29,
+    "perfect",
+    0,
+    204,
+    0.81
+   ],
+   [
+    30,
+    "good",
+    0,
+    210,
+    0.78
+   ],
+   [
+    31,
+    "good",
+    0,
+    218,
+    0.71
+   ],
+   [
+    32,
+    "good",
+    0,
+    204,
+    0.73
+   ],
+   [
+    33,
+    "perfect",
+    0,
+    212,
+    0.89
+   ],
+   [
+    34,
+    "good",
+    0,
+    205,
+    0.73
+   ],
+   [
+    35,
+    "good",
+    0,
+    211,
+    0.77
+   ],
+   [
+    36,
+    "good",
+    0,
+    199,
+    0.74
+   ],
+   [
+    37,
+    "perfect",
+    0,
+    4,
+    1
+   ],
+   [
+    38,
+    "perfect",
+    0,
+    13,
+    1
+   ],
+   [
+    39,
+    "perfect",
+    0,
+    18,
+    1
+   ],
+   [
+    40,
+    "good",
+    0,
+    204,
+    0.73
+   ],
+   [
+    41,
+    "perfect",
+    0,
+    212,
+    0.89
+   ]
+  ]
+ },
+ "warmup-chorale|L3|late150-uncal": {
+  "piece": "warmup-chorale",
+  "part": "P2",
+  "section": "s1-m7-12",
+  "level": 3,
+  "case": "late150-uncal",
+  "wallSec": 24.588,
+  "passed": true,
+  "accuracy": 0.9642857142857143,
+  "pitch": 0.8925527518068007,
+  "rhythm": 0.9001160781773094,
+  "score": 3570,
+  "counts": {
+   "perfect": 16,
+   "good": 5,
+   "ok": 0,
+   "miss": 0
+  },
+  "nNotes": 21,
+  "scheduled": 21,
+  "medOnsetMs": 155.44217687074635,
+  "medCents": 0.01912348374872863,
+  "insights": [
+   "scooping: Scooping up into notes",
+   "great: Excellent run"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 0,
+  "banner": "Level 3 reached: Independent! This section is rehearsal-ready.",
+  "scoreText": "3,570",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.453650793650796,
+     "from": 20.833333333333332,
+     "to": 40.833333333333336,
+     "rate": 1,
+     "now": 0.03192743764172336,
+     "countIn": 4
+    }
+   ],
+   "scheduled": 21,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 7–12 · ALTO · L3 INDEPENDENT Abendlied (Warm-up Chorale) Level 3 reached: Independent! This section is rehearsal-ready. S 3,570 96% accuracy In tune 89% avg ±0¢ Rhythm 90% Best combo 21 perfect 16 · good 5 · ok 0 · miss 0 Bar by bar tap a bar to loop it 7 8 9 10 11 12 solid ok needs work bars 7–12 Coach notes Scooping up into notes 33% of your notes started from below and slid up (e.g. bars 9–11). Aim for the centre of the pitch from the very start: hear it first, then sing it on the consonant. Loop bars 9–11 slowly Excellent run 96% accuracy across bars 7–12. Polish the point above, then move on. Next: Upbeat–bar 6, level 1 Again All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    21,
+    "perfect",
+    0,
+    116,
+    0.96
+   ],
+   [
+    22,
+    "perfect",
+    0,
+    2,
+    1
+   ],
+   [
+    23,
+    "perfect",
+    0,
+    8,
+    1
+   ],
+   [
+    24,
+    "perfect",
+    0,
+    155,
+    0.88
+   ],
+   [
+    25,
+    "perfect",
+    0,
+    161,
+    0.84
+   ],
+   [
+    26,
+    "perfect",
+    0,
+    7,
+    1
+   ],
+   [
+    27,
+    "perfect",
+    0,
+    160,
+    0.85
+   ],
+   [
+    28,
+    "perfect",
+    0,
+    148,
+    0.83
+   ],
+   [
+    29,
+    "perfect",
+    0,
+    154,
+    0.88
+   ],
+   [
+    30,
+    "perfect",
+    0,
+    162,
+    0.84
+   ],
+   [
+    31,
+    "good",
+    0,
+    167,
+    0.78
+   ],
+   [
+    32,
+    "good",
+    0,
+    155,
+    0.8
+   ],
+   [
+    33,
+    "perfect",
+    0,
+    161,
+    0.93
+   ],
+   [
+    34,
+    "good",
+    0,
+    155,
+    0.8
+   ],
+   [
+    35,
+    "perfect",
+    0,
+    160,
+    0.85
+   ],
+   [
+    36,
+    "good",
+    0,
+    168,
+    0.78
+   ],
+   [
+    37,
+    "perfect",
+    0,
+    14,
+    1
+   ],
+   [
+    38,
+    "perfect",
+    0,
+    2,
+    1
+   ],
+   [
+    39,
+    "perfect",
+    0,
+    8,
+    1
+   ],
+   [
+    40,
+    "good",
+    0,
+    156,
+    0.8
+   ],
+   [
+    41,
+    "perfect",
+    0,
+    161,
+    0.93
+   ]
+  ]
+ },
+ "warmup-chorale|L3|wrong": {
+  "piece": "warmup-chorale",
+  "part": "P2",
+  "section": "s1-m7-12",
+  "level": 3,
+  "case": "wrong",
+  "wallSec": 24.586,
+  "passed": false,
+  "accuracy": 0.5238095238095238,
+  "pitch": 0.5238095238095238,
+  "rhythm": 0.986902062412266,
+  "score": 1100,
+  "counts": {
+   "perfect": 11,
+   "good": 0,
+   "ok": 0,
+   "miss": 10
+  },
+  "nNotes": 21,
+  "scheduled": 21,
+  "medOnsetMs": 52.24489795918075,
+  "medCents": 0.01644313731077318,
+  "insights": [
+   "wrong-notes: Wrong notes in bars 8–11",
+   "leaps: Big leaps miss the target"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 60,
+  "banner": "Not yet: 52% of 80% needed. Use the tips below and try again.",
+  "scoreText": "1,100",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.453650793650796,
+     "from": 20.833333333333332,
+     "to": 40.833333333333336,
+     "rate": 1,
+     "now": 0.03192743764172336,
+     "countIn": 4
+    }
+   ],
+   "scheduled": 21,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 7–12 · ALTO · L3 INDEPENDENT Abendlied (Warm-up Chorale) Not yet: 52% of 80% needed. Use the tips below and try again. C 1,100 52% accuracy In tune 52% avg ±0¢ Rhythm 99% Best combo 1 perfect 11 · good 0 · ok 0 · miss 10 Bar by bar tap a bar to loop it 7 8 9 10 11 12 solid ok needs work bars 7–12 Coach notes Wrong notes in bars 8–11 10 notes were sung clearly but too high, typically by about a semitone (bars 7, 8, 9, 10 and elsewhere). Learn the pitches first: loop these bars slowly with your part playing and note names on. Loop bars 8–11 slowly Big leaps miss the target 3 of 3 leaps of a fourth or more landed off the note, worst in bars 10 and 11. Practise the leap slowly: sing the interval, check it against the piano, then put it back in tempo. Loop bars 10–11 slowly Try again Easier: level 2 All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    21,
+    "perfect",
+    0,
+    24,
+    1
+   ],
+   [
+    22,
+    "miss",
+    100,
+    13,
+    0
+   ],
+   [
+    23,
+    "perfect",
+    0,
+    38,
+    1
+   ],
+   [
+    24,
+    "miss",
+    100,
+    64,
+    0
+   ],
+   [
+    25,
+    "perfect",
+    0,
+    52,
+    1
+   ],
+   [
+    26,
+    "miss",
+    100,
+    17,
+    0
+   ],
+   [
+    27,
+    "perfect",
+    0,
+    51,
+    1
+   ],
+   [
+    28,
+    "miss",
+    100,
+    57,
+    0
+   ],
+   [
+    29,
+    "perfect",
+    0,
+    4,
+    1
+   ],
+   [
+    30,
+    "miss",
+    100,
+    50,
+    0
+   ],
+   [
+    31,
+    "perfect",
+    0,
+    59,
+    1
+   ],
+   [
+    32,
+    "miss",
+    100,
+    64,
+    0
+   ],
+   [
+    33,
+    "perfect",
+    0,
+    52,
+    1
+   ],
+   [
+    34,
+    "miss",
+    100,
+    63,
+    0
+   ],
+   [
+    35,
+    "perfect",
+    0,
+    11,
+    1
+   ],
+   [
+    36,
+    "miss",
+    100,
+    57,
+    0
+   ],
+   [
+    37,
+    "perfect",
+    0,
+    45,
+    1
+   ],
+   [
+    38,
+    "miss",
+    100,
+    210,
+    0
+   ],
+   [
+    39,
+    "perfect",
+    0,
+    38,
+    1
+   ],
+   [
+    40,
+    "miss",
+    100,
+    64,
+    0
+   ],
+   [
+    41,
+    "perfect",
+    0,
+    52,
+    1
+   ]
+  ]
+ },
+ "warmup-chorale|L3|silence": {
+  "piece": "warmup-chorale",
+  "part": "P2",
+  "section": "s1-m7-12",
+  "level": 3,
+  "case": "silence",
+  "wallSec": 24.635,
+  "passed": false,
+  "accuracy": 0,
+  "pitch": 0,
+  "rhythm": 0,
+  "score": 0,
+  "counts": {
+   "perfect": 0,
+   "good": 0,
+   "ok": 0,
+   "miss": 21
+  },
+  "nNotes": 21,
+  "scheduled": 0,
+  "medOnsetMs": null,
+  "medCents": null,
+  "insights": [
+   "quiet: We could hardly hear you",
+   "missed-notes: Trouble spot: bars 7–10",
+   "leaps: Big leaps miss the target"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 60,
+  "banner": "Not yet: 0% of 80% needed. Use the tips below and try again.",
+  "scoreText": "0",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.453650793650796,
+     "from": 20.833333333333332,
+     "to": 40.833333333333336,
+     "rate": 1,
+     "now": 0.03192743764172336,
+     "countIn": 4
+    }
+   ],
+   "scheduled": 0,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 7–12 · ALTO · L3 INDEPENDENT Abendlied (Warm-up Chorale) Not yet: 0% of 80% needed. Use the tips below and try again. D 0 0% accuracy In tune 0% Rhythm 0% Best combo 0 perfect 0 · good 0 · ok 0 · miss 21 Bar by bar tap a bar to loop it 7 8 9 10 11 12 solid ok needs work bars 7–12 Coach notes We could hardly hear you Your voice was detected on only a small part of the notes. Sing out at rehearsal volume, keep the phone 20–50 cm away, and check that the microphone isn’t blocked or muted. The Tuner in Settings shows whether your voice comes through. Trouble spot: bars 7–10 Only 0% of the notes in bars 7–10 landed. Loop these bars slowly with your part playing until the notes are secure, then take the support away. Loop bars 7–10 slowly Big leaps miss the target 3 of 3 leaps of a fourth or more landed off the note, worst in bars 10 and 11. Practise the leap slowly: sing the interval, check it against the piano, then put it back in tempo. Loop bars 10–11 slowly Try again Easier: level 2 All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    21,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    22,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    23,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    24,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    25,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    26,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    27,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    28,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    29,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    30,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    31,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    32,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    33,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    34,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    35,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    36,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    37,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    38,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    39,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    40,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    41,
+    "miss",
+    null,
+    null,
+    0
+   ]
+  ]
+ },
+ "debussy-dieu|L2|ok": {
+  "piece": "debussy-dieu",
+  "part": "P3",
+  "section": "s1-m5-12",
+  "level": 2,
+  "case": "ok",
+  "wallSec": 28.232,
+  "passed": true,
+  "accuracy": 1,
+  "pitch": 1,
+  "rhythm": 0.9069767441860465,
+  "score": 12400,
+  "counts": {
+   "perfect": 43,
+   "good": 0,
+   "ok": 0,
+   "miss": 0
+  },
+  "nNotes": 43,
+  "scheduled": 43,
+  "medOnsetMs": 48.526077097506004,
+  "medCents": 0.0017793180433045563,
+  "insights": [
+   "great: Excellent run"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 60,
+  "banner": "Level 2 reached: In time! ",
+  "scoreText": "12,400",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.1319274376417234,
+     "from": 15,
+     "to": 39,
+     "rate": 1,
+     "now": 0.03192743764172336,
+     "countIn": 3
+    }
+   ],
+   "scheduled": 43,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 6–13 · TENOR · L2 IN TIME Dieu! qu'il la fait bon regarder! Level 2 reached: In time! S 12,400 100% accuracy In tune 100% avg ±0¢ Rhythm 91% Best combo 43 perfect 43 · good 0 · ok 0 · miss 0 Bar by bar tap a bar to loop it 6 7 8 9 10 11 12 13 solid ok needs work bars 6–13 Coach notes Excellent run 100% accuracy across bars 6–13. Move on to the next level or the next section. Next: Bars 1–5, level 1 Again All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    27,
+    "perfect",
+    0,
+    16,
+    1
+   ],
+   [
+    28,
+    "perfect",
+    0,
+    47,
+    1
+   ],
+   [
+    29,
+    "perfect",
+    0,
+    67,
+    1
+   ],
+   [
+    30,
+    "perfect",
+    0,
+    17,
+    1
+   ],
+   [
+    31,
+    "perfect",
+    0,
+    16,
+    1
+   ],
+   [
+    32,
+    "perfect",
+    0,
+    13,
+    1
+   ],
+   [
+    33,
+    "perfect",
+    0,
+    19,
+    1
+   ],
+   [
+    34,
+    "perfect",
+    0,
+    69,
+    1
+   ],
+   [
+    35,
+    "perfect",
+    0,
+    56,
+    1
+   ],
+   [
+    36,
+    "perfect",
+    0,
+    76,
+    1
+   ],
+   [
+    37,
+    "perfect",
+    0,
+    30,
+    1
+   ],
+   [
+    38,
+    "perfect",
+    0,
+    70,
+    1
+   ],
+   [
+    39,
+    "perfect",
+    0,
+    69,
+    1
+   ],
+   [
+    40,
+    "perfect",
+    0,
+    16,
+    1
+   ],
+   [
+    41,
+    "perfect",
+    0,
+    50,
+    1
+   ],
+   [
+    42,
+    "perfect",
+    0,
+    67,
+    1
+   ],
+   [
+    43,
+    "perfect",
+    0,
+    48,
+    1
+   ],
+   [
+    44,
+    "perfect",
+    0,
+    65,
+    1
+   ],
+   [
+    45,
+    "perfect",
+    0,
+    47,
+    1
+   ],
+   [
+    46,
+    "perfect",
+    0,
+    46,
+    1
+   ],
+   [
+    47,
+    "perfect",
+    0,
+    45,
+    1
+   ],
+   [
+    48,
+    "perfect",
+    0,
+    56,
+    1
+   ],
+   [
+    49,
+    "perfect",
+    0,
+    58,
+    1
+   ],
+   [
+    50,
+    "perfect",
+    0,
+    72,
+    1
+   ],
+   [
+    51,
+    "perfect",
+    0,
+    59,
+    1
+   ],
+   [
+    52,
+    "perfect",
+    0,
+    47,
+    1
+   ],
+   [
+    53,
+    "perfect",
+    0,
+    9,
+    1
+   ],
+   [
+    54,
+    "perfect",
+    0,
+    53,
+    1
+   ],
+   [
+    55,
+    "perfect",
+    0,
+    51,
+    1
+   ],
+   [
+    56,
+    "perfect",
+    0,
+    49,
+    1
+   ],
+   [
+    57,
+    "perfect",
+    0,
+    48,
+    1
+   ],
+   [
+    58,
+    "perfect",
+    0,
+    null,
+    1
+   ],
+   [
+    59,
+    "perfect",
+    0,
+    null,
+    1
+   ],
+   [
+    60,
+    "perfect",
+    0,
+    53,
+    1
+   ],
+   [
+    61,
+    "perfect",
+    0,
+    49,
+    1
+   ],
+   [
+    62,
+    "perfect",
+    0,
+    45,
+    1
+   ],
+   [
+    63,
+    "perfect",
+    0,
+    null,
+    1
+   ],
+   [
+    64,
+    "perfect",
+    0,
+    45,
+    1
+   ],
+   [
+    65,
+    "perfect",
+    0,
+    48,
+    1
+   ],
+   [
+    66,
+    "perfect",
+    0,
+    49,
+    1
+   ],
+   [
+    67,
+    "perfect",
+    0,
+    null,
+    1
+   ],
+   [
+    68,
+    "perfect",
+    0,
+    53,
+    1
+   ],
+   [
+    69,
+    "perfect",
+    0,
+    45,
+    1
+   ]
+  ]
+ },
+ "debussy-dieu|L2|flat30": {
+  "piece": "debussy-dieu",
+  "part": "P3",
+  "section": "s1-m5-12",
+  "level": 2,
+  "case": "flat30",
+  "wallSec": 28.238,
+  "passed": true,
+  "accuracy": 0.8500000000000006,
+  "pitch": 0.9957592370887618,
+  "rhythm": 1,
+  "score": 8680,
+  "counts": {
+   "perfect": 0,
+   "good": 43,
+   "ok": 0,
+   "miss": 0
+  },
+  "nNotes": 43,
+  "scheduled": 43,
+  "medOnsetMs": 56.8707482993247,
+  "medCents": -29.98487581080269,
+  "insights": [
+   "flat-overall: You tend to sing flat"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 60,
+  "banner": "Level 2 reached: In time! ",
+  "scoreText": "8,680",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.12031746031746,
+     "from": 15,
+     "to": 39,
+     "rate": 1,
+     "now": 0.03192743764172336,
+     "countIn": 3
+    }
+   ],
+   "scheduled": 43,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 6–13 · TENOR · L2 IN TIME Dieu! qu'il la fait bon regarder! Level 2 reached: In time! A 8,680 85% accuracy In tune 100% avg −30¢ Rhythm 100% Best combo 43 perfect 0 · good 43 · ok 0 · miss 0 Bar by bar tap a bar to loop it 6 7 8 9 10 11 12 13 solid ok needs work bars 6–13 Coach notes You tend to sing flat Overall you sat about 30 cents under the pitch, most clearly in bars 9–12. Keep the sound bright and the breath moving; think each note slightly higher than you feel it. Loop bars 9–12 slowly Next: Bars 1–5, level 1 Again All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    27,
+    "good",
+    -30,
+    19,
+    1
+   ],
+   [
+    28,
+    "good",
+    -30,
+    59,
+    1
+   ],
+   [
+    29,
+    "good",
+    -30,
+    58,
+    1
+   ],
+   [
+    30,
+    "good",
+    -30,
+    17,
+    1
+   ],
+   [
+    31,
+    "good",
+    -30,
+    19,
+    0.94
+   ],
+   [
+    32,
+    "good",
+    -30,
+    4,
+    1
+   ],
+   [
+    33,
+    "good",
+    -30,
+    10,
+    1
+   ],
+   [
+    34,
+    "good",
+    -30,
+    57,
+    1
+   ],
+   [
+    35,
+    "good",
+    -30,
+    59,
+    1
+   ],
+   [
+    36,
+    "good",
+    -30,
+    58,
+    0.94
+   ],
+   [
+    37,
+    "good",
+    -30,
+    18,
+    1
+   ],
+   [
+    38,
+    "good",
+    -30,
+    58,
+    1
+   ],
+   [
+    39,
+    "good",
+    -30,
+    57,
+    1
+   ],
+   [
+    40,
+    "good",
+    -30,
+    19,
+    1
+   ],
+   [
+    41,
+    "good",
+    -30,
+    59,
+    1
+   ],
+   [
+    42,
+    "good",
+    -30,
+    58,
+    1
+   ],
+   [
+    43,
+    "good",
+    -30,
+    57,
+    1
+   ],
+   [
+    44,
+    "good",
+    -30,
+    59,
+    1
+   ],
+   [
+    45,
+    "good",
+    -30,
+    59,
+    1
+   ],
+   [
+    46,
+    "good",
+    -30,
+    58,
+    1
+   ],
+   [
+    47,
+    "good",
+    -30,
+    57,
+    1
+   ],
+   [
+    48,
+    "good",
+    -30,
+    59,
+    1
+   ],
+   [
+    49,
+    "good",
+    -30,
+    49,
+    1
+   ],
+   [
+    50,
+    "good",
+    -30,
+    58,
+    1
+   ],
+   [
+    51,
+    "good",
+    -30,
+    48,
+    1
+   ],
+   [
+    52,
+    "good",
+    -30,
+    39,
+    1
+   ],
+   [
+    53,
+    "good",
+    -30,
+    18,
+    1
+   ],
+   [
+    54,
+    "good",
+    -30,
+    65,
+    1
+   ],
+   [
+    55,
+    "good",
+    -30,
+    10,
+    1
+   ],
+   [
+    56,
+    "good",
+    -30,
+    57,
+    1
+   ],
+   [
+    57,
+    "good",
+    -30,
+    39,
+    1
+   ],
+   [
+    58,
+    "good",
+    -30,
+    52,
+    1
+   ],
+   [
+    59,
+    "good",
+    -30,
+    45,
+    1
+   ],
+   [
+    60,
+    "good",
+    -30,
+    59,
+    1
+   ],
+   [
+    61,
+    "good",
+    -30,
+    38,
+    1
+   ],
+   [
+    62,
+    "good",
+    -30,
+    51,
+    1
+   ],
+   [
+    63,
+    "good",
+    -30,
+    44,
+    1
+   ],
+   [
+    64,
+    "good",
+    -30,
+    57,
+    1
+   ],
+   [
+    65,
+    "good",
+    -30,
+    39,
+    1
+   ],
+   [
+    66,
+    "good",
+    -30,
+    52,
+    1
+   ],
+   [
+    67,
+    "good",
+    -30,
+    45,
+    1
+   ],
+   [
+    68,
+    "good",
+    -30,
+    58,
+    0.94
+   ],
+   [
+    69,
+    "good",
+    -30,
+    57,
+    1
+   ]
+  ]
+ },
+ "debussy-dieu|L2|late150": {
+  "piece": "debussy-dieu",
+  "part": "P3",
+  "section": "s1-m5-12",
+  "level": 2,
+  "case": "late150",
+  "wallSec": 28.256,
+  "passed": false,
+  "accuracy": 0.5581395348837211,
+  "pitch": 0.4918427066414712,
+  "rhythm": 0.5906423034330011,
+  "score": 4280,
+  "counts": {
+   "perfect": 9,
+   "good": 10,
+   "ok": 13,
+   "miss": 11
+  },
+  "nNotes": 43,
+  "scheduled": 43,
+  "medOnsetMs": 196.50793650793474,
+  "medCents": -0.0019378372059009052,
+  "insights": [
+   "wrong-notes: Wrong notes in bars 10–12",
+   "missed-notes: Trouble spot: bars 9–12",
+   "scooping: Scooping up into notes"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 60,
+  "banner": "Not yet: 56% of 80% needed. Use the tips below and try again.",
+  "scoreText": "4,280",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.1319274376417234,
+     "from": 15,
+     "to": 39,
+     "rate": 1,
+     "now": 0.03192743764172336,
+     "countIn": 3
+    }
+   ],
+   "scheduled": 43,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 6–13 · TENOR · L2 IN TIME Dieu! qu'il la fait bon regarder! Not yet: 56% of 80% needed. Use the tips below and try again. C 4,280 56% accuracy In tune 49% avg ±0¢ Rhythm 59% Best combo 27 perfect 9 · good 10 · ok 13 · miss 11 Bar by bar tap a bar to loop it 6 7 8 9 10 11 12 13 solid ok needs work bars 6–13 Coach notes Wrong notes in bars 10–12 12 notes were sung clearly but off, typically by about 2 semitones (bars 10, 11 and 12). Learn the pitches first: loop these bars slowly with your part playing and note names on. Loop bars 10–12 slowly Trouble spot: bars 9–12 Only 46% of the notes in bars 9–12 landed. Loop these bars slowly with your part playing until the notes are secure, then take the support away. Loop bars 9–12 slowly Scooping up into notes 42% of your notes started from below and slid up (e.g. bars 9–12). Aim for the centre of the pitch from the very start: hear it first, then sing it on the consonant. Loop bars 9–12 slowly Try again Easier: level 1 All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    27,
+    "good",
+    0,
+    176,
+    0.78
+   ],
+   [
+    28,
+    "ok",
+    0,
+    195,
+    0.56
+   ],
+   [
+    29,
+    "ok",
+    0,
+    218,
+    0.57
+   ],
+   [
+    30,
+    "perfect",
+    0,
+    17,
+    1
+   ],
+   [
+    31,
+    "perfect",
+    0,
+    16,
+    1
+   ],
+   [
+    32,
+    "perfect",
+    1,
+    4,
+    1
+   ],
+   [
+    33,
+    "perfect",
+    0,
+    10,
+    1
+   ],
+   [
+    34,
+    "ok",
+    0,
+    217,
+    0.56
+   ],
+   [
+    35,
+    "ok",
+    0,
+    216,
+    0.51
+   ],
+   [
+    36,
+    "perfect",
+    0,
+    215,
+    0.81
+   ],
+   [
+    37,
+    "good",
+    0,
+    175,
+    0.77
+   ],
+   [
+    38,
+    "ok",
+    0,
+    215,
+    0.51
+   ],
+   [
+    39,
+    "ok",
+    0,
+    217,
+    0.56
+   ],
+   [
+    40,
+    "perfect",
+    0,
+    16,
+    1
+   ],
+   [
+    41,
+    "ok",
+    0,
+    195,
+    0.51
+   ],
+   [
+    42,
+    "ok",
+    0,
+    197,
+    0.57
+   ],
+   [
+    43,
+    "ok",
+    0,
+    197,
+    0.56
+   ],
+   [
+    44,
+    "ok",
+    0,
+    216,
+    0.45
+   ],
+   [
+    45,
+    "good",
+    0,
+    195,
+    0.67
+   ],
+   [
+    46,
+    "ok",
+    0,
+    197,
+    0.56
+   ],
+   [
+    47,
+    "ok",
+    0,
+    217,
+    0.56
+   ],
+   [
+    48,
+    "good",
+    0,
+    196,
+    0.77
+   ],
+   [
+    49,
+    "good",
+    -422,
+    null,
+    0
+   ],
+   [
+    50,
+    "good",
+    0,
+    197,
+    0.74
+   ],
+   [
+    51,
+    "good",
+    -322,
+    null,
+    0
+   ],
+   [
+    52,
+    "perfect",
+    0,
+    195,
+    0.92
+   ],
+   [
+    53,
+    "perfect",
+    -2,
+    15,
+    1
+   ],
+   [
+    54,
+    "miss",
+    -100,
+    204,
+    0
+   ],
+   [
+    55,
+    "miss",
+    41,
+    190,
+    0
+   ],
+   [
+    56,
+    "good",
+    0,
+    197,
+    0.61
+   ],
+   [
+    57,
+    "miss",
+    122,
+    null,
+    0
+   ],
+   [
+    58,
+    "miss",
+    -100,
+    null,
+    0
+   ],
+   [
+    59,
+    "miss",
+    100,
+    null,
+    0
+   ],
+   [
+    60,
+    "good",
+    0,
+    195,
+    0.67
+   ],
+   [
+    61,
+    "miss",
+    121,
+    null,
+    0
+   ],
+   [
+    62,
+    "miss",
+    -100,
+    null,
+    0
+   ],
+   [
+    63,
+    "miss",
+    100,
+    null,
+    0
+   ],
+   [
+    64,
+    "good",
+    0,
+    196,
+    0.61
+   ],
+   [
+    65,
+    "miss",
+    121,
+    null,
+    0
+   ],
+   [
+    66,
+    "miss",
+    -100,
+    null,
+    0
+   ],
+   [
+    67,
+    "miss",
+    100,
+    null,
+    0
+   ],
+   [
+    68,
+    "perfect",
+    0,
+    198,
+    0.86
+   ],
+   [
+    69,
+    "ok",
+    0,
+    217,
+    0.46
+   ]
+  ]
+ },
+ "debussy-dieu|L2|late150-uncal": {
+  "piece": "debussy-dieu",
+  "part": "P3",
+  "section": "s1-m5-12",
+  "level": 2,
+  "case": "late150-uncal",
+  "wallSec": 28.253,
+  "passed": false,
+  "accuracy": 0.7000000000000002,
+  "pitch": 0.6397341449726125,
+  "rhythm": 0.6612508569319198,
+  "score": 6160,
+  "counts": {
+   "perfect": 15,
+   "good": 16,
+   "ok": 3,
+   "miss": 9
+  },
+  "nNotes": 43,
+  "scheduled": 43,
+  "medOnsetMs": 147.3242630385485,
+  "medCents": 0.0034555168177519135,
+  "insights": [
+   "wrong-notes: Wrong notes in bars 10–12",
+   "scooping: Scooping up into notes"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 0,
+  "banner": "Not yet: 70% of 80% needed. Use the tips below and try again.",
+  "scoreText": "6,160",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.1319274376417234,
+     "from": 15,
+     "to": 39,
+     "rate": 1,
+     "now": 0.040634920634920635,
+     "countIn": 3
+    }
+   ],
+   "scheduled": 43,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 6–13 · TENOR · L2 IN TIME Dieu! qu'il la fait bon regarder! Not yet: 70% of 80% needed. Use the tips below and try again. B 6,160 70% accuracy In tune 64% avg ±0¢ Rhythm 66% Best combo 30 perfect 15 · good 16 · ok 3 · miss 9 Bar by bar tap a bar to loop it 6 7 8 9 10 11 12 13 solid ok needs work bars 6–13 Coach notes Wrong notes in bars 10–12 11 notes were sung clearly but off, typically by about a semitone (bars 10 and 12). Learn the pitches first: loop these bars slowly with your part playing and note names on. Loop bars 10–12 slowly Scooping up into notes 42% of your notes started from below and slid up (e.g. bars 9–12). Aim for the centre of the pitch from the very start: hear it first, then sing it on the consonant. Loop bars 9–12 slowly Try again Easier: level 1 All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    27,
+    "perfect",
+    0,
+    128,
+    0.9
+   ],
+   [
+    28,
+    "good",
+    0,
+    167,
+    0.64
+   ],
+   [
+    29,
+    "good",
+    0,
+    167,
+    0.69
+   ],
+   [
+    30,
+    "perfect",
+    0,
+    6,
+    1
+   ],
+   [
+    31,
+    "perfect",
+    0,
+    5,
+    1
+   ],
+   [
+    32,
+    "perfect",
+    0,
+    14,
+    1
+   ],
+   [
+    33,
+    "perfect",
+    0,
+    20,
+    1
+   ],
+   [
+    34,
+    "good",
+    0,
+    166,
+    0.69
+   ],
+   [
+    35,
+    "good",
+    0,
+    165,
+    0.64
+   ],
+   [
+    36,
+    "perfect",
+    0,
+    167,
+    0.87
+   ],
+   [
+    37,
+    "perfect",
+    0,
+    127,
+    0.9
+   ],
+   [
+    38,
+    "good",
+    0,
+    167,
+    0.64
+   ],
+   [
+    39,
+    "good",
+    0,
+    166,
+    0.69
+   ],
+   [
+    40,
+    "perfect",
+    0,
+    6,
+    1
+   ],
+   [
+    41,
+    "ok",
+    0,
+    167,
+    0.59
+   ],
+   [
+    42,
+    "good",
+    0,
+    167,
+    0.69
+   ],
+   [
+    43,
+    "good",
+    0,
+    146,
+    0.69
+   ],
+   [
+    44,
+    "ok",
+    0,
+    165,
+    0.59
+   ],
+   [
+    45,
+    "good",
+    0,
+    147,
+    0.74
+   ],
+   [
+    46,
+    "good",
+    0,
+    166,
+    0.69
+   ],
+   [
+    47,
+    "good",
+    0,
+    145,
+    0.69
+   ],
+   [
+    48,
+    "perfect",
+    0,
+    148,
+    0.88
+   ],
+   [
+    49,
+    "good",
+    -207,
+    null,
+    0.85
+   ],
+   [
+    50,
+    "perfect",
+    0,
+    166,
+    0.81
+   ],
+   [
+    51,
+    "good",
+    -157,
+    null,
+    0.85
+   ],
+   [
+    52,
+    "perfect",
+    0,
+    147,
+    0.95
+   ],
+   [
+    53,
+    "perfect",
+    0,
+    5,
+    1
+   ],
+   [
+    54,
+    "perfect",
+    0,
+    153,
+    1
+   ],
+   [
+    55,
+    "perfect",
+    0,
+    139,
+    1
+   ],
+   [
+    56,
+    "good",
+    0,
+    146,
+    0.75
+   ],
+   [
+    57,
+    "miss",
+    103,
+    null,
+    0
+   ],
+   [
+    58,
+    "miss",
+    -100,
+    null,
+    0
+   ],
+   [
+    59,
+    "miss",
+    100,
+    null,
+    0
+   ],
+   [
+    60,
+    "good",
+    0,
+    147,
+    0.8
+   ],
+   [
+    61,
+    "miss",
+    104,
+    null,
+    0
+   ],
+   [
+    62,
+    "miss",
+    -100,
+    null,
+    0
+   ],
+   [
+    63,
+    "miss",
+    100,
+    null,
+    0
+   ],
+   [
+    64,
+    "good",
+    0,
+    145,
+    0.75
+   ],
+   [
+    65,
+    "miss",
+    103,
+    null,
+    0
+   ],
+   [
+    66,
+    "miss",
+    -100,
+    null,
+    0
+   ],
+   [
+    67,
+    "miss",
+    100,
+    null,
+    0
+   ],
+   [
+    68,
+    "perfect",
+    0,
+    147,
+    0.91
+   ],
+   [
+    69,
+    "ok",
+    0,
+    166,
+    0.59
+   ]
+  ]
+ },
+ "debussy-dieu|L2|wrong": {
+  "piece": "debussy-dieu",
+  "part": "P3",
+  "section": "s1-m5-12",
+  "level": 2,
+  "case": "wrong",
+  "wallSec": 28.235,
+  "passed": false,
+  "accuracy": 0.5116279069767442,
+  "pitch": 0.5116279069767442,
+  "rhythm": 0.9033802668354164,
+  "score": 2200,
+  "counts": {
+   "perfect": 22,
+   "good": 0,
+   "ok": 0,
+   "miss": 21
+  },
+  "nNotes": 43,
+  "scheduled": 43,
+  "medOnsetMs": 56.190476190476346,
+  "medCents": 0.07450097310481851,
+  "insights": [
+   "wrong-notes: Wrong notes in bars 9–12"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 60,
+  "banner": "Not yet: 51% of 80% needed. Use the tips below and try again.",
+  "scoreText": "2,200",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.1319274376417234,
+     "from": 15,
+     "to": 39,
+     "rate": 1,
+     "now": 0.03192743764172336,
+     "countIn": 3
+    }
+   ],
+   "scheduled": 43,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 6–13 · TENOR · L2 IN TIME Dieu! qu'il la fait bon regarder! Not yet: 51% of 80% needed. Use the tips below and try again. C 2,200 51% accuracy In tune 51% avg ±0¢ Rhythm 90% Best combo 1 perfect 22 · good 0 · ok 0 · miss 21 Bar by bar tap a bar to loop it 6 7 8 9 10 11 12 13 solid ok needs work bars 6–13 Coach notes Wrong notes in bars 9–12 21 notes were sung clearly but too high, typically by about a semitone (bars 6, 7, 8, 9 and elsewhere). Learn the pitches first: loop these bars slowly with your part playing and note names on. Loop bars 9–12 slowly Try again Easier: level 1 All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    27,
+    "perfect",
+    0,
+    16,
+    1
+   ],
+   [
+    28,
+    "miss",
+    100,
+    56,
+    0
+   ],
+   [
+    29,
+    "perfect",
+    0,
+    55,
+    1
+   ],
+   [
+    30,
+    "miss",
+    100,
+    315,
+    0
+   ],
+   [
+    31,
+    "perfect",
+    0,
+    16,
+    1
+   ],
+   [
+    32,
+    "miss",
+    100,
+    null,
+    0
+   ],
+   [
+    33,
+    "perfect",
+    0,
+    10,
+    1
+   ],
+   [
+    34,
+    "miss",
+    100,
+    57,
+    0
+   ],
+   [
+    35,
+    "perfect",
+    0,
+    56,
+    1
+   ],
+   [
+    36,
+    "miss",
+    100,
+    55,
+    0
+   ],
+   [
+    37,
+    "perfect",
+    0,
+    15,
+    1
+   ],
+   [
+    38,
+    "miss",
+    100,
+    55,
+    0
+   ],
+   [
+    39,
+    "perfect",
+    0,
+    57,
+    1
+   ],
+   [
+    40,
+    "miss",
+    100,
+    315,
+    0
+   ],
+   [
+    41,
+    "perfect",
+    0,
+    56,
+    1
+   ],
+   [
+    42,
+    "miss",
+    100,
+    55,
+    0
+   ],
+   [
+    43,
+    "perfect",
+    0,
+    57,
+    1
+   ],
+   [
+    44,
+    "miss",
+    100,
+    56,
+    0
+   ],
+   [
+    45,
+    "perfect",
+    0,
+    15,
+    1
+   ],
+   [
+    46,
+    "miss",
+    100,
+    116,
+    0
+   ],
+   [
+    47,
+    "perfect",
+    0,
+    57,
+    1
+   ],
+   [
+    48,
+    "miss",
+    100,
+    56,
+    0
+   ],
+   [
+    49,
+    "perfect",
+    0,
+    67,
+    1
+   ],
+   [
+    50,
+    "miss",
+    100,
+    116,
+    0
+   ],
+   [
+    51,
+    "perfect",
+    0,
+    48,
+    1
+   ],
+   [
+    52,
+    "miss",
+    100,
+    null,
+    0
+   ],
+   [
+    53,
+    "perfect",
+    0,
+    15,
+    1
+   ],
+   [
+    54,
+    "miss",
+    100,
+    62,
+    0
+   ],
+   [
+    55,
+    "perfect",
+    0,
+    51,
+    1
+   ],
+   [
+    56,
+    "miss",
+    100,
+    57,
+    0
+   ],
+   [
+    57,
+    "perfect",
+    0,
+    56,
+    1
+   ],
+   [
+    58,
+    "miss",
+    100,
+    49,
+    0
+   ],
+   [
+    59,
+    "perfect",
+    0,
+    63,
+    1
+   ],
+   [
+    60,
+    "miss",
+    100,
+    56,
+    0
+   ],
+   [
+    61,
+    "perfect",
+    0,
+    55,
+    1
+   ],
+   [
+    62,
+    "miss",
+    100,
+    51,
+    0
+   ],
+   [
+    63,
+    "perfect",
+    0,
+    null,
+    1
+   ],
+   [
+    64,
+    "miss",
+    100,
+    57,
+    0
+   ],
+   [
+    65,
+    "perfect",
+    0,
+    56,
+    1
+   ],
+   [
+    66,
+    "miss",
+    100,
+    49,
+    0
+   ],
+   [
+    67,
+    "perfect",
+    0,
+    63,
+    1
+   ],
+   [
+    68,
+    "miss",
+    100,
+    56,
+    0
+   ],
+   [
+    69,
+    "perfect",
+    0,
+    57,
+    1
+   ]
+  ]
+ },
+ "debussy-dieu|L2|silence": {
+  "piece": "debussy-dieu",
+  "part": "P3",
+  "section": "s1-m5-12",
+  "level": 2,
+  "case": "silence",
+  "wallSec": 28.25,
+  "passed": false,
+  "accuracy": 0,
+  "pitch": 0,
+  "rhythm": 0,
+  "score": 0,
+  "counts": {
+   "perfect": 0,
+   "good": 0,
+   "ok": 0,
+   "miss": 43
+  },
+  "nNotes": 43,
+  "scheduled": 0,
+  "medOnsetMs": null,
+  "medCents": null,
+  "insights": [
+   "quiet: We could hardly hear you",
+   "missed-notes: Trouble spot: bars 6–9"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 60,
+  "banner": "Not yet: 0% of 80% needed. Use the tips below and try again.",
+  "scoreText": "0",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.1319274376417234,
+     "from": 15,
+     "to": 39,
+     "rate": 1,
+     "now": 0.03192743764172336,
+     "countIn": 3
+    }
+   ],
+   "scheduled": 0,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 6–13 · TENOR · L2 IN TIME Dieu! qu'il la fait bon regarder! Not yet: 0% of 80% needed. Use the tips below and try again. D 0 0% accuracy In tune 0% Rhythm 0% Best combo 0 perfect 0 · good 0 · ok 0 · miss 43 Bar by bar tap a bar to loop it 6 7 8 9 10 11 12 13 solid ok needs work bars 6–13 Coach notes We could hardly hear you Your voice was detected on only a small part of the notes. Sing out at rehearsal volume, keep the phone 20–50 cm away, and check that the microphone isn’t blocked or muted. The Tuner in Settings shows whether your voice comes through. Trouble spot: bars 6–9 Only 0% of the notes in bars 6–9 landed. Loop these bars slowly with your part playing until the notes are secure, then take the support away. Loop bars 6–9 slowly Try again Easier: level 1 All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    27,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    28,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    29,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    30,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    31,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    32,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    33,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    34,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    35,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    36,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    37,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    38,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    39,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    40,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    41,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    42,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    43,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    44,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    45,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    46,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    47,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    48,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    49,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    50,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    51,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    52,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    53,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    54,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    55,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    56,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    57,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    58,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    59,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    60,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    61,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    62,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    63,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    64,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    65,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    66,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    67,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    68,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    69,
+    "miss",
+    null,
+    null,
+    0
+   ]
+  ]
+ },
+ "debussy-dieu|L3|ok": {
+  "piece": "debussy-dieu",
+  "part": "P3",
+  "section": "s1-m5-12",
+  "level": 3,
+  "case": "ok",
+  "wallSec": 28.259,
+  "passed": true,
+  "accuracy": 1,
+  "pitch": 1,
+  "rhythm": 1,
+  "score": 12400,
+  "counts": {
+   "perfect": 43,
+   "good": 0,
+   "ok": 0,
+   "miss": 0
+  },
+  "nNotes": 43,
+  "scheduled": 43,
+  "medOnsetMs": 55.41950113378391,
+  "medCents": 0.004948334954235634,
+  "insights": [
+   "great: Excellent run"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 60,
+  "banner": "Level 3 reached: Independent! This section is rehearsal-ready.",
+  "scoreText": "12,400",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.1319274376417234,
+     "from": 15,
+     "to": 39,
+     "rate": 1,
+     "now": 0.03192743764172336,
+     "countIn": 3
+    }
+   ],
+   "scheduled": 43,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 6–13 · TENOR · L3 INDEPENDENT Dieu! qu'il la fait bon regarder! Level 3 reached: Independent! This section is rehearsal-ready. S 12,400 100% accuracy In tune 100% avg ±0¢ Rhythm 100% Best combo 43 perfect 43 · good 0 · ok 0 · miss 0 Bar by bar tap a bar to loop it 6 7 8 9 10 11 12 13 solid ok needs work bars 6–13 Coach notes Excellent run 100% accuracy across bars 6–13. Move on to the next level or the next section. Next: Bars 1–5, level 1 Again All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    27,
+    "perfect",
+    0,
+    36,
+    1
+   ],
+   [
+    28,
+    "perfect",
+    0,
+    56,
+    1
+   ],
+   [
+    29,
+    "perfect",
+    0,
+    55,
+    1
+   ],
+   [
+    30,
+    "perfect",
+    0,
+    17,
+    1
+   ],
+   [
+    31,
+    "perfect",
+    0,
+    16,
+    1
+   ],
+   [
+    32,
+    "perfect",
+    0,
+    4,
+    1
+   ],
+   [
+    33,
+    "perfect",
+    0,
+    10,
+    1
+   ],
+   [
+    34,
+    "perfect",
+    0,
+    57,
+    1
+   ],
+   [
+    35,
+    "perfect",
+    0,
+    56,
+    1
+   ],
+   [
+    36,
+    "perfect",
+    0,
+    55,
+    1
+   ],
+   [
+    37,
+    "perfect",
+    0,
+    36,
+    1
+   ],
+   [
+    38,
+    "perfect",
+    0,
+    55,
+    1
+   ],
+   [
+    39,
+    "perfect",
+    0,
+    57,
+    1
+   ],
+   [
+    40,
+    "perfect",
+    0,
+    16,
+    1
+   ],
+   [
+    41,
+    "perfect",
+    0,
+    56,
+    1
+   ],
+   [
+    42,
+    "perfect",
+    0,
+    55,
+    1
+   ],
+   [
+    43,
+    "perfect",
+    0,
+    57,
+    1
+   ],
+   [
+    44,
+    "perfect",
+    0,
+    56,
+    1
+   ],
+   [
+    45,
+    "perfect",
+    0,
+    56,
+    1
+   ],
+   [
+    46,
+    "perfect",
+    0,
+    55,
+    1
+   ],
+   [
+    47,
+    "perfect",
+    0,
+    57,
+    1
+   ],
+   [
+    48,
+    "perfect",
+    0,
+    56,
+    1
+   ],
+   [
+    49,
+    "perfect",
+    0,
+    67,
+    1
+   ],
+   [
+    50,
+    "perfect",
+    0,
+    58,
+    1
+   ],
+   [
+    51,
+    "perfect",
+    0,
+    65,
+    1
+   ],
+   [
+    52,
+    "perfect",
+    0,
+    56,
+    1
+   ],
+   [
+    53,
+    "perfect",
+    0,
+    15,
+    1
+   ],
+   [
+    54,
+    "perfect",
+    0,
+    42,
+    1
+   ],
+   [
+    55,
+    "perfect",
+    0,
+    51,
+    1
+   ],
+   [
+    56,
+    "perfect",
+    0,
+    57,
+    1
+   ],
+   [
+    57,
+    "perfect",
+    0,
+    56,
+    1
+   ],
+   [
+    58,
+    "perfect",
+    0,
+    49,
+    1
+   ],
+   [
+    59,
+    "perfect",
+    0,
+    42,
+    1
+   ],
+   [
+    60,
+    "perfect",
+    0,
+    56,
+    1
+   ],
+   [
+    61,
+    "perfect",
+    0,
+    55,
+    1
+   ],
+   [
+    62,
+    "perfect",
+    0,
+    51,
+    1
+   ],
+   [
+    63,
+    "perfect",
+    0,
+    44,
+    1
+   ],
+   [
+    64,
+    "perfect",
+    0,
+    57,
+    1
+   ],
+   [
+    65,
+    "perfect",
+    0,
+    56,
+    1
+   ],
+   [
+    66,
+    "perfect",
+    0,
+    49,
+    1
+   ],
+   [
+    67,
+    "perfect",
+    0,
+    42,
+    1
+   ],
+   [
+    68,
+    "perfect",
+    0,
+    56,
+    1
+   ],
+   [
+    69,
+    "perfect",
+    0,
+    57,
+    1
+   ]
+  ]
+ },
+ "debussy-dieu|L3|flat30": {
+  "piece": "debussy-dieu",
+  "part": "P3",
+  "section": "s1-m5-12",
+  "level": 3,
+  "case": "flat30",
+  "wallSec": 28.253,
+  "passed": false,
+  "accuracy": 0.7732558139534889,
+  "pitch": 0.7139011623923989,
+  "rhythm": 1,
+  "score": 6870,
+  "counts": {
+   "perfect": 0,
+   "good": 35,
+   "ok": 7,
+   "miss": 1
+  },
+  "nNotes": 43,
+  "scheduled": 43,
+  "medOnsetMs": 56.8707482993247,
+  "medCents": -29.98537697276973,
+  "insights": [
+   "flat-overall: You tend to sing flat"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 60,
+  "banner": "Not yet: 77% of 80% needed. Use the tips below and try again.",
+  "scoreText": "6,870",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.12031746031746,
+     "from": 15,
+     "to": 39,
+     "rate": 1,
+     "now": 0.03192743764172336,
+     "countIn": 3
+    }
+   ],
+   "scheduled": 43,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 6–13 · TENOR · L3 INDEPENDENT Dieu! qu'il la fait bon regarder! Not yet: 77% of 80% needed. Use the tips below and try again. B 6,870 77% accuracy In tune 71% avg −30¢ Rhythm 100% Best combo 37 perfect 0 · good 35 · ok 7 · miss 1 Bar by bar tap a bar to loop it 6 7 8 9 10 11 12 13 solid ok needs work bars 6–13 Coach notes You tend to sing flat Overall you sat about 30 cents under the pitch, most clearly in bars 9–12. Keep the sound bright and the breath moving; think each note slightly higher than you feel it. Loop bars 9–12 slowly Try again Easier: level 2 All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    27,
+    "good",
+    -30,
+    19,
+    0.68
+   ],
+   [
+    28,
+    "good",
+    -30,
+    59,
+    0.63
+   ],
+   [
+    29,
+    "good",
+    -30,
+    58,
+    0.63
+   ],
+   [
+    30,
+    "good",
+    -30,
+    17,
+    0.63
+   ],
+   [
+    31,
+    "ok",
+    -30,
+    19,
+    0.51
+   ],
+   [
+    32,
+    "miss",
+    -30,
+    4,
+    0
+   ],
+   [
+    33,
+    "good",
+    -30,
+    10,
+    1
+   ],
+   [
+    34,
+    "ok",
+    -30,
+    57,
+    0.57
+   ],
+   [
+    35,
+    "good",
+    -30,
+    59,
+    0.69
+   ],
+   [
+    36,
+    "ok",
+    -30,
+    58,
+    0.47
+   ],
+   [
+    37,
+    "good",
+    -30,
+    18,
+    0.69
+   ],
+   [
+    38,
+    "good",
+    -30,
+    58,
+    0.63
+   ],
+   [
+    39,
+    "good",
+    -30,
+    57,
+    0.63
+   ],
+   [
+    40,
+    "good",
+    -30,
+    19,
+    0.68
+   ],
+   [
+    41,
+    "good",
+    -30,
+    59,
+    0.69
+   ],
+   [
+    42,
+    "good",
+    -30,
+    58,
+    0.63
+   ],
+   [
+    43,
+    "good",
+    -30,
+    57,
+    0.63
+   ],
+   [
+    44,
+    "ok",
+    -30,
+    59,
+    0.58
+   ],
+   [
+    45,
+    "good",
+    -30,
+    59,
+    0.63
+   ],
+   [
+    46,
+    "good",
+    -30,
+    58,
+    0.63
+   ],
+   [
+    47,
+    "good",
+    -30,
+    57,
+    0.63
+   ],
+   [
+    48,
+    "good",
+    -30,
+    59,
+    0.62
+   ],
+   [
+    49,
+    "good",
+    -30,
+    49,
+    1
+   ],
+   [
+    50,
+    "ok",
+    -30,
+    58,
+    0.59
+   ],
+   [
+    51,
+    "good",
+    -30,
+    48,
+    1
+   ],
+   [
+    52,
+    "good",
+    -30,
+    39,
+    0.79
+   ],
+   [
+    53,
+    "good",
+    -30,
+    18,
+    1
+   ],
+   [
+    54,
+    "good",
+    -30,
+    65,
+    1
+   ],
+   [
+    55,
+    "good",
+    -30,
+    10,
+    1
+   ],
+   [
+    56,
+    "good",
+    -30,
+    57,
+    0.63
+   ],
+   [
+    57,
+    "good",
+    -30,
+    39,
+    1
+   ],
+   [
+    58,
+    "good",
+    -30,
+    52,
+    1
+   ],
+   [
+    59,
+    "good",
+    -30,
+    45,
+    1
+   ],
+   [
+    60,
+    "good",
+    -30,
+    59,
+    0.63
+   ],
+   [
+    61,
+    "good",
+    -30,
+    38,
+    0
+   ],
+   [
+    62,
+    "good",
+    -30,
+    51,
+    1
+   ],
+   [
+    63,
+    "good",
+    -30,
+    44,
+    1
+   ],
+   [
+    64,
+    "good",
+    -30,
+    57,
+    0.63
+   ],
+   [
+    65,
+    "good",
+    -30,
+    39,
+    1
+   ],
+   [
+    66,
+    "good",
+    -30,
+    52,
+    1
+   ],
+   [
+    67,
+    "good",
+    -30,
+    45,
+    1
+   ],
+   [
+    68,
+    "ok",
+    -30,
+    58,
+    0.38
+   ],
+   [
+    69,
+    "ok",
+    -30,
+    57,
+    0.57
+   ]
+  ]
+ },
+ "debussy-dieu|L3|late150": {
+  "piece": "debussy-dieu",
+  "part": "P3",
+  "section": "s1-m5-12",
+  "level": 3,
+  "case": "late150",
+  "wallSec": 28.257,
+  "passed": false,
+  "accuracy": 0.5546511627906978,
+  "pitch": 0.4780137115220415,
+  "rhythm": 0.5906423034330011,
+  "score": 4220,
+  "counts": {
+   "perfect": 8,
+   "good": 11,
+   "ok": 13,
+   "miss": 11
+  },
+  "nNotes": 43,
+  "scheduled": 43,
+  "medOnsetMs": 196.50793650793474,
+  "medCents": -0.0019378372059009052,
+  "insights": [
+   "wrong-notes: Wrong notes in bars 10–12",
+   "missed-notes: Trouble spot: bars 9–12",
+   "scooping: Scooping up into notes"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 60,
+  "banner": "Not yet: 55% of 80% needed. Use the tips below and try again.",
+  "scoreText": "4,220",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.1319274376417234,
+     "from": 15,
+     "to": 39,
+     "rate": 1,
+     "now": 0.03192743764172336,
+     "countIn": 3
+    }
+   ],
+   "scheduled": 43,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 6–13 · TENOR · L3 INDEPENDENT Dieu! qu'il la fait bon regarder! Not yet: 55% of 80% needed. Use the tips below and try again. C 4,220 55% accuracy In tune 48% avg ±0¢ Rhythm 59% Best combo 27 perfect 8 · good 11 · ok 13 · miss 11 Bar by bar tap a bar to loop it 6 7 8 9 10 11 12 13 solid ok needs work bars 6–13 Coach notes Wrong notes in bars 10–12 12 notes were sung clearly but off, typically by about 2 semitones (bars 10, 11 and 12). Learn the pitches first: loop these bars slowly with your part playing and note names on. Loop bars 10–12 slowly Trouble spot: bars 9–12 Only 46% of the notes in bars 9–12 landed. Loop these bars slowly with your part playing until the notes are secure, then take the support away. Loop bars 9–12 slowly Scooping up into notes 42% of your notes started from below and slid up (e.g. bars 9–12). Aim for the centre of the pitch from the very start: hear it first, then sing it on the consonant. Loop bars 9–12 slowly Try again Easier: level 2 All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    27,
+    "good",
+    0,
+    176,
+    0.78
+   ],
+   [
+    28,
+    "ok",
+    0,
+    195,
+    0.51
+   ],
+   [
+    29,
+    "ok",
+    0,
+    218,
+    0.46
+   ],
+   [
+    30,
+    "perfect",
+    0,
+    17,
+    1
+   ],
+   [
+    31,
+    "perfect",
+    0,
+    16,
+    1
+   ],
+   [
+    32,
+    "perfect",
+    1,
+    4,
+    1
+   ],
+   [
+    33,
+    "perfect",
+    0,
+    10,
+    1
+   ],
+   [
+    34,
+    "ok",
+    0,
+    217,
+    0.51
+   ],
+   [
+    35,
+    "ok",
+    0,
+    216,
+    0.46
+   ],
+   [
+    36,
+    "good",
+    0,
+    215,
+    0.77
+   ],
+   [
+    37,
+    "good",
+    0,
+    175,
+    0.77
+   ],
+   [
+    38,
+    "ok",
+    0,
+    215,
+    0.46
+   ],
+   [
+    39,
+    "ok",
+    0,
+    217,
+    0.46
+   ],
+   [
+    40,
+    "perfect",
+    0,
+    16,
+    1
+   ],
+   [
+    41,
+    "ok",
+    0,
+    195,
+    0.51
+   ],
+   [
+    42,
+    "ok",
+    0,
+    197,
+    0.57
+   ],
+   [
+    43,
+    "ok",
+    0,
+    197,
+    0.56
+   ],
+   [
+    44,
+    "ok",
+    0,
+    216,
+    0.45
+   ],
+   [
+    45,
+    "good",
+    0,
+    195,
+    0.62
+   ],
+   [
+    46,
+    "ok",
+    0,
+    197,
+    0.56
+   ],
+   [
+    47,
+    "ok",
+    0,
+    217,
+    0.56
+   ],
+   [
+    48,
+    "good",
+    0,
+    196,
+    0.77
+   ],
+   [
+    49,
+    "good",
+    -422,
+    null,
+    0
+   ],
+   [
+    50,
+    "good",
+    0,
+    197,
+    0.74
+   ],
+   [
+    51,
+    "good",
+    -322,
+    null,
+    0
+   ],
+   [
+    52,
+    "perfect",
+    0,
+    195,
+    0.92
+   ],
+   [
+    53,
+    "perfect",
+    -2,
+    15,
+    1
+   ],
+   [
+    54,
+    "miss",
+    -100,
+    204,
+    0
+   ],
+   [
+    55,
+    "miss",
+    41,
+    190,
+    0
+   ],
+   [
+    56,
+    "good",
+    0,
+    197,
+    0.61
+   ],
+   [
+    57,
+    "miss",
+    122,
+    null,
+    0
+   ],
+   [
+    58,
+    "miss",
+    -100,
+    null,
+    0
+   ],
+   [
+    59,
+    "miss",
+    100,
+    null,
+    0
+   ],
+   [
+    60,
+    "good",
+    0,
+    195,
+    0.62
+   ],
+   [
+    61,
+    "miss",
+    121,
+    null,
+    0
+   ],
+   [
+    62,
+    "miss",
+    -100,
+    null,
+    0
+   ],
+   [
+    63,
+    "miss",
+    100,
+    null,
+    0
+   ],
+   [
+    64,
+    "good",
+    0,
+    196,
+    0.61
+   ],
+   [
+    65,
+    "miss",
+    121,
+    null,
+    0
+   ],
+   [
+    66,
+    "miss",
+    -100,
+    null,
+    0
+   ],
+   [
+    67,
+    "miss",
+    100,
+    null,
+    0
+   ],
+   [
+    68,
+    "perfect",
+    0,
+    198,
+    0.83
+   ],
+   [
+    69,
+    "ok",
+    0,
+    217,
+    0.46
+   ]
+  ]
+ },
+ "debussy-dieu|L3|late150-uncal": {
+  "piece": "debussy-dieu",
+  "part": "P3",
+  "section": "s1-m5-12",
+  "level": 3,
+  "case": "late150-uncal",
+  "wallSec": 28.282,
+  "passed": false,
+  "accuracy": 0.6593023255813955,
+  "pitch": 0.6264904934638633,
+  "rhythm": 0.6600696092390443,
+  "score": 5920,
+  "counts": {
+   "perfect": 15,
+   "good": 11,
+   "ok": 8,
+   "miss": 9
+  },
+  "nNotes": 43,
+  "scheduled": 43,
+  "medOnsetMs": 147.50566893424377,
+  "medCents": 0.0034555168177519135,
+  "insights": [
+   "wrong-notes: Wrong notes in bars 10–12",
+   "scooping: Scooping up into notes"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 0,
+  "banner": "Not yet: 66% of 80% needed. Use the tips below and try again.",
+  "scoreText": "5,920",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.1319274376417234,
+     "from": 15,
+     "to": 39,
+     "rate": 1,
+     "now": 0.03192743764172336,
+     "countIn": 3
+    }
+   ],
+   "scheduled": 43,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 6–13 · TENOR · L3 INDEPENDENT Dieu! qu'il la fait bon regarder! Not yet: 66% of 80% needed. Use the tips below and try again. C 5,920 66% accuracy In tune 63% avg ±0¢ Rhythm 66% Best combo 30 perfect 15 · good 11 · ok 8 · miss 9 Bar by bar tap a bar to loop it 6 7 8 9 10 11 12 13 solid ok needs work bars 6–13 Coach notes Wrong notes in bars 10–12 11 notes were sung clearly but off, typically by about a semitone (bars 10 and 12). Learn the pitches first: loop these bars slowly with your part playing and note names on. Loop bars 10–12 slowly Scooping up into notes 42% of your notes started from below and slid up (e.g. bars 9–12). Aim for the centre of the pitch from the very start: hear it first, then sing it on the consonant. Loop bars 9–12 slowly Try again Easier: level 2 All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    27,
+    "perfect",
+    0,
+    128,
+    0.9
+   ],
+   [
+    28,
+    "ok",
+    0,
+    167,
+    0.59
+   ],
+   [
+    29,
+    "ok",
+    0,
+    167,
+    0.59
+   ],
+   [
+    30,
+    "perfect",
+    0,
+    6,
+    1
+   ],
+   [
+    31,
+    "perfect",
+    0,
+    5,
+    1
+   ],
+   [
+    32,
+    "perfect",
+    0,
+    14,
+    1
+   ],
+   [
+    33,
+    "perfect",
+    0,
+    20,
+    1
+   ],
+   [
+    34,
+    "good",
+    0,
+    166,
+    0.64
+   ],
+   [
+    35,
+    "ok",
+    0,
+    165,
+    0.59
+   ],
+   [
+    36,
+    "perfect",
+    0,
+    167,
+    0.82
+   ],
+   [
+    37,
+    "perfect",
+    0,
+    127,
+    0.9
+   ],
+   [
+    38,
+    "ok",
+    0,
+    167,
+    0.59
+   ],
+   [
+    39,
+    "ok",
+    0,
+    166,
+    0.59
+   ],
+   [
+    40,
+    "perfect",
+    0,
+    6,
+    1
+   ],
+   [
+    41,
+    "ok",
+    0,
+    167,
+    0.59
+   ],
+   [
+    42,
+    "good",
+    0,
+    167,
+    0.69
+   ],
+   [
+    43,
+    "good",
+    0,
+    146,
+    0.69
+   ],
+   [
+    44,
+    "ok",
+    0,
+    165,
+    0.59
+   ],
+   [
+    45,
+    "good",
+    0,
+    147,
+    0.74
+   ],
+   [
+    46,
+    "good",
+    0,
+    166,
+    0.69
+   ],
+   [
+    47,
+    "good",
+    0,
+    166,
+    0.69
+   ],
+   [
+    48,
+    "perfect",
+    0,
+    148,
+    0.85
+   ],
+   [
+    49,
+    "good",
+    -207,
+    null,
+    0.85
+   ],
+   [
+    50,
+    "perfect",
+    0,
+    166,
+    0.81
+   ],
+   [
+    51,
+    "good",
+    -157,
+    null,
+    0.85
+   ],
+   [
+    52,
+    "perfect",
+    0,
+    147,
+    0.95
+   ],
+   [
+    53,
+    "perfect",
+    0,
+    5,
+    1
+   ],
+   [
+    54,
+    "perfect",
+    0,
+    153,
+    1
+   ],
+   [
+    55,
+    "perfect",
+    0,
+    139,
+    1
+   ],
+   [
+    56,
+    "good",
+    0,
+    146,
+    0.75
+   ],
+   [
+    57,
+    "miss",
+    103,
+    null,
+    0
+   ],
+   [
+    58,
+    "miss",
+    -100,
+    null,
+    0
+   ],
+   [
+    59,
+    "miss",
+    100,
+    null,
+    0
+   ],
+   [
+    60,
+    "good",
+    0,
+    147,
+    0.74
+   ],
+   [
+    61,
+    "miss",
+    104,
+    null,
+    0
+   ],
+   [
+    62,
+    "miss",
+    -100,
+    null,
+    0
+   ],
+   [
+    63,
+    "miss",
+    100,
+    null,
+    0
+   ],
+   [
+    64,
+    "good",
+    0,
+    145,
+    0.75
+   ],
+   [
+    65,
+    "miss",
+    103,
+    null,
+    0
+   ],
+   [
+    66,
+    "miss",
+    -100,
+    null,
+    0
+   ],
+   [
+    67,
+    "miss",
+    100,
+    null,
+    0
+   ],
+   [
+    68,
+    "perfect",
+    0,
+    147,
+    0.89
+   ],
+   [
+    69,
+    "ok",
+    0,
+    166,
+    0.59
+   ]
+  ]
+ },
+ "debussy-dieu|L3|wrong": {
+  "piece": "debussy-dieu",
+  "part": "P3",
+  "section": "s1-m5-12",
+  "level": 3,
+  "case": "wrong",
+  "wallSec": 28.236,
+  "passed": false,
+  "accuracy": 0.5116279069767442,
+  "pitch": 0.5116279069767442,
+  "rhythm": 0.8445499129884512,
+  "score": 2200,
+  "counts": {
+   "perfect": 22,
+   "good": 0,
+   "ok": 0,
+   "miss": 21
+  },
+  "nNotes": 43,
+  "scheduled": 43,
+  "medOnsetMs": 57.36961451247069,
+  "medCents": 0.05289359976714536,
+  "insights": [
+   "wrong-notes: Wrong notes in bars 9–12"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 60,
+  "banner": "Not yet: 51% of 80% needed. Use the tips below and try again.",
+  "scoreText": "2,200",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.12031746031746,
+     "from": 15,
+     "to": 39,
+     "rate": 1,
+     "now": 0.03192743764172336,
+     "countIn": 3
+    }
+   ],
+   "scheduled": 43,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 6–13 · TENOR · L3 INDEPENDENT Dieu! qu'il la fait bon regarder! Not yet: 51% of 80% needed. Use the tips below and try again. C 2,200 51% accuracy In tune 51% avg ±0¢ Rhythm 84% Best combo 1 perfect 22 · good 0 · ok 0 · miss 21 Bar by bar tap a bar to loop it 6 7 8 9 10 11 12 13 solid ok needs work bars 6–13 Coach notes Wrong notes in bars 9–12 21 notes were sung clearly but too high, typically by about a semitone (bars 6, 7, 8, 9 and elsewhere). Learn the pitches first: loop these bars slowly with your part playing and note names on. Loop bars 9–12 slowly Try again Easier: level 2 All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    27,
+    "perfect",
+    0,
+    19,
+    1
+   ],
+   [
+    28,
+    "miss",
+    100,
+    59,
+    0
+   ],
+   [
+    29,
+    "perfect",
+    0,
+    58,
+    1
+   ],
+   [
+    30,
+    "miss",
+    100,
+    318,
+    0
+   ],
+   [
+    31,
+    "perfect",
+    0,
+    19,
+    1
+   ],
+   [
+    32,
+    "miss",
+    100,
+    null,
+    0
+   ],
+   [
+    33,
+    "perfect",
+    0,
+    10,
+    1
+   ],
+   [
+    34,
+    "miss",
+    100,
+    57,
+    0
+   ],
+   [
+    35,
+    "perfect",
+    0,
+    59,
+    1
+   ],
+   [
+    36,
+    "miss",
+    100,
+    58,
+    0
+   ],
+   [
+    37,
+    "perfect",
+    0,
+    18,
+    1
+   ],
+   [
+    38,
+    "miss",
+    100,
+    58,
+    0
+   ],
+   [
+    39,
+    "perfect",
+    0,
+    57,
+    1
+   ],
+   [
+    40,
+    "miss",
+    100,
+    318,
+    0
+   ],
+   [
+    41,
+    "perfect",
+    0,
+    67,
+    1
+   ],
+   [
+    42,
+    "miss",
+    100,
+    58,
+    0
+   ],
+   [
+    43,
+    "perfect",
+    0,
+    57,
+    1
+   ],
+   [
+    44,
+    "miss",
+    100,
+    59,
+    0
+   ],
+   [
+    45,
+    "perfect",
+    0,
+    18,
+    1
+   ],
+   [
+    46,
+    "miss",
+    100,
+    119,
+    0
+   ],
+   [
+    47,
+    "perfect",
+    0,
+    42,
+    1
+   ],
+   [
+    48,
+    "miss",
+    100,
+    59,
+    0
+   ],
+   [
+    49,
+    "perfect",
+    0,
+    49,
+    1
+   ],
+   [
+    50,
+    "miss",
+    100,
+    319,
+    0
+   ],
+   [
+    51,
+    "perfect",
+    0,
+    48,
+    1
+   ],
+   [
+    52,
+    "miss",
+    100,
+    null,
+    0
+   ],
+   [
+    53,
+    "perfect",
+    0,
+    18,
+    1
+   ],
+   [
+    54,
+    "miss",
+    100,
+    65,
+    0
+   ],
+   [
+    55,
+    "perfect",
+    0,
+    51,
+    1
+   ],
+   [
+    56,
+    "miss",
+    100,
+    57,
+    0
+   ],
+   [
+    57,
+    "perfect",
+    0,
+    56,
+    1
+   ],
+   [
+    58,
+    "miss",
+    100,
+    52,
+    0
+   ],
+   [
+    59,
+    "perfect",
+    0,
+    null,
+    1
+   ],
+   [
+    60,
+    "miss",
+    100,
+    59,
+    0
+   ],
+   [
+    61,
+    "perfect",
+    0,
+    58,
+    1
+   ],
+   [
+    62,
+    "miss",
+    100,
+    51,
+    0
+   ],
+   [
+    63,
+    "perfect",
+    0,
+    64,
+    1
+   ],
+   [
+    64,
+    "miss",
+    100,
+    57,
+    0
+   ],
+   [
+    65,
+    "perfect",
+    0,
+    null,
+    1
+   ],
+   [
+    66,
+    "miss",
+    100,
+    52,
+    0
+   ],
+   [
+    67,
+    "perfect",
+    0,
+    null,
+    1
+   ],
+   [
+    68,
+    "miss",
+    100,
+    58,
+    0
+   ],
+   [
+    69,
+    "perfect",
+    0,
+    57,
+    1
+   ]
+  ]
+ },
+ "debussy-dieu|L3|silence": {
+  "piece": "debussy-dieu",
+  "part": "P3",
+  "section": "s1-m5-12",
+  "level": 3,
+  "case": "silence",
+  "wallSec": 28.232,
+  "passed": false,
+  "accuracy": 0,
+  "pitch": 0,
+  "rhythm": 0,
+  "score": 0,
+  "counts": {
+   "perfect": 0,
+   "good": 0,
+   "ok": 0,
+   "miss": 43
+  },
+  "nNotes": 43,
+  "scheduled": 0,
+  "medOnsetMs": null,
+  "medCents": null,
+  "insights": [
+   "quiet: We could hardly hear you",
+   "missed-notes: Trouble spot: bars 6–9"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 60,
+  "banner": "Not yet: 0% of 80% needed. Use the tips below and try again.",
+  "scoreText": "0",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.1319274376417234,
+     "from": 15,
+     "to": 39,
+     "rate": 1,
+     "now": 0.040634920634920635,
+     "countIn": 3
+    }
+   ],
+   "scheduled": 0,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 6–13 · TENOR · L3 INDEPENDENT Dieu! qu'il la fait bon regarder! Not yet: 0% of 80% needed. Use the tips below and try again. D 0 0% accuracy In tune 0% Rhythm 0% Best combo 0 perfect 0 · good 0 · ok 0 · miss 43 Bar by bar tap a bar to loop it 6 7 8 9 10 11 12 13 solid ok needs work bars 6–13 Coach notes We could hardly hear you Your voice was detected on only a small part of the notes. Sing out at rehearsal volume, keep the phone 20–50 cm away, and check that the microphone isn’t blocked or muted. The Tuner in Settings shows whether your voice comes through. Trouble spot: bars 6–9 Only 0% of the notes in bars 6–9 landed. Loop these bars slowly with your part playing until the notes are secure, then take the support away. Loop bars 6–9 slowly Try again Easier: level 2 All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    27,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    28,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    29,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    30,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    31,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    32,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    33,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    34,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    35,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    36,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    37,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    38,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    39,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    40,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    41,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    42,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    43,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    44,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    45,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    46,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    47,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    48,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    49,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    50,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    51,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    52,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    53,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    54,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    55,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    56,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    57,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    58,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    59,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    60,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    61,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    62,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    63,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    64,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    65,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    66,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    67,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    68,
+    "miss",
+    null,
+    null,
+    0
+   ],
+   [
+    69,
+    "miss",
+    null,
+    null,
+    0
+   ]
+  ]
+ },
+ "warmup-chorale|L2|x-late100": {
+  "piece": "warmup-chorale",
+  "part": "P2",
+  "section": "s1-m7-12",
+  "level": 2,
+  "case": "x-late100",
+  "wallSec": 24.577,
+  "passed": true,
+  "accuracy": 0.9642857142857143,
+  "pitch": 0.8960866293327651,
+  "rhythm": 0.9062250296944226,
+  "score": 3570,
+  "counts": {
+   "perfect": 16,
+   "good": 5,
+   "ok": 0,
+   "miss": 0
+  },
+  "nNotes": 21,
+  "scheduled": 21,
+  "medOnsetMs": 150.02267573696315,
+  "medCents": 0.0119267748956986,
+  "insights": [
+   "scooping: Scooping up into notes",
+   "great: Excellent run"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 60,
+  "banner": "Level 2 reached: In time! ",
+  "scoreText": "3,570",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.453650793650796,
+     "from": 20.833333333333332,
+     "to": 40.833333333333336,
+     "rate": 1,
+     "now": 0.03192743764172336,
+     "countIn": 4
+    }
+   ],
+   "scheduled": 21,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 7–12 · ALTO · L2 IN TIME Abendlied (Warm-up Chorale) Level 2 reached: In time! S 3,570 96% accuracy In tune 90% avg ±0¢ Rhythm 91% Best combo 21 perfect 16 · good 5 · ok 0 · miss 0 Bar by bar tap a bar to loop it 7 8 9 10 11 12 solid ok needs work bars 7–12 Coach notes Scooping up into notes 33% of your notes started from below and slid up (e.g. bars 9–11). Aim for the centre of the pitch from the very start: hear it first, then sing it on the consonant. Loop bars 9–11 slowly Excellent run 96% accuracy across bars 7–12. Polish the point above, then move on. Next: Upbeat–bar 6, level 1 Again All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    21,
+    "perfect",
+    0,
+    123,
+    0.95
+   ],
+   [
+    22,
+    "perfect",
+    0,
+    13,
+    1
+   ],
+   [
+    23,
+    "perfect",
+    0,
+    18,
+    1
+   ],
+   [
+    24,
+    "perfect",
+    0,
+    145,
+    0.95
+   ],
+   [
+    25,
+    "perfect",
+    0,
+    151,
+    0.86
+   ],
+   [
+    26,
+    "perfect",
+    0,
+    17,
+    1
+   ],
+   [
+    27,
+    "perfect",
+    0,
+    150,
+    0.83
+   ],
+   [
+    28,
+    "perfect",
+    0,
+    158,
+    0.85
+   ],
+   [
+    29,
+    "perfect",
+    0,
+    144,
+    0.93
+   ],
+   [
+    30,
+    "perfect",
+    0,
+    152,
+    0.83
+   ],
+   [
+    31,
+    "good",
+    0,
+    157,
+    0.79
+   ],
+   [
+    32,
+    "good",
+    0,
+    166,
+    0.78
+   ],
+   [
+    33,
+    "perfect",
+    0,
+    151,
+    0.92
+   ],
+   [
+    34,
+    "good",
+    0,
+    165,
+    0.78
+   ],
+   [
+    35,
+    "perfect",
+    0,
+    150,
+    0.83
+   ],
+   [
+    36,
+    "good",
+    0,
+    158,
+    0.79
+   ],
+   [
+    37,
+    "perfect",
+    0,
+    4,
+    1
+   ],
+   [
+    38,
+    "perfect",
+    0,
+    13,
+    1
+   ],
+   [
+    39,
+    "perfect",
+    0,
+    18,
+    1
+   ],
+   [
+    40,
+    "good",
+    0,
+    166,
+    0.78
+   ],
+   [
+    41,
+    "perfect",
+    0,
+    151,
+    0.93
+   ]
+  ]
+ },
+ "warmup-chorale|L2|x-early100": {
+  "piece": "warmup-chorale",
+  "part": "P2",
+  "section": "s1-m7-12",
+  "level": 2,
+  "case": "x-early100",
+  "wallSec": 24.642,
+  "passed": true,
+  "accuracy": 1,
+  "pitch": 0.9442950023494163,
+  "rhythm": 1,
+  "score": 3900,
+  "counts": {
+   "perfect": 21,
+   "good": 0,
+   "ok": 0,
+   "miss": 0
+  },
+  "nNotes": 21,
+  "scheduled": 21,
+  "medOnsetMs": 7.437641723349486,
+  "medCents": 0.015264786564728183,
+  "insights": [
+   "flat-long-notes: Long notes sink",
+   "great: Excellent run"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 60,
+  "banner": "Level 2 reached: In time! ",
+  "scoreText": "3,900",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.453650793650796,
+     "from": 20.833333333333332,
+     "to": 40.833333333333336,
+     "rate": 1,
+     "now": 0.020317460317460317,
+     "countIn": 4
+    }
+   ],
+   "scheduled": 21,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 7–12 · ALTO · L2 IN TIME Abendlied (Warm-up Chorale) Level 2 reached: In time! S 3,900 100% accuracy In tune 94% avg ±0¢ Rhythm 100% Best combo 21 perfect 21 · good 0 · ok 0 · miss 0 Bar by bar tap a bar to loop it 7 8 9 10 11 12 solid ok needs work bars 7–12 Coach notes Long notes sink On the held notes in bar 10 the pitch drops by about 16 cents by the end. Keep the breath support going right to the end of the note and think the line onward. Loop bars 10–11 slowly Excellent run 100% accuracy across bars 7–12. Polish the point above, then move on. Next: Upbeat–bar 6, level 1 Again All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    21,
+    "perfect",
+    0,
+    4,
+    1
+   ],
+   [
+    22,
+    "perfect",
+    0,
+    13,
+    1
+   ],
+   [
+    23,
+    "perfect",
+    0,
+    18,
+    0.91
+   ],
+   [
+    24,
+    "perfect",
+    0,
+    3,
+    1
+   ],
+   [
+    25,
+    "perfect",
+    0,
+    12,
+    1
+   ],
+   [
+    26,
+    "perfect",
+    -1,
+    17,
+    0.94
+   ],
+   [
+    27,
+    "perfect",
+    0,
+    2,
+    0.89
+   ],
+   [
+    28,
+    "perfect",
+    0,
+    7,
+    0.95
+   ],
+   [
+    29,
+    "perfect",
+    0,
+    16,
+    0.9
+   ],
+   [
+    30,
+    "perfect",
+    0,
+    1,
+    0.88
+   ],
+   [
+    31,
+    "perfect",
+    0,
+    6,
+    0.87
+   ],
+   [
+    32,
+    "perfect",
+    0,
+    15,
+    0.97
+   ],
+   [
+    33,
+    "perfect",
+    0,
+    0,
+    0.94
+   ],
+   [
+    34,
+    "perfect",
+    0,
+    14,
+    0.88
+   ],
+   [
+    35,
+    "perfect",
+    0,
+    2,
+    0.86
+   ],
+   [
+    36,
+    "perfect",
+    0,
+    7,
+    1
+   ],
+   [
+    37,
+    "perfect",
+    0,
+    16,
+    1
+   ],
+   [
+    38,
+    "perfect",
+    0,
+    1,
+    1
+   ],
+   [
+    39,
+    "perfect",
+    0,
+    7,
+    0.87
+   ],
+   [
+    40,
+    "perfect",
+    0,
+    15,
+    1
+   ],
+   [
+    41,
+    "perfect",
+    0,
+    0,
+    0.98
+   ]
+  ]
+ },
+ "warmup-chorale|L2|x-late250-uncal": {
+  "piece": "warmup-chorale",
+  "part": "P2",
+  "section": "s1-m7-12",
+  "level": 2,
+  "case": "x-late250-uncal",
+  "wallSec": 24.562,
+  "passed": true,
+  "accuracy": 0.9142857142857143,
+  "pitch": 0.8055817327161081,
+  "rhythm": 0.723893208076888,
+  "score": 3270,
+  "counts": {
+   "perfect": 9,
+   "good": 12,
+   "ok": 0,
+   "miss": 0
+  },
+  "nNotes": 21,
+  "scheduled": 21,
+  "medOnsetMs": 254.12698412698376,
+  "medCents": 0.01724167192307391,
+  "insights": [
+   "scooping: Scooping up into notes",
+   "great: Excellent run"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 0,
+  "banner": "Level 2 reached: In time! ",
+  "scoreText": "3,270",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.453650793650796,
+     "from": 20.833333333333332,
+     "to": 40.833333333333336,
+     "rate": 1,
+     "now": 0.03192743764172336,
+     "countIn": 4
+    }
+   ],
+   "scheduled": 21,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 7–12 · ALTO · L2 IN TIME Abendlied (Warm-up Chorale) Level 2 reached: In time! A 3,270 91% accuracy In tune 81% avg ±0¢ Rhythm 72% Best combo 21 perfect 9 · good 12 · ok 0 · miss 0 Bar by bar tap a bar to loop it 7 8 9 10 11 12 solid ok needs work bars 7–12 Coach notes Scooping up into notes 33% of your notes started from below and slid up (e.g. bars 9–11). Aim for the centre of the pitch from the very start: hear it first, then sing it on the consonant. Loop bars 9–11 slowly Excellent run 91% accuracy across bars 7–12. Polish the point above, then move on. Next: Upbeat–bar 6, level 1 Again All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    21,
+    "perfect",
+    0,
+    214,
+    0.83
+   ],
+   [
+    22,
+    "perfect",
+    0,
+    2,
+    1
+   ],
+   [
+    23,
+    "perfect",
+    0,
+    8,
+    1
+   ],
+   [
+    24,
+    "good",
+    -1,
+    254,
+    0.77
+   ],
+   [
+    25,
+    "good",
+    0,
+    263,
+    0.73
+   ],
+   [
+    26,
+    "perfect",
+    0,
+    7,
+    1
+   ],
+   [
+    27,
+    "good",
+    0,
+    262,
+    0.7
+   ],
+   [
+    28,
+    "good",
+    0,
+    247,
+    0.7
+   ],
+   [
+    29,
+    "good",
+    -1,
+    255,
+    0.77
+   ],
+   [
+    30,
+    "good",
+    -1,
+    261,
+    0.7
+   ],
+   [
+    31,
+    "good",
+    0,
+    249,
+    0.67
+   ],
+   [
+    32,
+    "good",
+    -1,
+    254,
+    0.66
+   ],
+   [
+    33,
+    "perfect",
+    0,
+    263,
+    0.86
+   ],
+   [
+    34,
+    "good",
+    0,
+    253,
+    0.66
+   ],
+   [
+    35,
+    "good",
+    -1,
+    262,
+    0.7
+   ],
+   [
+    36,
+    "good",
+    0,
+    267,
+    0.64
+   ],
+   [
+    37,
+    "perfect",
+    0,
+    14,
+    1
+   ],
+   [
+    38,
+    "perfect",
+    0,
+    2,
+    1
+   ],
+   [
+    39,
+    "perfect",
+    0,
+    8,
+    1
+   ],
+   [
+    40,
+    "good",
+    0,
+    254,
+    0.66
+   ],
+   [
+    41,
+    "perfect",
+    0,
+    263,
+    0.88
+   ]
+  ]
+ },
+ "warmup-chorale|L2|x-late350-uncal": {
+  "piece": "warmup-chorale",
+  "part": "P2",
+  "section": "s1-m7-12",
+  "level": 2,
+  "case": "x-late350-uncal",
+  "wallSec": 24.592,
+  "passed": false,
+  "accuracy": 0.7333333333333334,
+  "pitch": 0.704072184864311,
+  "rhythm": 0.5362676816758519,
+  "score": 2640,
+  "counts": {
+   "perfect": 7,
+   "good": 4,
+   "ok": 10,
+   "miss": 0
+  },
+  "nNotes": 21,
+  "scheduled": 21,
+  "medOnsetMs": 360.2494331065707,
+  "medCents": 0.03123749166604739,
+  "insights": [
+   "flat-long-notes: Long notes sink",
+   "scooping: Scooping up into notes"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 0,
+  "banner": "Not yet: 73% of 80% needed. Use the tips below and try again.",
+  "scoreText": "2,640",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.453650793650796,
+     "from": 20.833333333333332,
+     "to": 40.833333333333336,
+     "rate": 1,
+     "now": 0.03192743764172336,
+     "countIn": 4
+    }
+   ],
+   "scheduled": 21,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 7–12 · ALTO · L2 IN TIME Abendlied (Warm-up Chorale) Not yet: 73% of 80% needed. Use the tips below and try again. B 2,640 73% accuracy In tune 70% avg ±0¢ Rhythm 54% Best combo 21 perfect 7 · good 4 · ok 10 · miss 0 Bar by bar tap a bar to loop it 7 8 9 10 11 12 solid ok needs work bars 7–12 Coach notes Long notes sink On the held notes in bars 10 and 12 the pitch drops by about 119 cents by the end. Keep the breath support going right to the end of the note and think the line onward. Loop bars 10–12 slowly Scooping up into notes 33% of your notes started from below and slid up (e.g. bars 9–11). Aim for the centre of the pitch from the very start: hear it first, then sing it on the consonant. Loop bars 9–11 slowly Try again Easier: level 1 All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    21,
+    "good",
+    0,
+    316,
+    0.68
+   ],
+   [
+    22,
+    "perfect",
+    0,
+    2,
+    1
+   ],
+   [
+    23,
+    "perfect",
+    0,
+    19,
+    1
+   ],
+   [
+    24,
+    "good",
+    -1,
+    364,
+    0.62
+   ],
+   [
+    25,
+    "ok",
+    4,
+    370,
+    0.58
+   ],
+   [
+    26,
+    "perfect",
+    0,
+    7,
+    1
+   ],
+   [
+    27,
+    "ok",
+    0,
+    360,
+    0.54
+   ],
+   [
+    28,
+    "ok",
+    -2,
+    348,
+    0.55
+   ],
+   [
+    29,
+    "good",
+    -1,
+    354,
+    0.63
+   ],
+   [
+    30,
+    "ok",
+    -1,
+    368,
+    0.56
+   ],
+   [
+    31,
+    "ok",
+    1,
+    371,
+    0.49
+   ],
+   [
+    32,
+    "ok",
+    0,
+    362,
+    0.5
+   ],
+   [
+    33,
+    "good",
+    0,
+    361,
+    0.8
+   ],
+   [
+    34,
+    "ok",
+    1,
+    355,
+    0.51
+   ],
+   [
+    35,
+    "ok",
+    0,
+    366,
+    0.54
+   ],
+   [
+    36,
+    "ok",
+    0,
+    369,
+    0.5
+   ],
+   [
+    37,
+    "perfect",
+    0,
+    26,
+    1
+   ],
+   [
+    38,
+    "perfect",
+    0,
+    5,
+    1
+   ],
+   [
+    39,
+    "perfect",
+    0,
+    17,
+    1
+   ],
+   [
+    40,
+    "ok",
+    0,
+    365,
+    0.49
+   ],
+   [
+    41,
+    "perfect",
+    0,
+    367,
+    0.81
+   ]
+  ]
+ },
+ "warmup-chorale|L3|x-late100": {
+  "piece": "warmup-chorale",
+  "part": "P2",
+  "section": "s1-m7-12",
+  "level": 3,
+  "case": "x-late100",
+  "wallSec": 24.599,
+  "passed": true,
+  "accuracy": 0.9642857142857143,
+  "pitch": 0.8933740178084039,
+  "rhythm": 0.9062250296944226,
+  "score": 3570,
+  "counts": {
+   "perfect": 16,
+   "good": 5,
+   "ok": 0,
+   "miss": 0
+  },
+  "nNotes": 21,
+  "scheduled": 21,
+  "medOnsetMs": 150.02267573696315,
+  "medCents": 0.0119267748956986,
+  "insights": [
+   "scooping: Scooping up into notes",
+   "great: Excellent run"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 60,
+  "banner": "Level 3 reached: Independent! This section is rehearsal-ready.",
+  "scoreText": "3,570",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.453650793650796,
+     "from": 20.833333333333332,
+     "to": 40.833333333333336,
+     "rate": 1,
+     "now": 0.03192743764172336,
+     "countIn": 4
+    }
+   ],
+   "scheduled": 21,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 7–12 · ALTO · L3 INDEPENDENT Abendlied (Warm-up Chorale) Level 3 reached: Independent! This section is rehearsal-ready. S 3,570 96% accuracy In tune 89% avg ±0¢ Rhythm 91% Best combo 21 perfect 16 · good 5 · ok 0 · miss 0 Bar by bar tap a bar to loop it 7 8 9 10 11 12 solid ok needs work bars 7–12 Coach notes Scooping up into notes 33% of your notes started from below and slid up (e.g. bars 9–11). Aim for the centre of the pitch from the very start: hear it first, then sing it on the consonant. Loop bars 9–11 slowly Excellent run 96% accuracy across bars 7–12. Polish the point above, then move on. Next: Upbeat–bar 6, level 1 Again All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    21,
+    "perfect",
+    0,
+    123,
+    0.95
+   ],
+   [
+    22,
+    "perfect",
+    0,
+    13,
+    1
+   ],
+   [
+    23,
+    "perfect",
+    0,
+    18,
+    1
+   ],
+   [
+    24,
+    "perfect",
+    0,
+    145,
+    0.92
+   ],
+   [
+    25,
+    "perfect",
+    0,
+    151,
+    0.86
+   ],
+   [
+    26,
+    "perfect",
+    0,
+    17,
+    1
+   ],
+   [
+    27,
+    "perfect",
+    0,
+    150,
+    0.83
+   ],
+   [
+    28,
+    "perfect",
+    0,
+    158,
+    0.85
+   ],
+   [
+    29,
+    "perfect",
+    0,
+    144,
+    0.9
+   ],
+   [
+    30,
+    "perfect",
+    0,
+    152,
+    0.83
+   ],
+   [
+    31,
+    "good",
+    0,
+    157,
+    0.79
+   ],
+   [
+    32,
+    "good",
+    0,
+    166,
+    0.78
+   ],
+   [
+    33,
+    "perfect",
+    0,
+    151,
+    0.92
+   ],
+   [
+    34,
+    "good",
+    0,
+    165,
+    0.78
+   ],
+   [
+    35,
+    "perfect",
+    0,
+    150,
+    0.83
+   ],
+   [
+    36,
+    "good",
+    0,
+    158,
+    0.79
+   ],
+   [
+    37,
+    "perfect",
+    0,
+    4,
+    1
+   ],
+   [
+    38,
+    "perfect",
+    0,
+    13,
+    1
+   ],
+   [
+    39,
+    "perfect",
+    0,
+    18,
+    1
+   ],
+   [
+    40,
+    "good",
+    0,
+    166,
+    0.78
+   ],
+   [
+    41,
+    "perfect",
+    0,
+    151,
+    0.93
+   ]
+  ]
+ },
+ "warmup-chorale|L3|x-early100": {
+  "piece": "warmup-chorale",
+  "part": "P2",
+  "section": "s1-m7-12",
+  "level": 3,
+  "case": "x-early100",
+  "wallSec": 24.58,
+  "passed": true,
+  "accuracy": 1,
+  "pitch": 0.9441755739479445,
+  "rhythm": 1,
+  "score": 3900,
+  "counts": {
+   "perfect": 21,
+   "good": 0,
+   "ok": 0,
+   "miss": 0
+  },
+  "nNotes": 21,
+  "scheduled": 21,
+  "medOnsetMs": 11.655328798180875,
+  "medCents": 0.012328096300961988,
+  "insights": [
+   "great: Excellent run"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 60,
+  "banner": "Level 3 reached: Independent! This section is rehearsal-ready.",
+  "scoreText": "3,900",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.453650793650796,
+     "from": 20.833333333333332,
+     "to": 40.833333333333336,
+     "rate": 1,
+     "now": 0.03192743764172336,
+     "countIn": 4
+    }
+   ],
+   "scheduled": 21,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 7–12 · ALTO · L3 INDEPENDENT Abendlied (Warm-up Chorale) Level 3 reached: Independent! This section is rehearsal-ready. S 3,900 100% accuracy In tune 94% avg ±0¢ Rhythm 100% Best combo 21 perfect 21 · good 0 · ok 0 · miss 0 Bar by bar tap a bar to loop it 7 8 9 10 11 12 solid ok needs work bars 7–12 Coach notes Excellent run 100% accuracy across bars 7–12. Move on to the next level or the next section. Next: Upbeat–bar 6, level 1 Again All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    21,
+    "perfect",
+    0,
+    4,
+    1
+   ],
+   [
+    22,
+    "perfect",
+    0,
+    13,
+    1
+   ],
+   [
+    23,
+    "perfect",
+    0,
+    18,
+    0.91
+   ],
+   [
+    24,
+    "perfect",
+    0,
+    3,
+    1
+   ],
+   [
+    25,
+    "perfect",
+    0,
+    12,
+    1
+   ],
+   [
+    26,
+    "perfect",
+    0,
+    17,
+    0.94
+   ],
+   [
+    27,
+    "perfect",
+    0,
+    11,
+    0.87
+   ],
+   [
+    28,
+    "perfect",
+    0,
+    19,
+    0.91
+   ],
+   [
+    29,
+    "perfect",
+    0,
+    4,
+    0.86
+   ],
+   [
+    30,
+    "perfect",
+    0,
+    13,
+    0.93
+   ],
+   [
+    31,
+    "perfect",
+    0,
+    18,
+    0.88
+   ],
+   [
+    32,
+    "perfect",
+    0,
+    3,
+    1
+   ],
+   [
+    33,
+    "perfect",
+    0,
+    12,
+    0.94
+   ],
+   [
+    34,
+    "perfect",
+    0,
+    5,
+    0.86
+   ],
+   [
+    35,
+    "perfect",
+    0,
+    11,
+    0.87
+   ],
+   [
+    36,
+    "perfect",
+    0,
+    19,
+    1
+   ],
+   [
+    37,
+    "perfect",
+    0,
+    4,
+    1
+   ],
+   [
+    38,
+    "perfect",
+    0,
+    13,
+    1
+   ],
+   [
+    39,
+    "perfect",
+    0,
+    18,
+    0.88
+   ],
+   [
+    40,
+    "perfect",
+    0,
+    3,
+    1
+   ],
+   [
+    41,
+    "perfect",
+    0,
+    12,
+    0.98
+   ]
+  ]
+ },
+ "warmup-chorale|L3|x-late250-uncal": {
+  "piece": "warmup-chorale",
+  "part": "P2",
+  "section": "s1-m7-12",
+  "level": 3,
+  "case": "x-late250-uncal",
+  "wallSec": 24.584,
+  "passed": true,
+  "accuracy": 0.9142857142857143,
+  "pitch": 0.8012225960623521,
+  "rhythm": 0.7242387431163024,
+  "score": 3270,
+  "counts": {
+   "perfect": 9,
+   "good": 12,
+   "ok": 0,
+   "miss": 0
+  },
+  "nNotes": 21,
+  "scheduled": 21,
+  "medOnsetMs": 254.12698412698376,
+  "medCents": 0.020841672815663514,
+  "insights": [
+   "scooping: Scooping up into notes",
+   "great: Excellent run"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 0,
+  "banner": "Level 3 reached: Independent! This section is rehearsal-ready.",
+  "scoreText": "3,270",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.465260770975059,
+     "from": 20.833333333333332,
+     "to": 40.833333333333336,
+     "rate": 1,
+     "now": 0.03192743764172336,
+     "countIn": 4
+    }
+   ],
+   "scheduled": 21,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 7–12 · ALTO · L3 INDEPENDENT Abendlied (Warm-up Chorale) Level 3 reached: Independent! This section is rehearsal-ready. A 3,270 91% accuracy In tune 80% avg ±0¢ Rhythm 72% Best combo 21 perfect 9 · good 12 · ok 0 · miss 0 Bar by bar tap a bar to loop it 7 8 9 10 11 12 solid ok needs work bars 7–12 Coach notes Scooping up into notes 33% of your notes started from below and slid up (e.g. bars 9–11). Aim for the centre of the pitch from the very start: hear it first, then sing it on the consonant. Loop bars 9–11 slowly Excellent run 91% accuracy across bars 7–12. Polish the point above, then move on. Next: Upbeat–bar 6, level 1 Again All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    21,
+    "perfect",
+    0,
+    212,
+    0.83
+   ],
+   [
+    22,
+    "perfect",
+    0,
+    20,
+    1
+   ],
+   [
+    23,
+    "perfect",
+    0,
+    8,
+    1
+   ],
+   [
+    24,
+    "good",
+    0,
+    254,
+    0.74
+   ],
+   [
+    25,
+    "good",
+    0,
+    260,
+    0.71
+   ],
+   [
+    26,
+    "perfect",
+    0,
+    7,
+    1
+   ],
+   [
+    27,
+    "good",
+    0,
+    259,
+    0.71
+   ],
+   [
+    28,
+    "good",
+    -1,
+    247,
+    0.7
+   ],
+   [
+    29,
+    "good",
+    0,
+    252,
+    0.74
+   ],
+   [
+    30,
+    "good",
+    -1,
+    261,
+    0.71
+   ],
+   [
+    31,
+    "good",
+    0,
+    266,
+    0.64
+   ],
+   [
+    32,
+    "good",
+    0,
+    254,
+    0.66
+   ],
+   [
+    33,
+    "perfect",
+    0,
+    260,
+    0.86
+   ],
+   [
+    34,
+    "good",
+    0,
+    253,
+    0.66
+   ],
+   [
+    35,
+    "good",
+    0,
+    259,
+    0.71
+   ],
+   [
+    36,
+    "good",
+    0,
+    267,
+    0.64
+   ],
+   [
+    37,
+    "perfect",
+    0,
+    14,
+    1
+   ],
+   [
+    38,
+    "perfect",
+    0,
+    20,
+    1
+   ],
+   [
+    39,
+    "perfect",
+    0,
+    5,
+    1
+   ],
+   [
+    40,
+    "good",
+    0,
+    254,
+    0.66
+   ],
+   [
+    41,
+    "perfect",
+    0,
+    260,
+    0.86
+   ]
+  ]
+ },
+ "warmup-chorale|L3|x-late350-uncal": {
+  "piece": "warmup-chorale",
+  "part": "P2",
+  "section": "s1-m7-12",
+  "level": 3,
+  "case": "x-late350-uncal",
+  "wallSec": 24.619,
+  "passed": false,
+  "accuracy": 0.7261904761904762,
+  "pitch": 0.7068073458071318,
+  "rhythm": 0.5428328474246914,
+  "score": 2550,
+  "counts": {
+   "perfect": 6,
+   "good": 5,
+   "ok": 10,
+   "miss": 0
+  },
+  "nNotes": 21,
+  "scheduled": 21,
+  "medOnsetMs": 355.714285714285,
+  "medCents": 0.032608484508500624,
+  "insights": [
+   "flat-long-notes: Long notes sink",
+   "scooping: Scooping up into notes"
+  ],
+  "latencyAdjusted": null,
+  "profileLatencyAfter": 0,
+  "banner": "Not yet: 73% of 80% needed. Use the tips below and try again.",
+  "scoreText": "2,550",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.453650793650796,
+     "from": 20.833333333333332,
+     "to": 40.833333333333336,
+     "rate": 1,
+     "now": 0.020317460317460317,
+     "countIn": 4
+    }
+   ],
+   "scheduled": 21,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 7–12 · ALTO · L3 INDEPENDENT Abendlied (Warm-up Chorale) Not yet: 73% of 80% needed. Use the tips below and try again. B 2,550 73% accuracy In tune 71% avg ±0¢ Rhythm 54% Best combo 21 perfect 6 · good 5 · ok 10 · miss 0 Bar by bar tap a bar to loop it 7 8 9 10 11 12 solid ok needs work bars 7–12 Coach notes Long notes sink On the held notes in bars 10 and 12 the pitch drops by about 117 cents by the end. Keep the breath support going right to the end of the note and think the line onward. Loop bars 10–12 slowly Scooping up into notes 33% of your notes started from below and slid up (e.g. bars 9–11). Aim for the centre of the pitch from the very start: hear it first, then sing it on the consonant. Loop bars 9–11 slowly Try again Easier: level 2 All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    21,
+    "good",
+    0,
+    313,
+    0.69
+   ],
+   [
+    22,
+    "perfect",
+    0,
+    2,
+    1
+   ],
+   [
+    23,
+    "perfect",
+    0,
+    8,
+    1
+   ],
+   [
+    24,
+    "good",
+    -1,
+    356,
+    0.6
+   ],
+   [
+    25,
+    "ok",
+    4,
+    361,
+    0.56
+   ],
+   [
+    26,
+    "perfect",
+    0,
+    7,
+    1
+   ],
+   [
+    27,
+    "ok",
+    0,
+    360,
+    0.56
+   ],
+   [
+    28,
+    "ok",
+    -1,
+    348,
+    0.55
+   ],
+   [
+    29,
+    "good",
+    -1,
+    354,
+    0.6
+   ],
+   [
+    30,
+    "ok",
+    -1,
+    362,
+    0.56
+   ],
+   [
+    31,
+    "ok",
+    1,
+    368,
+    0.5
+   ],
+   [
+    32,
+    "ok",
+    0,
+    356,
+    0.52
+   ],
+   [
+    33,
+    "good",
+    0,
+    361,
+    0.8
+   ],
+   [
+    34,
+    "ok",
+    1,
+    355,
+    0.52
+   ],
+   [
+    35,
+    "ok",
+    0,
+    360,
+    0.56
+   ],
+   [
+    36,
+    "ok",
+    0,
+    369,
+    0.5
+   ],
+   [
+    37,
+    "perfect",
+    0,
+    14,
+    1
+   ],
+   [
+    38,
+    "perfect",
+    0,
+    2,
+    1
+   ],
+   [
+    39,
+    "perfect",
+    0,
+    8,
+    1
+   ],
+   [
+    40,
+    "ok",
+    0,
+    356,
+    0.52
+   ],
+   [
+    41,
+    "good",
+    0,
+    361,
+    0.8
+   ]
+  ]
+ },
+ "debussy-dieu|L2|x-late100": {
+  "piece": "debussy-dieu",
+  "level": 2,
+  "case": "x-late100",
+  "error": "TimeoutError: page.waitForFunction: Timeout 120000ms exceeded.",
+  "errors": []
+ },
+ "debussy-dieu|L2|x-early100": {
+  "piece": "debussy-dieu",
+  "level": 2,
+  "case": "x-early100",
+  "error": "TimeoutError: page.waitForFunction: Timeout 120000ms exceeded.",
+  "errors": []
+ },
+ "debussy-dieu|L2|x-late250-uncal": {
+  "piece": "debussy-dieu",
+  "part": "P3",
+  "section": "s1-m5-12",
+  "level": 2,
+  "case": "x-late250-uncal",
+  "wallSec": 28.233,
+  "passed": true,
+  "accuracy": 1,
+  "pitch": 1,
+  "rhythm": 1,
+  "score": 12400,
+  "counts": {
+   "perfect": 43,
+   "good": 0,
+   "ok": 0,
+   "miss": 0
+  },
+  "nNotes": 43,
+  "scheduled": 43,
+  "medOnsetMs": 61.18820861677676,
+  "medCents": 0.002688770230463433,
+  "insights": [
+   "great: Excellent run"
+  ],
+  "latencyAdjusted": 236,
+  "profileLatencyAfter": 236,
+  "banner": "Level 2 reached: In time! ",
+  "scoreText": "12,400",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.1319274376417234,
+     "from": 15,
+     "to": 39,
+     "rate": 1,
+     "now": 0.03192743764172336,
+     "countIn": 3
+    }
+   ],
+   "scheduled": 43,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 6–13 · TENOR · L2 IN TIME Dieu! qu'il la fait bon regarder! You came in consistently late after rests, which is usually headphone delay, not you. We've set your delay to 236 ms and re-scored this run with it. For best accuracy run the delay check in Voice setup. Level 2 reached: In time! S 12,400 100% accuracy In tune 100% avg ±0¢ Rhythm 100% Best combo 43 perfect 43 · good 0 · ok 0 · miss 0 Bar by bar tap a bar to loop it 6 7 8 9 10 11 12 13 solid ok needs work bars 6–13 Coach notes Excellent run 100% accuracy across bars 6–13. Move on to the next level or the next section. Next: Bars 1–5, level 1 Again All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    27,
+    "perfect",
+    0,
+    40,
+    1
+   ],
+   [
+    28,
+    "perfect",
+    0,
+    80,
+    1
+   ],
+   [
+    29,
+    "perfect",
+    0,
+    79,
+    1
+   ],
+   [
+    30,
+    "perfect",
+    0,
+    0,
+    1
+   ],
+   [
+    31,
+    "perfect",
+    0,
+    20,
+    1
+   ],
+   [
+    32,
+    "perfect",
+    0,
+    8,
+    1
+   ],
+   [
+    33,
+    "perfect",
+    0,
+    14,
+    1
+   ],
+   [
+    34,
+    "perfect",
+    0,
+    81,
+    1
+   ],
+   [
+    35,
+    "perfect",
+    0,
+    80,
+    1
+   ],
+   [
+    36,
+    "perfect",
+    0,
+    80,
+    1
+   ],
+   [
+    37,
+    "perfect",
+    0,
+    40,
+    1
+   ],
+   [
+    38,
+    "perfect",
+    0,
+    80,
+    1
+   ],
+   [
+    39,
+    "perfect",
+    0,
+    82,
+    1
+   ],
+   [
+    40,
+    "perfect",
+    0,
+    20,
+    1
+   ],
+   [
+    41,
+    "perfect",
+    0,
+    80,
+    1
+   ],
+   [
+    42,
+    "perfect",
+    0,
+    59,
+    1
+   ],
+   [
+    43,
+    "perfect",
+    0,
+    61,
+    1
+   ],
+   [
+    44,
+    "perfect",
+    0,
+    81,
+    1
+   ],
+   [
+    45,
+    "perfect",
+    0,
+    60,
+    1
+   ],
+   [
+    46,
+    "perfect",
+    0,
+    62,
+    1
+   ],
+   [
+    47,
+    "perfect",
+    0,
+    61,
+    1
+   ],
+   [
+    48,
+    "perfect",
+    0,
+    60,
+    1
+   ],
+   [
+    49,
+    "perfect",
+    0,
+    71,
+    1
+   ],
+   [
+    50,
+    "perfect",
+    0,
+    62,
+    1
+   ],
+   [
+    51,
+    "perfect",
+    0,
+    69,
+    1
+   ],
+   [
+    52,
+    "perfect",
+    0,
+    60,
+    1
+   ],
+   [
+    53,
+    "perfect",
+    0,
+    19,
+    1
+   ],
+   [
+    54,
+    "perfect",
+    0,
+    66,
+    1
+   ],
+   [
+    55,
+    "perfect",
+    0,
+    55,
+    1
+   ],
+   [
+    56,
+    "perfect",
+    0,
+    61,
+    1
+   ],
+   [
+    57,
+    "perfect",
+    0,
+    60,
+    1
+   ],
+   [
+    58,
+    "perfect",
+    0,
+    74,
+    1
+   ],
+   [
+    59,
+    "perfect",
+    0,
+    67,
+    1
+   ],
+   [
+    60,
+    "perfect",
+    0,
+    60,
+    1
+   ],
+   [
+    61,
+    "perfect",
+    0,
+    59,
+    1
+   ],
+   [
+    62,
+    "perfect",
+    0,
+    75,
+    1
+   ],
+   [
+    63,
+    "perfect",
+    0,
+    68,
+    1
+   ],
+   [
+    64,
+    "perfect",
+    0,
+    61,
+    1
+   ],
+   [
+    65,
+    "perfect",
+    0,
+    60,
+    1
+   ],
+   [
+    66,
+    "perfect",
+    0,
+    74,
+    1
+   ],
+   [
+    67,
+    "perfect",
+    0,
+    66,
+    1
+   ],
+   [
+    68,
+    "perfect",
+    0,
+    59,
+    1
+   ],
+   [
+    69,
+    "perfect",
+    0,
+    81,
+    1
+   ]
+  ]
+ },
+ "debussy-dieu|L2|x-late350-uncal": {
+  "piece": "debussy-dieu",
+  "part": "P3",
+  "section": "s1-m5-12",
+  "level": 2,
+  "case": "x-late350-uncal",
+  "wallSec": 28.262,
+  "passed": true,
+  "accuracy": 1,
+  "pitch": 1,
+  "rhythm": 1,
+  "score": 12400,
+  "counts": {
+   "perfect": 43,
+   "good": 0,
+   "ok": 0,
+   "miss": 0
+  },
+  "nNotes": 43,
+  "scheduled": 43,
+  "medOnsetMs": 65.72108843536739,
+  "medCents": 0.009675123963859278,
+  "insights": [
+   "great: Excellent run"
+  ],
+  "latencyAdjusted": 337,
+  "profileLatencyAfter": 337,
+  "banner": "Level 2 reached: In time! ",
+  "scoreText": "12,400",
+  "r4": {
+   "gum": 1,
+   "plays": [
+    {
+     "startCtx": 3.1319274376417234,
+     "from": 15,
+     "to": 39,
+     "rate": 1,
+     "now": 0.03192743764172336,
+     "countIn": 3
+    }
+   ],
+   "scheduled": 43,
+   "sampleRate": 44100,
+   "outputLatency": 0.03,
+   "baseLatency": 0.01
+  },
+  "main": "BARS 6–13 · TENOR · L2 IN TIME Dieu! qu'il la fait bon regarder! You came in consistently late after rests, which is usually headphone delay, not you. We've set your delay to 337 ms and re-scored this run with it. For best accuracy run the delay check in Voice setup. Level 2 reached: In time! S 12,400 100% accuracy In tune 100% avg ±0¢ Rhythm 100% Best combo 43 perfect 43 · good 0 · ok 0 · miss 0 Bar by bar tap a bar to loop it 6 7 8 9 10 11 12 13 solid ok needs work bars 6–13 Coach notes Excellent run 100% accuracy across bars 6–13. Move on to the next level or the next section. Next: Bars 1–5, level 1 Again All sections Leaderboard",
+  "errors": [],
+  "noteDetail": [
+   [
+    27,
+    "perfect",
+    0,
+    38,
+    1
+   ],
+   [
+    28,
+    "perfect",
+    0,
+    60,
+    1
+   ],
+   [
+    29,
+    "perfect",
+    0,
+    80,
+    1
+   ],
+   [
+    30,
+    "perfect",
+    0,
+    1,
+    1
+   ],
+   [
+    31,
+    "perfect",
+    0,
+    20,
+    1
+   ],
+   [
+    32,
+    "perfect",
+    0,
+    5,
+    1
+   ],
+   [
+    33,
+    "perfect",
+    0,
+    12,
+    1
+   ],
+   [
+    34,
+    "perfect",
+    0,
+    79,
+    1
+   ],
+   [
+    35,
+    "perfect",
+    0,
+    78,
+    1
+   ],
+   [
+    36,
+    "perfect",
+    0,
+    80,
+    1
+   ],
+   [
+    37,
+    "perfect",
+    0,
+    40,
+    1
+   ],
+   [
+    38,
+    "perfect",
+    0,
+    80,
+    1
+   ],
+   [
+    39,
+    "perfect",
+    0,
+    79,
+    1
+   ],
+   [
+    40,
+    "perfect",
+    0,
+    0,
+    1
+   ],
+   [
+    41,
+    "perfect",
+    0,
+    81,
+    1
+   ],
+   [
+    42,
+    "perfect",
+    0,
+    80,
+    1
+   ],
+   [
+    43,
+    "perfect",
+    0,
+    59,
+    1
+   ],
+   [
+    44,
+    "perfect",
+    0,
+    78,
+    1
+   ],
+   [
+    45,
+    "perfect",
+    0,
+    60,
+    1
+   ],
+   [
+    46,
+    "perfect",
+    0,
+    80,
+    1
+   ],
+   [
+    47,
+    "perfect",
+    0,
+    79,
+    1
+   ],
+   [
+    48,
+    "perfect",
+    0,
+    58,
+    1
+   ],
+   [
+    49,
+    "perfect",
+    0,
+    68,
+    1
+   ],
+   [
+    50,
+    "perfect",
+    0,
+    80,
+    1
+   ],
+   [
+    51,
+    "perfect",
+    0,
+    70,
+    1
+   ],
+   [
+    52,
+    "perfect",
+    0,
+    61,
+    1
+   ],
+   [
+    53,
+    "perfect",
+    0,
+    20,
+    1
+   ],
+   [
+    54,
+    "perfect",
+    0,
+    67,
+    1
+   ],
+   [
+    55,
+    "perfect",
+    0,
+    53,
+    1
+   ],
+   [
+    56,
+    "perfect",
+    0,
+    59,
+    1
+   ],
+   [
+    57,
+    "perfect",
+    0,
+    58,
+    1
+   ],
+   [
+    58,
+    "perfect",
+    0,
+    71,
+    1
+   ],
+   [
+    59,
+    "perfect",
+    0,
+    67,
+    1
+   ],
+   [
+    60,
+    "perfect",
+    0,
+    60,
+    1
+   ],
+   [
+    61,
+    "perfect",
+    0,
+    59,
+    1
+   ],
+   [
+    62,
+    "perfect",
+    0,
+    73,
+    1
+   ],
+   [
+    63,
+    "perfect",
+    0,
+    66,
+    1
+   ],
+   [
+    64,
+    "perfect",
+    0,
+    59,
+    1
+   ],
+   [
+    65,
+    "perfect",
+    0,
+    58,
+    1
+   ],
+   [
+    66,
+    "perfect",
+    0,
+    71,
+    1
+   ],
+   [
+    67,
+    "perfect",
+    0,
+    67,
+    1
+   ],
+   [
+    68,
+    "perfect",
+    0,
+    60,
+    1
+   ],
+   [
+    69,
+    "perfect",
+    0,
+    79,
+    1
+   ]
+  ]
+ }
+}

@@ -343,7 +343,7 @@ export class LiveScorer {
           a.runMiss = 0;
           if (a.runStart === null) a.runStart = t;
           // A real entry is sustained sound, not a 20 ms blip (or speaker bleed).
-          if (t - a.runStart >= Math.min(ONSET_RUN, 0.4 * w.note.dur) - 1e-9) a.onsetMs = Math.max(0, (a.runStart - w.start) * 1000);
+          if (t - a.runStart >= Math.min(ONSET_RUN, Math.max(0.02, 0.2 * w.note.dur)) - 1e-9) a.onsetMs = Math.max(0, (a.runStart - w.start) * 1000);
         } else if (++a.runMiss >= 2) {
           // Tolerate a single tracker dropout inside the run.
           a.runStart = null;
@@ -384,6 +384,8 @@ export class LiveScorer {
   private finalize(a: NoteAcc): void {
     if (a.final) return;
     const w = a.w;
+    // A qualifying run that was cut short only by the end of a short note still marks its start.
+    if (a.onsetMs === null && a.runStart !== null) a.onsetMs = Math.max(0, (a.runStart - w.start) * 1000);
     const bodyDur = w.bodyEnd - w.bodyStart;
     const tolN = this.tol + w.tolExtra;
     // Final judgement over the whole note: a centred average over ~one vibrato cycle (or the

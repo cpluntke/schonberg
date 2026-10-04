@@ -125,7 +125,8 @@ export function Setup() {
           </div>
           {(() => {
             const c = loadCycle();
-            const today = new Date().toISOString().slice(0, 10);
+            const d = new Date();
+            const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
             if (c.rehearsalDate && c.concertDate && c.concertDate < c.rehearsalDate) return <span className="small" role="alert" style={{ color: 'var(--accent-text)' }}>The concert is before the rehearsal: check the dates.</span>;
             if ([c.rehearsalDate, c.concertDate].some((d) => d && d < today)) return <span className="small" role="alert" style={{ color: 'var(--accent-text)' }}>That date is in the past.</span>;
             return null;

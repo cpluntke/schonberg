@@ -4,7 +4,8 @@
 //   PUT  /choirs/:code/entries/:name          body: LeaderboardEntry (name must match)
 // Data: one JSON file (DATA_FILE, default ./data/leaderboard.json), written atomically.
 import http from 'node:http';
-import { readFileSync, mkdirSync, writeFileSync, renameSync } from 'node:fs';
+import { readFileSync, mkdirSync } from 'node:fs';
+import { writeFile, rename } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
 const PORT = Number(process.env.PORT) || 8787;
@@ -37,11 +38,14 @@ function scheduleSave() {
   if (saveTimer) return;
   saveTimer = setTimeout(() => {
     saveTimer = null;
-    try {
-      mkdirSync(dirname(DATA_FILE), { recursive: true });
-      writeFileSync(DATA_FILE + '.tmp', JSON.stringify(db));
-      renameSync(DATA_FILE + '.tmp', DATA_FILE);
-    } catch (e) { console.error('save failed', e); }
+    // Asynchronous, debounced write so a burst of requests never blocks the event loop.
+    (async () => {
+      try {
+        mkdirSync(dirname(DATA_FILE), { recursive: true });
+        await writeFile(DATA_FILE + '.tmp', JSON.stringify(db));
+        await rename(DATA_FILE + '.tmp', DATA_FILE);
+      } catch (e) { console.error('save failed', e); }
+    })();
   }, 2000);
 }
 
