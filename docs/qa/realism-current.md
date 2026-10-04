@@ -1,9 +1,9 @@
 # Realism: before / after the scoring fixes
 
-Generated 2026-10-04T16:50:15.739Z by `npx vitest run --config vitest.realism.config.ts` (files `qa/realism/cmp-*.test.ts`). The same rendered takes are scored by both pipelines:
+Generated 2026-10-04T17:01:49.377Z by `npx vitest run --config vitest.realism.config.ts` (files `qa/realism/cmp-*.test.ts`). The same rendered takes are scored by both pipelines:
 
 - **before** = baseline app (frozen `qa/realism/baseline/`, as in `docs/qa/realism-baseline.md`): N=2048 window, `scoreAttempt`, onset-based delay learning that re-scores the same run, pass = accuracy only, and an uncalibrated estimate of 80 ms.
-- **after** = current app at `be4dfd6` plus uncommitted changes in `rc/game/align.ts`, `src/game/scoring.ts`, `src/ui/play/highway2d.ts`, `src/ui/screens/Play.tsx`. The analysis window comes from `windowFor(part.low)` (1024 for these alto parts). Then `scoreAttempt` → `scoreAligned`, two-run delay learning and the Android estimate of 130 ms. Play.tsx/session policy detected from the source: LATE_FAIL_MS=250; GUIDE_LEARN_MAX_ABOVE=150; timing gate: measured; liftSubharmonics: true; session stores raw samples.
+- **after** = current app at `27b6dff` plus uncommitted changes in `src/game/align.ts`, `src/ui/play/lastResult.ts`, `src/ui/screens/Play.tsx`, `src/ui/screens/Results.tsx`. The analysis window comes from `windowFor(part.low)` (1024 for these alto parts). Then `scoreAttempt` → `scoreAligned`, two-run delay learning and the Android estimate of 130 ms. Play.tsx/session policy detected from the source: LATE_FAIL_MS=250; GUIDE_LEARN_MAX_ABOVE=150; timing gate: measured; liftSubharmonics: true; session stores raw samples.
 - **after (80 ms estimate)** = the current app with the old 80 ms estimate (an iPhone-like device). It separates the estimate change from the rest.
 
 Run cells: `grade accuracy%` (✗ = run failed), `al±N` = the voice was shifted N ms for intonation, `→N ms` = the stored delay changed to N, `TF` = failed by the timing gate (median entry in ms), `[…]` = timing/wrong-note tips. Sequences are 3 consecutive runs (new performance each run) on a phone whose stored delay carries over.
@@ -30,7 +30,7 @@ Run cells: `grade accuracy%` (✗ = run failed), `al±N` = the voice was shifted
 2. **C/A/A is gone.** At L2 near the old learning cliff (true 200/215/230/280 ms, 4 seeds × 3 runs) every run is S, where before it was C/C/S, C/B/C and so on. The two-run learning stores 185–205 ms for a true 200 ms and 250–290 ms for a true 280 ms (run 2). Repeatability at L4 uncalibrated: accuracy 55–75 % (0/10 pass) → 95–100 % (10/10 pass).
 3. **Speaker bleed: mostly fixed.** Pooled octave/subharmonic readings drop from 27 % to 0 % at −13 dB (L1), and that take's accuracy goes from 77 % to 100 %. With headphones, the tracker is unchanged or better at N=1024 (steady 3.4¢ median, no invented overshoot). The fix still has limits on the warm-up chorale at L4 (no guide): 11 % residual subharmonic readings at −13 dB (B, fail) and 28 % at −8 dB (C, fail). At −8 dB Debussy L4 is B (80 %, fail). Loud bleed without headphones can still fail a good singer at L4 (P2).
 4. **Echo singer (right notes, 300 ms late, device 130 ms).** With a *measured* delay it fails L2 and L4 via the timing gate (TF 317–337 ms) with a behind-beat tip. At L1 there is no gate, so on the warm-up it passes with S plus the tip; on Debussy it fails on accuracy. With an *uncalibrated* phone it passes every run with S at L1 and L2. The alignment absorbs the lateness (al +270…+300). The behind-beat tip shows in runs 1–2. After the delay is learned (capped at 130 + 150 = 280 ms because the guide plays), run 3 still needs al +140…+150 and **the tip disappears**. This is by design (no delay check means no way to separate late singing from delay), but the run-3 result tells the singer nothing about being late.
-5. **One note behind on an uncalibrated phone: fixed.** The first version of the lag search (up to +300 ms) could line the trace up with the *next* note on Debussy's ornaments (71–77 %, passing L1 on run 2). The search is now capped at a plausible total device delay (estimate + 150 ms while the guide plays). One-note-behind singers score 17–64 % and fail every run, in every condition (table below).
+5. **New exploit: one note behind on an uncalibrated phone (P2).** Singing every pitch one note late scores 17 % with a measured delay and 17 % before the change. Uncalibrated, the lag search (up to +300 ms) lines the trace up with the *next* note on Debussy's quick ornaments. It then scores 71–77 % (B) and **passes L1 on run 2 (77 % ≥ 75 %)**. On the warm-up (longer notes) it reaches only 50 % at L2. Suggestion: cap the uncalibrated search at what the device can plausibly add (e.g. estimate + 150 ms, like the learning cap), or require the lag to agree with the median onset shift.
 6. **Late pitch arrival (pitch moves 200 ms after the beat on every legato change).** It used to score C/D; it now scores A 91–94 % on Debussy at L2/L4 with a measured delay (warm-up: S, but the timing gate fails it at L2/L4, TF 257–265). Three allowances add up to forgive it: the calibrated ±80 ms alignment shift, the 35 %-of-note cap and the TRANSITION_MAX arrival window. On Debussy the median onset (≈ 230 ms) stays under the 250 ms gate.
 7. **TRANSITION_MAX: 0.25 s is more lenient than the data needs.** For all realistic good voices tested (good, operatic, ringing ζ≈0.35, slow fn 3–4 Hz), scores are identical at 0.10, 0.15, 0.25 and 0.35 s. On these sections the 35 %-of-note cap and the arrival rule decide. Only the late-arrival singer reacts (Debussy L4 in tune 72 → 80 → 81 → 81 % for 0.10 → 0.15 → 0.25 → 0.35). Nothing is gained above 0.15 s for good singers. 0.15 s would keep the protection and cost slow arrivals a little more; 0.10 s starts to touch them (warm-up L4 late arrival 89 %). Recommendation: 0.15 s. The bigger lever on late arrival is the ±80 ms calibrated shift (item 6).
 8. **Live cents bubble.** Comparing against the note at the reading's own time removes the playhead mismatch. Still, 77 % of note changes (calibrated, L1) briefly show more than the tolerance toward the previous pitch, for about 155 ms. That is the voice's real glide plus the 0.2 s readout average, which still mixes readings from the previous note when the step is ≤ 1.5 semitones. Uncalibrated at a true 280 ms it is 100 %, because readings are stamped late. Beyond-the-note readouts rose from 4 % to 12 % (the real overshoot is now visible).
@@ -79,9 +79,9 @@ Uncalibrated phone (fresh profile, then runs 2–3 with whatever the app stored)
 | warmup-7-12 | 1 | 200 ms | S 100 · S 100 · S 100 | S 100 · S 100 →130ms · S 100 | S 100 al+90 · S 100 al+100 →175ms · S 100 |
 | warmup-7-12 | 1 | 280 ms | S 100 →250ms · S 100 · S 100 | S 100 al+120 · S 100 al+120 →250ms · S 100 | S 100 al+140 · S 100 al+140 →220ms · S 100 |
 | dieu-1-5 | 1 | 200 ms | S 96 · S 97 · S 97 | S 100 al+60 · S 100 al+70 →195ms · S 100 | S 100 al+110 · S 100 al+120 →195ms · S 100 |
-| dieu-1-5 | 1 | 280 ms | S 100 →256ms · S 100 · S 100 | S 100 al+140 · S 100 al+140 →270ms · S 100 | S 100 al+150 · S 100 al+150 →230ms · S 100 |
+| dieu-1-5 | 1 | 280 ms | S 100 →256ms · S 100 · S 100 | S 100 al+140 · S 100 al+140 →270ms · S 100 | S 100 al+150 · S 100 al+150 →230ms · S 100 al+50 |
 | dieu-6-13 | 1 | 200 ms | S 99 · S 99 · S 99 | S 100 al+60 · S 100 al+60 →190ms · S 100 | S 100 al+110 · S 100 al+110 →190ms · S 100 |
-| dieu-6-13 | 1 | 280 ms | S 100 →247ms · S 98 · S 100 | S 100 al+130 · S 98 al+140 →265ms · S 100 | S 100 al+150 · S 98 al+150 →230ms · S 100 |
+| dieu-6-13 | 1 | 280 ms | S 100 →247ms · S 98 · S 100 | S 100 al+130 · S 98 al+140 →265ms · S 100 | S 100 al+150 · S 98 al+150 →230ms · S 100 al+40 |
 | tabourin-solo-1-8 | 1 | 200 ms | S 99 · S 100 · S 98 | S 100 al+80 · S 100 al+70 →205ms · A 93 | S 100 al+130 · S 100 al+120 →205ms · A 93 |
 | tabourin-solo-1-8 | 1 | 280 ms | S 100 →253ms · S 100 · S 100 | S 100 al+150 · S 100 al+150 →280ms · S 100 | S 100 al+150 · S 100 al+150 →230ms · S 100 |
 | tabourin-solo-9-16 | 1 | 200 ms | S 100 · S 100 · S 100 | S 99 al+60 · S 100 al+60 →190ms · S 100 | S 99 al+100 · S 100 al+100 →180ms · S 100 |
@@ -145,10 +145,10 @@ Uncalibrated phone (fresh profile, then runs 2–3 with whatever the app stored)
 | 230 ms | 2 | S 100 →210ms · S 99 · S 98 | S 100 al+100 · S 99 al+100 →230ms · S 99 | S 100 al+150 · S 99 al+150 →230ms · S 99 |
 | 230 ms | 3 | S 100 →207ms · S 100 · S 100 | S 100 al+100 · S 100 al+100 →230ms · S 100 | S 100 al+150 · S 100 al+150 →230ms · S 100 |
 | 230 ms | 4 | S 99 →207ms · S 100 · S 99 | S 100 al+100 · S 99 al+110 →235ms · S 99 | S 100 al+150 · S 99 al+150 →230ms · S 99 |
-| 280 ms | 1 | S 98 →247ms · S 100 · S 99 | S 99 al+140 · S 100 al+140 →270ms · S 99 | S 99 al+150 · S 99 al+150 →230ms · S 99 |
-| 280 ms | 2 | D 47 ✗ · S 98 →247ms · S 100 | S 99 al+150 · S 97 al+150 →280ms · S 99 | S 99 al+150 · S 98 al+150 →230ms · S 99 |
-| 280 ms | 3 | S 98 →247ms · S 100 · S 99 | S 99 al+140 · S 99 al+150 →275ms · S 99 | S 98 al+150 · S 99 al+150 →230ms · S 99 |
-| 280 ms | 4 | S 100 →247ms · S 99 · S 98 | S 100 al+140 · S 100 al+150 →275ms · S 99 | S 99 al+150 · S 98 al+150 →230ms · S 98 |
+| 280 ms | 1 | S 98 →247ms · S 100 · S 99 | S 99 al+140 · S 100 al+140 →270ms · S 99 | S 99 al+150 · S 99 al+150 →230ms · S 99 al+40 |
+| 280 ms | 2 | D 47 ✗ · S 98 →247ms · S 100 | S 99 al+150 · S 97 al+150 →280ms · S 99 | S 99 al+150 · S 98 al+150 →230ms · S 98 al+50 |
+| 280 ms | 3 | S 98 →247ms · S 100 · S 99 | S 99 al+140 · S 99 al+150 →275ms · S 99 | S 98 al+150 · S 99 al+150 →230ms · S 99 al+50 |
+| 280 ms | 4 | S 100 →247ms · S 99 · S 98 | S 100 al+140 · S 100 al+150 →275ms · S 99 | S 99 al+150 · S 98 al+150 →230ms · S 99 al+50 |
 
 ### Phone speaker, no headphones (bleed sweep), before → after
 
@@ -225,33 +225,33 @@ Uncalibrated phone (fresh profile, then runs 2–3 with whatever the app stored)
 | echo (300 ms behind) | dieu-1-5 | 1 | measured 130 | C 53 ✗ [behind-beat] | C 61 ✗ al+80 [behind-beat] |
 | echo (300 ms behind) | dieu-1-5 | 2 | measured 130 | C 50 ✗ [behind-beat] | C 58 ✗ al+80 TF317 [behind-beat] |
 | echo (300 ms behind) | dieu-1-5 | 4 | measured 130 | D 50 ✗ [behind-beat] | C 50 ✗ al+80 TF319 [behind-beat] |
-| echo (300 ms behind) | dieu-1-5 | 1 | uncalibrated (true 130) | C 55 ✗ [behind-beat] · C 52 ✗ [behind-beat] · C 57 ✗ [behind-beat] | S 95 al+150 [behind-beat] · A 94 al+150 →280ms [behind-beat] · A 87 [wrong-notes] |
-| echo (300 ms behind) | dieu-1-5 | 2 | uncalibrated (true 130) | D 49 ✗ [behind-beat] · D 48 ✗ [behind-beat] · D 47 ✗ [behind-beat] | C 59 ✗ al+140 [behind-beat] · C 61 ✗ al+150 →275ms [behind-beat] · C 62 ✗ [wrong-notes] |
+| echo (300 ms behind) | dieu-1-5 | 1 | uncalibrated (true 130) | C 55 ✗ [behind-beat] · C 52 ✗ [behind-beat] · C 57 ✗ [behind-beat] | S 99 ✗ al+290 TF290 [behind-beat] · S 100 ✗ al+290 →280ms TF290 [behind-beat] · S 100 al+80 |
+| echo (300 ms behind) | dieu-1-5 | 2 | uncalibrated (true 130) | D 49 ✗ [behind-beat] · D 48 ✗ [behind-beat] · D 47 ✗ [behind-beat] | S 99 ✗ al+300 TF300 [behind-beat] · S 99 ✗ al+300 →280ms TF300 [behind-beat] · A 91 al+70 [wrong-notes] |
 | echo (300 ms behind) | warmup-7-12 | 1 | measured 130 | A 94 [behind-beat] | S 100 al+70 [behind-beat] |
 | echo (300 ms behind) | warmup-7-12 | 2 | measured 130 | B 81 [behind-beat] | S 98 ✗ al+80 TF337 [behind-beat] |
 | echo (300 ms behind) | warmup-7-12 | 4 | measured 130 | B 84 ✗ [behind-beat] | S 97 ✗ al+80 TF321 [behind-beat] |
-| echo (300 ms behind) | warmup-7-12 | 1 | uncalibrated (true 130) | S 100 →400ms · S 100 · S 100 | S 100 al+140 [behind-beat] · S 99 al+140 →270ms [behind-beat] · S 100 |
-| echo (300 ms behind) | warmup-7-12 | 2 | uncalibrated (true 130) | S 99 →400ms · S 99 · S 100 | S 100 al+150 [behind-beat] · S 100 al+150 →280ms [behind-beat] · S 100 |
+| echo (300 ms behind) | warmup-7-12 | 1 | uncalibrated (true 130) | S 100 →400ms · S 100 · S 100 | S 100 al+140 [behind-beat] · S 99 al+140 →270ms [behind-beat] · S 100 al+70 |
+| echo (300 ms behind) | warmup-7-12 | 2 | uncalibrated (true 130) | S 99 →400ms · S 99 · S 100 | S 100 ✗ al+150 TF331 [behind-beat] · S 100 ✗ al+150 →280ms TF326 [behind-beat] · S 100 al+80 |
 | one note behind | dieu-1-5 | 1 | measured 130 | D 17 ✗ [wrong-notes] | D 17 ✗ [wrong-notes] |
 | one note behind | dieu-1-5 | 2 | measured 130 | D 17 ✗ [wrong-notes] | D 17 ✗ [wrong-notes] |
 | one note behind | dieu-1-5 | 4 | measured 130 | D 17 ✗ [wrong-notes] | D 17 ✗ [wrong-notes] |
 | one note behind | dieu-1-5 | 1 | uncalibrated (true 130) | D 17 ✗ [wrong-notes] · D 17 ✗ [wrong-notes] · D 17 ✗ [wrong-notes] | D 17 ✗ [wrong-notes] · D 17 ✗ [wrong-notes] · D 17 ✗ [wrong-notes] |
-| one note behind | dieu-1-5 | 2 | uncalibrated (true 130) | D 20 ✗ [wrong-notes] · D 20 ✗ [wrong-notes] · D 27 ✗ [wrong-notes] | C 54 ✗ al+140 [behind-beat] · C 64 ✗ al+150 [behind-beat] · C 62 ✗ al+150 [behind-beat] |
+| one note behind | dieu-1-5 | 2 | uncalibrated (true 130) | D 20 ✗ [wrong-notes] · D 20 ✗ [wrong-notes] · D 27 ✗ [wrong-notes] | C 65 ✗ al+440 TF440 [behind-beat] · C 61 ✗ al+440 TF440 [behind-beat] · C 63 ✗ al+440 TF440 [behind-beat] |
 | one note behind | warmup-7-12 | 1 | measured 130 | D 33 ✗ [wrong-notes] | D 33 ✗ [wrong-notes] |
 | one note behind | warmup-7-12 | 2 | measured 130 | D 33 ✗ [wrong-notes] | D 33 ✗ [wrong-notes] |
 | one note behind | warmup-7-12 | 4 | measured 130 | D 33 ✗ [wrong-notes] | D 33 ✗ [wrong-notes] |
-| one note behind | warmup-7-12 | 1 | uncalibrated (true 130) | D 33 ✗ [wrong-notes] · D 33 ✗ [wrong-notes] · D 33 ✗ [wrong-notes] | D 33 ✗ [wrong-notes] · D 33 ✗ [wrong-notes] · D 33 ✗ [wrong-notes] |
-| one note behind | warmup-7-12 | 2 | uncalibrated (true 130) | D 33 ✗ [wrong-notes] · D 33 ✗ [wrong-notes] · D 33 ✗ [wrong-notes] | D 33 ✗ [wrong-notes] · D 33 ✗ [wrong-notes] · D 33 ✗ [wrong-notes] |
+| one note behind | warmup-7-12 | 1 | uncalibrated (true 130) | D 33 ✗ [wrong-notes] · D 33 ✗ [wrong-notes] · D 33 ✗ [wrong-notes] | C 55 ✗ al+440 TF440 [behind-beat] · D 48 ✗ al+450 TF450 [behind-beat] · C 55 ✗ al+440 TF440 [behind-beat] |
+| one note behind | warmup-7-12 | 2 | uncalibrated (true 130) | D 33 ✗ [wrong-notes] · D 33 ✗ [wrong-notes] · D 33 ✗ [wrong-notes] | B 75 ✗ al+450 TF450 [behind-beat] · B 74 ✗ al+450 TF450 [behind-beat] · B 74 ✗ al+450 TF450 [behind-beat] |
 | late pitch arrival (200 ms) | dieu-1-5 | 1 | measured 130 | C 50 ✗ [wrong-notes] | A 91 al+80 [wrong-notes] |
 | late pitch arrival (200 ms) | dieu-1-5 | 2 | measured 130 | D 39 ✗ [behind-beat] | A 90 al+80 [behind-beat] |
 | late pitch arrival (200 ms) | dieu-1-5 | 4 | measured 130 | D 35 ✗ [behind-beat] | A 92 al+80 [behind-beat] |
-| late pitch arrival (200 ms) | dieu-1-5 | 1 | uncalibrated (true 130) | S 100 →333ms [early-entries] · S 100 [early-entries] · S 100 [early-entries] | S 99 al+150 · S 100 al+150 →280ms · S 100 |
-| late pitch arrival (200 ms) | dieu-1-5 | 2 | uncalibrated (true 130) | D 26 ✗ [wrong-notes] · S 98 →325ms [early-entries] · S 98 [early-entries] | S 100 al+140 [behind-beat] · S 100 al+150 →275ms [behind-beat] · S 99 [early-entries] |
+| late pitch arrival (200 ms) | dieu-1-5 | 1 | uncalibrated (true 130) | S 100 →333ms [early-entries] · S 100 [early-entries] · S 100 [early-entries] | S 99 al+150 · S 100 al+150 →280ms · S 100 al+60 |
+| late pitch arrival (200 ms) | dieu-1-5 | 2 | uncalibrated (true 130) | D 26 ✗ [wrong-notes] · S 98 →325ms [early-entries] · S 98 [early-entries] | S 100 al+140 [behind-beat] · S 100 al+150 →275ms [behind-beat] · S 98 al+40 [early-entries] |
 | late pitch arrival (200 ms) | warmup-7-12 | 1 | measured 130 | S 97 | S 100 al+70 |
 | late pitch arrival (200 ms) | warmup-7-12 | 2 | measured 130 | A 91 [behind-beat] | S 99 ✗ al+70 TF265 [behind-beat] |
 | late pitch arrival (200 ms) | warmup-7-12 | 4 | measured 130 | A 86 [behind-beat] | S 97 ✗ al+70 TF257 [behind-beat] |
-| late pitch arrival (200 ms) | warmup-7-12 | 1 | uncalibrated (true 130) | S 99 →336ms · S 95 · S 100 | S 100 al+140 [behind-beat] · S 95 al+140 →270ms · S 100 |
-| late pitch arrival (200 ms) | warmup-7-12 | 2 | uncalibrated (true 130) | S 99 →337ms · S 99 · S 100 | S 99 al+140 [behind-beat] · S 99 al+150 →275ms [behind-beat] · S 100 |
+| late pitch arrival (200 ms) | warmup-7-12 | 1 | uncalibrated (true 130) | S 99 →336ms · S 95 · S 100 | S 100 al+140 [behind-beat] · S 95 al+140 →270ms · S 100 al+60 |
+| late pitch arrival (200 ms) | warmup-7-12 | 2 | uncalibrated (true 130) | S 99 →337ms · S 99 · S 100 | S 99 ✗ al+140 TF257 [behind-beat] · S 99 ✗ al+150 →275ms TF258 [behind-beat] · S 100 al+70 |
 
 ## 5. TRANSITION_MAX sweep (current scorer + alignment, calibrated 150 ms)
 

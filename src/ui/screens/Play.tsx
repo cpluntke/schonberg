@@ -135,6 +135,7 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
     let alignedMs: number | undefined;
     let suggestDelayCheck = false;
     let timingFail: number | undefined;
+    let timingUnsure: number | undefined;
     const sess = sessionRef.current;
     const calibrated = profile.latencySource === 'measured' && profile.latencyMs > 0;
     if (sess) {
@@ -144,7 +145,7 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
         sess.samples, sess.cfg.scoring,
         {
           rate: sess.cfg.rate, latencyMs: sess.latencyMs, calibrated, liftSubharmonics: !sess.cfg.scoring.octaveTolerant,
-          maxTotalMs: sess.cfg.guide ? estimateLatencyMs() + GUIDE_LEARN_MAX_ABOVE : 450,
+          maxTotalMs: sess.cfg.guide ? Math.max(estimateLatencyMs() + GUIDE_LEARN_MAX_ABOVE, sess.latencyMs + 80) : 450,
         },
       );
       r = al.result;
@@ -158,7 +159,9 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
         const hint = profile.latencyHint;
         if (hint != null && Math.abs(suggested - hint) <= 60) {
           const cap = sess.cfg.guide ? estimateLatencyMs() + GUIDE_LEARN_MAX_ABOVE : 450;
-          const learned = Math.round(Math.max(20, Math.min(cap, (suggested + hint) / 2)));
+          const target = (suggested + hint) / 2;
+          // The guide-level cap only limits increases; it never pulls a delay learned elsewhere down.
+          const learned = Math.round(Math.max(20, Math.min(450, target > sess.latencyMs ? Math.min(Math.max(cap, sess.latencyMs), target) : target)));
           if (Math.abs(learned - (profile.latencyMs || sess.latencyMs)) >= 25) latencyAdjusted = learned;
           updateProfile({ latencyMs: learned, latencySource: 'learned', latencyHint: undefined });
         } else {
@@ -170,6 +173,11 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
       // delay: without it, device delay and late singing can't be told apart.
       const med = medianOnsetMs(r, sess.cfg.rate, part);
       if (calibrated && level >= 2 && med !== null && med > LATE_FAIL_MS) timingFail = Math.round(med);
+      // Without a measured delay, clearly late entries (or a delay beyond anything we'd assume)
+      // could be the singer or the device: don't count the run for the level, ask for the check.
+      if (!calibrated && ((level >= 2 && med !== null && med > LATE_FAIL_MS) || al.beyondCapMs != null)) {
+        timingUnsure = Math.round(al.beyondCapMs ?? med!);
+      }
     }
     setLastRun(sess?.recording ? {
       recording: sess.recording,
@@ -183,7 +191,7 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
     } : null);
     const realSection = section.id !== 'all' && section.id !== 'drill' && section.id !== 'entries';
     const partial = !!sessionRef.current?.partial;
-    const ladder = realSection && !partial && (rateOverride == null || rateOverride >= (spec?.rate ?? 1) - 1e-6);
+    const ladder = realSection && !partial && timingUnsure == null && (rateOverride == null || rateOverride >= (spec?.rate ?? 1) - 1e-6);
     // Practice runs (slower tempo, stopped early) are logged but never change section levels.
     const recId = ladder || !realSection ? section.id : 'practice';
     const durationSec = (section.end - section.start) / rate;
@@ -201,7 +209,12 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
       suggestDelayCheck,
       timingFail,
       latencyUsedMs: sess ? Math.round(sess.latencyMs) : undefined,
-      notCounted: realSection && !ladder ? (partial ? 'stopped early' : 'slower than the level’s tempo') : undefined,
+      timingUnsure,
+      notCounted: realSection && !ladder
+        ? (partial ? 'stopped early'
+          : timingUnsure != null ? `your voice reached the app about ${timingUnsure} ms after the beat, and without the delay check the app can't tell whether that's your timing or your phone and headphones. Do the 10-second delay check in Voice setup`
+            : 'slower than the level’s tempo')
+        : undefined,
       passed: rec.passed, prevLevel: rec.prevLevel, newLevel: rec.newLevel,
     });
     // After the first real practice run, ask the browser to keep our data (Safari may otherwise

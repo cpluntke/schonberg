@@ -101,3 +101,18 @@ describe('re-review scenarios', () => {
     expect(al.result.accuracy).toBeGreaterThan(0.9);
   });
 });
+
+describe('beyond the plausible delay', () => {
+  const eighths = makePart('A', [[62, 0.5], [64, 0.5], [65, 0.5], [67, 0.5], [69, 0.5], [67, 0.5], [65, 0.5], [64, 0.5], [62, 0.5], [64, 0.5], [65, 0.5], [67, 0.5], [69, 2]], 100);
+  const c: ScoringContext = { score: makeScore([eighths], 100), part: eighths, range: [0, eighths.notes.length - 1] };
+  it('a very slow device (Bluetooth, 450 ms on a 130 ms estimate) is flagged, and intonation still lined up', () => {
+    const al = scoreAligned(c, singRealistic(eighths, { lag: 0.32 }), opts, { rate: 1, latencyMs: 130, calibrated: false, maxTotalMs: 280 });
+    expect(al.beyondCapMs).toBeGreaterThan(250);
+    expect(al.result.accuracy).toBeGreaterThan(0.9);
+  });
+  it('a normal device is not flagged', () => {
+    const al = scoreAligned(c, singRealistic(eighths, { lag: 0.08 }), opts, { rate: 1, latencyMs: 130, calibrated: false, maxTotalMs: 280 });
+    expect(al.beyondCapMs).toBeUndefined();
+    expect(al.result.accuracy).toBeGreaterThan(0.9);
+  });
+});

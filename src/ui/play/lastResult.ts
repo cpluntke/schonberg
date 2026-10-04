@@ -22,6 +22,8 @@ export interface LastResult {
   latencyAdjusted?: number;
   /** The voice was lined up with the music by this many ms before scoring (device delay). */
   alignedMs?: number;
+  /** Without a measured delay the entries came this late (ms): the run didn't count, the delay check is needed. */
+  timingUnsure?: number;
   /** Delay the app applied during the run (ms). */
   latencyUsedMs?: number;
   /** The measured delay looks off: suggest redoing the delay check. */

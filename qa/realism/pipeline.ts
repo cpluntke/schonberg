@@ -193,6 +193,7 @@ export function runSession(spec: PipelineSpec, setup: RunSetup, profile: Profile
   let alignedMs = 0;
   let match: number | null = null;
   let timingFailMs: number | null = null;
+  let unsure = false;
   let next: Profile = { ...profile };
   let medOnset: number | null = null;
   if (!after) {
@@ -215,7 +216,7 @@ export function runSession(spec: PipelineSpec, setup: RunSetup, profile: Profile
     const al = impl.scoreAligned({ ...ctx, range: [Math.min(...idx), Math.max(...idx)] }, samples, opts, {
       rate, latencyMs: latencyUsed, calibrated, ...(pol.liftSubharmonics ? { liftSubharmonics: !opts.octaveTolerant } : {}),
       // Play.tsx: the lag search never looks past a plausible total device delay (guide on: estimate + cap).
-      maxTotalMs: pol.guideLearnMaxAbove !== null && L.guide ? spec.estimateMs + pol.guideLearnMaxAbove : 450,
+      maxTotalMs: pol.guideLearnMaxAbove !== null && L.guide ? Math.max(spec.estimateMs + pol.guideLearnMaxAbove, latencyUsed + 80) : 450,
     });
     result = al.result;
     alignedMs = al.shiftMs;
@@ -225,7 +226,9 @@ export function runSession(spec: PipelineSpec, setup: RunSetup, profile: Profile
       const hint = profile.hint;
       if (hint != null && Math.abs(suggested - hint) <= 60) {
         const cap = pol.guideLearnMaxAbove !== null && L.guide ? spec.estimateMs + pol.guideLearnMaxAbove : 450;
-        const learned = Math.round(Math.max(20, Math.min(cap, (suggested + hint) / 2)));
+        const target = (suggested + hint) / 2;
+        // Play.tsx: the guide-level cap only limits increases.
+        const learned = Math.round(Math.max(20, Math.min(450, target > latencyUsed ? Math.min(Math.max(cap, latencyUsed), target) : target)));
         next = { latencyMs: learned, source: 'learned' };
       } else {
         next = { ...profile, hint: suggested };
@@ -235,6 +238,12 @@ export function runSession(spec: PipelineSpec, setup: RunSetup, profile: Profile
     const gateOn = pol.timingGate === 'measured' ? calibrated : calibrated || profile.source === 'learned';
     medOnset = impl.medianOnsetMs(result, rate, part);
     if (gateOn && level >= 2 && medOnset !== null && medOnset > pol.lateFailMs) timingFailMs = Math.round(medOnset);
+    // Play.tsx: uncalibrated runs with clearly late entries (L2+) or a delay beyond the plausible
+    // range don't count for the level (reported as a timing failure with the onset/shift).
+    if (!calibrated && ((level >= 2 && medOnset !== null && medOnset > pol.lateFailMs) || al.beyondCapMs != null)) {
+      timingFailMs = Math.round(al.beyondCapMs ?? medOnset!);
+      unsure = true; void unsure;
+    }
   }
   if (medOnset === null) medOnset = curAlign.medianOnsetMs(result, rate, part);
   const passed = result.accuracy >= L.pass && timingFailMs === null;

@@ -47,7 +47,7 @@ What you hear from the phone and what the microphone picks up arrive late by the
   - The app suggests a delay after each complete run.
   - It stores the delay once **two runs agree** (within 60 ms).
   - While the guide plays your own part (levels 1–2), you might be following it by ear, so those runs can't teach a delay much above what the device itself suggests.
-- **Timing at level 2 and up:** when the delay was **measured** with the delay check, a run with the right notes still fails if your entries come more than 250 ms behind the beat (median). Without a measured delay, the app can't tell a late singer from a slow phone, so timing only gives tips.
+- **Timing at level 2 and up:** when the delay was **measured** with the delay check, a run with the right notes still fails if your entries come more than 250 ms behind the beat (median). Without a measured delay, the app can't tell a late singer from a slow phone (Bluetooth headphones can add 200–300 ms). So when entries come clearly late (L2+), or your voice only lines up with a delay far beyond what phones usually have, the run is shown but **doesn't count toward the level**, and the app asks for the 10-second delay check.
 
 ## Recordings for tuning
 

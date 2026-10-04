@@ -106,6 +106,11 @@ export interface AlignedResult {
   estimate: LagEstimate;
   /** Real-time milliseconds the voice was shifted by for the intonation judgement (0 = none). */
   shiftMs: number;
+  /**
+   * The voice lines up clearly better at a total delay beyond `maxTotalMs` (this many ms of shift):
+   * a very slow device, or a singer far behind. The run can't be judged fairly without the delay check.
+   */
+  beyondCapMs?: number;
 }
 
 /**
@@ -130,17 +135,28 @@ export function scoreAligned(
   // "lined up" with the next note).
   const hiCap = run.maxTotalMs != null ? (run.maxTotalMs - run.latencyMs) / 1000 : 0.3;
   const hi = run.calibrated ? 0.08 : Math.max(0, Math.min(0.3, hiCap));
-  const estimate = estimateLag(ctx.part, ctx.range, samples, { minLag: Math.min(0, lo) * rate, maxLag: hi * rate, step: 0.01 * rate });
+  let estimate = estimateLag(ctx.part, ctx.range, samples, { minLag: Math.min(0, lo) * rate, maxLag: hi * rate, step: 0.01 * rate });
+  let beyondCapMs: number | undefined;
+  if (!run.calibrated && run.maxTotalMs != null && hi < 0.45) {
+    // Beyond the plausible range the voice may line up much better: a very slow device (or a singer
+    // far behind). The caller doesn't count such a run; intonation is shown lined up anyway.
+    const wide = estimateLag(ctx.part, ctx.range, samples, { minLag: Math.min(0, lo) * rate, maxLag: 0.45 * rate, step: 0.01 * rate });
+    const wideMs = wide.confident ? Math.round((wide.lag / rate) * 1000) : 0;
+    if (wideMs > hi * 1000 + 30 && wide.match > estimate.match + 0.1) {
+      beyondCapMs = wideMs;
+      estimate = wide;
+    }
+  }
   const shiftMs = estimate.confident ? Math.round((estimate.lag / rate) * 1000) : 0;
   // Small shifts aren't worth second-guessing the delay setting for.
-  if (Math.abs(shiftMs) < 25) return { result: scoreAttempt(ctx, prep(samples), opts), estimate, shiftMs: 0 };
+  if (Math.abs(shiftMs) < 25) return { result: scoreAttempt(ctx, prep(samples), opts), estimate, shiftMs: 0, beyondCapMs };
   const aligned = scoreAttempt(ctx, prep(shiftSamples(samples, estimate.lag)), opts);
   // Timing is reported against the delay we applied: add the shift back to every onset.
   const lagMs = estimate.lag * 1000;
   const notes = aligned.notes.map((n) => ({ ...n, onsetMs: n.onsetMs === null ? null : Math.max(0, n.onsetMs + lagMs) }));
   const rhythm = notes.length ? notes.reduce((x, n) => x + rhythmValue(n.onsetMs), 0) / notes.length : 0;
   const result: AttemptResult = { ...aligned, notes, rhythm, insights: analyze(ctx, notes, samples) };
-  return { result, estimate, shiftMs };
+  return { result, estimate, shiftMs, beyondCapMs };
 }
 
 /**

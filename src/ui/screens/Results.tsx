@@ -67,6 +67,9 @@ export function Results() {
     goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: 'drill', level, mode: '2d', from, to });
   };
 
+  // A run that failed (or didn't count) on timing isn't an "excellent run".
+  const insights = lr.timingFail != null || lr.timingUnsure != null ? r.insights.filter((i) => i.kind !== 'great') : r.insights;
+
   return (
     <main className="screen">
       <div className="col" style={{ gap: 2, paddingTop: 8 }}>
@@ -76,7 +79,7 @@ export function Results() {
         <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800 }}>{piece.title}</h1>
       </div>
 
-      {lr.alignedMs != null && Math.abs(lr.alignedMs) >= 25 && lr.timingFail == null && (
+      {lr.alignedMs != null && Math.abs(lr.alignedMs) >= 25 && lr.timingFail == null && lr.timingUnsure == null && (
         <div className="notice info" role="status" data-testid="aligned-note">
           {lr.latencyUsedMs != null
             ? <>Your phone and headphones seem to delay sound by about {lr.latencyUsedMs + lr.alignedMs} ms (we allowed {lr.latencyUsedMs} ms), so we lined your voice up with the music before judging intonation.</>
@@ -88,7 +91,8 @@ export function Results() {
       )}
       {lr.notCounted && (
         <div className="notice info" role="status" data-testid="pass-banner">
-          <strong>Practice run:</strong> {lr.notCounted}, so it doesn't count toward the level. Sing the whole section at the level's tempo to level up.
+          <strong>Practice run:</strong> {lr.notCounted}{lr.timingUnsure != null ? '.' : <>, so it doesn't count toward the level. Sing the whole section at the level's tempo to level up.</>}
+          {lr.timingUnsure != null && <> <button className="linklike" onClick={() => go({ name: 'setup' })}>Open Voice setup</button></>}
         </div>
       )}
       {lr.ladder && (
@@ -144,10 +148,10 @@ export function Results() {
         </div>
       )}
 
-      {r.insights.length > 0 && (
+      {insights.length > 0 && (
         <div className="col" style={{ gap: 8 }}>
           <h2 style={{ fontSize: 16 }}>Coach notes</h2>
-          {r.insights.map((i, k) => (
+          {insights.map((i, k) => (
             <div key={k} className="card" style={{ padding: '12px 14px', gap: 8 }}>
               <div className="row" style={{ alignItems: 'flex-start' }}>
                 <span style={{ flex: 'none', marginTop: 2 }}>{insightIcon(i)}</span>

@@ -1,11 +1,11 @@
 {
  "meta": {
-  "head": "be4dfd6",
+  "head": "27b6dff",
   "dirty": [
-   "rc/game/align.ts",
-   "src/game/scoring.ts",
-   "src/ui/play/highway2d.ts",
-   "src/ui/screens/Play.tsx"
+   "src/game/align.ts",
+   "src/ui/play/lastResult.ts",
+   "src/ui/screens/Play.tsx",
+   "src/ui/screens/Results.tsx"
   ],
   "policy": [
    "LATE_FAIL_MS=250",
@@ -753,7 +753,7 @@
         "passed": true,
         "timingFailMs": null,
         "alignedMs": 0,
-        "match": 0.8027251263685821,
+        "match": 0.8116918896544414,
         "learnedMs": null,
         "medianOnsetMs": 80.38095238095114,
         "avgCents": -2,
@@ -1406,7 +1406,7 @@
         "passed": true,
         "timingFailMs": null,
         "alignedMs": 0,
-        "match": 0.7921294458579535,
+        "match": 0.7947435563824834,
         "learnedMs": null,
         "medianOnsetMs": 55.33333333333295,
         "avgCents": 1,
@@ -1519,7 +1519,7 @@
         "passed": true,
         "timingFailMs": null,
         "alignedMs": 0,
-        "match": 0.7841087001775972,
+        "match": 0.7947435563824834,
         "learnedMs": null,
         "medianOnsetMs": 85.3333333333341,
         "avgCents": 1,
@@ -2174,7 +2174,7 @@
         "passed": true,
         "timingFailMs": null,
         "alignedMs": 0,
-        "match": 0.7706494803276424,
+        "match": 0.7730382751640241,
         "learnedMs": null,
         "medianOnsetMs": 32.2857142857139,
         "avgCents": 1,
@@ -2280,17 +2280,17 @@
         "pipeline": "after (80 ms estimate)",
         "latencyUsedMs": 230,
         "windowN": 1024,
-        "pitch": 1,
+        "pitch": 0.9977401129943493,
         "rhythm": 1,
         "accuracy": 1,
         "letter": "S",
         "passed": true,
         "timingFailMs": null,
-        "alignedMs": 0,
-        "match": 0.7489674713343174,
+        "alignedMs": 50,
+        "match": 0.7730382751640241,
         "learnedMs": null,
-        "medianOnsetMs": 72.28571428571331,
-        "avgCents": 3,
+        "medianOnsetMs": 72.2857142857131,
+        "avgCents": 1,
         "insights": [
          "great"
         ],
@@ -3046,16 +3046,16 @@
         "pipeline": "after (80 ms estimate)",
         "latencyUsedMs": 230,
         "windowN": 1024,
-        "pitch": 1,
+        "pitch": 0.9974668128120809,
         "rhythm": 1,
         "accuracy": 1,
         "letter": "S",
         "passed": true,
         "timingFailMs": null,
-        "alignedMs": 0,
-        "match": 0.7820778365395001,
+        "alignedMs": 40,
+        "match": 0.8024957805483689,
         "learnedMs": null,
-        "medianOnsetMs": 66.9523809523831,
+        "medianOnsetMs": 66.95238095238243,
         "avgCents": 1,
         "insights": [
          "great"
@@ -3821,7 +3821,7 @@
         "passed": true,
         "timingFailMs": null,
         "alignedMs": 0,
-        "match": 0.8006883744890954,
+        "match": 0.8138035637287667,
         "learnedMs": null,
         "medianOnsetMs": 81.26530612244665,
         "avgCents": 0,
@@ -4246,7 +4246,7 @@
         "passed": true,
         "timingFailMs": null,
         "alignedMs": 0,
-        "match": 0.7964698374638387,
+        "match": 0.7956604168973105,
         "learnedMs": null,
         "medianOnsetMs": 44.8435374149625,
         "avgCents": 1,
@@ -4474,7 +4474,7 @@
         "passed": true,
         "timingFailMs": null,
         "alignedMs": 0,
-        "match": 0.8003128416495149,
+        "match": 0.7994936882803751,
         "learnedMs": null,
         "medianOnsetMs": 48.9183673469386,
         "avgCents": 0,
@@ -4587,7 +4587,7 @@
         "passed": true,
         "timingFailMs": null,
         "alignedMs": 0,
-        "match": 0.7938825024030347,
+        "match": 0.7987534471218244,
         "learnedMs": null,
         "medianOnsetMs": 73.91836734694124,
         "avgCents": 0,
@@ -14215,7 +14215,7 @@
        "passed": true,
        "timingFailMs": null,
        "alignedMs": 0,
-       "match": 0.7619206945590179,
+       "match": 0.7606675355219142,
        "learnedMs": null,
        "medianOnsetMs": 20.666666666667055,
        "avgCents": -2,
@@ -14328,7 +14328,7 @@
        "passed": true,
        "timingFailMs": null,
        "alignedMs": 0,
-       "match": 0.7580003920253948,
+       "match": 0.7596762209508539,
        "learnedMs": null,
        "medianOnsetMs": 25.666666666667837,
        "avgCents": -2,
@@ -15601,7 +15601,7 @@
        "passed": true,
        "timingFailMs": null,
        "alignedMs": 0,
-       "match": 0.7616191210718611,
+       "match": 0.7603746453838353,
        "learnedMs": null,
        "medianOnsetMs": 26.666666666667282,
        "avgCents": -5,
@@ -15709,23 +15709,23 @@
        "pipeline": "after (80 ms estimate)",
        "latencyUsedMs": 230,
        "windowN": 1024,
-       "pitch": 0.9553264604810989,
+       "pitch": 0.9908914439301189,
        "rhythm": 0.9988888888888888,
-       "accuracy": 0.9875000000000002,
+       "accuracy": 0.99375,
        "letter": "S",
        "passed": true,
        "timingFailMs": null,
-       "alignedMs": 0,
-       "match": 0.736153642092893,
+       "alignedMs": 40,
+       "match": 0.7603746453838353,
        "learnedMs": null,
-       "medianOnsetMs": 66.66666666666643,
+       "medianOnsetMs": 66.66666666666728,
        "avgCents": -5,
        "insights": [
         "great"
        ],
        "counts": {
-        "perfect": 22,
-        "good": 2,
+        "perfect": 23,
+        "good": 1,
         "ok": 0,
         "miss": 0
        },
@@ -15736,9 +15736,9 @@
        },
        "loss": {
         "early": 1,
-        "perfect": 22,
+        "perfect": 23,
         "demoted": 1,
-        "lowHit": 1
+        "lowHit": 0
        }
       }
      ]
@@ -15951,7 +15951,7 @@
        "passed": true,
        "timingFailMs": null,
        "alignedMs": 0,
-       "match": 0.8006417747756829,
+       "match": 0.7993441381877159,
        "learnedMs": null,
        "medianOnsetMs": 29.333333333333655,
        "avgCents": -2,
@@ -16059,23 +16059,23 @@
        "pipeline": "after (80 ms estimate)",
        "latencyUsedMs": 230,
        "windowN": 1024,
-       "pitch": 1,
+       "pitch": 0.9516666666666657,
        "rhythm": 1,
-       "accuracy": 0.99375,
+       "accuracy": 0.9812500000000002,
        "letter": "S",
        "passed": true,
        "timingFailMs": null,
-       "alignedMs": 0,
-       "match": 0.7658425522089005,
+       "alignedMs": 50,
+       "match": 0.7993441381877159,
        "learnedMs": null,
-       "medianOnsetMs": 82.00000000000074,
-       "avgCents": -1,
+       "medianOnsetMs": 79.33333333333366,
+       "avgCents": -2,
        "insights": [
         "great"
        ],
        "counts": {
-        "perfect": 23,
-        "good": 1,
+        "perfect": 21,
+        "good": 3,
         "ok": 0,
         "miss": 0
        },
@@ -16086,9 +16086,9 @@
        },
        "loss": {
         "early": 1,
-        "perfect": 23,
+        "perfect": 21,
         "demoted": 1,
-        "lowHit": 0
+        "lowHit": 2
        }
       }
      ]
@@ -16299,7 +16299,7 @@
        "passed": true,
        "timingFailMs": null,
        "alignedMs": 0,
-       "match": 0.811348167463027,
+       "match": 0.817341456555901,
        "learnedMs": null,
        "medianOnsetMs": 33.00000000000036,
        "avgCents": 3,
@@ -16407,23 +16407,23 @@
        "pipeline": "after (80 ms estimate)",
        "latencyUsedMs": 230,
        "windowN": 1024,
-       "pitch": 0.9583333333333334,
+       "pitch": 0.9753607008907627,
        "rhythm": 0.9996527777777778,
-       "accuracy": 0.9875000000000002,
+       "accuracy": 0.99375,
        "letter": "S",
        "passed": true,
        "timingFailMs": null,
-       "alignedMs": 0,
-       "match": 0.7809116063654377,
+       "alignedMs": 50,
+       "match": 0.8159716657971596,
        "learnedMs": null,
-       "medianOnsetMs": 78.00000000000028,
-       "avgCents": 2,
+       "medianOnsetMs": 78.00000000000047,
+       "avgCents": 1,
        "insights": [
         "great"
        ],
        "counts": {
-        "perfect": 22,
-        "good": 2,
+        "perfect": 23,
+        "good": 1,
         "ok": 0,
         "miss": 0
        },
@@ -16434,8 +16434,8 @@
        },
        "loss": {
         "early": 1,
-        "perfect": 22,
-        "demoted": 1,
+        "perfect": 23,
+        "demoted": 0,
         "lowHit": 1
        }
       }
@@ -16648,7 +16648,7 @@
        "passed": true,
        "timingFailMs": null,
        "alignedMs": 0,
-       "match": 0.7758436423261762,
+       "match": 0.779899966280924,
        "learnedMs": null,
        "medianOnsetMs": 30.3333333333331,
        "avgCents": 0,
@@ -16756,23 +16756,23 @@
        "pipeline": "after (80 ms estimate)",
        "latencyUsedMs": 230,
        "windowN": 1024,
-       "pitch": 0.9961471688034195,
+       "pitch": 0.9974226804123706,
        "rhythm": 0.9983333333333334,
-       "accuracy": 0.9750000000000001,
+       "accuracy": 0.99375,
        "letter": "S",
        "passed": true,
        "timingFailMs": null,
-       "alignedMs": 0,
-       "match": 0.744100701776621,
+       "alignedMs": 50,
+       "match": 0.77910998353247,
        "learnedMs": null,
-       "medianOnsetMs": 75.33333333333303,
-       "avgCents": 2,
+       "medianOnsetMs": 75.3333333333332,
+       "avgCents": 0,
        "insights": [
         "great"
        ],
        "counts": {
-        "perfect": 20,
-        "good": 4,
+        "perfect": 23,
+        "good": 1,
         "ok": 0,
         "miss": 0
        },
@@ -16783,8 +16783,8 @@
        },
        "loss": {
         "early": 1,
-        "perfect": 20,
-        "demoted": 4,
+        "perfect": 23,
+        "demoted": 1,
         "lowHit": 0
        }
       }
@@ -20884,24 +20884,24 @@
        "pipeline": "after",
        "latencyUsedMs": 130,
        "windowN": 1024,
-       "pitch": 0.7083472795104853,
-       "rhythm": 0.6827708333333334,
-       "accuracy": 0.9500000000000002,
+       "pitch": 0.9915092744348192,
+       "rhythm": 0.6869583333333326,
+       "accuracy": 0.99375,
        "letter": "S",
-       "passed": true,
-       "timingFailMs": null,
-       "alignedMs": 150,
-       "match": 0.6757894245350268,
+       "passed": false,
+       "timingFailMs": 290,
+       "alignedMs": 290,
+       "match": 0.7927947131269587,
        "learnedMs": null,
-       "medianOnsetMs": 320.4761904761882,
-       "avgCents": 5,
+       "medianOnsetMs": 320.4761904761897,
+       "avgCents": 4,
        "insights": [
         "behind-beat",
         "great"
        ],
        "counts": {
-        "perfect": 16,
-        "good": 8,
+        "perfect": 23,
+        "good": 1,
         "ok": 0,
         "miss": 0
        },
@@ -20912,33 +20912,33 @@
        },
        "loss": {
         "early": 0.922077922077922,
-        "perfect": 16,
-        "demoted": 1,
-        "lowHit": 7
+        "perfect": 23,
+        "demoted": 0,
+        "lowHit": 1
        }
       },
       {
        "pipeline": "after",
        "latencyUsedMs": 130,
        "windowN": 1024,
-       "pitch": 0.6664313823153982,
-       "rhythm": 0.6701041666666673,
-       "accuracy": 0.9437500000000002,
-       "letter": "A",
-       "passed": true,
-       "timingFailMs": null,
-       "alignedMs": 150,
-       "match": 0.6881176399830953,
+       "pitch": 0.9930343486545037,
+       "rhythm": 0.6817083333333326,
+       "accuracy": 1,
+       "letter": "S",
+       "passed": false,
+       "timingFailMs": 290,
+       "alignedMs": 290,
+       "match": 0.8055113041316934,
        "learnedMs": 280,
-       "medianOnsetMs": 323.5238095238094,
+       "medianOnsetMs": 323.904761904762,
        "avgCents": 3,
        "insights": [
         "behind-beat",
         "great"
        ],
        "counts": {
-        "perfect": 15,
-        "good": 9,
+        "perfect": 24,
+        "good": 0,
         "ok": 0,
         "miss": 0
        },
@@ -20949,34 +20949,34 @@
        },
        "loss": {
         "early": 0.8974358974358975,
-        "perfect": 15,
+        "perfect": 24,
         "demoted": 0,
-        "lowHit": 9
+        "lowHit": 0
        }
       },
       {
        "pipeline": "after",
        "latencyUsedMs": 280,
        "windowN": 1024,
-       "pitch": 0.6630878532421396,
-       "rhythm": 0.7931805555555559,
-       "accuracy": 0.8729166666666668,
-       "letter": "A",
+       "pitch": 0.9938422351767242,
+       "rhythm": 0.9440694444444437,
+       "accuracy": 1,
+       "letter": "S",
        "passed": true,
        "timingFailMs": null,
-       "alignedMs": 0,
-       "match": 0.673624019607401,
+       "alignedMs": 80,
+       "match": 0.7513215437467854,
        "learnedMs": null,
-       "medianOnsetMs": 173.14285714285458,
-       "avgCents": -2,
+       "medianOnsetMs": 175.4285714285711,
+       "avgCents": -3,
        "insights": [
-        "wrong-notes"
+        "great"
        ],
        "counts": {
-        "perfect": 15,
-        "good": 7,
+        "perfect": 24,
+        "good": 0,
         "ok": 0,
-        "miss": 2
+        "miss": 0
        },
        "bubble": {
         "lagShare": 1,
@@ -20985,9 +20985,9 @@
        },
        "loss": {
         "early": 1,
-        "perfect": 15,
-        "demoted": 1,
-        "lowHit": 8
+        "perfect": 24,
+        "demoted": 0,
+        "lowHit": 0
        }
       }
      ]
@@ -21126,25 +21126,26 @@
        "pipeline": "after",
        "latencyUsedMs": 130,
        "windowN": 1024,
-       "pitch": 0.5287836542474557,
-       "rhythm": 0.3333333333333339,
-       "accuracy": 0.5937499999999999,
-       "letter": "C",
+       "pitch": 0.9683876084546886,
+       "rhythm": 0.4349305555555561,
+       "accuracy": 0.9875000000000002,
+       "letter": "S",
        "passed": false,
-       "timingFailMs": null,
-       "alignedMs": 140,
-       "match": 0.6315766059201465,
+       "timingFailMs": 300,
+       "alignedMs": 300,
+       "match": 0.7989269106770349,
        "learnedMs": null,
-       "medianOnsetMs": 319.333333333334,
-       "avgCents": -1,
+       "medianOnsetMs": 319.3333333333339,
+       "avgCents": -2,
        "insights": [
-        "behind-beat"
+        "behind-beat",
+        "great"
        ],
        "counts": {
-        "perfect": 10,
-        "good": 5,
+        "perfect": 22,
+        "good": 2,
         "ok": 0,
-        "miss": 9
+        "miss": 0
        },
        "bubble": {
         "lagShare": 0.9,
@@ -21153,34 +21154,35 @@
        },
        "loss": {
         "early": 0.6470588235294118,
-        "perfect": 10,
+        "perfect": 22,
         "demoted": 0,
-        "lowHit": 14
+        "lowHit": 2
        }
       },
       {
        "pipeline": "after",
        "latencyUsedMs": 130,
        "windowN": 1024,
-       "pitch": 0.5616016936717514,
-       "rhythm": 0.315555555555556,
-       "accuracy": 0.6124999999999999,
-       "letter": "C",
+       "pitch": 0.9642320049615091,
+       "rhythm": 0.4399305555555561,
+       "accuracy": 0.9875000000000002,
+       "letter": "S",
        "passed": false,
-       "timingFailMs": null,
-       "alignedMs": 150,
-       "match": 0.6030893588166801,
-       "learnedMs": 275,
-       "medianOnsetMs": 318.0000000000001,
-       "avgCents": 3,
+       "timingFailMs": 300,
+       "alignedMs": 300,
+       "match": 0.7751373989296632,
+       "learnedMs": 280,
+       "medianOnsetMs": 319.3333333333321,
+       "avgCents": 2,
        "insights": [
-        "behind-beat"
+        "behind-beat",
+        "great"
        ],
        "counts": {
-        "perfect": 13,
+        "perfect": 22,
         "good": 2,
         "ok": 0,
-        "miss": 9
+        "miss": 0
        },
        "bubble": {
         "lagShare": 0.85,
@@ -21189,45 +21191,46 @@
        },
        "loss": {
         "early": 0.7631578947368421,
-        "perfect": 13,
+        "perfect": 22,
         "demoted": 0,
-        "lowHit": 11
+        "lowHit": 2
        }
       },
       {
        "pipeline": "after",
-       "latencyUsedMs": 275,
+       "latencyUsedMs": 280,
        "windowN": 1024,
-       "pitch": 0.5753729309785877,
-       "rhythm": 0.5346527777777775,
-       "accuracy": 0.61875,
-       "letter": "C",
-       "passed": false,
+       "pitch": 0.7804036458333332,
+       "rhythm": 0.7981249999999985,
+       "accuracy": 0.9083333333333333,
+       "letter": "A",
+       "passed": true,
        "timingFailMs": null,
-       "alignedMs": 0,
-       "match": 0.621019865798177,
+       "alignedMs": 70,
+       "match": 0.7179946366524657,
        "learnedMs": null,
-       "medianOnsetMs": 174.33333333333323,
+       "medianOnsetMs": 169.33333333333306,
        "avgCents": 5,
        "insights": [
-        "wrong-notes"
+        "wrong-notes",
+        "great"
        ],
        "counts": {
-        "perfect": 14,
-        "good": 1,
+        "perfect": 15,
+        "good": 8,
         "ok": 0,
-        "miss": 9
+        "miss": 1
        },
        "bubble": {
         "lagShare": 1,
         "overShare": 0.35,
-        "settleMs": 275.8333333333392
+        "settleMs": 273.3333333333391
        },
        "loss": {
-        "early": 0.9850746268656716,
-        "perfect": 14,
-        "demoted": 0,
-        "lowHit": 10
+        "early": 0.984375,
+        "perfect": 15,
+        "demoted": 3,
+        "lowHit": 6
        }
       }
      ]
@@ -21710,17 +21713,17 @@
        "pipeline": "after",
        "latencyUsedMs": 270,
        "windowN": 1024,
-       "pitch": 0.9991061422701281,
-       "rhythm": 0.9411825396825422,
+       "pitch": 0.9975557375674756,
+       "rhythm": 0.9324761904761926,
        "accuracy": 1,
        "letter": "S",
        "passed": true,
        "timingFailMs": null,
-       "alignedMs": 0,
-       "match": 0.7441952747869373,
+       "alignedMs": 70,
+       "match": 0.7709237548789057,
        "learnedMs": null,
-       "medianOnsetMs": 186.57142857143023,
-       "avgCents": -3,
+       "medianOnsetMs": 186.57142857143097,
+       "avgCents": -2,
        "insights": [
         "great"
        ],
@@ -21876,8 +21879,8 @@
        "rhythm": 0.5302380952380938,
        "accuracy": 1,
        "letter": "S",
-       "passed": true,
-       "timingFailMs": null,
+       "passed": false,
+       "timingFailMs": 331,
        "alignedMs": 150,
        "match": 0.7365623350203356,
        "learnedMs": null,
@@ -21913,8 +21916,8 @@
        "rhythm": 0.5391269841269843,
        "accuracy": 1,
        "letter": "S",
-       "passed": true,
-       "timingFailMs": null,
+       "passed": false,
+       "timingFailMs": 326,
        "alignedMs": 150,
        "match": 0.719546290396906,
        "learnedMs": 280,
@@ -21946,16 +21949,16 @@
        "pipeline": "after",
        "latencyUsedMs": 280,
        "windowN": 1024,
-       "pitch": 0.9962925962925956,
-       "rhythm": 0.8504761904761912,
+       "pitch": 0.9937963383265239,
+       "rhythm": 0.8436507936507907,
        "accuracy": 1,
        "letter": "S",
        "passed": true,
        "timingFailMs": null,
-       "alignedMs": 0,
-       "match": 0.7286730550242984,
+       "alignedMs": 80,
+       "match": 0.7768146351405415,
        "learnedMs": null,
-       "medianOnsetMs": 174.66666666666697,
+       "medianOnsetMs": 174.66666666666868,
        "avgCents": 0,
        "insights": [
         "great"
@@ -22642,26 +22645,26 @@
        "pipeline": "after",
        "latencyUsedMs": 130,
        "windowN": 1024,
-       "pitch": 0.5368659064097522,
-       "rhythm": 0.4641666666666671,
-       "accuracy": 0.5416666666666666,
+       "pitch": 0.6527483733413169,
+       "rhythm": 0.03520833333333293,
+       "accuracy": 0.6458333333333334,
        "letter": "C",
        "passed": false,
-       "timingFailMs": null,
-       "alignedMs": 140,
-       "match": 0.4288878911534376,
+       "timingFailMs": 440,
+       "alignedMs": 440,
+       "match": 0.5489531797407078,
        "learnedMs": null,
-       "medianOnsetMs": 267.99999999999835,
-       "avgCents": -4,
+       "medianOnsetMs": 516.6666666666675,
+       "avgCents": -5,
        "insights": [
         "behind-beat",
-        "leaps"
+        "flat-long-notes"
        ],
        "counts": {
-        "perfect": 13,
+        "perfect": 14,
         "good": 0,
-        "ok": 0,
-        "miss": 11
+        "ok": 3,
+        "miss": 7
        },
        "bubble": {
         "lagShare": 1,
@@ -22670,35 +22673,35 @@
        },
        "loss": {
         "early": 0.3322884012539185,
-        "perfect": 13,
+        "perfect": 14,
         "demoted": 0,
-        "lowHit": 11
+        "lowHit": 10
        }
       },
       {
        "pipeline": "after",
        "latencyUsedMs": 130,
        "windowN": 1024,
-       "pitch": 0.6236870534667521,
-       "rhythm": 0.4584027777777779,
-       "accuracy": 0.6395833333333333,
+       "pitch": 0.647553926604133,
+       "rhythm": 0.042569444444444104,
+       "accuracy": 0.6124999999999999,
        "letter": "C",
        "passed": false,
-       "timingFailMs": null,
-       "alignedMs": 150,
-       "match": 0.41851555315210665,
+       "timingFailMs": 440,
+       "alignedMs": 440,
+       "match": 0.5354033759061363,
        "learnedMs": null,
-       "medianOnsetMs": 265.3333333333322,
-       "avgCents": 0,
+       "medianOnsetMs": 519.3333333333326,
+       "avgCents": -2,
        "insights": [
         "behind-beat",
-        "leaps"
+        "flat-long-notes"
        ],
        "counts": {
-        "perfect": 13,
-        "good": 1,
-        "ok": 3,
-        "miss": 7
+        "perfect": 12,
+        "good": 2,
+        "ok": 2,
+        "miss": 8
        },
        "bubble": {
         "lagShare": 1,
@@ -22707,35 +22710,35 @@
        },
        "loss": {
         "early": 0.3333333333333333,
-        "perfect": 13,
-        "demoted": 0,
-        "lowHit": 11
+        "perfect": 12,
+        "demoted": 2,
+        "lowHit": 10
        }
       },
       {
        "pipeline": "after",
        "latencyUsedMs": 130,
        "windowN": 1024,
-       "pitch": 0.6140002719342263,
-       "rhythm": 0.44750000000000006,
-       "accuracy": 0.61875,
+       "pitch": 0.6177868560991184,
+       "rhythm": 0.04055555555555521,
+       "accuracy": 0.6333333333333333,
        "letter": "C",
        "passed": false,
-       "timingFailMs": null,
-       "alignedMs": 150,
-       "match": 0.41952068479551946,
+       "timingFailMs": 440,
+       "alignedMs": 440,
+       "match": 0.5463107217323133,
        "learnedMs": null,
-       "medianOnsetMs": 286.66666666666674,
-       "avgCents": 5,
+       "medianOnsetMs": 518.0000000000002,
+       "avgCents": 1,
        "insights": [
         "behind-beat",
-        "leaps"
+        "flat-long-notes"
        ],
        "counts": {
-        "perfect": 13,
-        "good": 1,
-        "ok": 2,
-        "miss": 8
+        "perfect": 12,
+        "good": 2,
+        "ok": 3,
+        "miss": 7
        },
        "bubble": {
         "lagShare": 0.95,
@@ -22744,9 +22747,9 @@
        },
        "loss": {
         "early": 0.334384858044164,
-        "perfect": 13,
+        "perfect": 12,
         "demoted": 1,
-        "lowHit": 10
+        "lowHit": 11
        }
       }
      ]
@@ -23167,27 +23170,27 @@
        "pipeline": "after",
        "latencyUsedMs": 130,
        "windowN": 1024,
-       "pitch": 0.3333333333333333,
-       "rhythm": 0.3333333333333333,
-       "accuracy": 0.3333333333333333,
-       "letter": "D",
+       "pitch": 0.5415645532369867,
+       "rhythm": 0.15302380952381014,
+       "accuracy": 0.5476190476190477,
+       "letter": "C",
        "passed": false,
-       "timingFailMs": null,
-       "alignedMs": 0,
-       "match": 0.3104259482467939,
+       "timingFailMs": 440,
+       "alignedMs": 440,
+       "match": 0.4235931036976006,
        "learnedMs": null,
-       "medianOnsetMs": null,
-       "avgCents": 0,
+       "medianOnsetMs": 1225.2380952380956,
+       "avgCents": 2,
        "insights": [
-        "wrong-notes",
-        "missed-notes",
-        "leaps"
+        "behind-beat",
+        "leaps",
+        "flat-long-notes"
        ],
        "counts": {
         "perfect": 7,
         "good": 0,
-        "ok": 0,
-        "miss": 14
+        "ok": 9,
+        "miss": 5
        },
        "bubble": {
         "lagShare": 1,
@@ -23205,27 +23208,27 @@
        "pipeline": "after",
        "latencyUsedMs": 130,
        "windowN": 1024,
-       "pitch": 0.3333333333333333,
-       "rhythm": 0.3333333333333333,
-       "accuracy": 0.3333333333333333,
+       "pitch": 0.542564912433725,
+       "rhythm": 0.14791269841269938,
+       "accuracy": 0.47619047619047616,
        "letter": "D",
        "passed": false,
-       "timingFailMs": null,
-       "alignedMs": 0,
-       "match": 0.3157766273070709,
+       "timingFailMs": 450,
+       "alignedMs": 450,
+       "match": 0.4350037047824933,
        "learnedMs": null,
-       "medianOnsetMs": null,
-       "avgCents": -3,
+       "medianOnsetMs": 1224.0952380952342,
+       "avgCents": -2,
        "insights": [
-        "wrong-notes",
-        "missed-notes",
-        "leaps"
+        "behind-beat",
+        "leaps",
+        "flat-long-notes"
        ],
        "counts": {
         "perfect": 7,
         "good": 0,
-        "ok": 0,
-        "miss": 14
+        "ok": 6,
+        "miss": 8
        },
        "bubble": {
         "lagShare": 1,
@@ -23243,27 +23246,27 @@
        "pipeline": "after",
        "latencyUsedMs": 130,
        "windowN": 1024,
-       "pitch": 0.3333333333333333,
-       "rhythm": 0.3333333333333333,
-       "accuracy": 0.3333333333333333,
-       "letter": "D",
+       "pitch": 0.5600124275543783,
+       "rhythm": 0.15280158730158902,
+       "accuracy": 0.5476190476190477,
+       "letter": "C",
        "passed": false,
-       "timingFailMs": null,
-       "alignedMs": 0,
-       "match": 0.30923495985144483,
+       "timingFailMs": 440,
+       "alignedMs": 440,
+       "match": 0.4282702578837793,
        "learnedMs": null,
-       "medianOnsetMs": null,
-       "avgCents": -6,
+       "medianOnsetMs": 1212.2857142857163,
+       "avgCents": -2,
        "insights": [
-        "wrong-notes",
-        "missed-notes",
-        "leaps"
+        "behind-beat",
+        "leaps",
+        "flat-long-notes"
        ],
        "counts": {
         "perfect": 7,
         "good": 0,
-        "ok": 0,
-        "miss": 14
+        "ok": 9,
+        "miss": 5
        },
        "bubble": {
         "lagShare": 1,
@@ -23413,27 +23416,26 @@
        "pipeline": "after",
        "latencyUsedMs": 130,
        "windowN": 1024,
-       "pitch": 0.3333333333333333,
-       "rhythm": 0.3333333333333333,
-       "accuracy": 0.3333333333333333,
-       "letter": "D",
+       "pitch": 0.6935529347720623,
+       "rhythm": 0.035793650793652064,
+       "accuracy": 0.7523809523809524,
+       "letter": "B",
        "passed": false,
-       "timingFailMs": null,
-       "alignedMs": 0,
-       "match": 0.3425968118299086,
+       "timingFailMs": 450,
+       "alignedMs": 450,
+       "match": 0.5172468797959341,
        "learnedMs": null,
-       "medianOnsetMs": null,
-       "avgCents": -4,
+       "medianOnsetMs": 863.3333333333339,
+       "avgCents": -6,
        "insights": [
-        "wrong-notes",
-        "missed-notes",
-        "leaps"
+        "behind-beat",
+        "flat-long-notes"
        ],
        "counts": {
         "perfect": 7,
-        "good": 0,
-        "ok": 0,
-        "miss": 14
+        "good": 8,
+        "ok": 4,
+        "miss": 2
        },
        "bubble": {
         "lagShare": 1,
@@ -23451,27 +23453,26 @@
        "pipeline": "after",
        "latencyUsedMs": 130,
        "windowN": 1024,
-       "pitch": 0.3333333333333333,
-       "rhythm": 0.3333333333333333,
-       "accuracy": 0.3333333333333333,
-       "letter": "D",
+       "pitch": 0.6934470487824573,
+       "rhythm": 0.034206349206350226,
+       "accuracy": 0.7357142857142855,
+       "letter": "B",
        "passed": false,
-       "timingFailMs": null,
-       "alignedMs": 0,
-       "match": 0.34163397553446695,
+       "timingFailMs": 450,
+       "alignedMs": 450,
+       "match": 0.5078279080296242,
        "learnedMs": null,
-       "medianOnsetMs": null,
-       "avgCents": -2,
+       "medianOnsetMs": 848.6666666666672,
+       "avgCents": -5,
        "insights": [
-        "wrong-notes",
-        "missed-notes",
-        "leaps"
+        "behind-beat",
+        "flat-long-notes"
        ],
        "counts": {
         "perfect": 7,
-        "good": 0,
-        "ok": 0,
-        "miss": 14
+        "good": 7,
+        "ok": 5,
+        "miss": 2
        },
        "bubble": {
         "lagShare": 1,
@@ -23489,27 +23490,25 @@
        "pipeline": "after",
        "latencyUsedMs": 130,
        "windowN": 1024,
-       "pitch": 0.3333333333333333,
-       "rhythm": 0.38095238095238093,
-       "accuracy": 0.3261904761904762,
-       "letter": "D",
+       "pitch": 0.6750366302366914,
+       "rhythm": 0.03547619047619305,
+       "accuracy": 0.7357142857142857,
+       "letter": "B",
        "passed": false,
-       "timingFailMs": null,
-       "alignedMs": 0,
-       "match": 0.3302695574461477,
+       "timingFailMs": 450,
+       "alignedMs": 450,
+       "match": 0.5022949603459193,
        "learnedMs": null,
-       "medianOnsetMs": null,
-       "avgCents": -2,
+       "medianOnsetMs": 856.6666666666663,
+       "avgCents": -3,
        "insights": [
-        "wrong-notes",
-        "missed-notes",
-        "leaps"
+        "behind-beat"
        ],
        "counts": {
-        "perfect": 6,
-        "good": 1,
-        "ok": 0,
-        "miss": 14
+        "perfect": 7,
+        "good": 7,
+        "ok": 5,
+        "miss": 2
        },
        "bubble": {
         "lagShare": 1,
@@ -23518,8 +23517,8 @@
        },
        "loss": {
         "early": 0.1810344827586207,
-        "perfect": 6,
-        "demoted": 1,
+        "perfect": 7,
+        "demoted": 0,
         "lowHit": 14
        }
       }
@@ -24006,17 +24005,17 @@
        "pipeline": "after",
        "latencyUsedMs": 280,
        "windowN": 1024,
-       "pitch": 0.9925639993253995,
+       "pitch": 0.9952516712544243,
        "rhythm": 0.9989444444444443,
        "accuracy": 1,
        "letter": "S",
        "passed": true,
        "timingFailMs": null,
-       "alignedMs": 0,
-       "match": 0.723777117740451,
+       "alignedMs": 60,
+       "match": 0.7728966658112328,
        "learnedMs": null,
-       "medianOnsetMs": 95.42857142857234,
-       "avgCents": -3,
+       "medianOnsetMs": 95.42857142857258,
+       "avgCents": -1,
        "insights": [
         "great"
        ],
@@ -24246,24 +24245,24 @@
        "pipeline": "after",
        "latencyUsedMs": 275,
        "windowN": 1024,
-       "pitch": 0.9512211091468603,
-       "rhythm": 0.9842708333333334,
-       "accuracy": 0.9875000000000002,
+       "pitch": 0.9625533854360189,
+       "rhythm": 0.984270833333333,
+       "accuracy": 0.9750000000000001,
        "letter": "S",
        "passed": true,
        "timingFailMs": null,
-       "alignedMs": 0,
-       "match": 0.7204877906952325,
+       "alignedMs": 40,
+       "match": 0.748791436187347,
        "learnedMs": null,
-       "medianOnsetMs": 53.000000000000824,
-       "avgCents": 3,
+       "medianOnsetMs": 55.66666666666805,
+       "avgCents": 6,
        "insights": [
         "early-entries",
         "great"
        ],
        "counts": {
-        "perfect": 22,
-        "good": 2,
+        "perfect": 20,
+        "good": 4,
         "ok": 0,
         "miss": 0
        },
@@ -24274,9 +24273,9 @@
        },
        "loss": {
         "early": 0.96,
-        "perfect": 22,
-        "demoted": 1,
-        "lowHit": 1
+        "perfect": 20,
+        "demoted": 2,
+        "lowHit": 2
        }
       }
      ]
@@ -24757,17 +24756,17 @@
        "pipeline": "after",
        "latencyUsedMs": 270,
        "windowN": 1024,
-       "pitch": 0.9991619254977648,
-       "rhythm": 0.9975476190476191,
+       "pitch": 0.9980118943010103,
+       "rhythm": 0.9975476190476197,
        "accuracy": 1,
        "letter": "S",
        "passed": true,
        "timingFailMs": null,
-       "alignedMs": 0,
-       "match": 0.7612615064497046,
+       "alignedMs": 60,
+       "match": 0.782559153630384,
        "learnedMs": null,
-       "medianOnsetMs": 117.23809523808931,
-       "avgCents": 0,
+       "medianOnsetMs": 117.23809523808704,
+       "avgCents": 1,
        "insights": [
         "great"
        ],
@@ -24923,8 +24922,8 @@
        "rhythm": 0.6896031746031795,
        "accuracy": 0.9928571428571429,
        "letter": "S",
-       "passed": true,
-       "timingFailMs": null,
+       "passed": false,
+       "timingFailMs": 257,
        "alignedMs": 140,
        "match": 0.7503157937283709,
        "learnedMs": null,
@@ -24960,8 +24959,8 @@
        "rhythm": 0.6915079365079368,
        "accuracy": 0.9928571428571429,
        "letter": "S",
-       "passed": true,
-       "timingFailMs": null,
+       "passed": false,
+       "timingFailMs": 258,
        "alignedMs": 150,
        "match": 0.7316452567942805,
        "learnedMs": 275,
@@ -24993,16 +24992,16 @@
        "pipeline": "after",
        "latencyUsedMs": 275,
        "windowN": 1024,
-       "pitch": 0.9966040642732376,
+       "pitch": 0.9944124574022976,
        "rhythm": 0.9744444444444453,
        "accuracy": 1,
        "letter": "S",
        "passed": true,
        "timingFailMs": null,
-       "alignedMs": 0,
-       "match": 0.7671248352410615,
+       "alignedMs": 70,
+       "match": 0.7997470164447996,
        "learnedMs": null,
-       "medianOnsetMs": 104.99999999999687,
+       "medianOnsetMs": 104.99999999999659,
        "avgCents": -1,
        "insights": [
         "great"
