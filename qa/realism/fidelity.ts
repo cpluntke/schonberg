@@ -258,8 +258,21 @@ export interface BubbleStats {
  */
 export function bubbleStats(
   part: Part, range: [number, number], samples: PitchSample[], availSec: number[],
-  m: { scoreTimeAtSample0: number; rate: number; outputLatencyMs: number; tolerance: number; stopSec: number },
+  m: {
+    scoreTimeAtSample0: number; rate: number; outputLatencyMs: number; tolerance: number; stopSec: number;
+    /** 'playhead' (baseline highway2d): note under the playhead; 'sample': note at the reading's own score time. */
+    reference?: 'playhead' | 'sample';
+  },
 ): BubbleStats {
+  const bySample = m.reference === 'sample';
+  const noteAt = (t: number): number => {
+    for (let i = range[0]; i <= range[1]; i++) {
+      const n = part.notes[i];
+      if (n.start > t) break;
+      if (t < n.start + n.dur) return i;
+    }
+    return -1;
+  };
   const fps = 60;
   const acc = { n: 0, lag: 0, over: 0, lagN: 0, overN: 0, settle: 0 };
   const changes: { k: number; start: number; end: number; dir: number }[] = [];
@@ -267,11 +280,11 @@ export function bubbleStats(
     const a = part.notes[i - 1];
     const b = part.notes[i];
     if (b.midi === a.midi || b.start - (a.start + a.dur) > 0.03) continue;
-    changes.push({ k: i, start: b.start, end: b.start + Math.min(b.dur, 1.0 * m.rate), dir: Math.sign(b.midi - a.midi) });
+    changes.push({ k: i, start: b.start, end: b.start + Math.min(b.dur, 1.0 * m.rate) + (bySample ? 0.4 * m.rate : 0), dir: Math.sign(b.midi - a.midi) });
   }
   let si = 0;
   for (const ch of changes) {
-    const target = part.notes[ch.k].midi;
+    let target = part.notes[ch.k].midi;
     let lag = 0;
     let over = 0;
     let lastBad = -1;
@@ -284,6 +297,12 @@ export function bubbleStats(
       while (si < samples.length && availSec[si] <= tau) si++;
       const last = samples[si - 1];
       if (!last || last.midi == null || pos - last.time >= 0.2) continue;
+      if (bySample) {
+        const h = noteAt(last.time);
+        if (h > ch.k) break; // the readout has moved on to the next note
+        if (h < 0) continue;
+        target = part.notes[h].midi;
+      }
       let sum = 0;
       let cnt = 0;
       for (let k = si - 1; k >= 0 && last.time - samples[k].time < 0.2; k--) {

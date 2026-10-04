@@ -1,7 +1,7 @@
 // Realistic synthetic-singer experiments. Writes qa/realism/out/report*.json and docs/qa/realism-*.md.
 //
-//   npx vitest run --config vitest.realism.config.ts
-//   REALISM_IMPL=current npx vitest run --config vitest.realism.config.ts   (working-tree scorer/tracker)
+//   REALISM_BASELINE=1 npx vitest run --config vitest.realism.config.ts qa/realism/run.test.ts
+// (skipped otherwise; the before/after comparison with the current app is cmp-*.test.ts)
 //   REALISM_SEEDS=5 ...                                                      (fewer repeatability seeds)
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -18,7 +18,9 @@ import { hashSeed } from './prng';
 
 declare const process: { env: Record<string, string | undefined>; version: string };
 
-const IMPL = process.env.REALISM_IMPL === 'current' ? 'current' : 'head';
+// The before/after comparison lives in cmp-*.test.ts; this file regenerates the baseline report only.
+const IMPL = 'head' as 'head' | 'current';
+const ENABLED = process.env.REALISM_BASELINE === '1';
 const SCORER: Scorer = IMPL === 'head' ? SCORE_HEAD : SCORE_CURRENT;
 const PITCH = IMPL === 'head' ? PITCH_HEAD : PITCH_CURRENT;
 const SEEDS = Math.max(2, Number(process.env.REALISM_SEEDS ?? 10));
@@ -81,7 +83,7 @@ const report = {
   roundtrip: null as null | { direct: number; viaWav: number; wav: string },
 };
 
-describe(`realism harness (${IMPL})`, () => {
+describe.skipIf(!ENABLED)(`realism baseline (${IMPL})`, () => {
   it('1. tracker fidelity vs ground truth', async () => {
     const singers = [SINGERS.goodChoir, SINGERS.operatic, SINGERS.plainControl, SINGERS.ringing];
     const configs = [

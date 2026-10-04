@@ -51,8 +51,12 @@ export interface SingerProfile {
   consonantLead: number;
   /** Voice stops this much before a written rest (breath). */
   releaseMs: Range2;
-  /** Probability of a wrong note (±1–2 semitones). */
+  /** Share of wrong notes (±1–2 semitones), exactly round(share·N) notes per take. */
   wrongNoteProb: number;
+  /** Adversarial: sing each note's pitch one note late (note k gets note k−1's pitch). */
+  noteBehind?: boolean;
+  /** Adversarial: in legato, the pitch only starts moving this long after the vowel onset. */
+  arrivalDelayMs?: number;
   source: { jitterPct: number; shimmerPct: number; aspirationDb: number };
 }
 
@@ -172,6 +176,14 @@ export const SINGERS = {
   } as SingerProfile,
   flat40: { ...base, name: 'flat −40¢', biasCents: -40, noteSdCents: 8 } as SingerProfile,
   wrongNotes: { ...base, name: 'wrong notes (40 %)', wrongNoteProb: 0.4, noteSdCents: 8 } as SingerProfile,
+  /** Sings the right notes, but 300 ms behind what they hear (following the guide by ear). */
+  echo300: { ...base, name: 'echo (300 ms behind)', timing: { jitterMs: 25, biasMs: 300 } } as SingerProfile,
+  /** Sings every pitch one note late. */
+  oneBehind: { ...base, name: 'one note behind', noteBehind: true } as SingerProfile,
+  /** Consonant and vowel on time, but the pitch arrives 200 ms late on every legato change. */
+  lateArriver: { ...base, name: 'late pitch arrival (200 ms)', arrivalDelayMs: 200 } as SingerProfile,
+  /** Good intonation, slow but well-damped transitions (settling ≈ 0.3 s). */
+  slowTransitions: { ...base, name: 'slow transitions (fn 3–4 Hz)', transition: { fnHz: [3, 4], zeta: [0.6, 0.75] } } as SingerProfile,
 };
 
 /** The idealised singer used by the earlier synthetic tests (for ablations). */
@@ -259,6 +271,17 @@ export function renderSinger(o: RenderOptions): RenderedTake {
   const hasLyrics = ns.slice(ra, rb + 1).some((n) => n.lyric);
   const notes: (RenderedNote & { endSec: number; voiceEnd: number; fn: number; zeta: number; vibDelay: number; vibExtent: number; scoopCents: number; vowel: number; consDur: number })[] = [];
   let vowel = perf.fork('vowel').next() * 5 | 0;
+  // Wrong notes: exactly round(p·N) of the notes (random choice), so every take is equally bad.
+  const wrongSet = new Set<number>();
+  if (P.wrongNoteProb > 0) {
+    const idx = Array.from({ length: rb - ra + 1 }, (_, k) => ra + k);
+    const wr = perf.fork('wrong');
+    for (let k = idx.length - 1; k > 0; k--) {
+      const j = Math.floor(wr.next() * (k + 1));
+      [idx[k], idx[j]] = [idx[j], idx[k]];
+    }
+    idx.slice(0, Math.round(P.wrongNoteProb * idx.length)).forEach((k) => wrongSet.add(k));
+  }
   for (let i = ra; i <= rb; i++) {
     const n: ScoreNote = ns[i];
     const prev = i > ra ? ns[i - 1] : null;
@@ -273,10 +296,12 @@ export function renderSinger(o: RenderOptions): RenderedTake {
     const consonantSec = cons ? onset - P.consonantLead * consDur : null;
     const vowelSec = cons ? onset + (1 - P.consonantLead) * consDur : onset;
     if (n.lyric || !hasLyrics) vowel = (vowel + 1) % 5;
-    const wrong = P.wrongNoteProb > 0 && perf.chance(P.wrongNoteProb);
+    const wrong = wrongSet.has(i);
     const wrongBy = wrong ? perf.pick([-2, -1, 1, 2]) : 0;
-    const targetMidi = n.midi + wrongBy + perf.normal(P.biasCents, P.noteSdCents) / 100;
-    const cmdSec = afterRest ? vowelSec : cons ? consonantSec! + 0.5 * consDur : vowelSec - perf.uniform(0, 0.03);
+    const sungMidi = P.noteBehind && i > ra ? ns[i - 1].midi : n.midi;
+    const targetMidi = sungMidi + wrongBy + perf.normal(P.biasCents, P.noteSdCents) / 100;
+    let cmdSec = afterRest ? vowelSec : cons ? consonantSec! + 0.5 * consDur : vowelSec - perf.uniform(0, 0.03);
+    if (P.arrivalDelayMs && !afterRest) cmdSec = Math.max(cmdSec, Math.min(vowelSec + P.arrivalDelayMs / 1000, tau(n.start + n.dur) - 0.03));
     notes.push({
       index: i, writtenMidi: n.midi, targetMidi, scoreStart: n.start, scoreDur: n.dur, cmdSec, vowelSec,
       consonantSec, afterRest, wrong,

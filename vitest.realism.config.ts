@@ -1,5 +1,7 @@
 // Vitest config for the realistic synthetic-singer harness (qa/realism).
-// Run: npx vitest run --config vitest.realism.config.ts
+// Run: npx vitest run --config vitest.realism.config.ts            (before/after → docs/qa/realism-current.md)
+//      REALISM_BASELINE=1 npx vitest run --config vitest.realism.config.ts qa/realism/run.test.ts
+//                                                                   (baseline only → docs/qa/realism-baseline.md)
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
@@ -10,7 +12,8 @@ export default defineConfig({
     include: ['qa/realism/**/*.test.ts'],
     testTimeout: 15 * 60_000,
     hookTimeout: 15 * 60_000,
-    // One file, one worker: the experiments are CPU-bound and write shared outputs.
-    fileParallelism: false,
+    // The cmp-*.test.ts files write separate parts; global-setup.ts merges them at the end.
+    fileParallelism: true,
+    globalSetup: ['qa/realism/global-setup.ts'],
   },
 });
