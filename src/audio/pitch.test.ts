@@ -139,3 +139,16 @@ describe('windowFor', () => {
     expect(windowFor(48, 44100)).toBe(1024);
   });
 });
+
+describe('fixSubharmonic', () => {
+  it('lifts octave, octave-and-a-fifth and two-octave subharmonics onto the note that is due', async () => {
+    const { fixSubharmonic } = await import('./pitch');
+    expect(fixSubharmonic(69.2, 69)).toBe(69.2); // fine: untouched
+    expect(fixSubharmonic(66, 69)).toBe(66); // a wrong note: untouched
+    expect(fixSubharmonic(57.1, 69)).toBeCloseTo(69.1); // ×½
+    expect(fixSubharmonic(50, 69)).toBe(69); // ×⅓
+    expect(fixSubharmonic(45, 69)).toBe(69); // ×¼
+    expect(fixSubharmonic(52, 69)).toBe(52); // not a subharmonic of the due note
+    expect(fixSubharmonic(50, null)).toBe(50); // rest: untouched
+  });
+});

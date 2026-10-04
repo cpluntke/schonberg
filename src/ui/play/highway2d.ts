@@ -296,8 +296,19 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
     c.beginPath();
     c.arc(nowX, py, 6, 0, Math.PI * 2);
     c.fill();
-    if (current >= 0) {
-      const target = notes[current].midi;
+    // Compare the reading with the note that was due when it was SUNG (its own score time), not
+    // the note under the playhead: the voice reaches us a moment later, and comparing it with the
+    // next note made every note change look like a big overshoot.
+    let heard = -1;
+    if (current >= 0 || s.range) {
+      const [h0, h1] = s.range ?? [0, notes.length - 1];
+      for (let i = h0; i <= h1; i++) {
+        if (notes[i].start > last.time) break;
+        if (last.time < notes[i].start + notes[i].dur) heard = i;
+      }
+    }
+    if (heard >= 0) {
+      const target = notes[heard].midi;
       // Average over ~one vibrato cycle so the readout doesn't flicker.
       let sum = 0;
       let cnt = 0;

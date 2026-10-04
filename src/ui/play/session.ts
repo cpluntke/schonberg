@@ -2,7 +2,7 @@
 import type { Part, Score } from '../../music/types';
 import type { AttemptResult, PitchSample, ScoringOptions } from '../../game/types';
 import { getAudioContext, unlockAudio, outputLatencySec } from '../../audio/context';
-import { PitchTracker, type RawPitch } from '../../audio/pitch';
+import { PitchTracker, fixSubharmonic, type RawPitch } from '../../audio/pitch';
 import { ScorePlayer, beatsInMeasure, beatSecAt } from '../../audio/player';
 import { LiveScorer, scoreAttempt, type ScoringContext } from '../../game/scoring';
 import { RunRecorder, type Recording } from '../../audio/recorder';
@@ -186,11 +186,25 @@ export class PracticeSession {
   private onPitch(p: RawPitch) {
     if (this.phase !== 'playing' && this.phase !== 'countin') return;
     const t = this.player.scoreTimeAt(p.ctxTime - this.latencyMs / 1000);
-    const s: PitchSample = { time: t, midi: p.midi, clarity: p.clarity, rms: p.rms };
+    const midi = p.midi != null && !this.cfg.scoring.octaveTolerant ? fixSubharmonic(p.midi, this.noteDueAt(t)) : p.midi;
+    const s: PitchSample = { time: t, midi, clarity: p.clarity, rms: p.rms };
     this.latest = s;
     if (t < this.minTime) return;
     this.samples.push(s);
     this.live?.push(s);
+  }
+
+  /** Written pitch of the singer's note sounding at score time t (null in rests). */
+  private noteDueAt(t: number): number | null {
+    const ns = this.cfg.part.notes;
+    let lo = 0;
+    let hi = ns.length - 1;
+    let idx = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (ns[mid].start <= t) { idx = mid; lo = mid + 1; } else hi = mid - 1;
+    }
+    return idx >= 0 && t < ns[idx].start + ns[idx].dur ? ns[idx].midi : null;
   }
 
   private startSimulation(kind: 'perfect' | 'flat' | 'sloppy') {

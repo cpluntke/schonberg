@@ -150,6 +150,19 @@ export class PitchSmoother {
   }
 }
 
+/**
+ * Practising on the phone speaker, the mic hears the backing too, and McLeod can lock onto the
+ * common period of voice + chord: an octave (×½), an octave and a fifth (×⅓) or two octaves (×¼)
+ * below the voice. A reading far below the note that is due is lifted by 12, 19 or 24 semitones
+ * when that lands it on (within a semitone and a half of) that note. Only for singers singing the
+ * part in its own octave.
+ */
+export function fixSubharmonic(midi: number, expected: number | null): number {
+  if (expected == null || midi > expected - 7) return midi;
+  for (const k of [12, 19, 24]) if (Math.abs(midi + k - expected) <= 1.5) return midi + k;
+  return midi;
+}
+
 function isOctaveJump(d: number): boolean {
   const a = Math.abs(d);
   return (a > 10.5 && a < 13.5) || (a > 22.5 && a < 25.5);
