@@ -137,6 +137,9 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
   useEffect(() => {
     let raf = 0;
     let lastHud = 0;
+    const ghostParts = piece && part ? piece.score.parts.filter((p) => p.id !== part.id && p.voiceType !== 'other' && p.notes.length) : [];
+    const win = part ? pitchWindow(part, range) : ([55, 72] as [number, number]);
+    let lanes: number[] | null = null;
     const loop = (ts: number) => {
       raf = requestAnimationFrame(loop);
       const canvas = canvasRef.current;
@@ -154,16 +157,16 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
       c.setTransform(dpr, 0, 0, dpr, 0, 0);
       const s = sessionRef.current;
       const pos = s ? s.position : section.start;
-      const [lo, hi] = pitchWindow(part, range);
+      const [lo, hi] = win;
       const st: DrawState = {
         score: piece.score, part, range, pos, rate,
         samples: s?.samples ?? [], live: s?.live ?? null,
         notation, showNames, key: keyAtTime(piece.score, Math.max(0, pos)), tolerance,
-        ghostParts: piece.score.parts.filter((p) => p.id !== part.id && p.voiceType !== 'other' && p.notes.length),
+        ghostParts,
         lo, hi, from: section.start, to: section.end,
         bpm: tempoAt(piece.score.tempos, Math.max(0, pos)) * rate,
       };
-      if (route.mode === '3d') drawArcade(c, W, H, st, fxRef.current, lanesFor(st), ts / 1000);
+      if (route.mode === '3d') drawArcade(c, W, H, st, fxRef.current, (lanes ??= lanesFor(st)), ts / 1000);
       else drawHighway2D(c, W, H, st);
 
       if (ts - lastHud > 90) {
@@ -178,7 +181,8 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
           if (part.notes[i].start <= pos + 0.05) lyricIdx = i;
           else break;
         }
-        setHud({ score: s?.live?.score ?? 0, combo: s?.live?.combo ?? 0, count, lyricIdx });
+        const next = { score: s?.live?.score ?? 0, combo: s?.live?.combo ?? 0, count, lyricIdx };
+        setHud((h) => (h.score === next.score && h.combo === next.combo && h.count === next.count && h.lyricIdx === next.lyricIdx ? h : next));
       }
     };
     raf = requestAnimationFrame(loop);
