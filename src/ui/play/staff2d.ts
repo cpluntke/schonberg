@@ -989,8 +989,8 @@ export function drawStaff2D(c: Ctx, W: number, H: number, s: DrawState) {
     c.lineTo(px, yTop + 0.1 * sp);
     c.closePath();
     c.fill();
-    drawCountdown(c, cur, s, L, beat);
-    drawBubble(c, cur, s, L, px, beat);
+    drawCountdown(c, cur, s, L);
+    drawBubble(c, cur, s, L, px);
   }
 }
 
@@ -1003,7 +1003,10 @@ interface Vis {
 
 function noteColor(s: DrawState, i: number, v: Vis): string {
   if (!v.inRange(i)) return INK.note;
-  if (v.isPast(i)) return gradeColor(s.live?.noteGrade(i));
+  if (v.isPast(i)) {
+    const g = s.live?.noteGrade(i);
+    return g ? gradeColor(g) : INK.note; // not graded yet (the voice arrives a moment later)
+  }
   if (v.isNow(i)) return COLORS.target;
   return INK.note;
 }
@@ -1035,7 +1038,7 @@ function drawSystem(c: Ctx, g: SysGeo, layout: StaffLayout, L: Cached, s: DrawSt
     } else c.fillRect(bx, top, lw + 0.5, 4 * sp + lw);
     c.fillStyle = INK.barNo;
     const nx = mi === 0 ? sys.clefX : m.x0 - 0.2 * sp;
-    if (m.sm.number !== '0') c.fillText(m.sm.number, nx, top - 1.3 * sp);
+    if (m.sm.number !== '0') c.fillText(m.sm.number, nx, top - 1.75 * sp);
     if (m.changeX != null) {
       let cx = m.changeX;
       if (m.sm.keyChange) {
@@ -1074,16 +1077,16 @@ function drawSystem(c: Ctx, g: SysGeo, layout: StaffLayout, L: Cached, s: DrawSt
       const maxRise = Math.min(1.0 * sp, Math.abs(x1 - x0) * 0.25);
       if (Math.abs(y1 - y0) > maxRise) y1 = y0 + Math.sign(y1 - y0) * maxRise;
       const at = (x: number) => (x1 === x0 ? y0 : y0 + ((x - x0) / (x1 - x0)) * (y1 - y0));
-      // Every stem at least 2.6 spaces long; and a beam never sits inside the middle of the staff's far side.
+      // Every stem at least 2.6 spaces long...
       let fix = 0;
       for (const le of les) {
         const need = hy(le) + d * (2.6 + Math.max(0, maxBeams - 1) * 0.75) * sp;
         const diff = up ? at(sx(le)) - need : need - at(sx(le));
         if (diff > fix) fix = diff;
       }
-      const midTarget = mid; // keep beams reaching at least the middle line
+      // ...and the beam reaches at least the middle line.
       for (const le of les) {
-        const diff = up ? at(sx(le)) - midTarget : midTarget - at(sx(le));
+        const diff = up ? at(sx(le)) - mid : mid - at(sx(le));
         if (diff > fix) fix = diff;
       }
       y0 -= d * fix;
@@ -1101,8 +1104,8 @@ function drawSystem(c: Ctx, g: SysGeo, layout: StaffLayout, L: Cached, s: DrawSt
         c.beginPath();
         c.moveTo(xa, ya);
         c.lineTo(xb, yb);
-        c.lineTo(xb, yb + d * -bt * -1);
-        c.lineTo(xa, ya + d * -bt * -1);
+        c.lineTo(xb, yb + d * bt);
+        c.lineTo(xa, ya + d * bt);
         c.closePath();
         c.fill();
       };
@@ -1188,7 +1191,7 @@ function drawSystem(c: Ctx, g: SysGeo, layout: StaffLayout, L: Cached, s: DrawSt
         if (!up && ey < mid) ey = mid;
       }
       c.fillRect(sx - stemW / 2, Math.min(y, ey), stemW, Math.abs(ey - y));
-      if (!beamed && e.base <= 0.5) drawFlags(c, sx + (up ? stemW / 2 : -stemW / 2) * 0, ey, sp, beamCount(e.base), up);
+      if (!beamed && e.base <= 0.5) drawFlags(c, sx, ey, sp, beamCount(e.base), up);
     }
     c.globalAlpha = 1;
   }
@@ -1356,6 +1359,9 @@ function drawTrace(c: Ctx, g: SysGeo, s: DrawState, L: Cached, beatNow: number) 
   c.lineCap = 'round';
   let prev: { x: number; y: number; t: number } | null = null;
   let color = '';
+  // In tune or not is judged on ~one vibrato cycle (like the scoring), so vibrato centred on the
+  // note doesn't stripe the line.
+  const win: { t: number; m: number; ev: StaffEvent | null }[] = [];
   c.beginPath();
   for (let q = lo; q < smp.length; q++) {
     const sm: PitchSample = smp[q];
@@ -1367,13 +1373,18 @@ function drawTrace(c: Ctx, g: SysGeo, s: DrawState, L: Cached, beatNow: number) 
     const b = timeToBeat(tempos, sm.time);
     const ev = eventAt(sys, b);
     const key = keyAtBeat(s.score, b);
-    const step = sungStep(sm.midi, key, ev ? { midi: ev.midi!, step: ev.step!, alt: ev.alt! } : null);
+    const hidden = !!ev && ev.noteIndex != null && !!s.hide && s.hide(ev.noteIndex) !== 'show'
+      && s.part.notes[ev.noteIndex].start + s.part.notes[ev.noteIndex].dur > s.pos;
+    const step = sungStep(sm.midi, key, ev && !hidden ? { midi: ev.midi!, step: ev.step!, alt: ev.alt! } : null);
     const x = xAtBeat(sys, b);
     const y = Math.max(yMin, Math.min(yMax, g.y(step)));
+    while (win.length && (sm.time - win[0].t > 0.18 || win[0].ev !== ev)) win.shift();
+    win.push({ t: sm.time, m: sm.midi, ev });
     let col: string;
-    if (!ev || (ev.noteIndex != null && s.hide && s.hide(ev.noteIndex) !== 'show' && s.part.notes[ev.noteIndex].start + s.part.notes[ev.noteIndex].dur > s.pos)) col = '#8C96CC';
+    if (!ev || hidden) col = '#8C96CC';
     else {
-      let cents = (sm.midi - ev.midi!) * 100;
+      const avg = win.reduce((a, w) => a + w.m, 0) / win.length;
+      let cents = (avg - ev.midi!) * 100;
       if (Math.abs(cents) > 700) cents = ((cents % 1200) + 1800) % 1200 - 600;
       col = Math.abs(cents) <= s.tolerance ? COLORS.voice : INK.outTune;
     }
@@ -1401,7 +1412,7 @@ function drawTrace(c: Ctx, g: SysGeo, s: DrawState, L: Cached, beatNow: number) 
   c.stroke();
 }
 
-function drawBubble(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: number, beatNow: number) {
+function drawBubble(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: number) {
   const sp = L.layout.sp;
   const last = s.samples[s.samples.length - 1];
   if (!last || last.midi == null || s.pos - last.time >= 0.2) return;
@@ -1416,7 +1427,9 @@ function drawBubble(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: number, beat
   }
   const lb = timeToBeat(s.score.tempos, last.time);
   const ev = eventAt(g.sys, lb);
-  const step = sungStep(last.midi, keyAtBeat(s.score, lb), ev ? { midi: ev.midi!, step: ev.step!, alt: ev.alt! } : null);
+  const hiddenEv = !!ev && ev.noteIndex != null && !!s.hide && s.hide(ev.noteIndex) !== 'show'
+    && notes[ev.noteIndex].start + notes[ev.noteIndex].dur > s.pos;
+  const step = sungStep(last.midi, keyAtBeat(s.score, lb), ev && !hiddenEv ? { midi: ev.midi!, step: ev.step!, alt: ev.alt! } : null);
   const yMin = g.top - (L.above - 0.6) * sp;
   const yMax = g.top + (4 + L.lyricOff - 1.5) * sp;
   const py = Math.max(yMin, Math.min(yMax, g.y(step)));
@@ -1430,7 +1443,6 @@ function drawBubble(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: number, beat
   c.arc(px, py, Math.max(3.5, 0.45 * sp), 0, Math.PI * 2);
   c.fill();
   if (heard < 0 || (s.hide && s.hide(heard) !== 'show' && notes[heard].start + notes[heard].dur > s.pos)) return;
-  void beatNow;
   const target = notes[heard].midi;
   let sum = 0;
   let cnt = 0;
@@ -1466,7 +1478,7 @@ function drawBubble(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: number, beat
 }
 
 /** Entry countdown above the staff when your next note comes after a rest. */
-function drawCountdown(c: Ctx, g: SysGeo, s: DrawState, L: Cached, beatNow: number) {
+function drawCountdown(c: Ctx, g: SysGeo, s: DrawState, L: Cached) {
   if (!s.range) return;
   const sp = L.layout.sp;
   const notes = s.part.notes;
@@ -1493,7 +1505,6 @@ function drawCountdown(c: Ctx, g: SysGeo, s: DrawState, L: Cached, beatNow: numb
         c.textAlign = 'left';
       }
     }
-    void beatNow;
     break;
   }
 }

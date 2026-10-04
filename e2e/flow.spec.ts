@@ -23,6 +23,50 @@ test('a perfect simulated singer passes level 1 and levels up', async ({ page })
   expect(errors).toEqual([]);
 });
 
+// Score view (sheet music): suggested at level 1, switchable before Start, remembered, and a run
+// through it reaches the results.
+test('score view: switch display, sing level 1 from sheet music, reach results', async ({ page }) => {
+  test.setTimeout(150_000); // the run plays in real time; leave room for a loaded machine
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await page.goto('/?simulate=perfect#/');
+  await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
+  await page.getByTestId('piece-row').first().click();
+  await page.getByRole('button', { name: /level 1/ }).first().click();
+
+  // Nothing chosen yet: level 1 suggests the score.
+  await expect(page.getByTestId('display-score')).toHaveAttribute('aria-pressed', 'true');
+  await page.getByTestId('display-highway').click();
+  await expect(page.locator('canvas[data-display="highway"]')).toHaveCount(1);
+  await page.getByTestId('display-score').click();
+  await expect(page.locator('canvas[data-display="score"]')).toHaveCount(1);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('sh:profile') ?? '{}').display)).toBe('score');
+
+  await page.getByTestId('start').click();
+  await page.waitForTimeout(5000);
+  // The staff is drawn: plenty of light (ink) pixels on the dark canvas.
+  const ink = await page.locator('canvas').evaluate((cv: HTMLCanvasElement) => {
+    const d = cv.getContext('2d')!.getImageData(0, 0, cv.width, cv.height).data;
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 450) n++;
+    return n;
+  });
+  expect(ink).toBeGreaterThan(2000);
+
+  await expect(page.getByTestId('pass-banner')).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByTestId('pass-banner')).toContainText(/Level 1 reached|Passed/);
+
+  // Settings: the same choice, including going back to automatic.
+  await page.goto('/#/settings');
+  const seg = page.getByTestId('settings-display');
+  await expect(seg.getByRole('button', { name: 'Score' })).toHaveAttribute('aria-pressed', 'true');
+  await seg.getByRole('button', { name: 'Highway' }).click();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('sh:profile') ?? '{}').display)).toBe('highway');
+  await seg.getByRole('button', { name: 'Automatic' }).click();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('sh:profile') ?? '{}').display)).toBeUndefined();
+  expect(errors).toEqual([]);
+});
+
 test('a flat simulated singer does not pass level 4', async ({ page }) => {
   await page.goto('/?simulate=flat#/');
   await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
