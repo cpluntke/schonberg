@@ -3,7 +3,19 @@
 The app is a static site: `npm run build` produces `dist/`, which any static host can serve.
 The microphone needs **https**, which all of the hosts below provide.
 
-## Option A: Render (Blueprint, recommended)
+## Option 0: inside messiermarathon (already set up, PR #291)
+
+`cpluntke/messiermarathon` already deploys to Render through Docker Hub. PR #291 vendors the build
+into `schonberg_dist/` and serves it at **https://messiermarathon-latest.onrender.com/schonberg/**,
+with the choir leaderboard at `/schonberg/api/…` on that service's persistent disk. Merge the PR
+and the next image deploy puts it online. To update later:
+
+```bash
+scripts/export-messier.sh ../messiermarathon   # build with the right leaderboard URL + copy
+cd ../messiermarathon && git add schonberg_dist && git commit -m "Update Schönberg Hero" && git push
+```
+
+## Option A: Render (Blueprint)
 
 1. On render.com: **Account settings → GitHub** and give Render access to `cpluntke/schonberg`.
    During the overnight build Render couldn't read the private repo, which is why it isn't online yet.

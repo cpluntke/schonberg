@@ -15,8 +15,11 @@ Good morning! Here is what happened between midnight and 7.
   exploratory and a11y, code review, a week-long acceptance test, a real-audio pipeline test, two
   final gates with about 11,000 synthetic singer runs). Every P0/P1 they found was fixed and re-verified. The final
   gate (round 6) found **0 P0 and 0 P1**; see "Testing" below.
-- **Not online yet:** Render couldn't read the private repo. It's one click once you give Render
-  access: see `docs/DEPLOY.md` (a `render.yaml` blueprint is included).
+- **Going online via messiermarathon:** PR cpluntke/messiermarathon#291 serves the app at
+  `https://messiermarathon-latest.onrender.com/schonberg/` (with the choir leaderboard on its disk). Merge it to go
+  live. Other options are in `docs/DEPLOY.md`.
+- **Onboarding video:** a 100-second narrated intro (coach + singer dialogue over the real app), playable from
+  Home, voice setup and Settings. Sources are in `media-src/onboarding/`.
 
 ## Try it
 
