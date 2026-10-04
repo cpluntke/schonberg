@@ -33,6 +33,9 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
   const [stopping, setStopping] = useState(false);
   const runningRef = useRef(false);
   const [silentFor, setSilentFor] = useState(0);
+  // Seconds on step 1 without a steady note yet (voiced or not).
+  const [waited, setWaited] = useState(0);
+  const stepStart = useRef(performance.now());
   const lastVoiced = useRef(performance.now());
   const stopRef = useRef(false);
   const cancelRef = useRef(false);
@@ -71,7 +74,11 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
   // "Can't hear you" hint on step 1.
   useEffect(() => {
     if (phase !== 'comfortable' || comfy !== null) return;
-    const id = setInterval(() => setSilentFor((performance.now() - lastVoiced.current) / 1000), 500);
+    stepStart.current = performance.now();
+    const id = setInterval(() => {
+      setSilentFor((performance.now() - lastVoiced.current) / 1000);
+      setWaited((performance.now() - stepStart.current) / 1000);
+    }, 500);
     return () => clearInterval(id);
   }, [phase, comfy]);
 
@@ -162,6 +169,33 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
   const phaseRounds = rounds.filter((x) => x.phase === phase);
   const lastDone = phaseRounds.length > 0 && !busy;
 
+  // Fixed place right under the status card, so the buttons don't move as results come in.
+  const rangeActions = () => (
+    <div className="col" style={{ gap: 6 }}>
+      <div className="row" style={{ minHeight: 48 }}>
+        {busy && (
+          <button className="btn grow" disabled={stopping} onClick={() => { stopRef.current = true; setStopping(true); }} data-testid="range-stop">
+            {stopping ? 'Stopping after this round' : phase === 'high' ? "That's my top" : phase === 'low' ? "That's my bottom" : 'Stop'}
+          </button>
+        )}
+        {!busy && (
+          phaseRounds.length ? (
+            <>
+              <button className="btn" onClick={() => runPhase(phase)}>Again</button>
+              <button className="btn primary grow" data-testid="range-next"
+                onClick={() => setPhase(phase === 'middle' ? 'high' : phase === 'high' ? 'low' : 'done')}>
+                {phase === 'low' ? 'See my range' : 'Next'}
+              </button>
+            </>
+          ) : (
+            <button className="btn primary grow" data-testid="range-start" onClick={() => runPhase(phase)}>Start</button>
+          )
+        )}
+      </div>
+      {!busy && <button className="btn ghost small" style={{ alignSelf: 'center' }} onClick={onSkip}>Skip the range check</button>}
+    </div>
+  );
+
   return (
     <div className="col" style={{ gap: 14 }} data-testid="range-check">
       <div className="row tiny" style={{ gap: 6, flexWrap: 'wrap' }} aria-label={`Range check, part ${Math.min(4, stepNo)} of 4`}>
@@ -179,9 +213,11 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
           {comfy === null ? (
             <>
               <div className="bar" aria-label="Holding the note"><span style={{ width: `${hold * 100}%` }} /></div>
-              {silentFor > 5 && hold === 0 && (
+              {silentFor > 5 && hold === 0 ? (
                 <span className="small muted" role="status">Can't hear you yet. Is the microphone on (tap the tuner above)? Then sing a little louder, close to the phone.</span>
-              )}
+              ) : waited > 8 && hold < 0.5 ? (
+                <span className="small muted" role="status">Hold one note on the same pitch: the bar fills after two seconds. Any comfortable “ah” is fine. In a noisy room, move closer to the phone.</span>
+              ) : null}
             </>
           ) : (
             <div className="notice info" role="status">Got it: <strong>{letterName(comfy)}</strong>. Next, a short tune to sing back.</div>
@@ -209,13 +245,14 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
             </span>
             <span className="tiny muted">Headphones help: the app only listens while it's your turn.</span>
           </div>
+          {rangeActions()}
           {phaseRounds.length > 0 && (
             <div className="row wrap" style={{ gap: 6 }}>
               {phaseRounds.map(({ r }, k) => {
                 const lo = r.root;
                 const hi = r.root + 4;
                 return (
-                  <span key={k} className="chip" style={{ borderColor: COLOR[r.verdict], color: COLOR[r.verdict] }}>
+                  <span key={k} className="chip" style={{ borderColor: COLOR[r.verdict], color: COLOR[r.verdict], display: 'inline-flex', alignItems: 'center', minHeight: 34 }}>
                     {letterName(lo)}–{letterName(hi)} {r.verdict === 'good' ? '✓' : r.verdict === 'shaky' ? '~' : '✗'}
                   </span>
                 );
@@ -228,28 +265,6 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
                 `${letterName(n.midi)}: ${n.verdict === 'missed' ? 'not heard' : `${n.cents! > 0 ? '+' : ''}${n.cents}¢${n.spread! > 30 ? ', unsteady' : ''}`}`).join(' · ')}
             </span>
           )}
-          <div className="row" style={{ marginTop: 'auto' }}>
-            {(phase === 'high' || phase === 'low') && busy && (
-              <button className="btn grow" disabled={stopping} onClick={() => { stopRef.current = true; setStopping(true); }} data-testid="range-stop">
-                {stopping ? 'Stopping after this round' : phase === 'high' ? "That's my top" : "That's my bottom"}
-              </button>
-            )}
-            {!busy && (
-              <>
-                {phaseRounds.length ? (
-                  <>
-                    <button className="btn" onClick={() => runPhase(phase)}>Again</button>
-                    <button className="btn primary grow" data-testid="range-next"
-                      onClick={() => setPhase(phase === 'middle' ? 'high' : phase === 'high' ? 'low' : 'done')}>
-                      {phase === 'low' ? 'See my range' : 'Next'}
-                    </button>
-                  </>
-                ) : (
-                  <button className="btn primary grow" data-testid="range-start" onClick={() => runPhase(phase)}>Start</button>
-                )}
-              </>
-            )}
-          </div>
         </>
       )}
 

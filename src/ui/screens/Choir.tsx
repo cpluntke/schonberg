@@ -11,7 +11,8 @@ import {
   withdrawProgress, type ChoirInfo, type ChoirSummary, type SectionView,
 } from '../../progress/choir';
 import { PieceMap } from '../components/PieceMap';
-import type { BarMap } from '../../progress/bars';
+import { importScoreFile } from '../../music/import';
+import { mastery, type BarMap } from '../../progress/bars';
 import { shareMyProgress, shareError } from '../play/shareProgress';
 
 const VOICE_NAME: Record<string, string> = { S: 'Sopranos', A: 'Altos', T: 'Tenors', B: 'Basses' };
@@ -118,7 +119,7 @@ export function ChoirScreen() {
           </div>
         </>
       )}
-      <button className="btn ghost small" style={{ alignSelf: 'center', marginTop: 'auto' }} onClick={() => go({ name: 'superadmin' })}>Super admin</button>
+      <button className="linklike tiny muted" style={{ alignSelf: 'center', marginTop: 'auto', minHeight: 44 }} onClick={() => go({ name: 'superadmin' })}>Setting up choirs? (super admin)</button>
     </main>
   );
 }
@@ -271,20 +272,21 @@ function ScoresEditor({ code, admin, info, onChanged }: { code: string; admin: s
   const [title, setTitle] = useState('');
   const [composer, setComposer] = useState('');
   const [busy, setBusy] = useState(false);
+  const [fileKey, setFileKey] = useState(0);
   return (
     <div className="card" data-testid="scores-editor">
       <strong>Scores</strong>
       <span className="small muted">MusicXML (.musicxml, .xml, .mxl) or MIDI, up to 6 MB. Everyone with the choir code can download them, so only upload scores your choir may share.</span>
       {(info?.pieces ?? []).map((p) => (
         <div key={p.id} className="row" style={{ gap: 6 }}>
-          <span className="grow small ellipsis">{p.title || p.filename}<span className="tiny muted"> · {p.composer}</span></span>
+          <span className="grow small ellipsis">{p.title || p.filename}{p.composer && <span className="tiny muted"> · {p.composer}</span>}</span>
           <button className="btn small ghost" onClick={async () => {
             if (!confirm(`Remove “${p.title || p.filename}” from the choir?`)) return;
             try { await deleteChoirPiece(code, admin, p.id); await onChanged(); } catch (e) { toast((e as Error).message); }
           }}>Remove</button>
         </div>
       ))}
-      <input type="file" accept=".musicxml,.xml,.mxl,.mid,.midi" aria-label="Score file" onChange={(e) => {
+      <input key={fileKey} type="file" accept=".musicxml,.xml,.mxl,.mid,.midi" aria-label="Score file" style={{ minHeight: 44 }} onChange={(e) => {
         const f = e.target.files?.[0] ?? null;
         setFile(f);
         if (f && !title) setTitle(f.name.replace(/\.[^.]+$/, ''));
@@ -296,8 +298,17 @@ function ScoresEditor({ code, admin, info, onChanged }: { code: string; admin: s
       <button className="btn block" disabled={!file || busy} onClick={async () => {
         setBusy(true);
         try {
-          await uploadChoirPiece(code, admin, file!, title, composer);
+          // Check it opens here first: a broken file would otherwise reach every member's phone.
+          let parsed: Awaited<ReturnType<typeof importScoreFile>>;
+          try {
+            parsed = await importScoreFile(file!.name, await file!.arrayBuffer());
+          } catch (e) {
+            toast(`This file can't be read as a score: ${(e as Error).message}`);
+            return;
+          }
+          await uploadChoirPiece(code, admin, file!, title.trim() || parsed.title, composer.trim() || parsed.composer || '');
           setFile(null);
+          setFileKey((k) => k + 1);
           setTitle('');
           setComposer('');
           await onChanged();
@@ -416,7 +427,7 @@ function SectionReport({ view }: { view: SectionView }) {
           <tbody>
             {view.members.map((m) => (
               <tr key={m.name}>
-                <td>{m.name}</td>
+                <td style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{m.name}</td>
                 <td className="muted tiny">{m.updatedAt ? new Date(m.updatedAt).toLocaleDateString() : ''}</td>
                 <td className="mono" style={{ textAlign: 'right' }}>
                   {Object.values(m.pieces).length ? `${Math.round((Object.values(m.pieces).reduce((a, p) => a + p.readiness, 0) / Object.values(m.pieces).length) * 100)}%` : '–'}
@@ -435,14 +446,16 @@ function SectionReport({ view }: { view: SectionView }) {
         if (!part) return null;
         const bars: BarMap = {};
         for (const [m, b] of Object.entries(agg.bars)) bars[Number(m)] = { ema: b.mean, n: b.n, at: 0 };
-        const hardest = Object.entries(agg.bars).filter(([, b]) => b.weak > 0).sort((a, b) => b[1].weak / b[1].n - a[1].weak / a[1].n || a[1].mean - b[1].mean).slice(0, 5);
+        // Same judgement as the map (the section's average), most struggling singers first.
+        const hardest = Object.entries(agg.bars).filter(([m]) => mastery(bars[Number(m)]) === 'weak')
+          .sort((a, b) => a[1].mean - b[1].mean || b[1].weak - a[1].weak).slice(0, 5);
         const label = (m: string) => piece.score.measures[Number(m)]?.number ?? m;
         return (
           <div key={id} className="card" data-testid="section-piece">
             <strong>{piece.title}</strong>
             <span className="small muted">{agg.singers} singer{agg.singers > 1 ? 's' : ''} · {part.name}</span>
             {hardest.length > 0 && (
-              <span className="small">Hardest: {hardest.map(([m, b]) => `bar ${label(m)} (${b.weak} of ${b.n})`).join(', ')}</span>
+              <span className="small">Hardest: {hardest.map(([m, b]) => `bar ${label(m)} (${b.weak} of ${b.n} struggling)`).join(', ')}</span>
             )}
             <PieceMap score={piece.score} part={part} sections={singableSections(piece, part.id)} bars={bars}
               onLoop={(m) => {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useProfile, useStoreVersion } from '../hooks';
 import { loadCycle, saveCycle, type Profile } from '../../progress/store';
-import { apiBase, cachedChoir } from '../../progress/choir';
+import { apiBase, cachedChoir, leaveChoir } from '../../progress/choir';
 import { JoinChoir } from './Choir';
 import { allPieces } from '../library';
 import { IntroVideoButton, introSeen } from '../components/IntroVideo';
@@ -71,7 +71,7 @@ export function Setup() {
     <main className="screen" style={{ paddingBottom: 24 }}>
       <div className="topbar">
         <button className="icon-btn" aria-label="Back" onClick={() => (step > 0 ? setStep(step - 1) : back())}><IconBack /></button>
-        <span className="eyebrow grow">Voice setup · {step + 1} of {steps}</span>
+        <span className="eyebrow grow">{step === 0 ? 'Setup' : 'Voice setup'} · {step + 1} of {steps}</span>
         <button className="btn ghost small" onClick={finish}>Skip</button>
       </div>
       <div className="steps" aria-hidden="true">
@@ -118,7 +118,7 @@ export function Setup() {
           })()}
           <span className="tiny muted">With dates, Home tells you how many sections to learn per day.</span>
           <div className="col">
-            <span className="small">{cachedChoir() && profile.choirCode ? `Pieces ${cachedChoir()!.name} is singing (from the choir; change them any time)` : 'Pieces your choir is singing this cycle'}</span>
+            <span className="small">{cachedChoir()?.cycle && profile.choirCode && loadCycle().preset === `choir:${profile.choirCode}` ? `Pieces ${cachedChoir()!.name} is singing (from the choir; change them any time)` : 'Pieces your choir is singing this cycle'}</span>
             <div className="chips" role="group" aria-label="Pieces in this cycle">
               {allPieces().map((pc) => {
                 const on = loadCycle().pieceIds.includes(pc.id);
@@ -218,13 +218,16 @@ function ChoirStep({ profile, update, onNext }: { profile: Profile; update: (p: 
         <div className="card" data-testid="setup-choir-joined">
           <span className="eyebrow">Joined</span>
           <strong style={{ fontSize: 20 }}>{choir!.name}</strong>
-          <span className="small muted">
-            {choir!.cycle ? `Programme: ${choir!.cycle.name}. ` : ''}{choir!.pieces.length ? `${choir!.pieces.length} score${choir!.pieces.length === 1 ? '' : 's'} from the choir are on their way to your phone.` : ''}
-          </span>
-          <label className="row small" style={{ gap: 8, alignItems: 'flex-start' }}>
-            <input type="checkbox" checked={!!profile.shareProgress} onChange={(e) => update({ shareProgress: e.target.checked })} />
+          {(choir!.cycle || choir!.pieces.length > 0) && (
+            <span className="small muted">
+              {choir!.cycle ? `Programme: ${choir!.cycle.name}. ` : ''}{choir!.pieces.length ? `${choir!.pieces.length} score${choir!.pieces.length === 1 ? '' : 's'} from the choir are on their way to your phone.` : ''}
+            </span>
+          )}
+          <label className="row small" style={{ gap: 10, alignItems: 'flex-start' }}>
+            <input type="checkbox" style={{ width: 22, height: 22, flex: 'none', accentColor: 'var(--accent)' }} checked={!!profile.shareProgress} onChange={(e) => update({ shareProgress: e.target.checked })} />
             <span>Share my progress with my section lead (which bars are hard for me). You can change this any time under Settings › Your choir.</span>
           </label>
+          <button className="linklike small" style={{ alignSelf: 'flex-start', minHeight: 44 }} onClick={() => { leaveChoir(); update({}); }}>Wrong choir? Use a different code</button>
         </div>
       ) : (
         <div className="card">

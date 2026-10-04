@@ -160,7 +160,7 @@ h2 { margin: 0; font-size: 18px; font-weight: 800; }
 .nav button[aria-current='page'] { color: var(--accent); }
 
 .field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
-.field input[type='text'], .field input[type='date'], .field input[type='time'], .field input[type='number'], .field select, .field textarea {
+.field input[type='text'], .field input[type='password'], .field input[type='email'], .field input[type='date'], .field input[type='time'], .field input[type='number'], .field select, .field textarea {
   min-height: 44px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); padding: 0 12px; color: var(--text);
 }
 .field textarea { padding: 10px 12px; min-height: 80px; }
