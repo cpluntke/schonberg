@@ -4,6 +4,7 @@ import { useProfile, useStoreVersion, formatDate, daysUntil, initials } from '..
 import { go } from '../router';
 import { loadCycle, getProgress, streakDays, dueForReview, attemptLog } from '../../progress/store';
 import { pieceReadiness, nextStep, levelSpec } from '../../progress/ladder';
+import { nextRehearsal } from '../../progress/rehearsal';
 import { rowOfTheDay } from '../../game/twelvetone';
 import { IconFlame, IconPlay, IconMic } from '../icons';
 import { IntroVideoButton } from '../components/IntroVideo';
@@ -53,14 +54,20 @@ export function Home() {
   // Today's plan: reviews first, then continue the piece you practised most recently, then the rest.
   const lastPractised = new Map<string, number>();
   for (const e of attemptLog()) lastPractised.set(e.pieceId, Math.max(lastPractised.get(e.pieceId) ?? 0, e.at));
+  // Pieces the next rehearsal works on come first (if they still need work), then reviews, then recency.
+  const focusIds = new Set(cycle.focusPieceIds ?? []);
   const ordered = [...statuses].sort((a, b) =>
-    (b.due.length ? 1 : 0) - (a.due.length ? 1 : 0) || (lastPractised.get(b.piece.id) ?? 0) - (lastPractised.get(a.piece.id) ?? 0));
+    (focusIds.has(b.piece.id) && !b.rehearsalReady ? 1 : 0) - (focusIds.has(a.piece.id) && !a.rehearsalReady ? 1 : 0)
+    || (b.due.length ? 1 : 0) - (a.due.length ? 1 : 0)
+    || (lastPractised.get(b.piece.id) ?? 0) - (lastPractised.get(a.piece.id) ?? 0));
   const plan = ordered.filter((s) => s.next && (!s.concertReady || s.due.length)).slice(0, 3);
   const focus = plan[0] ?? null;
   const row = rowOfTheDay(new Date());
-  const toRehearsal = daysUntil(cycle.rehearsalDate);
+  const nr = nextRehearsal(cycle);
+  const toRehearsal = nr ? nr.days : null;
   const toConcert = daysUntil(cycle.concertDate);
-  const target = cycleTarget(statuses, toRehearsal, toConcert);
+  const focusStatuses = statuses.filter((s) => focusIds.has(s.piece.id));
+  const target = cycleTarget(statuses, toRehearsal, toConcert, focusStatuses.length ? focusStatuses : null);
   const avg = statuses.length ? statuses.reduce((a, s) => a + s.pct, 0) / statuses.length : 0;
 
   return (
@@ -106,13 +113,22 @@ export function Home() {
           <button className="btn ghost small" onClick={() => go({ name: 'settings' })}>Edit dates</button>
         </div>
         <div className="row" style={{ gap: 16 }}>
-          <Countdown label="Rehearsal" days={toRehearsal} date={cycle.rehearsalDate} />
+          <Countdown label="Rehearsal" days={toRehearsal} date={nr?.label} raw />
           <Countdown label="Concert" days={toConcert} date={cycle.concertDate} />
           <div className="col" style={{ gap: 2, marginLeft: 'auto', alignItems: 'flex-end' }}>
             <span className="mono" style={{ fontSize: 26, fontWeight: 600 }}>{Math.round(avg * 100)}%</span>
             <span className="tiny muted">cycle readiness</span>
           </div>
         </div>
+        {focusStatuses.length > 0 && nr && nr.days >= 0 && (
+          <div className="small" data-testid="rehearsal-focus">
+            <span className="muted">{nr.days === 0 ? 'Tonight' : `Next rehearsal (${nr.label})`}:</span>{' '}
+            {focusStatuses.map((s, i) => (
+              <span key={s.piece.id}>{i ? ', ' : ''}<button className="linklike" onClick={() => go({ name: 'piece', pieceId: s.piece.id })}>{s.piece.title}</button>
+                <span className="muted"> {Math.round(s.pct * 100)}%</span></span>
+            ))}
+          </div>
+        )}
         {target && <div className="small" style={{ color: 'var(--accent-text)' }}>{target}</div>}
         {focus && focus.next ? (
           <>
@@ -156,6 +172,16 @@ export function Home() {
               <span className="mono small">{Math.round(s.pct * 100)}%</span>
               <span className="tiny muted">{s.concertReady ? 'concert-ready' : s.rehearsalReady ? 'rehearsal-ready' : s.pct > 0 && s.minLevel === 0 ? 'in progress' : levelName(s.minLevel)}</span>
             </div>
+          </button>
+        ))}
+        {(cycle.wanted ?? []).filter((w) => !statuses.some((s) => sameWork(s.piece.title, w.title))).map((w) => (
+          <button key={w.title} className="list-row" onClick={() => go({ name: 'library' })} data-testid="wanted-row">
+            <div className="mono-tile" style={{ color: 'var(--muted)', border: '1px dashed var(--line)', background: 'transparent' }}>+</div>
+            <div className="grow col" style={{ gap: 2 }}>
+              <span className="ellipsis" style={{ fontWeight: 600, fontSize: 15 }}>{w.title}</span>
+              <span className="small muted ellipsis">{w.composer} · {w.note ?? 'import your choir’s score'}</span>
+            </div>
+            <span className="badge muted">Import</span>
           </button>
         ))}
       </section>
@@ -204,33 +230,41 @@ function NextUp({ status }: { status: PieceStatus }) {
   );
 }
 
-function Countdown({ label, days, date }: { label: string; days: number | null; date?: string }) {
+/** Loose title match so an imported "Vinea mea electa" fills the "Vinea mea electa" slot. */
+export function sameWork(a: string, b: string): boolean {
+  const n = (x: string) => x.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  const A = n(a), B = n(b);
+  return !!A && !!B && (A.includes(B) || B.includes(A));
+}
+
+function Countdown({ label, days, date, raw }: { label: string; days: number | null; date?: string; raw?: boolean }) {
   return (
     <div className="col" style={{ gap: 2 }}>
       <span className="mono" style={{ fontSize: 22, fontWeight: 600 }}>
         {days == null ? '–' : days < 0 ? 'past' : days === 0 ? 'today' : `${days}d`}
       </span>
-      <span className="tiny muted">{label}{date ? ` · ${formatDate(date)}` : ' · not set'}</span>
+      <span className="tiny muted">{label}{date ? ` · ${raw ? date : formatDate(date)}` : ' · not set'}</span>
     </div>
   );
 }
 
-function cycleTarget(statuses: PieceStatus[], toRehearsal: number | null, toConcert: number | null): string | null {
+function cycleTarget(statuses: PieceStatus[], toRehearsal: number | null, toConcert: number | null, focus: PieceStatus[] | null): string | null {
   const goals = [
-    { label: 'Rehearsal', level: 3, days: toRehearsal, name: 'level 3 (Independent)' },
-    { label: 'Concert', level: 4, days: toConcert, name: 'level 4 (Concert-ready)' },
+    { label: 'Rehearsal', level: 3, days: toRehearsal, name: 'level 3 (Independent)', set: focus ?? statuses },
+    { label: 'Concert', level: 4, days: toConcert, name: 'level 4 (Concert-ready)', set: statuses },
   ];
   for (const g of goals) {
     if (g.days == null || g.days < 0) continue;
     let missing = 0;
-    for (const st of statuses) {
+    for (const st of g.set) {
       const prog = getProgress(st.piece.id, st.partId);
       for (const sec of singableSections(st.piece, st.partId)) if ((prog?.sections[sec.id]?.level ?? 0) < g.level) missing++;
     }
     if (!missing) continue;
     const when = g.days === 0 ? 'today' : g.days === 1 ? 'tomorrow' : `in ${g.days} days`;
+    const what = g.label === 'Rehearsal' && focus ? ' of the rehearsal pieces' : '';
     const perDay = g.days > 1 ? Math.ceil(missing / g.days) : missing;
-    return `${g.label} ${when}: ${missing} section${missing > 1 ? 's' : ''} still below ${g.name}${g.days > 1 ? `, about ${perDay} a day` : ''}.`;
+    return `${g.label} ${when}: ${missing} section${missing > 1 ? 's' : ''}${what} still below ${g.name}${g.days > 1 ? `, about ${perDay} a day` : ''}.`;
   }
   return null;
 }

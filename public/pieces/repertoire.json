@@ -18,6 +18,15 @@
     "credit": "PDMX / MuseScore (Public Domain Mark)"
   },
   {
+    "id": "debussy-tabourin",
+    "file": "pd/debussy-tabourin.mxl",
+    "title": "Quant j'ai ouy le tabourin",
+    "composer": "Claude Debussy",
+    "level": "medium",
+    "description": "Trois chansons de Charles d'Orléans, no. 2. Alto solo over a humming ATB chorus.",
+    "credit": "PDMX / MuseScore (Public Domain Mark)"
+  },
+  {
     "id": "brahms-schaffe",
     "file": "pd/brahms-schaffe.mxl",
     "title": "Schaffe in mir, Gott, Op. 29/2 (opening)",

@@ -71,7 +71,23 @@ export interface AttemptLog {
   durationSec?: number;
 }
 
-export interface Cycle { name: string; concertDate?: string; rehearsalDate?: string; pieceIds: string[] }
+export interface WantedPiece { title: string; composer: string; note?: string }
+export interface Cycle {
+  name: string;
+  concertDate?: string;
+  /** A one-off next rehearsal (YYYY-MM-DD). Ignored when a weekly rehearsal is set. */
+  rehearsalDate?: string;
+  pieceIds: string[];
+  /** Weekly rehearsal: 0 = Sunday … 6 = Saturday, with a local time "HH:MM". */
+  rehearsalWeekday?: number;
+  rehearsalTime?: string;
+  /** Pieces the next rehearsal works on (Home puts them first). */
+  focusPieceIds?: string[];
+  /** Pieces in the programme that aren't in the app yet (e.g. still in copyright): import your own score. */
+  wanted?: WantedPiece[];
+  /** Id of the built-in programme preset this cycle came from (if any). */
+  preset?: string;
+}
 
 export const DEFAULT_PROFILE: Profile = {
   name: '',

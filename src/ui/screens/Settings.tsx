@@ -1,5 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { useProfile, useStoreVersion, toast, daysUntil } from '../hooks';
+import { nextRehearsal, WEEKDAYS } from '../../progress/rehearsal';
+import { getPiece } from '../library';
 import { go } from '../router';
 import { loadCycle, saveCycle, exportBackup, importBackup } from '../../progress/store';
 import { effectiveTolerance } from '../../progress/ladder';
@@ -17,7 +19,7 @@ export function Settings() {
 
   const setCycle = (patch: Partial<typeof cycle>) => {
     const c = { ...loadCycle(), ...patch };
-    if (c.name === 'Demo cycle' && (patch.rehearsalDate || patch.concertDate)) c.name = 'This cycle';
+    if (c.name === 'Demo cycle' && (patch.rehearsalDate || patch.concertDate || patch.rehearsalWeekday != null)) c.name = 'This cycle';
     saveCycle(c);
   };
 
@@ -88,18 +90,48 @@ export function Settings() {
           <input type="text" value={cycle.name} onChange={(e) => setCycle({ name: e.target.value })} placeholder="e.g. Spring concert" />
         </label>
         <div className="row">
-          <label className="field grow"><span>Next rehearsal</span>
-            <input type="date" value={cycle.rehearsalDate ?? ''} onChange={(e) => setCycle({ rehearsalDate: e.target.value || undefined })} />
+          <label className="field grow"><span>Rehearsals</span>
+            <select value={cycle.rehearsalWeekday ?? -1} aria-label="Rehearsal day"
+              onChange={(e) => { const v = Number(e.target.value); setCycle({ rehearsalWeekday: v < 0 ? undefined : v, rehearsalTime: cycle.rehearsalTime ?? '19:30' }); }}>
+              <option value={-1}>One-off date</option>
+              {WEEKDAYS.map((d, i) => <option key={d} value={i}>Every {d}</option>)}
+            </select>
           </label>
-          <label className="field grow"><span>Concert</span>
-            <input type="date" value={cycle.concertDate ?? ''} onChange={(e) => setCycle({ concertDate: e.target.value || undefined })} />
-          </label>
+          {cycle.rehearsalWeekday != null ? (
+            <label className="field grow"><span>Time</span>
+              <input type="time" value={cycle.rehearsalTime ?? '19:30'} onChange={(e) => setCycle({ rehearsalTime: e.target.value || '19:30' })} />
+            </label>
+          ) : (
+            <label className="field grow"><span>Next rehearsal</span>
+              <input type="date" value={cycle.rehearsalDate ?? ''} onChange={(e) => setCycle({ rehearsalDate: e.target.value || undefined })} />
+            </label>
+          )}
         </div>
-        {cycle.rehearsalDate && cycle.concertDate && cycle.concertDate < cycle.rehearsalDate && (
-          <span className="small" role="alert" style={{ color: 'var(--accent-text)' }}>The concert is before the rehearsal: check the dates.</span>
+        <label className="field"><span>Concert</span>
+          <input type="date" value={cycle.concertDate ?? ''} onChange={(e) => setCycle({ concertDate: e.target.value || undefined })} />
+        </label>
+        {(() => { const nr = nextRehearsal(cycle); return nr ? <span className="small muted">Next rehearsal: {nr.at.toLocaleString(undefined, { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}</span> : null; })()}
+        {cycle.concertDate && nextRehearsal(cycle) && cycle.concertDate < nextRehearsal(cycle)!.iso && (
+          <span className="small" role="alert" style={{ color: 'var(--accent-text)' }}>The concert is before the next rehearsal: check the dates.</span>
         )}
-        {[cycle.rehearsalDate, cycle.concertDate].some((d) => d && (daysUntil(d) ?? 0) < 0) && (
+        {[cycle.rehearsalWeekday == null ? cycle.rehearsalDate : undefined, cycle.concertDate].some((d) => d && (daysUntil(d) ?? 0) < 0) && (
           <span className="small" style={{ color: 'var(--accent-text)' }}>A date is in the past. Set the next rehearsal so Home can pace your practice.</span>
+        )}
+        {cycle.pieceIds.length > 0 && (
+          <div className="col" style={{ gap: 0 }}>
+            <span className="small">The next rehearsal works on…</span>
+            {cycle.pieceIds.map((id) => {
+              const pc = getPiece(id);
+              if (!pc) return null;
+              const on = (cycle.focusPieceIds ?? []).includes(id);
+              return (
+                <label key={id} className="toggle-row">
+                  <span className="ellipsis">{pc.title} <span className="muted small">· {pc.composer}</span></span>
+                  <input type="checkbox" checked={on} onChange={() => setCycle({ focusPieceIds: on ? (cycle.focusPieceIds ?? []).filter((x) => x !== id) : [...(cycle.focusPieceIds ?? []), id] })} />
+                </label>
+              );
+            })}
+          </div>
         )}
         <button className="btn small" onClick={() => go({ name: 'library' })}>Choose the cycle's pieces</button>
       </section>

@@ -90,6 +90,29 @@ function migrateIds() {
   } catch { /* storage unavailable */ }
 }
 
+interface CyclePreset {
+  id: string;
+  name: string;
+  pieceIds: string[];
+  wanted?: { title: string; composer: string; note?: string }[];
+  titles?: Record<string, { title: string; composer: string }>;
+  rehearsalWeekday?: number;
+  rehearsalTime?: string;
+  focusPieceIds?: string[];
+  concertDate?: string;
+}
+
+async function loadPreset(base: string): Promise<CyclePreset | null> {
+  try {
+    const r = await fetch(`${base}pieces/cycle.json`);
+    if (!r.ok) return null;
+    const p = await r.json();
+    return p && typeof p.id === 'string' && Array.isArray(p.pieceIds) ? p : null;
+  } catch {
+    return null;
+  }
+}
+
 async function loadAll() {
   migrateIds();
   const base = import.meta.env.BASE_URL || './';
@@ -131,11 +154,36 @@ async function loadAll() {
   } catch (e) {
     console.error(e);
   }
-  // First run: put the built-ins into the cycle so Home isn't empty.
+  // The choir's current programme (public/pieces/cycle.json) replaces the demo cycle once.
+  const preset = await loadPreset(base);
   const cycle = loadCycle();
   let seeded = false;
-  try { seeded = !!localStorage.getItem('sh:cycleSeeded'); } catch { /* storage blocked */ }
-  if (!cycle.pieceIds.length && !seeded) {
+  let presetApplied: string | null = null;
+  try {
+    seeded = !!localStorage.getItem('sh:cycleSeeded');
+    presetApplied = localStorage.getItem('sh:cyclePreset');
+  } catch { /* storage blocked */ }
+  const untouched = !cycle.pieceIds.length || cycle.name === 'Demo cycle' || cycle.preset != null;
+  if (preset && presetApplied !== preset.id && untouched) {
+    const own = cycle.pieceIds.filter((id) => pieces.get(id) && !pieces.get(id)!.builtin);
+    const ids = preset.pieceIds.filter((id) => pieces.has(id));
+    // Programme pieces we couldn't ship become "import your score" slots.
+    const missing = preset.pieceIds.filter((id) => !pieces.has(id) && preset.titles?.[id]).map((id) => ({ ...preset.titles![id], note: 'import your choir’s score' }));
+    saveCycle({
+      name: preset.name,
+      pieceIds: [...ids, ...own.filter((id) => !ids.includes(id))],
+      wanted: [...(preset.wanted ?? []), ...missing],
+      rehearsalWeekday: preset.rehearsalWeekday,
+      rehearsalTime: preset.rehearsalTime,
+      focusPieceIds: (preset.focusPieceIds ?? []).filter((id) => pieces.has(id)),
+      concertDate: preset.concertDate,
+      preset: preset.id,
+    });
+    try {
+      localStorage.setItem('sh:cyclePreset', preset.id);
+      localStorage.setItem('sh:cycleSeeded', '1');
+    } catch { /* storage blocked */ }
+  } else if (!cycle.pieceIds.length && !seeded) {
     const preferred = ['warmup-chorale', 'debussy-dieu', 'ravel-nicolette', 'bruckner-locus-iste'].filter((id) => pieces.has(id));
     cycle.pieceIds = preferred.length ? preferred : [...pieces.values()].filter((p) => p.builtin).slice(0, 4).map((p) => p.id);
     cycle.name = cycle.name === 'This cycle' ? 'Demo cycle' : cycle.name;
