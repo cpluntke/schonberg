@@ -15,9 +15,8 @@ Good morning! Here is what happened between midnight and 7.
   exploratory and a11y, code review, a week-long acceptance test, a real-audio pipeline test, two
   final gates with about 11,000 synthetic singer runs). Every P0/P1 they found was fixed and re-verified. The final
   gate (round 6) found **0 P0 and 0 P1**; see "Testing" below.
-- **Going online via messiermarathon:** PR cpluntke/messiermarathon#291 serves the app at
-  `https://messiermarathon-latest.onrender.com/schonberg/` (with the choir leaderboard on its disk). Merge it to go
-  live. Other options are in `docs/DEPLOY.md`.
+- **LIVE:** **https://messiermarathon-latest.onrender.com/schonberg/**, deployed through messiermarathon
+  (PR #291, merged and deployed 4 Oct 12:15 UTC). The choir leaderboard runs on that service's disk.
 - **Onboarding video:** a 100-second narrated intro (coach + singer dialogue over the real app), playable from
   Home, voice setup and Settings. Sources are in `media-src/onboarding/`.
 

@@ -16,6 +16,8 @@ target, movable/fixed solfège and Chinese numbered notation (jianpu), and an at
   <img src="docs/screenshots/results.png" width="200" alt="Results with coach notes">
 </p>
 
+**Live:** https://messiermarathon-latest.onrender.com/schonberg/ (open on your phone, then *Add to Home Screen*).
+
 ## Features
 
 - **Repertoire:** import your choir's **MusicXML** (`.musicxml`, `.xml`, `.mxl`) or **MIDI**.

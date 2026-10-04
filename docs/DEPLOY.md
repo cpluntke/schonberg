@@ -3,7 +3,7 @@
 The app is a static site: `npm run build` produces `dist/`, which any static host can serve.
 The microphone needs **https**, which all of the hosts below provide.
 
-## Option 0: inside messiermarathon (already set up, PR #291)
+## Option 0: inside messiermarathon (LIVE since 4 Oct, PR #291 merged)
 
 `cpluntke/messiermarathon` already deploys to Render through Docker Hub. PR #291 vendors the build
 into `schonberg_dist/` and serves it at **https://messiermarathon-latest.onrender.com/schonberg/**,
