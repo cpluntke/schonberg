@@ -61,12 +61,16 @@ function SingPlay({ route }: { route: PlayRoute }) {
   }, [piece, route]);
 
   const [rateOverride, setRateOverride] = useState<number | null>(null);
-  const [firstTime] = useState(() => {
+  // First-run "how to read the screen", once per display (the highway's flag predates the score view).
+  const [howtoSeen, setHowtoSeen] = useState<{ score: boolean; highway: boolean } | null>(() => {
     try {
-      if (route.mode !== '2d' || route.level === 0) return false;
-      if (typeof matchMedia === 'function' && matchMedia('(max-height: 520px)').matches) return false; // hidden in landscape
-      return localStorage.getItem('sh:seenHowto') !== '1';
-    } catch { return false; }
+      if (route.mode !== '2d' || route.level === 0) return null;
+      if (typeof matchMedia === 'function' && matchMedia('(max-height: 520px)').matches) return null; // hidden in landscape
+      return {
+        score: localStorage.getItem('sh:seenHowto:score') === '1',
+        highway: localStorage.getItem('sh:seenHowto') === '1' || localStorage.getItem('sh:seenHowto:highway') === '1',
+      };
+    } catch { return null; }
   });
   const rate = rateOverride ?? spec?.rate ?? 1;
   const [phase, setPhase] = useState<'ready' | 'running' | 'paused' | 'micError'>('ready');
@@ -146,6 +150,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
   const notation = profile.notation as NotationMode;
   // 2D practice: sheet music or the note highway (the arcade is always 3D).
   const display = route.mode === '3d' ? 'highway' : practiceDisplay(profile, level);
+  const showHowto = !!howtoSeen && !howtoSeen[display];
   const singerIsHigh = profile.voice === 'S' || profile.voice === 'A';
   const partIsHigh = part ? part.voiceType === 'S' || part.voiceType === 'A' : singerIsHigh;
   // Singing a part written for the other voice range (e.g. a tenor practising the soprano line)
@@ -420,9 +425,12 @@ function SingPlay({ route }: { route: PlayRoute }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [piece, part, section, route.mode, notation, showNames, rate, tolerance, offBook, cold, display]);
 
+  // Seen once a run starts with it on screen (switching display before Start shows the other one's).
   useEffect(() => {
-    if (firstTime) try { localStorage.setItem('sh:seenHowto', '1'); } catch { /* ignore */ }
-  }, [firstTime]);
+    if (phase !== 'running' || !showHowto) return;
+    try { localStorage.setItem(`sh:seenHowto:${display}`, '1'); } catch { /* ignore */ }
+    setHowtoSeen((h) => (h ? { ...h, [display]: true } : h));
+  }, [phase, showHowto, display]);
 
   // Cleanup on unmount / pause when hidden.
   useEffect(() => {
@@ -538,10 +546,23 @@ function SingPlay({ route }: { route: PlayRoute }) {
                   <span className="tiny muted">Hold “Peek” to see the next bars for two seconds. Pass off book on {OFF_BOOK_DAYS} different days and the section is memorised.</span>
                 </div>
               )}
+              {route.mode === '2d' && !listenOnly && profile.scoreViewNews && display === 'highway' && (
+                <div className="col small" style={{ gap: 6, background: 'var(--bg-2)', borderRadius: 10, padding: '10px 12px' }} data-testid="score-news">
+                  <strong>New: sheet music view</strong>
+                  <span className="muted">See your part as real sheet music, with your voice drawn on the staff: just under a note means flat, just over means sharp.</span>
+                  <div className="row" style={{ gap: 8 }}>
+                    <button className="btn voice" onClick={() => updateProfile({ display: 'score', scoreViewNews: false })} data-testid="score-news-try">Try it</button>
+                    <button className="btn" onClick={() => updateProfile({ scoreViewNews: false })} data-testid="score-news-dismiss">No thanks</button>
+                  </div>
+                </div>
+              )}
               {route.mode === '2d' && (
-                <div className="seg" role="group" aria-label="Practice display" data-testid="display-toggle">
-                  <button aria-pressed={display === 'highway'} onClick={() => updateProfile({ display: 'highway' })} data-testid="display-highway">Highway</button>
-                  <button aria-pressed={display === 'score'} onClick={() => updateProfile({ display: 'score' })} data-testid="display-score">Score</button>
+                <div className="col" style={{ gap: 4 }}>
+                  <span className="tiny muted" id="display-label">Score / Highway <span style={{ opacity: 0.8 }}>(remembered)</span></span>
+                  <div className="seg" role="group" aria-labelledby="display-label" data-testid="display-toggle">
+                    <button aria-pressed={display === 'score'} onClick={() => updateProfile({ display: 'score', scoreViewNews: false })} data-testid="display-score">Score</button>
+                    <button aria-pressed={display === 'highway'} onClick={() => updateProfile({ display: 'highway', scoreViewNews: false })} data-testid="display-highway">Highway</button>
+                  </div>
                 </div>
               )}
               {level === 1 && (
@@ -550,14 +571,14 @@ function SingPlay({ route }: { route: PlayRoute }) {
                   <input type="range" min={40} max={100} step={5} value={Math.round(rate * 100)} onChange={(e) => setRateOverride(Number(e.target.value) / 100)} />
                 </label>
               )}
-              {!listenOnly && firstTime && (
+              {!listenOnly && showHowto && (
                 <div className="col small howto" style={{ gap: 4, background: 'var(--bg-2)', borderRadius: 10, padding: '10px 12px' }} data-testid="howto">
                   <strong>How to read the screen</strong>
                   {display === 'score' ? (
                     <>
                       <span>Your part as sheet music. The white line moves through the bar: sing the note it's on (it glows <span style={{ color: 'var(--accent)' }}>orange</span>).</span>
                       <span><span style={{ color: 'var(--voice)' }}>━</span> Your voice draws a blue line at its exact height on the staff: just under the note means flat, just over means sharp (light orange when out of tune).</span>
-                      <span>Notes turn blue when sung well, red when missed. The bubble shows how many cents sharp (+) or flat (−) you are.</span>
+                      <span>Notes turn <span style={{ color: 'var(--voice)' }}>blue</span> when sung well, <span style={{ color: '#F2D15C' }}>yellow</span> when close, <span style={{ color: '#FF5D73' }}>red</span> when missed. The bubble shows how many cents sharp (+) or flat (−) you are.</span>
                     </>
                   ) : (
                     <>

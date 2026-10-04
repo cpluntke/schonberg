@@ -8,10 +8,10 @@
 // current key (plus the accidental of the note being sung), so a note sung 30 cents flat sits just
 // below its notehead and a perfectly sung C♮ in D major sits exactly on the C.
 import type { KeySig, Part, Score } from '../../music/types';
-import type { PitchSample } from '../../game/types';
+import type { Grade, PitchSample } from '../../game/types';
 import { beatToTime, timeToBeat } from '../../music/time';
 import { spellPc } from '../../game/notation';
-import { COLORS, gradeColor, wordInitial, type DrawState } from './highway2d';
+import { COLORS, wordInitial, type DrawState } from './highway2d';
 
 const EPS = 0.01;
 const mod = (n: number, m: number) => ((n % m) + m) % m;
@@ -154,12 +154,22 @@ export function splitDuration(start: number, dur: number, origin: number, unit: 
     let take: number | null = null;
     const whole = writtenValue(d);
     if (rest) {
-      if (!onBeat && d > toBeat + EPS) take = writtenValue(toBeat) ? toBeat : largestWritten(toBeat);
-      else if (whole && (d <= unit + EPS || mod(off + EPS, d) < 2 * EPS)) take = d;
-      else {
-        for (const v of [4, 3, 2, 1.5, 1, 0.5, 0.25, 0.125]) {
-          if (v <= d + EPS && (v < unit - EPS || mod(off + EPS, v) < 2 * EPS) && writtenValue(v)) { take = v; break; }
-        }
+      // Rests show the metre: each one starts on a multiple of its own length, never a dotted
+      // value in simple time (a dotted beat in compound time), and one shorter than a beat stays
+      // inside its beat. So 3 beats of rest in 4/4 are a half + a quarter, not a dotted half.
+      const compound = Math.abs(unit - 1.5 * Math.pow(2, Math.round(Math.log2(unit / 1.5)))) < EPS;
+      const plain = [4, 2, 1, 0.5, 0.25, 0.125, 0.0625];
+      const cands = compound ? [unit * 2, unit, ...plain.filter((v) => v < unit - EPS)] : plain;
+      for (const v of cands) {
+        if (v > d + EPS || mod(off + EPS, v) >= 2 * EPS) continue;
+        if (v < unit - EPS && (onBeat ? 0 : into) + v > unit + EPS) continue;
+        if (!writtenValue(v)) continue;
+        take = v;
+        break;
+      }
+      if (take == null) {
+        if (!onBeat && d > toBeat + EPS) take = writtenValue(toBeat) ? toBeat : largestWritten(toBeat);
+        else if (whole && d <= unit + EPS) take = d;
       }
     } else if (whole) take = d;
     else if (!onBeat && d > toBeat + EPS) take = writtenValue(toBeat) ? toBeat : largestWritten(toBeat);
@@ -207,6 +217,32 @@ export interface StaffEvent extends Piece {
   stemUp?: boolean;
   /** Index of the beam group in StaffMeasure.beams. */
   beam?: number;
+  /** Other notes sounding with this one (a chord on one stem; instrument parts). */
+  chord?: ChordNote[];
+}
+
+/** A further note of a chord (the event's own fields describe its main note). */
+export interface ChordNote {
+  noteIndex: number;
+  midi: number;
+  step: number;
+  alt: number;
+  accidental?: number | null;
+  tieStart: boolean;
+  tieEnd: boolean;
+  first: boolean;
+}
+
+/** Steps of every notehead of an event (main note first). */
+export function eventSteps(e: Pick<StaffEvent, 'step' | 'chord'>): number[] {
+  const out = e.step == null ? [] : [e.step];
+  if (e.chord) for (const c of e.chord) out.push(c.step);
+  return out;
+}
+
+/** Does the event hold note `i` (as its main note or in its chord)? */
+export function eventHas(e: Pick<StaffEvent, 'noteIndex' | 'chord'>, i: number): boolean {
+  return e.noteIndex === i || !!e.chord?.some((c) => c.noteIndex === i);
 }
 
 export interface StaffMeasure {
@@ -230,18 +266,23 @@ export interface StaffMeasure {
 export function markAccidentals(events: StaffEvent[], fifths: number): void {
   const ka = keyAlts(fifths);
   const state = new Map<number, number>();
-  for (const e of events) {
-    if (e.kind !== 'note' || e.step == null) continue;
-    if (e.tieEnd) {
+  const mark = (h: { step?: number; alt?: number; tieEnd?: boolean; accidental?: number | null }) => {
+    if (h.step == null) return;
+    if (h.tieEnd) {
       // A tie into the bar doesn't need (or set) an accidental.
-      e.accidental = null;
-      continue;
+      h.accidental = null;
+      return;
     }
-    const cur = state.get(e.step) ?? ka[mod(e.step, 7)];
-    if ((e.alt ?? 0) !== cur) {
-      e.accidental = e.alt ?? 0;
-      state.set(e.step, e.alt ?? 0);
-    } else e.accidental = null;
+    const cur = state.get(h.step) ?? ka[mod(h.step, 7)];
+    if ((h.alt ?? 0) !== cur) {
+      h.accidental = h.alt ?? 0;
+      state.set(h.step, h.alt ?? 0);
+    } else h.accidental = null;
+  };
+  for (const e of events) {
+    if (e.kind !== 'note') continue;
+    mark(e);
+    if (e.chord) for (const c of e.chord) mark(c);
   }
 }
 
@@ -268,14 +309,16 @@ export function beamGroups(events: StaffEvent[], origin: number, beamSpan: numbe
     if (e.start + e.dur - origin > (win + 1) * beamSpan + EPS) flush();
   });
   flush();
-  for (const e of events) if (e.kind === 'note') e.stemUp = (e.step ?? mid) < mid;
+  // Stem direction: away from the head farthest from the middle line.
+  const far = (es: StaffEvent[]) => {
+    let f = 0;
+    for (const e of es) for (const st of eventSteps(e)) if (Math.abs(st - mid) > Math.abs(f)) f = st - mid;
+    return f;
+  };
+  for (const e of events) if (e.kind === 'note') e.stemUp = far([e]) < 0;
   groups.forEach((g, gi) => {
-    let far = 0;
-    for (const i of g) {
-      const off = (events[i].step ?? mid) - mid;
-      if (Math.abs(off) > Math.abs(far)) far = off;
-    }
-    const up = far < 0;
+    const f = far(g.map((i) => events[i]));
+    const up = f < 0;
     for (const i of g) {
       events[i].stemUp = up;
       events[i].beam = gi;
@@ -284,15 +327,28 @@ export function beamGroups(events: StaffEvent[], origin: number, beamSpan: numbe
   return groups;
 }
 
+/** Shortest rest of an overlapped note (beats) that is still drawn, tied, in the next chord. */
+const MIN_HELD = 0.2;
+
 /** Bars [m0, m1] of a part as notatable events: rests fill gaps, notes split at barlines with ties. */
 export function buildMeasures(score: Score, part: Part, m0: number, m1: number, clef: Clef = clefFor(part)): StaffMeasure[] {
   const mid = middleStep(clef);
   const ms = score.measures;
   const buckets: { s: number; e: number; i: number }[][] = [];
   for (let mi = m0; mi <= m1; mi++) buckets.push([]);
+  // A slight overlap with a later note (legato in a MIDI file) just ends the note there; a note
+  // held well into later ones (instrument parts) keeps sounding.
+  const ends = part.notes.map((n, i) => {
+    let e = n.startBeat + n.durBeats;
+    for (let j = i + 1; j < part.notes.length && part.notes[j].startBeat < e - 1e-6; j++) {
+      const o = part.notes[j].startBeat;
+      if (o > n.startBeat + 0.03 && e - o < MIN_HELD) e = o;
+    }
+    return e;
+  });
   part.notes.forEach((n, i) => {
     const ns = n.startBeat;
-    const ne = n.startBeat + n.durBeats;
+    const ne = ends[i];
     let mi = Math.max(m0, Math.min(n.measure, ms.length - 1));
     while (mi > m0 && ms[mi].startBeat > ns + 1e-6) mi--;
     for (; mi <= m1; mi++) {
@@ -307,6 +363,8 @@ export function buildMeasures(score: Score, part: Part, m0: number, m1: number, 
   let prevKey: number | null = null;
   let prevTs: string | null = null;
   const firstOfNote = new Set<number>();
+  /** Notes trimmed at an overlap: their later bars are dropped too. */
+  const dropped = new Set<number>();
   for (let mi = m0; mi <= m1; mi++) {
     const m = ms[mi];
     const key = keyAtBeat(score, m.startBeat);
@@ -316,30 +374,64 @@ export function buildMeasures(score: Score, part: Part, m0: number, m1: number, 
     const nominal = (ts[0] * 4) / ts[1];
     const origin = mi === 0 && m.durBeats < nominal - EPS ? b - nominal : a;
     const { unit, beam } = meterUnits(ts);
-    const segs = buckets[mi - m0].sort((x, y) => x.s - y.s);
+    const segs = buckets[mi - m0].filter((sg) => !dropped.has(sg.i)).sort((x, y) => x.s - y.s);
     const events: StaffEvent[] = [];
     const pushRest = (s: number, e: number) => {
       for (const p of splitDuration(s, e - s, origin, unit, true)) events.push({ ...p, kind: 'rest' });
     };
     let t = a;
-    for (let k = 0; k < segs.length; k++) {
-      const sg = segs[k];
-      const end = Math.min(sg.e, k + 1 < segs.length ? segs[k + 1].s : sg.e);
-      if (end - sg.s < 0.03) continue;
-      if (sg.s - t > 0.03) pushRest(t, sg.s);
-      const n = part.notes[sg.i];
-      const sp = spell(n.midi, key);
-      const pieces = splitDuration(sg.s, end - sg.s, origin, unit, false);
+    // Notes starting together become one chord; a note still sounding when the next one starts
+    // is cut there and continues, tied, in the next chord (polyphonic instrument parts).
+    const work = segs.slice();
+    const insert = (x: { s: number; e: number; i: number }) => {
+      let q = 0;
+      while (q < work.length && work[q].s <= x.s + 1e-9) q++;
+      work.splice(q, 0, x);
+    };
+    while (work.length) {
+      const s0 = work[0].s;
+      let grp: { s: number; e: number; i: number }[] = [];
+      while (work.length && work[0].s - s0 < 0.03) grp.push(work.shift()!);
+      grp = grp.filter((g) => g.e - s0 >= 0.03);
+      // One head per pitch; the highest note leads (or the one carrying a syllable).
+      const seen = new Set<number>();
+      grp = grp.sort((x, y) => part.notes[y.i].midi - part.notes[x.i].midi).filter((g) => {
+        const mm = part.notes[g.i].midi;
+        if (seen.has(mm)) return false;
+        seen.add(mm);
+        return true;
+      });
+      if (!grp.length) continue;
+      const li = grp.findIndex((g) => part.notes[g.i].lyric);
+      if (li > 0) grp.unshift(...grp.splice(li, 1));
+      const end = Math.min(work.length ? work[0].s : Infinity, ...grp.map((g) => g.e));
+      if (s0 - t > 0.03) pushRest(t, s0);
+      const pieces = splitDuration(s0, end - s0, origin, unit, false);
+      // A note cut short by the next onset continues (tied) only when a real part of it is left;
+      // a slight overlap (legato in a MIDI file) is just trimmed, without a tie.
+      const heads = grp.map((g) => {
+        const n = part.notes[g.i];
+        const cut = g.e > end + 0.03;
+        const keep = cut && g.e - end >= MIN_HELD;
+        if (cut && !keep) dropped.add(g.i);
+        return { g, n, sp: spell(n.midi, key), more: cut ? keep : ends[g.i] > g.e + 0.03 };
+      });
       pieces.forEach((p, pi) => {
-        const isFirst = !firstOfNote.has(sg.i);
-        firstOfNote.add(sg.i);
-        const continues = pi < pieces.length - 1 || n.startBeat + n.durBeats > end + 0.03;
+        const lastPiece = pi === pieces.length - 1;
+        const hs = heads.map(({ g, n, sp: hsp, more }) => {
+          const isFirst = !firstOfNote.has(g.i);
+          firstOfNote.add(g.i);
+          return { noteIndex: g.i, midi: n.midi, step: hsp.step, alt: hsp.alt, tieStart: !lastPiece || more, tieEnd: !isFirst, first: isFirst, n };
+        });
+        const [h0, ...rest] = hs;
         events.push({
-          ...p, kind: 'note', noteIndex: sg.i, midi: n.midi, step: sp.step, alt: sp.alt,
-          tieStart: continues, tieEnd: !isFirst, first: isFirst,
-          lyric: isFirst ? n.lyric : undefined, syllabic: isFirst ? n.syllabic : undefined,
+          ...p, kind: 'note', noteIndex: h0.noteIndex, midi: h0.midi, step: h0.step, alt: h0.alt,
+          tieStart: h0.tieStart, tieEnd: h0.tieEnd, first: h0.first,
+          lyric: h0.first ? h0.n.lyric : undefined, syllabic: h0.first ? h0.n.syllabic : undefined,
+          ...(rest.length ? { chord: rest.map(({ n: _n, ...c }) => c) } : {}),
         });
       });
+      for (const g of grp) if (g.e > end + 0.03 && !dropped.has(g.i)) insert({ s: end, e: g.e, i: g.i });
       t = Math.max(t, end);
     }
     if (b - t > 0.03) {
@@ -400,6 +492,8 @@ export interface StaffSystem {
   startBeat: number;
   endBeat: number;
   key: KeySig;
+  /** Key signature cancelled (with naturals) at the start of this system, 0 = none. */
+  cancelFifths: number;
   timeSig: [number, number] | null;
   clefX: number;
   keyX: number;
@@ -408,6 +502,8 @@ export interface StaffSystem {
   x1: number;
   /** time → x breakpoints (beats ascending): every onset, then the system's end. */
   bp: { beat: number; x: number }[];
+  /** Horizontal scale against the natural spacing (< 1: squeezed). */
+  squeeze: number;
 }
 export interface StaffLayout {
   clef: Clef;
@@ -436,6 +532,21 @@ export function naturalSpace(durBeats: number): number {
 const CLEF_W = 3.5;
 const TIME_W = 2.5;
 const keyW = (fifths: number) => (fifths ? Math.abs(fifths) * 0.85 + 0.7 : 0.3);
+/** Naturals needed to cancel `prev` when the key changes to `fifths`. */
+const cancelCount = (fifths: number, prev: number) =>
+  Math.sign(prev) === Math.sign(fifths) ? Math.max(0, Math.abs(prev) - Math.abs(fifths)) : Math.abs(prev);
+/** Width of a key change (naturals, then the new signature). */
+const keyChangeW = (fifths: number, prev: number) => {
+  const n = cancelCount(fifths, prev) + Math.abs(fifths);
+  return n ? n * 0.85 + 0.7 : 0.3;
+};
+const hasAcc = (e: StaffEvent | undefined) => !!e && (e.accidental != null || !!e.chord?.some((c) => c.accidental != null));
+/** Two heads a step apart in a chord: one sits on the other side of the stem. */
+const hasSecond = (e: StaffEvent) => {
+  const st = eventSteps(e).sort((a, b) => a - b);
+  for (let i = 1; i < st.length; i++) if (st[i] - st[i - 1] === 1) return true;
+  return false;
+};
 const ACC_W = 1.25;
 
 function measureWidths(sm: StaffMeasure, sp: number, textW: (s: string) => number, inside: boolean) {
@@ -443,18 +554,19 @@ function measureWidths(sm: StaffMeasure, sp: number, textW: (s: string) => numbe
   const lw = evs.map((e) => (e.lyric ? textW(e.lyric) : 0));
   const gaps: number[] = [];
   let changeW = 0;
-  if (inside && sm.keyChange) changeW += keyW(Math.max(Math.abs(sm.key.fifths), Math.abs(sm.prevFifths))) * sp;
+  if (inside && sm.keyChange) changeW += keyChangeW(sm.key.fifths, sm.prevFifths) * sp;
   if (inside && sm.timeChange) changeW += TIME_W * sp;
-  let lead = Math.max(1.3 * sp + (evs[0]?.accidental != null ? ACC_W * sp : 0), lw[0] / 2 + 0.4 * sp);
+  let lead = Math.max(1.3 * sp + (hasAcc(evs[0]) ? ACC_W * sp : 0), lw[0] / 2 + 0.4 * sp);
   if (evs[0]?.measureRest) lead = 2.2 * sp;
   for (let j = 0; j < evs.length; j++) {
     const e = evs[j];
     let g = naturalSpace(e.dur) * sp;
     if (e.measureRest) g = 5 * sp;
     if (e.dots) g += 0.35 * sp * e.dots;
+    if (e.kind === 'note' && hasSecond(e)) g += 1.1 * sp;
     if (j + 1 < evs.length) {
       const nx = evs[j + 1];
-      if (nx.accidental != null) g = Math.max(g, (1.5 + ACC_W + 0.4) * sp);
+      if (hasAcc(nx)) g = Math.max(g, (1.5 + ACC_W + 0.4) * sp);
       if (lw[j] || lw[j + 1]) {
         const hyph = e.syllabic === 'begin' || e.syllabic === 'middle';
         g = Math.max(g, lw[j] / 2 + lw[j + 1] / 2 + (hyph ? 1.4 : 0.6) * sp);
@@ -480,13 +592,15 @@ export function layoutStaff(score: Score, part: Part, m0: number, m1: number, o:
   const sms = buildMeasures(score, part, m0, m1, clef);
   let minStep = mid - 4;
   let maxStep = mid + 4;
-  for (const sm of sms) for (const e of sm.events) if (e.step != null) {
-    minStep = Math.min(minStep, e.step);
-    maxStep = Math.max(maxStep, e.step);
+  for (const sm of sms) for (const e of sm.events) for (const st of eventSteps(e)) {
+    minStep = Math.min(minStep, st);
+    maxStep = Math.max(maxStep, st);
   }
   const prefixW = (k: number) => {
     const sm = sms[k];
-    return (CLEF_W + keyW(sm.key.fifths) + (sm.timeChange ? TIME_W : 0) + 0.4) * sp;
+    // A key change at the start of a system also cancels the old key with naturals.
+    const kw = sm.keyChange ? keyChangeW(sm.key.fifths, sm.prevFifths) : keyW(sm.key.fifths);
+    return (CLEF_W + kw + (sm.timeChange ? TIME_W : 0) + 0.4) * sp;
   };
   const inner = sms.map((sm) => measureWidths(sm, sp, o.textW, true));
   const opening = sms.map((sm) => measureWidths(sm, sp, o.textW, false));
@@ -495,7 +609,7 @@ export function layoutStaff(score: Score, part: Part, m0: number, m1: number, o:
     const firstSm = sms[g[0]];
     const clefX = left + 0.3 * sp;
     const keyX = left + CLEF_W * sp;
-    const timeX = keyX + keyW(firstSm.key.fifths) * sp;
+    const timeX = keyX + (firstSm.keyChange ? keyChangeW(firstSm.key.fifths, firstSm.prevFifths) : keyW(firstSm.key.fifths)) * sp;
     const prefixEnd = left + prefixW(g[0]);
     const widths = g.map((k, idx) => (idx === 0 ? opening[k] : inner[k]));
     const natural = widths.reduce((a, w) => a + w.total, 0);
@@ -525,8 +639,9 @@ export function layoutStaff(score: Score, part: Part, m0: number, m1: number, o:
     bp.push({ beat: endBeat, x });
     return {
       measures, startBeat: firstSm.startBeat, endBeat, key: firstSm.key,
+      cancelFifths: firstSm.keyChange ? firstSm.prevFifths : 0,
       timeSig: firstSm.timeChange ? firstSm.timeSig : null,
-      clefX, keyX, timeX, prefixEnd, x1: x, bp,
+      clefX, keyX, timeX, prefixEnd, x1: x, bp, squeeze: f,
     };
   });
   return { clef, mid, sp, systems, minStep, maxStep };
@@ -574,9 +689,11 @@ export function measureSpan(score: Pick<Score, 'measures'>, from: number, to: nu
  * note being sung (if any). Far-off octaves are folded towards the target (a tenor singing the
  * soprano line an octave down still draws on the staff).
  *
- * Near the target, small deviations are magnified (about ×2 at the note, fading out by ~1.5
- * semitones; still monotonic, exact on the note and further away): on a phone a staff step is only ~4 px, so
- * 30 cents would otherwise move the line by a single pixel.
+ * Between the target and its neighbouring letters, deviations are magnified: the pitch is warped
+ * monotonically inside that interval (about MAGNIFY staff steps per semitone right at the note,
+ * easing off towards the neighbour), so 30 cents off shows as about half a step on a phone, on
+ * either side of the note. It is exact on the note, exact on the neighbouring letters and beyond,
+ * and keeps the order of pitches whatever the size of the interval (also augmented seconds).
  */
 export function sungStep(midi: number, key: Pick<KeySig, 'fifths'>, target?: { midi: number; step: number; alt: number } | null): number {
   const alts = keyAlts(key.fifths);
@@ -584,11 +701,21 @@ export function sungStep(midi: number, key: Pick<KeySig, 'fifths'>, target?: { m
   if (!target) return midiToStep(m, alts);
   alts[mod(target.step, 7)] = target.alt;
   if (Math.abs(m - target.midi) > 7) m -= 12 * Math.round((m - target.midi) / 12);
-  const cents = (m - target.midi) * 100;
-  return midiToStep(m, alts) + MAGNIFY * (cents / 200) * Math.exp(-((cents / 70) ** 2));
+  const d = m - target.midi;
+  if (Math.abs(d) < 1e-9) return target.step;
+  const dir = d > 0 ? 1 : -1;
+  const nb = target.step + dir;
+  const nl = mod(nb, 7);
+  const nbPitch = (Math.floor(nb / 7) + 1) * 12 + LETTER_PC[nl] + (alts[nl] ?? 0);
+  const gap = (nbPitch - target.midi) * dir; // semitones to the neighbouring letter
+  if (gap < 0.5 || Math.abs(d) >= gap) return midiToStep(m, alts);
+  const s1 = midiToStep(nbPitch, alts);
+  const u = Math.abs(d) / gap;
+  const k = Math.max(0, MAGNIFY * gap - 1);
+  return target.step + (s1 - target.step) * (((1 + k) * u) / (1 + k * u));
 }
-/** Extra gain near the target (must stay < 1.49 to keep the mapping monotonic over augmented seconds). */
-const MAGNIFY = 1.4;
+/** Staff steps per semitone right at the target (plain staff: 0.5 for a whole tone, 1 for a semitone). */
+const MAGNIFY = 3;
 
 // ---------------------------------------------------------------------------------------------
 // Glyphs (drawn in staff-space units; y grows downwards)
@@ -746,6 +873,14 @@ function drawNotehead(c: Ctx, x: number, y: number, sp: number, base: number) {
   }
 }
 
+/** Outline of a notehead (drawn over the voice trace so the head keeps its shape). */
+function strokeNotehead(c: Ctx, x: number, y: number, sp: number, base: number) {
+  c.beginPath();
+  if (base >= 4) c.ellipse(x, y, 0.78 * sp, 0.48 * sp, 0, 0, Math.PI * 2);
+  else c.ellipse(x, y, 0.64 * sp, 0.45 * sp, -0.35, 0, Math.PI * 2);
+  c.stroke();
+}
+
 function drawRest(c: Ctx, x: number, midY: number, sp: number, base: number, dots: number) {
   c.save();
   c.lineCap = 'round';
@@ -870,7 +1005,271 @@ const INK = {
   barNo: '#8790BC',
   outTune: '#FFB08F',
   rest: '#8A93C2',
+  traceRest: '#8C96CC',
 };
+
+/**
+ * Colour of a sung note on the staff by its grade: blue when sung well, yellow when close ("ok"),
+ * red when missed. (The highway's dark "ok" blue all but disappears as a thin notehead.)
+ */
+export const STAFF_GRADE: Record<Grade, string> = {
+  perfect: COLORS.voice,
+  good: COLORS.voice,
+  ok: '#F2D15C',
+  miss: COLORS.miss,
+};
+
+// Lyric and bar-number widths depend on the web fonts: lay out again once they have loaded.
+let fontGen = 0;
+try {
+  const fonts = typeof document !== 'undefined' ? document.fonts : undefined;
+  if (fonts) {
+    const bump = () => { fontGen++; };
+    fonts.ready?.then(bump, () => {});
+    fonts.addEventListener?.('loadingdone', bump);
+  }
+} catch { /* no font loading API */ }
+
+// ---------------------------------------------------------------------------------------------
+// Per-system geometry (static for a layout; y relative to the middle staff line, down = +)
+
+interface HeadG {
+  i: number;
+  x: number;
+  dy: number;
+  /** Steps from the middle line. */
+  off: number;
+  acc: number | null;
+  accX: number;
+  tieStart: boolean;
+  tieEnd: boolean;
+}
+interface EvG {
+  ev: StaffEvent;
+  m: LaidMeasure;
+  x: number;
+  /** Noteheads (empty for rests). */
+  heads: HeadG[];
+  up: boolean;
+  stemX: number;
+  /** Stem from the head at its root… */
+  stemFrom: number;
+  /** …to its free end (flags), or to the beam when the beam is drawn. */
+  freeEnd: number;
+  beamEnd: number | null;
+  beam: BeamG | null;
+  /** Ledger lines: flat [x0, x1, dy] triples. */
+  ledgers: number[];
+  dotX: number;
+  /** x where the event ends (next onset, or the system's end). */
+  xEnd: number;
+  /** Highest ink of the event (dy), stems and beams included. */
+  top: number;
+}
+interface BeamG {
+  evs: EvG[];
+  /** Flat [xa, ya, xb, yb] quads (dy); thickness `bt` towards `d`. */
+  segs: number[];
+  bt: number;
+  d: number;
+}
+interface TieG {
+  i: number;
+  xa: number;
+  xb: number;
+  dy: number;
+  side: number;
+}
+interface TupG {
+  evs: EvG[];
+  x: number;
+  dy: number;
+}
+interface SysDraw {
+  evs: EvG[];
+  beams: BeamG[];
+  ties: TieG[];
+  tups: TupG[];
+}
+
+function buildSysDraw(sys: StaffSystem, layout: StaffLayout, notes: Part['notes']): SysDraw {
+  const sp = layout.sp;
+  const yOf = (st: number) => -((st - layout.mid) * sp) / 2;
+  const headRx = 0.62 * sp;
+  const stemW = Math.max(1, 0.12 * sp);
+  const evs: EvG[] = [];
+  const beams: BeamG[] = [];
+  for (const m of sys.measures) {
+    const first = evs.length;
+    for (const le of m.events) {
+      const e = le.ev;
+      const g: EvG = {
+        ev: e, m, x: le.x, heads: [], up: !!e.stemUp, stemX: 0, stemFrom: 0, freeEnd: 0, beamEnd: null, beam: null,
+        ledgers: [], dotX: le.x + headRx, xEnd: xAtBeat(sys, e.start + e.dur), top: -2 * sp,
+      };
+      evs.push(g);
+      if (e.kind !== 'note' || e.step == null) continue;
+      const up = g.up;
+      const raw = [
+        { i: e.noteIndex!, step: e.step, acc: e.accidental ?? null, tieStart: !!e.tieStart, tieEnd: !!e.tieEnd },
+        ...(e.chord ?? []).map((h) => ({ i: h.noteIndex, step: h.step, acc: h.accidental ?? null, tieStart: h.tieStart, tieEnd: h.tieEnd })),
+      ].sort((a, b) => (up ? a.step - b.step : b.step - a.step));
+      // From the stem's root: a head a step from the previous one goes on the other side of the stem.
+      let prevStep = NaN;
+      let prevDisp = false;
+      let dispLeft = false;
+      for (const h of raw) {
+        const disp: boolean = Math.abs(h.step - prevStep) === 1 && !prevDisp;
+        const x = disp ? le.x + (up ? 1 : -1) * (2 * headRx - stemW) : le.x;
+        if (disp && !up) dispLeft = true;
+        if (disp && up) g.dotX = Math.max(g.dotX, x + headRx);
+        g.heads.push({ i: h.i, x, dy: yOf(h.step), off: h.step - layout.mid, acc: h.acc, accX: 0, tieStart: h.tieStart, tieEnd: h.tieEnd });
+        prevStep = h.step;
+        prevDisp = disp;
+      }
+      // Accidentals: top to bottom, in columns so that close ones don't collide.
+      const cols: number[][] = [];
+      const withAcc = g.heads.filter((h) => h.acc != null).sort((a, b) => b.off - a.off);
+      for (const h of withAcc) {
+        let col = 0;
+        while (cols[col]?.some((o) => Math.abs(o - h.off) < 6)) col++;
+        (cols[col] ??= []).push(h.off);
+        h.accX = le.x - headRx - 0.75 * sp - col * 1.0 * sp - (dispLeft ? 2 * headRx - stemW : 0);
+      }
+      // Ledger lines (one per height, as wide as the heads on it).
+      const led = new Map<number, [number, number]>();
+      for (const h of g.heads) {
+        if (Math.abs(h.off) < 6) continue;
+        const dir = Math.sign(h.off);
+        for (let o = 6; o <= Math.abs(h.off); o += 2) {
+          const k = dir * o;
+          const cur = led.get(k);
+          const x0 = h.x - headRx - 0.4 * sp;
+          const x1 = h.x + headRx + 0.4 * sp;
+          led.set(k, cur ? [Math.min(cur[0], x0), Math.max(cur[1], x1)] : [x0, x1]);
+        }
+      }
+      for (const [k, [x0, x1]] of led) g.ledgers.push(x0, x1, yOf(layout.mid + k));
+      const dys = g.heads.map((h) => h.dy);
+      const tip = up ? Math.min(...dys) : Math.max(...dys);
+      g.stemFrom = up ? Math.max(...dys) : Math.min(...dys);
+      g.stemX = up ? le.x + headRx - stemW / 2 : le.x - headRx + stemW / 2;
+      const fl = beamCount(e.base);
+      let end = tip + (up ? -1 : 1) * (3.3 + Math.max(0, fl - 1) * 0.6) * sp;
+      if (up && end > 0) end = 0; // long stems reach the middle line
+      if (!up && end < 0) end = 0;
+      g.freeEnd = end;
+      g.top = Math.min(...dys) - 0.5 * sp;
+      if (e.base < 4 && up) g.top = Math.min(g.top, end - (e.base <= 0.5 ? 0.3 * sp : 0));
+    }
+    // Beams (they decide stem lengths).
+    for (const grp of m.sm.beams) {
+      const les = grp.map((i) => evs[first + i]);
+      const up = les[0].up;
+      const d = up ? -1 : 1;
+      const sx = (g: EvG) => g.stemX;
+      const hy = (g: EvG) => (up ? Math.min(...g.heads.map((h) => h.dy)) : Math.max(...g.heads.map((h) => h.dy)));
+      const x0 = sx(les[0]);
+      const x1 = sx(les[les.length - 1]);
+      const maxBeams = Math.max(...les.map((g) => beamCount(g.ev.base)));
+      const len = 3.3 + Math.max(0, maxBeams - 2) * 0.75;
+      let y0 = hy(les[0]) + d * len * sp;
+      let y1 = hy(les[les.length - 1]) + d * len * sp;
+      const maxRise = Math.min(1.0 * sp, Math.abs(x1 - x0) * 0.25);
+      if (Math.abs(y1 - y0) > maxRise) y1 = y0 + Math.sign(y1 - y0) * maxRise;
+      const at = (x: number) => (x1 === x0 ? y0 : y0 + ((x - x0) / (x1 - x0)) * (y1 - y0));
+      // Every stem at least 2.6 spaces long, and the beam reaches at least the middle line.
+      let fix = 0;
+      for (const g of les) {
+        const need = hy(g) + d * (2.6 + Math.max(0, maxBeams - 1) * 0.75) * sp;
+        fix = Math.max(fix, up ? at(sx(g)) - need : need - at(sx(g)), up ? at(sx(g)) : -at(sx(g)));
+      }
+      y0 -= d * fix;
+      y1 -= d * fix;
+      const gap = 0.76 * sp;
+      const segs: number[] = [];
+      const seg = (xa: number, xb: number, level: number) => {
+        const off = -d * level * gap;
+        segs.push(xa, at(xa) + off, xb, at(xb) + off);
+      };
+      seg(x0, x1, 0);
+      for (let lvl = 1; lvl < maxBeams; lvl++) {
+        for (let q = 0; q < les.length; q++) {
+          if (beamCount(les[q].ev.base) <= lvl) continue;
+          const nextHas = q + 1 < les.length && beamCount(les[q + 1].ev.base) > lvl;
+          const prevHas = q > 0 && beamCount(les[q - 1].ev.base) > lvl;
+          if (nextHas) seg(sx(les[q]), sx(les[q + 1]), lvl);
+          else if (!prevHas) {
+            const stub = 1.1 * sp;
+            if (q === 0) seg(sx(les[q]), sx(les[q]) + stub, lvl);
+            else seg(sx(les[q]) - stub, sx(les[q]), lvl);
+          }
+        }
+      }
+      const bg: BeamG = { evs: les, segs, bt: 0.46 * sp, d };
+      beams.push(bg);
+      for (const g of les) {
+        g.beam = bg;
+        g.beamEnd = at(sx(g));
+        if (up) g.top = Math.min(g.top, g.beamEnd - (maxBeams - 1) * gap - 0.2 * sp);
+      }
+    }
+  }
+  // Ties: to the next head of the same note, or over the system's edge when the note goes on.
+  const ties: TieG[] = [];
+  const seenNote = new Set<number>();
+  for (let q = 0; q < evs.length; q++) {
+    const g = evs[q];
+    const n = g.heads.length;
+    g.heads.forEach((h, hi) => {
+      const side = n > 1 ? (h.dy <= (g.heads.reduce((a, x) => a + x.dy, 0) / n) ? -1 : 1) : g.up ? 1 : -1;
+      const dy = h.dy + side * 0.65 * sp;
+      const note = notes[h.i];
+      if (h.tieEnd && !seenNote.has(h.i) && note && note.startBeat < sys.startBeat - 1e-6) {
+        ties.push({ i: h.i, xa: sys.prefixEnd - 0.8 * sp, xb: h.x - 0.75 * sp, dy, side });
+      }
+      seenNote.add(h.i);
+      if (!h.tieStart) return;
+      let to: HeadG | null = null;
+      for (let r = q + 1; r < evs.length && !to; r++) to = evs[r].heads.find((x) => x.i === h.i) ?? null;
+      if (to) ties.push({ i: h.i, xa: h.x + 0.75 * sp, xb: to.x - 0.75 * sp, dy, side });
+      else if (note && note.startBeat + note.durBeats > sys.endBeat + 0.03) ties.push({ i: h.i, xa: h.x + 0.75 * sp, xb: sys.x1 + 0.6 * sp, dy, side });
+      void hi;
+    });
+  }
+  // Triplet numbers.
+  const tups: TupG[] = [];
+  let mi = 0;
+  for (const m of sys.measures) {
+    const mEvs = evs.slice(mi, mi + m.events.length);
+    mi += m.events.length;
+    let grp: EvG[] = [];
+    let sum = 0;
+    const flush = () => {
+      if (grp.length) {
+        let yTop = -2.6 * sp;
+        for (const g of grp) if (g.heads.length) yTop = Math.min(yTop, g.top - 0.4 * sp, Math.min(...g.heads.map((h) => h.dy)) - 0.8 * sp);
+        tups.push({ evs: grp, x: (grp[0].x + grp[grp.length - 1].x) / 2 + 0.3 * sp, dy: yTop });
+      }
+      grp = [];
+      sum = 0;
+    };
+    for (const g of mEvs) {
+      if (!g.ev.tuplet) {
+        flush();
+        continue;
+      }
+      grp.push(g);
+      sum += g.ev.dur;
+      if (Math.abs(sum * 2 - Math.round(sum * 2)) < 0.02) flush();
+    }
+    flush();
+  }
+  return { evs, beams, ties, tups };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Layout cache
 
 interface Cached {
   key: string;
@@ -880,6 +1279,8 @@ interface Cached {
   band: number;
   lyricFont: string;
   lyricOff: number;
+  sys: (SysDraw | undefined)[];
+  textW: Map<string, number>;
 }
 let cache: Cached | null = null;
 
@@ -887,8 +1288,16 @@ function lyricFontFor(sp: number) {
   return `600 ${Math.round(Math.max(11, Math.min(15, sp * 1.45)))}px "Bricolage Grotesque", system-ui, sans-serif`;
 }
 
+/** Staff-space size: a portrait phone gets fewer but bigger systems (filling the height), so the
+ *  sung line's height against the notes reads; landscape shows two systems. */
+export function staffSpace(W: number, H: number, perSys: number): { sp: number; floor: number } {
+  const portrait = H > W * 1.15;
+  const sp = Math.max(6.5, Math.min(portrait ? 15 : 12, (H - 8) / ((portrait ? 3 : 2) * perSys), W / (portrait ? 33 : 44)));
+  return { sp, floor: Math.max(6.5, Math.min(sp, W / 44)) };
+}
+
 function getLayout(c: Ctx, W: number, H: number, s: DrawState): Cached {
-  const key = `${s.score.id}|${s.part.id}|${s.part.notes.length}|${s.from}|${s.to}|${W}|${H}`;
+  const key = `${s.score.id}|${s.part.id}|${s.part.notes.length}|${s.from}|${s.to}|${W}|${H}|${fontGen}`;
   if (cache && cache.key === key) return cache;
   const [m0, m1] = measureSpan(s.score, s.from, s.to);
   const clef = clefFor(s.part);
@@ -903,23 +1312,39 @@ function getLayout(c: Ctx, W: number, H: number, s: DrawState): Cached {
     lo = Math.min(lo, st);
     hi = Math.max(hi, st);
   }
-  const above = Math.max(3.0, (hi - (mid + 4)) / 2 + 2.0);
+  const above = Math.max(3.4, (hi - (mid + 4)) / 2 + 2.6);
   const lyricOff = Math.max(3.2, ((mid - 4) - lo) / 2 + 2.6); // bottom line → lyric baseline
   const below = lyricOff + 1.3;
   const perSys = above + 4 + below;
-  const sp = Math.max(6.5, Math.min(11, (H - 8) / (2 * perSys), W / 44));
-  c.font = lyricFontFor(sp);
-  const textW = (t: string) => c.measureText(t).width;
-  const layout = layoutStaff(s.score, s.part, m0, m1, { width: W, sp, textW, maxBars: W < 520 ? 3 : 4 });
-  cache = { key, layout, above, below, band: perSys * sp, lyricFont: lyricFontFor(sp), lyricOff };
+  let { sp, floor } = staffSpace(W, H, perSys);
+  let layout: StaffLayout;
+  // Bigger staff, but a bar never squeezed much below its natural width (shrink until it fits).
+  for (let guard = 0; ; guard++) {
+    c.font = lyricFontFor(sp);
+    const textW = (t: string) => c.measureText(t).width;
+    layout = layoutStaff(s.score, s.part, m0, m1, { width: W, sp, textW, maxBars: W < 520 ? 3 : 4 });
+    let worst = Infinity;
+    for (const sy of layout.systems) worst = Math.min(worst, sy.squeeze);
+    if (worst >= 0.9 || sp <= floor + 1e-6 || guard >= 6) break;
+    sp = Math.max(floor, sp * 0.92);
+  }
+  cache = {
+    key, layout, above, below, band: perSys * sp, lyricFont: lyricFontFor(sp), lyricOff,
+    sys: [], textW: new Map(),
+  };
   return cache;
 }
 
+function sysDraw(L: Cached, j: number, s: DrawState): SysDraw {
+  return (L.sys[j] ??= buildSysDraw(L.layout.systems[j], L.layout, s.part.notes));
+}
+
 interface SysGeo {
+  j: number;
   sys: StaffSystem;
+  sd: SysDraw;
   top: number; // top staff line
   mid: number; // middle line y
-  y: (step: number) => number;
 }
 
 /** Note being sung at a beat on a system (null in rests). */
@@ -933,6 +1358,29 @@ function eventAt(sys: StaffSystem, beat: number): StaffEvent | null {
   return null;
 }
 
+/** The head of a chord closest to a sung pitch (octaves folded), as a sungStep target. */
+function nearestHead(ev: StaffEvent, midi: number): { midi: number; step: number; alt: number; noteIndex: number } {
+  const fold = (d: number) => (Math.abs(d) > 7 ? d - 12 * Math.round(d / 12) : d);
+  let best = { midi: ev.midi!, step: ev.step!, alt: ev.alt!, noteIndex: ev.noteIndex! };
+  if (!ev.chord) return best;
+  let bd = Math.abs(fold(midi - ev.midi!));
+  for (const h of ev.chord) {
+    const d = Math.abs(fold(midi - h.midi));
+    if (d < bd) {
+      bd = d;
+      best = { midi: h.midi, step: h.step, alt: h.alt, noteIndex: h.noteIndex };
+    }
+  }
+  return best;
+}
+
+interface Vis {
+  vis: (i: number) => 'show' | 'letters' | 'none';
+  isPast: (i: number) => boolean;
+  isNow: (i: number) => boolean;
+  inRange: (i: number) => boolean;
+}
+
 export function drawStaff2D(c: Ctx, W: number, H: number, s: DrawState) {
   c.fillStyle = COLORS.bg;
   c.fillRect(0, 0, W, H);
@@ -944,13 +1392,14 @@ export function drawStaff2D(c: Ctx, W: number, H: number, s: DrawState) {
   const tempos = s.score.tempos;
   const beat = timeToBeat(tempos, s.pos);
   const k = systemAt(systems, beat);
-  const band = L.band;
-  const pad = Math.max(4, Math.min(16, (H - 2 * band) / 3));
+  // Only systems that fit whole (the lowest one's lyrics are never cut off), spread over the height.
+  const fit = Math.max(1, Math.floor((H - 8) / L.band));
+  const band = L.band + (fit > 1 ? Math.min(0.3 * L.band, (H - 8 - fit * L.band) / fit) : 0);
+  const pad = Math.max(4, Math.min(18, (H - fit * band) / 2 + (fit > 1 ? (band - L.band) / 2 : 0)));
   // Turning to the next system: slide up over ~0.35 s (real time).
   const t0 = beatToTime(tempos, systems[k].startBeat);
   const u = k > 0 ? Math.max(0, Math.min(1, (s.pos - t0) / (0.35 * Math.max(0.3, s.rate)))) : 1;
   const shift = (1 - (1 - (1 - u) ** 3)) * band;
-  const slots = Math.max(1, Math.floor((H - pad) / band));
 
   const notes = s.part.notes;
   const [ra, rb] = s.range ?? [0, -1];
@@ -958,24 +1407,26 @@ export function drawStaff2D(c: Ctx, W: number, H: number, s: DrawState) {
   const isPast = (i: number) => notes[i].start + notes[i].dur <= s.pos;
   const isNow = (i: number) => inRange(i) && notes[i].start <= s.pos && s.pos < notes[i].start + notes[i].dur;
   const vis = (i: number): 'show' | 'letters' | 'none' => ((isPast(i) && inRange(i)) || !s.hide ? 'show' : s.hide(i));
+  const v: Vis = { vis, isPast, isNow, inRange };
 
   const geos: SysGeo[] = [];
   // The previous system only while it slides out of view.
-  for (let j = k - (shift > 0.5 ? 1 : 0); j <= k + slots; j++) {
+  for (let j = k - (shift > 0.5 ? 1 : 0); j < k + fit; j++) {
     if (j < 0 || j >= systems.length) continue;
     const top = pad + (j - k) * band + shift + L.above * sp;
     if (top - L.above * sp > H || top + (4 + L.below) * sp < 0) continue;
-    const midY = top + 2 * sp;
-    geos.push({ sys: systems[j], top, mid: midY, y: (st: number) => midY - ((st - layout.mid) * sp) / 2 });
+    geos.push({ j, sys: systems[j], sd: sysDraw(L, j, s), top, mid: top + 2 * sp });
   }
 
-  for (const g of geos) drawSystem(c, g, layout, L, s, { vis, isPast, isNow, inRange });
+  for (const g of geos) drawSystem(c, g, layout, L, s, v);
 
-  // Pitch trace, on every visible system up to now.
+  // Pitch trace, on every visible system up to now; then the outlines of the notes it crosses.
+  updateTrace(s, L);
   for (const g of geos) drawTrace(c, g, s, L, beat);
+  for (const g of geos) drawOutlines(c, g, s, v, sp);
 
   // Playhead on the current system.
-  const cur = geos.find((g) => g.sys === systems[k]);
+  const cur = geos.find((g) => g.j === k);
   if (cur) {
     const sys = cur.sys;
     const px = beat < sys.startBeat ? sys.prefixEnd - 0.2 * sp : xAtBeat(sys, beat);
@@ -989,45 +1440,40 @@ export function drawStaff2D(c: Ctx, W: number, H: number, s: DrawState) {
     c.lineTo(px, yTop + 0.1 * sp);
     c.closePath();
     c.fill();
-    drawCountdown(c, cur, s, L);
+    drawCountdown(c, cur, s, L, px, yTop);
     drawBubble(c, cur, s, L, px);
   }
-}
-
-interface Vis {
-  vis: (i: number) => 'show' | 'letters' | 'none';
-  isPast: (i: number) => boolean;
-  isNow: (i: number) => boolean;
-  inRange: (i: number) => boolean;
 }
 
 function noteColor(s: DrawState, i: number, v: Vis): string {
   if (!v.inRange(i)) return INK.note;
   if (v.isPast(i)) {
     const g = s.live?.noteGrade(i);
-    return g ? gradeColor(g) : INK.note; // not graded yet (the voice arrives a moment later)
+    return g ? STAFF_GRADE[g] : INK.note; // not graded yet (the voice arrives a moment later)
   }
   if (v.isNow(i)) return COLORS.target;
   return INK.note;
 }
 
 function drawSystem(c: Ctx, g: SysGeo, layout: StaffLayout, L: Cached, s: DrawState, v: Vis) {
-  const { sys, top, mid } = g;
+  const { sys, sd, top, mid } = g;
   const sp = layout.sp;
   const lw = Math.max(1, Math.round(sp * 0.1));
   // Staff lines.
   c.fillStyle = INK.staff;
   for (let l = 0; l < 5; l++) c.fillRect(sys.clefX - 0.3 * sp, Math.round(top + l * sp), sys.x1 - sys.clefX + 0.3 * sp, lw);
-  // Clef, key, time.
+  // Clef, key (cancelling the old one when it changes here), time.
   if (layout.clef === 'bass') drawBass(c, sys.clefX, top + sp, sp, INK.clef);
   else drawTreble(c, sys.clefX, top + 3 * sp, sp, INK.clef, layout.clef === 'treble8');
-  drawKeySig(c, sys.keyX, mid, sp, sys.key.fifths, layout.clef, INK.clef);
+  drawKeySig(c, sys.keyX, mid, sp, sys.key.fifths, layout.clef, INK.clef, sys.cancelFifths);
   if (sys.timeSig) drawTimeSig(c, sys.timeX, mid, sp, sys.timeSig, INK.clef);
 
   // Barlines + numbers.
   c.font = `600 ${Math.round(Math.max(9, sp * 0.95))}px "JetBrains Mono", monospace`;
   c.textBaseline = 'alphabetic';
-  sys.measures.forEach((m, mi) => {
+  c.textAlign = 'left';
+  for (let mi = 0; mi < sys.measures.length; mi++) {
+    const m = sys.measures[mi];
     const last = mi === sys.measures.length - 1;
     c.fillStyle = INK.bar;
     const bx = Math.round(m.x1) - 1;
@@ -1043,216 +1489,134 @@ function drawSystem(c: Ctx, g: SysGeo, layout: StaffLayout, L: Cached, s: DrawSt
       let cx = m.changeX;
       if (m.sm.keyChange) {
         drawKeySig(c, cx, mid, sp, m.sm.key.fifths, layout.clef, INK.clef, m.sm.prevFifths);
-        cx += keyW(Math.max(Math.abs(m.sm.key.fifths), Math.abs(m.sm.prevFifths))) * sp;
+        cx += keyChangeW(m.sm.key.fifths, m.sm.prevFifths) * sp;
       }
       if (m.sm.timeChange) drawTimeSig(c, cx, mid, sp, m.sm.timeSig, INK.clef);
     }
-  });
-
-  // Notes.
-  const headRx = 0.62 * sp;
-  const stemW = Math.max(1, 0.12 * sp);
-  const allEvents: { le: LaidEvent; m: LaidMeasure }[] = [];
-  for (const m of sys.measures) for (const le of m.events) allEvents.push({ le, m });
-  // Bars where some note is still hidden: rests hidden too (off book: empty bars).
-  const hiddenBar = new Set<number>();
-  for (const m of sys.measures) for (const le of m.events) if (le.ev.noteIndex != null && v.vis(le.ev.noteIndex) !== 'show') hiddenBar.add(m.sm.index);
-
-  const stemEnds = new Map<StaffEvent, number>();
-  // Beams first (they decide stem lengths).
-  for (const m of sys.measures) {
-    m.sm.beams.forEach((grp) => {
-      const les = grp.map((i) => m.events[i]);
-      if (les.some((le) => v.vis(le.ev.noteIndex!) !== 'show')) return; // falls back to flags
-      const up = les[0].ev.stemUp!;
-      const d = up ? -1 : 1;
-      const sx = (le: LaidEvent) => (up ? le.x + headRx - stemW / 2 : le.x - headRx + stemW / 2);
-      const hy = (le: LaidEvent) => g.y(le.ev.step!);
-      const x0 = sx(les[0]);
-      const x1 = sx(les[les.length - 1]);
-      const maxBeams = Math.max(...les.map((le) => beamCount(le.ev.base)));
-      const len = 3.3 + Math.max(0, maxBeams - 2) * 0.75;
-      let y0 = hy(les[0]) + d * len * sp;
-      let y1 = hy(les[les.length - 1]) + d * len * sp;
-      const maxRise = Math.min(1.0 * sp, Math.abs(x1 - x0) * 0.25);
-      if (Math.abs(y1 - y0) > maxRise) y1 = y0 + Math.sign(y1 - y0) * maxRise;
-      const at = (x: number) => (x1 === x0 ? y0 : y0 + ((x - x0) / (x1 - x0)) * (y1 - y0));
-      // Every stem at least 2.6 spaces long...
-      let fix = 0;
-      for (const le of les) {
-        const need = hy(le) + d * (2.6 + Math.max(0, maxBeams - 1) * 0.75) * sp;
-        const diff = up ? at(sx(le)) - need : need - at(sx(le));
-        if (diff > fix) fix = diff;
-      }
-      // ...and the beam reaches at least the middle line.
-      for (const le of les) {
-        const diff = up ? at(sx(le)) - mid : mid - at(sx(le));
-        if (diff > fix) fix = diff;
-      }
-      y0 -= d * fix;
-      y1 -= d * fix;
-      const bt = 0.46 * sp;
-      const gap = 0.76 * sp;
-      const colors = les.map((le) => noteColor(s, le.ev.noteIndex!, v));
-      const beamColor = colors.every((x) => x === colors[0]) ? colors[0] : INK.note;
-      c.fillStyle = beamColor;
-      c.globalAlpha = les.every((le) => !v.inRange(le.ev.noteIndex!)) ? 0.35 : 1;
-      const beamSeg = (xa: number, xb: number, level: number) => {
-        const off = -d * level * gap;
-        const ya = at(xa) + off;
-        const yb = at(xb) + off;
-        c.beginPath();
-        c.moveTo(xa, ya);
-        c.lineTo(xb, yb);
-        c.lineTo(xb, yb + d * bt);
-        c.lineTo(xa, ya + d * bt);
-        c.closePath();
-        c.fill();
-      };
-      // Stems end at the outer edge of the primary beam.
-      for (const le of les) stemEnds.set(le.ev, at(sx(le)));
-      beamSeg(x0, x1, 0);
-      for (let lvl = 1; lvl < maxBeams; lvl++) {
-        for (let q = 0; q < les.length; q++) {
-          if (beamCount(les[q].ev.base) <= lvl) continue;
-          const nextHas = q + 1 < les.length && beamCount(les[q + 1].ev.base) > lvl;
-          const prevHas = q > 0 && beamCount(les[q - 1].ev.base) > lvl;
-          if (nextHas) beamSeg(sx(les[q]), sx(les[q + 1]), lvl);
-          else if (!prevHas) {
-            const stub = 1.1 * sp;
-            if (q === 0) beamSeg(sx(les[q]), sx(les[q]) + stub, lvl);
-            else beamSeg(sx(les[q]) - stub, sx(les[q]), lvl);
-          }
-        }
-      }
-      c.globalAlpha = 1;
-    });
   }
 
-  for (const { le, m } of allEvents) {
-    const e = le.ev;
-    const x = le.x;
+  const headRx = 0.62 * sp;
+  const stemW = Math.max(1, 0.12 * sp);
+  const shown = (e: StaffEvent) => v.vis(e.noteIndex!) === 'show';
+  const beamShown = (b: BeamG) => b.evs.every((x) => shown(x.ev));
+  // Bars where some note is still hidden: rests hidden too (off book: empty bars).
+  let hiddenBars: number[] | null = null;
+  if (s.hide) {
+    for (const e of sd.evs) {
+      if (e.ev.noteIndex != null && !shown(e.ev) && !(hiddenBars ??= []).includes(e.m.sm.index)) hiddenBars.push(e.m.sm.index);
+    }
+  }
+
+  // Beams.
+  for (const b of sd.beams) {
+    if (!beamShown(b)) continue; // falls back to flags
+    let col = noteColor(s, b.evs[0].ev.noteIndex!, v);
+    for (const e of b.evs) if (noteColor(s, e.ev.noteIndex!, v) !== col) { col = INK.note; break; }
+    c.fillStyle = col;
+    c.globalAlpha = b.evs.every((e) => !v.inRange(e.ev.noteIndex!)) ? 0.35 : 1;
+    for (let q = 0; q < b.segs.length; q += 4) {
+      const xa = b.segs[q], ya = mid + b.segs[q + 1], xb = b.segs[q + 2], yb = mid + b.segs[q + 3];
+      c.beginPath();
+      c.moveTo(xa, ya);
+      c.lineTo(xb, yb);
+      c.lineTo(xb, yb + b.d * b.bt);
+      c.lineTo(xa, ya + b.d * b.bt);
+      c.closePath();
+      c.fill();
+    }
+    c.globalAlpha = 1;
+  }
+
+  for (const eg of sd.evs) {
+    const e = eg.ev;
+    const x = eg.x;
     if (e.kind === 'rest') {
       const pastRest = beatToTime(s.score.tempos, e.start + e.dur) <= s.pos;
-      if (hiddenBar.has(m.sm.index) && !pastRest) continue;
+      if (hiddenBars?.includes(eg.m.sm.index) && !pastRest) continue;
       c.fillStyle = INK.rest;
       c.strokeStyle = INK.rest;
       drawRest(c, x, mid, sp, e.base, e.dots);
       continue;
     }
-    const i = e.noteIndex!;
-    const visib = v.vis(i);
-    if (visib !== 'show') continue;
-    const col = noteColor(s, i, v);
-    const dim = !v.inRange(i);
-    const now = v.isNow(i);
-    const y = g.y(e.step!);
-    c.globalAlpha = dim ? 0.35 : 1;
+    if (!shown(e)) continue;
+    const main = e.noteIndex!;
+    const col = noteColor(s, main, v);
+    // A faint guide at the note's exact height while and after it is sung: the voice line just
+    // under it is flat, just over it sharp.
+    for (const h of eg.heads) {
+      if (h.i !== main || !v.inRange(h.i) || s.part.notes[h.i].start > s.pos) continue;
+      c.fillStyle = col;
+      c.globalAlpha = 0.6;
+      c.fillRect(h.x + headRx, Math.round(mid + h.dy) - 0.5, Math.max(0, eg.xEnd - h.x - headRx - 0.3 * sp), 1);
+    }
+    c.globalAlpha = v.inRange(main) ? 1 : 0.35;
     // Ledger lines.
     c.fillStyle = INK.staff;
-    const off = e.step! - layout.mid;
-    if (Math.abs(off) >= 6) {
-      const dir = Math.sign(off);
-      for (let o = 6; o <= Math.abs(off); o += 2) {
-        const ly = g.y(layout.mid + dir * o);
-        c.fillRect(x - headRx - 0.4 * sp, Math.round(ly), 2 * headRx + 0.8 * sp, lw);
+    for (let q = 0; q < eg.ledgers.length; q += 3) c.fillRect(eg.ledgers[q], Math.round(mid + eg.ledgers[q + 2]), eg.ledgers[q + 1] - eg.ledgers[q], lw);
+    for (const h of eg.heads) {
+      const hc = h.i === main ? col : noteColor(s, h.i, v);
+      const y = mid + h.dy;
+      c.fillStyle = hc;
+      if (v.isNow(h.i)) {
+        c.shadowColor = COLORS.target;
+        c.shadowBlur = Math.max(12, sp * 1.8);
+        drawNotehead(c, h.x, y, sp, e.base);
+        c.shadowBlur = 0;
+      } else drawNotehead(c, h.x, y, sp, e.base);
+      if (h.acc != null) drawAccidental(c, h.accX, y, sp, h.acc, hc);
+      // Dots (moved into the space when the note sits on a line).
+      for (let d = 0; d < e.dots; d++) {
+        const dy = mod(h.off, 2) === 0 ? -0.5 * sp : 0;
+        c.beginPath();
+        c.arc(eg.dotX + (0.45 + d * 0.45) * sp, y + dy, 0.16 * sp, 0, Math.PI * 2);
+        c.fill();
       }
-    }
-    c.fillStyle = col;
-    if (now) {
-      c.save();
-      c.shadowColor = COLORS.target;
-      c.shadowBlur = Math.max(10, sp * 1.6);
-      drawNotehead(c, x, y, sp, e.base);
-      drawNotehead(c, x, y, sp, e.base);
-      c.restore();
-    } else drawNotehead(c, x, y, sp, e.base);
-    // Accidental.
-    if (e.accidental != null) drawAccidental(c, x - headRx - 0.75 * sp, y, sp, e.accidental, col);
-    // Dots (moved into the space when the note sits on a line).
-    for (let d = 0; d < e.dots; d++) {
-      const dy = mod(off, 2) === 0 ? -0.5 * sp : 0;
-      c.beginPath();
-      c.arc(x + headRx + (0.45 + d * 0.45) * sp, y + dy, 0.16 * sp, 0, Math.PI * 2);
-      c.fill();
     }
     // Stem + flags.
     if (e.base < 4) {
-      const up = e.stemUp!;
-      const sx = up ? x + headRx - stemW / 2 : x - headRx + stemW / 2;
-      let ey = stemEnds.get(e);
-      const beamed = ey != null;
-      if (ey == null) {
-        const fl = beamCount(e.base);
-        const len = (3.3 + Math.max(0, fl - 1) * 0.6) * sp;
-        ey = y + (up ? -len : len);
-        // Long stems reach the middle line.
-        if (up && ey > mid) ey = mid;
-        if (!up && ey < mid) ey = mid;
-      }
-      c.fillRect(sx - stemW / 2, Math.min(y, ey), stemW, Math.abs(ey - y));
-      if (!beamed && e.base <= 0.5) drawFlags(c, sx, ey, sp, beamCount(e.base), up);
+      c.fillStyle = col;
+      const beamed = !!eg.beam && beamShown(eg.beam);
+      const ey = mid + (beamed ? eg.beamEnd! : eg.freeEnd);
+      const y0 = mid + eg.stemFrom;
+      c.fillRect(eg.stemX - stemW / 2, Math.min(y0, ey), stemW, Math.abs(ey - y0));
+      if (!beamed && e.base <= 0.5) drawFlags(c, eg.stemX, ey, sp, beamCount(e.base), eg.up);
     }
     c.globalAlpha = 1;
   }
 
-  // Ties (also across the system edge).
-  c.globalAlpha = 1;
-  for (let q = 0; q < allEvents.length; q++) {
-    const e = allEvents[q].le.ev;
-    if (e.kind !== 'note') continue;
-    const i = e.noteIndex!;
-    if (v.vis(i) !== 'show') continue;
-    const y = g.y(e.step!);
-    const side = e.stemUp ? 1 : -1;
-    c.fillStyle = noteColor(s, i, v);
-    c.globalAlpha = v.inRange(i) ? 1 : 0.35;
-    if (e.tieStart) {
-      const nx = allEvents[q + 1]?.le.ev.noteIndex === i ? allEvents[q + 1].le.x : sys.x1 + 0.6 * sp;
-      drawTie(c, allEvents[q].le.x + 0.75 * sp, nx - 0.75 * sp, y + side * 0.65 * sp, side, sp);
-    }
-    if (e.tieEnd && q === 0) drawTie(c, sys.prefixEnd - 0.8 * sp, allEvents[q].le.x - 0.75 * sp, y + side * 0.65 * sp, side, sp);
-    c.globalAlpha = 1;
+  // Ties.
+  for (const t of sd.ties) {
+    if (v.vis(t.i) !== 'show') continue;
+    c.fillStyle = noteColor(s, t.i, v);
+    c.globalAlpha = v.inRange(t.i) ? 1 : 0.35;
+    drawTie(c, t.xa, t.xb, mid + t.dy, t.side, sp);
   }
+  c.globalAlpha = 1;
 
   // Triplet numbers.
-  c.font = `italic 700 ${Math.round(sp * 1.25)}px Georgia, serif`;
-  c.textAlign = 'center';
-  c.textBaseline = 'alphabetic';
-  for (const m of sys.measures) {
-    let grp: LaidEvent[] = [];
-    let sum = 0;
-    const flushT = () => {
-      if (grp.length && grp.every((le) => le.ev.kind === 'rest' || v.vis(le.ev.noteIndex!) === 'show')) {
-        const xa = grp[0].x;
-        const xb = grp[grp.length - 1].x;
-        let yTop = top - 0.6 * sp;
-        for (const le of grp) {
-          if (le.ev.step == null) continue;
-          const y = g.y(le.ev.step);
-          const end = stemEnds.get(le.ev) ?? (le.ev.stemUp ? y - 3.3 * sp : y);
-          yTop = Math.min(yTop, y - 0.8 * sp, end - 0.4 * sp);
-        }
-        c.fillStyle = INK.clef;
-        c.fillText('3', (xa + xb) / 2 + 0.3 * sp, yTop);
-      }
-      grp = [];
-      sum = 0;
-    };
-    for (const le of m.events) {
-      if (!le.ev.tuplet) {
-        flushT();
-        continue;
-      }
-      grp.push(le);
-      sum += le.ev.dur;
-      if (Math.abs(sum * 2 - Math.round(sum * 2)) < 0.02) flushT();
-    }
-    flushT();
+  if (sd.tups.length) {
+    c.font = `italic 700 ${Math.round(sp * 1.25)}px Georgia, serif`;
+    c.textAlign = 'center';
+    c.textBaseline = 'alphabetic';
+    c.fillStyle = INK.clef;
+    for (const t of sd.tups) if (t.evs.every((e) => e.ev.kind === 'rest' || shown(e.ev))) c.fillText('3', t.x, mid + t.dy);
+    c.textAlign = 'left';
   }
-  c.textAlign = 'left';
 
-  drawLyrics(c, g, s, L, v, allEvents.map((x) => x.le));
+  drawLyrics(c, g, s, L, v);
+}
+
+/** Outlines over the noteheads the voice trace runs through (sung or being sung). */
+function drawOutlines(c: Ctx, g: SysGeo, s: DrawState, v: Vis, sp: number) {
+  c.lineWidth = Math.max(1.3, 0.13 * sp);
+  for (const eg of g.sd.evs) {
+    if (!eg.heads.length || v.vis(eg.ev.noteIndex!) !== 'show') continue;
+    for (const h of eg.heads) {
+      if (!v.inRange(h.i) || s.part.notes[h.i].start > s.pos) continue;
+      c.strokeStyle = noteColor(s, h.i, v);
+      strokeNotehead(c, h.x, g.mid + h.dy, sp, eg.ev.base);
+    }
+  }
 }
 
 function beamCount(base: number): number {
@@ -1271,68 +1635,200 @@ function drawTie(c: Ctx, xa: number, xb: number, y: number, side: number, sp: nu
   c.fill();
 }
 
-function drawLyrics(c: Ctx, g: SysGeo, s: DrawState, L: Cached, v: Vis, les: LaidEvent[]) {
+function textWidth(c: Ctx, L: Cached, font: string, t: string): number {
+  const k = font + '|' + t;
+  let w = L.textW.get(k);
+  if (w == null) {
+    w = c.measureText(t).width;
+    L.textW.set(k, w);
+  }
+  return w;
+}
+
+function drawLyrics(c: Ctx, g: SysGeo, s: DrawState, L: Cached, v: Vis) {
   const sp = L.layout.sp;
   const by = g.top + (4 + L.lyricOff) * sp;
+  const evs = g.sd.evs;
   c.font = L.lyricFont;
   c.textBaseline = 'alphabetic';
   c.textAlign = 'center';
-  const placed: { le: LaidEvent; text: string; x0: number; x1: number; syl?: string; i: number }[] = [];
-  for (const le of les) {
-    const e = le.ev;
+  const notes = s.part.notes;
+  const hy = by - 0.45 * sp;
+  const thick = Math.max(1, 0.14 * sp);
+  for (let q = 0; q < evs.length; q++) {
+    const e = evs[q].ev;
     if (e.kind !== 'note' || !e.first) continue;
     const i = e.noteIndex!;
-    const n = s.part.notes[i];
+    const n = notes[i];
     const visib = v.vis(i);
     if (visib === 'none') continue;
-    let text = n.lyric ?? '';
+    const x = evs[q].x;
     if (visib === 'letters') {
-      text = wordInitial(n);
+      const text = wordInitial(n);
+      if (!text) continue;
       c.save();
       c.font = `800 ${Math.round(sp * 1.6)}px "Bricolage Grotesque", sans-serif`;
       c.fillStyle = v.isNow(i) ? COLORS.target : COLORS.targetText;
-      if (text) c.fillText(text, le.x, by);
+      c.fillText(text, x, by);
       c.restore();
       continue;
     }
+    const text = n.lyric ?? '';
     if (!text) continue;
     const now = v.isNow(i);
     c.fillStyle = !v.inRange(i) ? INK.lyricPast : now ? COLORS.targetText : v.isPast(i) ? INK.lyricPast : INK.lyric;
+    let w: number;
     if (now) {
-      c.save();
-      c.font = L.lyricFont.replace(/^600/, '800');
-      c.fillText(text, le.x, by);
-      c.restore();
-    } else c.fillText(text, le.x, by);
-    const w = c.measureText(text).width;
-    placed.push({ le, text, x0: le.x - w / 2, x1: le.x + w / 2, syl: n.syllabic, i });
-  }
-  c.textAlign = 'left';
-  // Hyphens between syllables of a word; extender lines under melismas.
-  c.fillStyle = INK.lyricPast;
-  const hy = by - 0.45 * sp;
-  for (let q = 0; q < placed.length; q++) {
-    const p = placed[q];
-    const nx = placed[q + 1];
-    if (p.syl === 'begin' || p.syl === 'middle') {
-      const xa = p.x1;
-      const xb = nx ? nx.x0 : g.sys.x1;
-      if (xb - xa > 0.8 * sp) {
-        const hw = Math.min(0.6 * sp, (xb - xa) * 0.4);
-        c.fillRect((xa + xb) / 2 - hw / 2, hy, hw, Math.max(1, 0.14 * sp));
+      const f = L.lyricFont.replace(/^600/, '800');
+      c.font = f;
+      c.fillText(text, x, by);
+      w = textWidth(c, L, f, text);
+      c.font = L.lyricFont;
+    } else {
+      c.fillText(text, x, by);
+      w = textWidth(c, L, L.lyricFont, text);
+    }
+    const x1 = x + w / 2;
+    // Hyphen to the next syllable of the word (only when that syllable is shown); extender line
+    // under a melisma (only over notes that are shown).
+    c.fillStyle = INK.lyricPast;
+    if (n.syllabic === 'begin' || n.syllabic === 'middle') {
+      let nx: EvG | null = null;
+      for (let r = q + 1; r < evs.length && !nx; r++) {
+        const re = evs[r].ev;
+        if (re.kind === 'note' && re.first && notes[re.noteIndex!].lyric) nx = evs[r];
+      }
+      if (nx && v.vis(nx.ev.noteIndex!) !== 'show') continue;
+      const xb = nx ? nx.x - textWidth(c, L, L.lyricFont, notes[nx.ev.noteIndex!].lyric!) / 2 : Math.min(g.sys.x1, x1 + 2.2 * sp);
+      if (xb - x1 > 0.8 * sp) {
+        const hw = Math.min(0.6 * sp, (xb - x1) * 0.4);
+        c.fillRect((x1 + xb) / 2 - hw / 2, hy, hw, thick);
       }
     } else {
-      // Melisma: following notes without a syllable until the next word.
       let lastX = -1;
-      const start = les.indexOf(p.le);
-      for (let r = start + 1; r < les.length; r++) {
-        const e = les[r].ev;
-        if (e.kind !== 'note') break;
-        if (e.first && s.part.notes[e.noteIndex!].lyric) break;
-        lastX = les[r].x;
+      for (let r = q + 1; r < evs.length; r++) {
+        const re = evs[r].ev;
+        if (re.kind !== 'note') break;
+        if (re.first && notes[re.noteIndex!].lyric) break;
+        if (v.vis(re.noteIndex!) !== 'show') break;
+        lastX = evs[r].x;
       }
-      if (lastX > p.x1 + 0.5 * sp) c.fillRect(p.x1 + 0.2 * sp, by, lastX + 0.6 * sp - p.x1 - 0.2 * sp, Math.max(1, 0.1 * sp));
+      if (lastX > x1 + 0.5 * sp) c.fillRect(x1 + 0.2 * sp, by, lastX + 0.6 * sp - x1 - 0.2 * sp, Math.max(1, 0.1 * sp));
     }
+  }
+  c.textAlign = 'left';
+}
+
+// ---------------------------------------------------------------------------------------------
+// Voice trace: each sample's position and colour are worked out once (and again only while its
+// note is still being sung), then each frame just strokes the cached points.
+
+const TR_HIDE = -1;
+const TR_REST = 0;
+const TR_IN = 1;
+const TR_OUT = 2;
+const TRACE_COLORS = [INK.traceRest, COLORS.voice, INK.outTune];
+/** Half-width (s) of the trace's smoothing window. */
+const SMOOTH = 0.09;
+
+interface TraceCache {
+  samples: PitchSample[] | null;
+  key: string;
+  /** Samples [0, done) are final. */
+  done: number;
+  sys: number[];
+  x: number[];
+  dy: number[];
+  col: number[];
+  ev: (StaffEvent | null)[];
+}
+const tr: TraceCache = { samples: null, key: '', done: 0, sys: [], x: [], dy: [], col: [], ev: [] };
+
+function updateTrace(s: DrawState, L: Cached) {
+  const smp = s.samples;
+  const lkey = `${L.key}|${s.tolerance}|${s.range?.join(',')}`;
+  if (tr.samples !== smp || tr.key !== lkey || smp.length < tr.done) {
+    tr.samples = smp;
+    tr.key = lkey;
+    tr.done = 0;
+    tr.sys.length = tr.x.length = tr.dy.length = tr.col.length = tr.ev.length = 0;
+  }
+  const { layout } = L;
+  const sp = layout.sp;
+  const systems = layout.systems;
+  const tempos = s.score.tempos;
+  const notes = s.part.notes;
+  const yMin = -(2 + L.above - 0.6) * sp;
+  const yMax = (2 + L.lyricOff - 1.5) * sp;
+  const dyOf = (st: number) => -((st - layout.mid) * sp) / 2;
+  let allFinal = true;
+  for (let q = tr.done; q < smp.length; q++) {
+    const sm = smp[q];
+    let sys = 0;
+    let x = 0;
+    let dy = 0;
+    let col = TR_HIDE;
+    let ev: StaffEvent | null = null;
+    if (sm.midi != null) {
+      const b = timeToBeat(tempos, sm.time);
+      sys = systemAt(systems, b);
+      const sy = systems[sys];
+      if (b <= sy.endBeat + 1e-6) {
+        ev = eventAt(sy, b);
+        const hidden = !!ev && ev.noteIndex != null && !!s.hide && s.hide(ev.noteIndex) !== 'show'
+          && notes[ev.noteIndex].start + notes[ev.noteIndex].dur > s.pos;
+        // Smoothed over about one vibrato cycle (±90 ms, no jumps to other notes): the line shows
+        // where the voice is centred, so a few cents flat or sharp reads instead of a scribble.
+        let sum = 0;
+        let n = 0;
+        for (let r = q; r >= 0 && sm.time - smp[r].time <= SMOOTH; r--) {
+          const mm = smp[r].midi;
+          if (mm != null && Math.abs(mm - sm.midi) < 0.8) { sum += mm; n++; }
+        }
+        for (let r = q + 1; r < smp.length && smp[r].time - sm.time <= SMOOTH; r++) {
+          const mm = smp[r].midi;
+          if (mm != null && Math.abs(mm - sm.midi) < 0.8) { sum += mm; n++; }
+        }
+        const m = sum / n;
+        const key = keyAtBeat(s.score, b);
+        x = xAtBeat(sy, b);
+        if (ev && !hidden) {
+          const tgt = nearestHead(ev, m);
+          dy = Math.max(yMin, Math.min(yMax, dyOf(sungStep(m, key, tgt))));
+          // In tune or not is judged on ~one vibrato cycle (like the scoring), so vibrato centred
+          // on the note doesn't stripe the line.
+          let ws = 0;
+          let wn = 0;
+          for (let r = q; r >= 0 && sm.time - smp[r].time <= 0.18; r--) {
+            const mm = smp[r].midi;
+            if (mm == null || (r < q && tr.ev[r] !== ev)) continue;
+            ws += mm;
+            wn++;
+          }
+          let cents = (ws / wn - tgt.midi) * 100;
+          if (Math.abs(cents) > 700) cents = ((cents % 1200) + 1800) % 1200 - 600;
+          col = Math.abs(cents) <= s.tolerance ? TR_IN : TR_OUT;
+        } else {
+          // Rests (or a hidden note): your voice at its staff height, folded by octaves onto the
+          // staff when it would be off it (a tenor singing a soprano line); hidden if it can't be.
+          let mm = m;
+          dy = dyOf(sungStep(mm, key));
+          for (let f = 0; f < 3 && (dy < yMin || dy > yMax); f++) {
+            mm += dy > yMax ? 12 : -12;
+            dy = dyOf(sungStep(mm, key));
+          }
+          col = dy < yMin || dy > yMax ? TR_HIDE : TR_REST;
+        }
+      }
+    }
+    tr.sys[q] = sys;
+    tr.x[q] = x;
+    tr.dy[q] = dy;
+    tr.col[q] = col;
+    tr.ev[q] = ev;
+    const final = sm.time < s.pos - 0.3 && (!ev || ev.noteIndex == null || notes[ev.noteIndex].start + notes[ev.noteIndex].dur <= s.pos);
+    if (allFinal && final) tr.done = q + 1;
+    else allFinal = false;
   }
 }
 
@@ -1340,9 +1836,10 @@ function drawTrace(c: Ctx, g: SysGeo, s: DrawState, L: Cached, beatNow: number) 
   const { sys } = g;
   const sp = L.layout.sp;
   const tempos = s.score.tempos;
+  if (beatNow < sys.startBeat - 1e-6) return;
   const tA = beatToTime(tempos, sys.startBeat);
   const tB = Math.min(beatToTime(tempos, sys.endBeat), s.pos + 0.05);
-  if (tB <= tA || beatNow < sys.startBeat - 1e-6) return;
+  if (tB <= tA) return;
   const smp = s.samples;
   // First sample at or after tA (samples are in time order).
   let lo = 0;
@@ -1352,64 +1849,44 @@ function drawTrace(c: Ctx, g: SysGeo, s: DrawState, L: Cached, beatNow: number) 
     if (smp[m].time < tA) lo = m + 1;
     else hi = m;
   }
-  const yMin = g.top - (L.above - 0.6) * sp;
-  const yMax = g.top + (4 + L.lyricOff - 1.5) * sp;
-  c.lineWidth = Math.max(2.5, 0.34 * sp);
+  let end = lo;
+  while (end < smp.length && smp[end].time <= tB) end++;
+  if (end <= lo) return;
+  const w = Math.max(2, 0.16 * sp);
   c.lineJoin = 'round';
   c.lineCap = 'round';
-  let prev: { x: number; y: number; t: number } | null = null;
-  let color = '';
-  // In tune or not is judged on ~one vibrato cycle (like the scoring), so vibrato centred on the
-  // note doesn't stripe the line.
-  const win: { t: number; m: number; ev: StaffEvent | null }[] = [];
-  c.beginPath();
-  for (let q = lo; q < smp.length; q++) {
-    const sm: PitchSample = smp[q];
-    if (sm.time > tB) break;
-    if (sm.midi == null) {
-      prev = null;
-      continue;
-    }
-    const b = timeToBeat(tempos, sm.time);
-    const ev = eventAt(sys, b);
-    const key = keyAtBeat(s.score, b);
-    const hidden = !!ev && ev.noteIndex != null && !!s.hide && s.hide(ev.noteIndex) !== 'show'
-      && s.part.notes[ev.noteIndex].start + s.part.notes[ev.noteIndex].dur > s.pos;
-    const step = sungStep(sm.midi, key, ev && !hidden ? { midi: ev.midi!, step: ev.step!, alt: ev.alt! } : null);
-    const x = xAtBeat(sys, b);
-    const y = Math.max(yMin, Math.min(yMax, g.y(step)));
-    while (win.length && (sm.time - win[0].t > 0.18 || win[0].ev !== ev)) win.shift();
-    win.push({ t: sm.time, m: sm.midi, ev });
-    let col: string;
-    if (!ev || hidden) col = '#8C96CC';
-    else {
-      const avg = win.reduce((a, w) => a + w.m, 0) / win.length;
-      let cents = (avg - ev.midi!) * 100;
-      if (Math.abs(cents) > 700) cents = ((cents % 1200) + 1800) % 1200 - 600;
-      col = Math.abs(cents) <= s.tolerance ? COLORS.voice : INK.outTune;
-    }
-    if (prev && sm.time - prev.t <= 0.12) {
-      if (col !== color) {
+  // Two passes: a dark halo (so the line reads across a notehead of its own colour), then the line.
+  for (let pass = 0; pass < 2; pass++) {
+    c.lineWidth = pass === 0 ? w + 2.5 : w;
+    let color = -2;
+    let prevQ = -1;
+    c.beginPath();
+    if (pass === 0) c.strokeStyle = 'rgba(15,18,38,0.85)';
+    for (let q = lo; q < end; q++) {
+      const col = tr.col[q];
+      if (col === TR_HIDE || tr.sys[q] !== g.j) {
+        prevQ = -1;
+        continue;
+      }
+      const x = tr.x[q];
+      const y = g.mid + tr.dy[q];
+      const joined = prevQ >= 0 && smp[q].time - smp[prevQ].time <= 0.12;
+      if (pass === 1 && col !== color) {
         c.stroke();
-        c.strokeStyle = col;
+        c.strokeStyle = TRACE_COLORS[col];
         color = col;
         c.beginPath();
-        c.moveTo(prev.x, prev.y);
+        if (joined) c.moveTo(tr.x[prevQ], g.mid + tr.dy[prevQ]);
       }
-      c.lineTo(x, y);
-    } else {
-      if (col !== color) {
-        c.stroke();
-        c.strokeStyle = col;
-        color = col;
-        c.beginPath();
+      if (joined) c.lineTo(x, y);
+      else {
+        c.moveTo(x, y);
+        c.lineTo(x + 0.01, y);
       }
-      c.moveTo(x, y);
-      c.lineTo(x + 0.01, y);
+      prevQ = q;
     }
-    prev = { x, y, t: sm.time };
+    c.stroke();
   }
-  c.stroke();
 }
 
 function drawBubble(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: number) {
@@ -1417,37 +1894,50 @@ function drawBubble(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: number) {
   const last = s.samples[s.samples.length - 1];
   if (!last || last.midi == null || s.pos - last.time >= 0.2) return;
   const notes = s.part.notes;
+  // The note being sung: of the notes sounding then (a chord in an instrument part), the nearest.
   let heard = -1;
+  let bestD = Infinity;
   if (s.range) {
     const [h0, h1] = s.range;
     for (let i = h0; i <= h1; i++) {
       if (notes[i].start > last.time) break;
-      if (last.time < notes[i].start + notes[i].dur) heard = i;
+      if (last.time >= notes[i].start + notes[i].dur) continue;
+      let d = Math.abs(last.midi - notes[i].midi);
+      if (d > 6) d = Math.abs(((d % 12) + 6) % 12 - 6);
+      if (d < bestD) {
+        bestD = d;
+        heard = i;
+      }
     }
   }
-  const lb = timeToBeat(s.score.tempos, last.time);
-  const ev = eventAt(g.sys, lb);
-  const hiddenEv = !!ev && ev.noteIndex != null && !!s.hide && s.hide(ev.noteIndex) !== 'show'
-    && notes[ev.noteIndex].start + notes[ev.noteIndex].dur > s.pos;
-  const step = sungStep(last.midi, keyAtBeat(s.score, lb), ev && !hiddenEv ? { midi: ev.midi!, step: ev.step!, alt: ev.alt! } : null);
-  const yMin = g.top - (L.above - 0.6) * sp;
-  const yMax = g.top + (4 + L.lyricOff - 1.5) * sp;
-  const py = Math.max(yMin, Math.min(yMax, g.y(step)));
-  // Live voice dot at the playhead.
+  // Live voice dot at the playhead (the trace's last point when it is on this system).
+  const q = s.samples.length - 1;
+  let py: number;
+  if (tr.samples === s.samples && q < tr.col.length && tr.sys[q] === g.j && tr.col[q] !== TR_HIDE) py = g.mid + tr.dy[q];
+  else {
+    const lb = timeToBeat(s.score.tempos, last.time);
+    const ev = eventAt(g.sys, lb);
+    const hiddenEv = !!ev && ev.noteIndex != null && !!s.hide && s.hide(ev.noteIndex) !== 'show'
+      && notes[ev.noteIndex].start + notes[ev.noteIndex].dur > s.pos;
+    const step = sungStep(last.midi, keyAtBeat(s.score, lb), ev && !hiddenEv ? nearestHead(ev, last.midi) : null);
+    const yMin = g.top - (L.above - 0.6) * sp;
+    const yMax = g.top + (4 + L.lyricOff - 1.5) * sp;
+    py = Math.max(yMin, Math.min(yMax, g.mid - ((step - L.layout.mid) * sp) / 2));
+  }
   c.fillStyle = 'rgba(76,201,240,0.28)';
   c.beginPath();
-  c.arc(px, py, Math.max(7, 0.9 * sp), 0, Math.PI * 2);
+  c.arc(px, py, Math.max(6, 0.75 * sp), 0, Math.PI * 2);
   c.fill();
   c.fillStyle = COLORS.voice;
   c.beginPath();
-  c.arc(px, py, Math.max(3.5, 0.45 * sp), 0, Math.PI * 2);
+  c.arc(px, py, Math.max(3, 0.32 * sp), 0, Math.PI * 2);
   c.fill();
   if (heard < 0 || (s.hide && s.hide(heard) !== 'show' && notes[heard].start + notes[heard].dur > s.pos)) return;
   const target = notes[heard].midi;
   let sum = 0;
   let cnt = 0;
-  for (let q = s.samples.length - 1; q >= 0 && last.time - s.samples[q].time < 0.2 && s.samples[q].time >= notes[heard].start; q--) {
-    const mm = s.samples[q].midi;
+  for (let r = s.samples.length - 1; r >= 0 && last.time - s.samples[r].time < 0.2 && s.samples[r].time >= notes[heard].start; r--) {
+    const mm = s.samples[r].midi;
     if (mm != null && Math.abs(mm - last.midi) < 1.5) {
       sum += mm;
       cnt++;
@@ -1460,12 +1950,29 @@ function drawBubble(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: number) {
   const txt = `${rc === 0 ? '±' : cents > 0 ? '+' : '−'}${rc}¢`;
   c.font = '600 12px "JetBrains Mono", monospace';
   c.textBaseline = 'middle';
-  const tw = c.measureText(txt).width;
-  const bw = tw + 14;
-  // Above the staff, next to the top of the playhead: it never hides the notes you're about to sing.
+  c.textAlign = 'left';
+  const bw = textWidth(c, L, c.font, txt) + 14;
+  // Above the notes next to the top of the playhead (right, else left), clear of any stem or beam
+  // there: it never hides the notes you're about to sing.
+  const bandTop = g.top - L.above * sp + 12;
+  const base = g.top - Math.max(12, 0.9 * sp);
+  const place = (bx: number) => {
+    let ink = Infinity;
+    for (const e of g.sd.evs) if (e.heads.length && e.x + 0.8 * sp >= bx && e.x - 0.8 * sp <= bx + bw) ink = Math.min(ink, g.mid + e.top);
+    return Math.min(base, ink - 13);
+  };
   let bx = px + 0.9 * sp;
   if (bx + bw > g.sys.x1 + 6) bx = px - 0.9 * sp - bw;
-  const by = g.top - Math.max(11, (L.above - 0.9) * sp * 0.5 + 6);
+  let by = place(bx);
+  if (by < bandTop) {
+    const alt = bx > px ? px - 0.9 * sp - bw : px + 0.9 * sp;
+    const by2 = place(alt);
+    if (by2 > by && alt >= 0 && alt + bw <= g.sys.x1 + 6) {
+      bx = alt;
+      by = by2;
+    }
+  }
+  by = Math.max(bandTop, by);
   const ok = Math.abs(cents) <= s.tolerance;
   c.fillStyle = '#0B0D1A';
   roundRect(c, bx, by - 11, bw, 22, 7);
@@ -1477,8 +1984,9 @@ function drawBubble(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: number) {
   c.fillText(txt, bx + 7, by + 1);
 }
 
-/** Entry countdown above the staff when your next note comes after a rest. */
-function drawCountdown(c: Ctx, g: SysGeo, s: DrawState, L: Cached) {
+/** Entry countdown when your next note comes after a rest: beside the playhead's head, on the side
+ *  already sung (the notes coming up stay clear). */
+function drawCountdown(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: number, yTop: number) {
   if (!s.range) return;
   const sp = L.layout.sp;
   const notes = s.part.notes;
@@ -1493,15 +2001,13 @@ function drawCountdown(c: Ctx, g: SysGeo, s: DrawState, L: Cached) {
     if (afterRest && ahead <= 3 * bt && s.pos >= s.from - 0.01) {
       const kk = Math.ceil(ahead / bt - 1e-6);
       if (kk > 0) {
-        const nb = timeToBeat(s.score.tempos, n.start);
-        const x = nb < g.sys.endBeat ? xAtBeat(g.sys, nb) : g.sys.x1 - 0.8 * sp;
-        c.font = `800 ${Math.round(Math.max(16, sp * 2))}px "Bricolage Grotesque", sans-serif`;
-        c.textAlign = 'center';
+        const size = Math.round(Math.max(16, sp * 1.9));
+        c.font = `800 ${size}px "Bricolage Grotesque", sans-serif`;
         c.textBaseline = 'alphabetic';
         c.fillStyle = COLORS.target;
-        c.globalAlpha = 0.95;
-        c.fillText(String(kk), x, g.top - (L.above - 1.9) * sp);
-        c.globalAlpha = 1;
+        const left = px - 0.8 * sp - size * 0.6 > g.sys.clefX;
+        c.textAlign = left ? 'right' : 'left';
+        c.fillText(String(kk), left ? px - 0.8 * sp : px + 0.8 * sp, yTop + 0.35 * size);
         c.textAlign = 'left';
       }
     }

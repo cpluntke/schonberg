@@ -6,7 +6,7 @@ import {
   _resetAllForTests, loadProfile, saveProfile, getProgress, recordAttempt, attemptLog, streakDays,
   dueForReview, practiceMinutes, loadCycle, saveCycle, exportBackup, importBackup, subscribe,
   personalBest, snapshotReadiness, readinessHistory, saveImportedScore, loadImportedScores,
-  deleteImportedScore, LOG_CAP, DEFAULT_PROFILE,
+  deleteImportedScore, LOG_CAP, DEFAULT_PROFILE, practiceDisplay,
 } from './store';
 
 const DAY = 86_400_000;
@@ -17,6 +17,38 @@ const res = (accuracy: number, score = Math.round(accuracy * 1000)): AttemptResu
 const at = (y: number, m: number, d: number, h = 12) => new Date(y, m - 1, d, h).getTime();
 
 beforeEach(() => { localStorage.clear(); _resetAllForTests(); });
+
+describe('practice display migration', () => {
+  it('singers who practised before the score view keep the highway, once, with the news card', () => {
+    recordAttempt('p', 'S', 'a', 1, res(0.9), 30);
+    // A profile saved before the migration existed:
+    localStorage.setItem('sh:profile', JSON.stringify({ ...DEFAULT_PROFILE, onboarded: true }));
+    const p = loadProfile();
+    expect(p).toMatchObject({ display: 'highway', scoreViewNews: true, displayMigrated: true });
+    expect(practiceDisplay(p, 1)).toBe('highway');
+    // Choosing Automatic later sticks (the migration doesn't run again).
+    saveProfile({ ...p, display: undefined, scoreViewNews: false });
+    expect(loadProfile().display).toBeUndefined();
+    expect(practiceDisplay(loadProfile(), 1)).toBe('score');
+  });
+
+  it('new singers keep Automatic (score at levels 1–2)', () => {
+    saveProfile({ ...DEFAULT_PROFILE, onboarded: true });
+    const p = loadProfile();
+    expect(p.display).toBeUndefined();
+    expect(p.scoreViewNews).toBeFalsy();
+    expect(p.displayMigrated).toBe(true);
+    recordAttempt('p', 'S', 'a', 1, res(0.9), 30);
+    expect(loadProfile().display).toBeUndefined();
+  });
+
+  it('an explicit choice is kept', () => {
+    recordAttempt('p', 'S', 'a', 1, res(0.9), 30);
+    localStorage.setItem('sh:profile', JSON.stringify({ ...DEFAULT_PROFILE, onboarded: true, display: 'score' }));
+    expect(loadProfile()).toMatchObject({ display: 'score' });
+    expect(loadProfile().scoreViewNews).toBeFalsy();
+  });
+});
 
 describe('profile & corrupted storage', () => {
   it('defaults and roundtrip', () => {

@@ -52,6 +52,10 @@ export interface Profile {
    * levels 1–2, the highway from level 3.
    */
   display?: 'highway' | 'score';
+  /** The one-time display migration ran (singers who practised before the score view keep the highway). */
+  displayMigrated?: boolean;
+  /** Show the one-time "New: sheet music view" card on the practice screen. */
+  scoreViewNews?: boolean;
 }
 
 /** The practice display to use at a level (the singer's choice, else score at levels 0–2). */
@@ -244,6 +248,16 @@ export function loadProfile(): Profile {
   // Delays saved before the source was recorded may have been measured or learned: treat them as
   // learned (kept, refined when two runs agree, never used to fail a run on timing).
   if (typeof p.latencyMs === 'number' && p.latencyMs > 0 && !p.latencySource) p.latencySource = 'learned';
+  // Once: singers who already practised (before the score view existed) keep the highway they know,
+  // and get a card offering the new view. New singers keep Automatic (sheet music at levels 1–2).
+  if (p.onboarded && !p.displayMigrated) {
+    p.displayMigrated = true;
+    if (p.display === undefined && attemptLog().length > 0) {
+      p.display = 'highway';
+      p.scoreViewNews = true;
+    }
+    writeJSON(K.profile, p, false);
+  }
   return { ...DEFAULT_PROFILE, ...p };
 }
 export function saveProfile(p: Profile): void { writeJSON(K.profile, p); }

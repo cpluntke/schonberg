@@ -4,9 +4,10 @@ import { resolve } from 'node:path';
 import { makePart, makeScore } from '../../game/testutil';
 import { importScoreFile } from '../../music/import';
 import type { Score } from '../../music/types';
+import type { Part } from '../../music/types';
 import {
-  beamGroups, breakSystems, buildMeasures, clefFor, keyAlts, layoutStaff, measureSpan, midiToStep, middleStep,
-  spell, splitDuration, sungStep, systemAt, writtenValue, xAtBeat, type StaffEvent,
+  beamGroups, breakSystems, buildMeasures, clefFor, eventHas, eventSteps, keyAlts, layoutStaff, measureSpan, midiToStep,
+  middleStep, spell, splitDuration, staffSpace, STAFF_GRADE, sungStep, systemAt, writtenValue, xAtBeat, type StaffEvent,
 } from './staff2d';
 
 const C = { fifths: 0, mode: 'major' as const };
@@ -90,6 +91,37 @@ describe('pitch → staff height', () => {
     const target = { midi: 60, ...spell(60, C) };
     expect(sungStep(48, C, target)).toBeCloseTo(28); // an octave down: drawn on the note
   });
+
+  it('stays monotonic next to wide gaps (augmented seconds and wider)', () => {
+    // G𝄪 (= A) in C♭ major: the F♭ below is 5 semitones away; B♯ in G♭ major: D♭ is 3 above.
+    const cases = [
+      { key: { fifths: -7 }, target: { midi: 69, step: 32, alt: 2 } },
+      { key: { fifths: -6 }, target: { midi: 60, step: 27, alt: 1 } },
+      { key: { fifths: 7 }, target: { midi: 64, step: 29, alt: -2 } },
+    ];
+    for (const { key, target } of cases) {
+      let prev = -Infinity;
+      for (let m = target.midi - 6.5; m <= target.midi + 6.5; m += 0.01) {
+        const st = sungStep(m, key, target);
+        expect(st).toBeGreaterThanOrEqual(prev - 1e-9);
+        prev = st;
+      }
+      expect(sungStep(target.midi, key, target)).toBeCloseTo(target.step);
+    }
+  });
+
+  it('magnifies 30–50 cents to a clearly visible offset, about the same either side', () => {
+    const target = { midi: 64, ...spell(64, C) }; // E4: D a whole tone below, F a semitone above
+    for (const c of [30, 50]) {
+      const below = target.step - sungStep(64 - c / 100, C, target);
+      const above = sungStep(64 + c / 100, C, target) - target.step;
+      expect(below).toBeGreaterThan(0.45);
+      expect(above).toBeGreaterThan(0.45);
+      expect(Math.abs(above - below)).toBeLessThan(0.15);
+    }
+    // A semitone below E still sits between D and E, never past D.
+    expect(sungStep(63, C, target)).toBeGreaterThan(29);
+  });
 });
 
 describe('rhythm', () => {
@@ -115,6 +147,15 @@ describe('rhythm', () => {
     expect(durs(splitDuration(1, 3, 0, 1, true))).toEqual([1, 2]);
     expect(durs(splitDuration(0.5, 1.5, 0, 1, true))).toEqual([0.5, 1]);
     expect(durs(splitDuration(0, 2, 0, 1, true))).toEqual([2]);
+    // No dotted half rest for three beats in 4/4: half + quarter (or quarter + half from beat 2).
+    expect(durs(splitDuration(0, 3, 0, 1, true))).toEqual([2, 1]);
+    expect(durs(splitDuration(1, 3, 0, 1, true))).toEqual([1, 2]);
+    // 2/2: half rests on the beats, quarters inside them.
+    expect(durs(splitDuration(0, 3, 0, 2, true))).toEqual([2, 1]);
+    expect(durs(splitDuration(1, 3, 0, 2, true))).toEqual([1, 2]);
+    // 6/8: dotted quarter rests for whole beats, eighths within a beat.
+    expect(durs(splitDuration(0, 1.5, 0, 1.5, true))).toEqual([1.5]);
+    expect(durs(splitDuration(0.5, 2.5, 0, 1.5, true))).toEqual([0.5, 0.5, 1.5]);
   });
 
   it('beams eighths within a beat; rests break beams; stems follow the farthest note', () => {
@@ -155,6 +196,16 @@ describe('bars', () => {
     expect(acc(1)).toEqual([null, 1, 0]);
   });
 
+  it('cancels the old key with naturals when a key change opens a system', () => {
+    const part = makePart('s', [[60, 4], [62, 4], [64, 4], [65, 4]]);
+    const score: Score = { ...makeScore([part]), keys: [{ beat: 0, time: 0, fifths: 3, mode: 'major' }, { beat: 8, time: 8, fifths: -2, mode: 'major' }] };
+    const L = layoutStaff(score, part, 0, 3, { width: 390, sp: 9, textW, maxBars: 2 });
+    const sys = L.systems.find((sy) => sy.startBeat === 8)!;
+    expect(sys.cancelFifths).toBe(3);
+    expect(sys.timeX - sys.keyX).toBeGreaterThan(5 * 0.85 * 9); // 3 naturals + 2 flats
+    expect(L.systems[0].cancelFifths).toBe(0);
+  });
+
   it('marks key changes and time-signature changes', () => {
     const part = makePart('s', [[60, 4], [62, 4], [64, 4]]);
     const score: Score = { ...makeScore([part]), keys: [{ beat: 0, time: 0, fifths: 0, mode: 'major' }, { beat: 4, time: 4, fifths: -2, mode: 'major' }] };
@@ -163,6 +214,58 @@ describe('bars', () => {
     expect(ms.map((m) => m.keyChange)).toEqual([false, true, false]);
     expect(ms[1].prevFifths).toBe(0);
     expect(ms.map((m) => m.timeChange)).toEqual([true, false, true]);
+  });
+});
+
+describe('chords and overlapping notes (instrument parts)', () => {
+  const note = (midi: number, startBeat: number, durBeats: number) =>
+    ({ midi, start: startBeat, dur: durBeats, startBeat, durBeats, measure: Math.floor(startBeat / 4) });
+  const partOf = (notes: ReturnType<typeof note>[]): Part => ({ id: 'o', name: 'Organ', voiceType: 'other', notes, low: 40, high: 80 });
+
+  it('draws notes starting together as one chord on one stem', () => {
+    const part = partOf([note(60, 0, 2), note(64, 0, 2), note(67, 0, 2), note(62, 2, 2)]);
+    const ms = buildMeasures(makeScore([part]), part, 0, 0, 'treble');
+    const notes = ms[0].events.filter((e) => e.kind === 'note');
+    expect(notes).toHaveLength(2);
+    expect(eventSteps(notes[0]).sort()).toEqual([28, 30, 32]);
+    expect(notes[0].noteIndex).toBe(2); // the top note leads
+    expect(eventHas(notes[0], 0) && eventHas(notes[0], 1)).toBe(true);
+    expect(notes.some((e) => e.tieStart || e.chord?.some((c) => c.tieStart))).toBe(false);
+  });
+
+  it('never ties a note cut short by an overlap unless it really goes on (then it is tied into the next chord)', () => {
+    // A held whole note under two halves: tied into the second chord, and every tie has a target.
+    const held = partOf([note(48, 0, 4), note(60, 0, 2), note(62, 2, 2)]);
+    const ms = buildMeasures(makeScore([held]), held, 0, 0, 'bass');
+    const evs = ms[0].events.filter((e) => e.kind === 'note');
+    expect(evs).toHaveLength(2);
+    const ties = evs.flatMap((e, k) => [e, ...(e.chord ?? [])].filter((h) => h.tieStart).map((h) => ({ k, i: h.noteIndex })));
+    for (const t of ties) expect(eventHas(evs[t.k + 1], t.i!)).toBe(true);
+    // A slight legato overlap (MIDI) is trimmed, without any tie.
+    const legato = partOf([note(60, 0, 1.05), note(62, 1, 1), note(64, 2, 2.1), note(65, 4, 4)]);
+    const ms2 = buildMeasures(makeScore([legato]), legato, 0, 1, 'treble');
+    const all = ms2.flatMap((m) => m.events).filter((e) => e.kind === 'note');
+    expect(all.map((e) => e.midi)).toEqual([60, 62, 64, 65]);
+    expect(all.some((e) => e.tieStart || e.tieEnd || e.chord)).toBe(false);
+    for (const m of ms2) expect(m.events.reduce((a, e) => a + e.dur, 0)).toBeCloseTo(4);
+  });
+});
+
+describe('staff size', () => {
+  it('uses the height of a portrait phone for a bigger staff', () => {
+    const portrait = staffSpace(390, 610, 12).sp;
+    expect(portrait).toBeGreaterThan(11);
+    expect(staffSpace(560, 260, 12).sp).toBeLessThanOrEqual(12);
+  });
+
+  it('colours "ok" notes visibly on the dark staff, distinct from good and missed', () => {
+    const lum = (hex: string) => {
+      const c = [1, 3, 5].map((k) => parseInt(hex.slice(k, k + 2), 16) / 255).map((x) => (x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4));
+      return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    };
+    const contrast = (a: string, b: string) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
+    for (const g of ['good', 'ok', 'miss'] as const) expect(contrast(STAFF_GRADE[g], '#0F1226')).toBeGreaterThanOrEqual(4.5);
+    expect(new Set([STAFF_GRADE.good, STAFF_GRADE.ok, STAFF_GRADE.miss]).size).toBe(3);
   });
 });
 
@@ -234,7 +337,8 @@ describe('built-in pieces', () => {
           for (const e of m.events) expect(writtenValue(e.dur), `${f} ${part.name} bar ${m.number} dur ${e.dur}`).not.toBeNull();
         }
         // Every note of the part starts exactly once.
-        expect(ms.flatMap((m) => m.events).filter((e) => e.first).length).toBe(part.notes.length);
+        const firsts = ms.flatMap((m) => m.events).reduce((a, e) => a + (e.first ? 1 : 0) + (e.chord?.filter((c) => c.first).length ?? 0), 0);
+        expect(firsts).toBe(part.notes.length);
         const L = layoutStaff(score, part, 0, score.measures.length - 1, { width: 390, sp: 8.9, textW });
         for (const s of L.systems) expect(s.measures.length === 1 || s.x1 <= 390).toBe(true);
       }
