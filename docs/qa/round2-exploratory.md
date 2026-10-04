@@ -1,0 +1,64 @@
+# Round 2: fresh-eyes exploratory test
+
+Date: 2026-10-04. Build: dev server at `localhost:5179`. Priorities follow `docs/priorities.md`.
+Perspectives: **newcomer** (24, 360×740 Android, link from WhatsApp), **director** (imports MusicXML, sets cycle), **a11y** auditor.
+Scripts: `docs/qa/scripts/r2x-*.mjs`. Screenshots: `docs/qa/shots-r2x/`. axe-core 4.x was installed with `npm i --no-save`, so package.json is unchanged.
+
+## Summary
+
+| Priority | Count |
+|---|---|
+| P0 | 0 |
+| P1 | 1 |
+| P2 | 10 |
+| P3 | 16 |
+
+**What works well (no action needed):**
+- axe-core (wcag2a/aa and best-practice) reports **0 violations** on Home, Library, Setup, Settings, Ranks, Expert, Tuner, Piece and Results. The only one on Play is the missing h1 (see R2X-10).
+- Every control shows a visible 2px cyan focus ring, and the tab order is logical.
+- Onboarding is short and clear.
+- When the mic is blocked, the app explains it and offers "Listen instead".
+- The core loop of practise, results, next section and level-up works.
+- Coach notes and "Loop bars 2–5 slowly" give actionable feedback.
+- "Due for review" shows up correctly after 9 simulated days, and the streak counts up the next day.
+- Import is fast (about 650 ms per .mxl). All 11 files in `content/raw` import with sensible parts (divisi Tenor 1/2, Bass I/II/III), sections and per-part lyrics.
+- The arcade ran at about 60 fps in headless Chromium.
+
+## Findings
+
+| ID | Priority | Type | Perspective | Title | Steps / evidence | Suggested fix |
+|---|---|---|---|---|---|---|
+| R2X-01 | P1 | bug (content) | newcomer / director | Built-in "Gib dich zufrieden, BWV 315" (the piece recommended as "the ideal first piece") has implausible soprano leaps, probably octave errors in the PDMX edition | `public/pieces/pd/bach-bwv315.mxl`, soprano P1: bar 4 `E4 C5 B4` (↑m6), bar 5 `E5 D5 F#4 C5` (↓m6 then ↑TT/m6 back, crossing into the alto's F#4), bar 10 `C5 F#4 E5`, bar 11 `… A4 G5 F#5` (↑m7). A chorale melody does not leap like this. Expert → "Leap drill from your repertoire" lists these as the hardest intervals (`↑m7 … bar 10`, `↑TT … bar 5`, `↓TT … bar 10`, see `01-expert.png`). Every new soprano is first taught these notes. | Check the soprano against a reference edition (e.g. Breitkopf/Riemenschneider No. 315) and fix the octaves, or replace the edition. Add a content sanity test that flags leaps ≥ m7 or tritones in chorale soprano lines. |
+| R2X-02 | P2 | a11y | a11y | `prefers-reduced-motion` is not handled anywhere | `grep -r reduced-motion src/` finds nothing. The 3D arcade lanes rushing toward you, glow and PERFECT/MISS popups, bar transitions and the scrolling highway all run regardless (`05-arcade-mid.png`). | Add a `@media (prefers-reduced-motion: reduce)` block and a Settings toggle. Under reduced motion: no glow pulses or popups, no CSS transitions, arcade off by default (or a static camera), and optionally a "paged" highway that jumps per bar instead of scrolling. |
+| R2X-03 | P2 | a11y | a11y | At 200% zoom the pages scroll sideways and the Play start card gets cut off | Viewport 180×370 (360 phone at 200%): Home scrollWidth 248 > 180, so the "HERO" badge is cut (`08-zoom200-__.png`). Play scrollWidth 217: the level card's top (and Back button) sits above the viewport, "Start singing" is only reachable by scrolling, and the round transport button sits off-screen to the right (`08-zoom200-__play_bach-bwv315_P1_s0-m0-5_.png`, `09-zoom-play-scrolled.png`). Settings 222, Ranks 212. All font sizes are hard-coded `px` (no `rem`), so the browser's text-size setting is also ignored. | Use `rem` for type. Let the header row wrap. Give the Play start overlay `max-height: 100dvh; overflow:auto` anchored at the top. Make the transport row wrap or shrink. Re-test at 180 px and 320 px. |
+| R2X-04 | P2 | a11y | a11y / newcomer | Results heat strip: "ok" bars have 2.2:1 text contrast | `Results.tsx` uses dark `#0B0D1A` text on `#1D4F63`, which is 2.16:1 (needs 4.5:1). Bar 4 in `05-sloppy-results.png`. axe missed it because only an all-solid result was scanned. The meaning is also carried by colour alone in the visual. | Use white text on `#1D4F63` (8.9:1), or a lighter teal. Add a glyph or pattern per state (e.g. ✓ / ~ / !). |
+| R2X-05 | P2 | feature request | director | Imported pieces can't be renamed and get a filename as title, with no composer | 7 of 11 `content/raw` files show titles like `bach_chorale_bwv512_gib-dich-zufrieden` and "Unknown composer". Nicolette's composer is "Nicolette - Ravel" (taken from a running-header credit) (`07-library-after.png`, `07-import-*.png`). There is no edit UI. | Add "Edit details" on imported pieces: title, composer, part names, and which part maps to S/A/T/B. Ignore small running-header credits (font-size < 9) when looking for a composer. |
+| R2X-06 | P2 | UX | newcomer | Ranking code is shared under the name "Me" when no name is set | When onboarding is skipped (or Settings never visited), `leaderboard.ts:60` falls back to `'Me'`. The code pasted into WhatsApp reads `["Me","S",…]`, so the director can't tell who it is (`05-ranks-share.png`). | Before sharing, ask for a name if `profile.name` is empty (an inline field on the Ranks card). |
+| R2X-07 | P2 | feature request | director | Pasted leaderboard entries can't be removed | No remove or clear control exists (`grep remove` in Ranks finds none). Stale entries from earlier cycles, typos or a test code stay forever (`06-ranks-others.png`). Pasting your own code shows "Added 1 ranking" but nothing changes (`05-ranks-pasted.png`). | Add swipe or long-press to remove, plus "Clear choir board". Skip codes older than the cycle start. Toast "Already up to date" for your own or duplicate codes. |
+| R2X-08 | P2 | feature request | director | No choir-wide readiness view for the director | Without the optional server, the director sees readiness for one piece at a time, only for people who pasted codes. There is no per-part × per-section matrix to answer "will the altos know bars 20–26 of Nicolette by Thursday?". The Section battle shows only the average readiness per voice. | Add a "Director" view: a cycle-wide matrix (part × piece), the share of singers at L3 per section, and who hasn't reported in N days. Allow one multi-piece share code per singer. |
+| R2X-09 | P2 | UX | director | Cycle dates are not validated | In Settings I set rehearsal to 2026-10-01 and the concert to 2026-09-20: a concert before the rehearsal, both in the past. Both are accepted silently, and Home shows "done / done" with no target and no prompt to start a new cycle (`08-home-pastdates.png`, `08-settings-cycle.png`). | Warn inline when concert < rehearsal or a date is in the past. When both dates have passed, show "Cycle finished. Set up the next one" on Home. |
+| R2X-10 | P2 | a11y | a11y | Changing screen doesn't move focus or announce the new screen, and Play has no h1 | After "Practise now", `document.activeElement` is `<body>`. The router only calls `scrollTo(0,0)` (`router.ts:78`). A screen-reader user isn't told the screen changed. axe: Play has no level-one heading. | On route change, focus the screen's `<h1>` (`tabIndex=-1`) or announce the title in a polite live region. Make the Play title an `h1`. |
+| R2X-11 | P2 | a11y / UX | a11y / newcomer | Voice mixer chips: unclear meaning and state | All four chips have `aria-pressed="true"` with names like "Soprano" / "Alto · you". A screen reader hears "Alto, toggle button, pressed" with no verb. At L3 your own part is muted, which shows only as strikethrough text in low contrast (`05-arcade-mid.png`). Newcomers don't know the chips mute voices. | Label them as "Hear Alto" (pressed = audible) and add a small "Voices you hear" caption. Replace strikethrough with a speaker or muted icon plus a text state. |
+| R2X-12 | P3 | UX / a11y | newcomer / director | "Edit dates" lands at the top of Settings, and its target is 32 px tall | Home → "Edit dates" shows Note names first. The cycle section is three groups further down (`01-settings.png`). The button is `height:32` (`01` SMALL output). | Deep-link to `#/settings?focus=cycle` and scroll or focus the date field. Make the button ≥ 44 px. |
+| R2X-13 | P3 | UX | newcomer | The coach drill screen only says "Drill" | "Loop bars 2–5 slowly" opens a card titled "Drill" with subtitle "Soprano · Drill" (`05-drill.png`). | Title it "Bars 2–5 (drill)". |
+| R2X-14 | P3 | UX | newcomer | Whole-piece Arcade is available from level 0 | The README says "Arcade unlocks per section at level 2", but Piece → "Run the whole piece" → Arcade is always enabled (`04-piece-9days.png`). | Either gate it (on all sections ≥ L2) or document it as an exception. |
+| R2X-15 | P3 | UX | newcomer | Restore asks "Replace your current progress?" before checking the file | Restoring `{"hello":1}` first shows the confirm dialog, then the toast "This is not a Schönberg Hero backup." (`08-garbage-restore.png`). | Validate first, then ask for confirmation, and show what the backup contains (date, pieces, levels). |
+| R2X-16 | P3 | UX | director | Multi-file import shows only the last error, and toasts overwrite each other | `Library.tsx onFiles`: `setError` is replaced for each failing file, and each success toast replaces the previous one. | Show one summary ("9 imported, 2 failed: …") listing each failure. |
+| R2X-17 | P3 | UX | director | No duplicate detection on import | Importing the raw Bach, Locus iste, Debussy or Nicolette files adds second copies next to the built-ins under different titles (`07-library-after.png`). | Match on note hash or title and offer to replace or skip. |
+| R2X-18 | P3 | bug | director | Literal hyphens left in lyrics | Nicolette: "Jo- li, jo- li", "Ren- con- tra seigneur che-" (Tenor/Bass section previews in the r2x-07 output). Some syllables also show split ("frie den", "mus sic", "sapien tiam") where the source lacks `<syllabic>`. | Strip a trailing "-" from `<text>` and treat it as `syllabic=begin/middle`. |
+| R2X-19 | P3 | UX | newcomer | Pickup bar labelled "Bars 0–7" | Reger Nachtlied, all parts. | Label it "Pickup–7" or "Bars 1–7 (with upbeat)". |
+| R2X-20 | P3 | a11y | a11y | Results heat-strip tiles are 43 px wide | Below 44 px (`02-results.png`). | Use `minmax(44px,1fr)`. |
+| R2X-21 | P3 | feature request | newcomer | Bare link preview in WhatsApp | `index.html` has no `meta description` or `og:title`/`og:image`. The choir link shows as a plain URL. | Add OG tags with an icon or screenshot and a one-line pitch. |
+| R2X-22 | P3 | UX | newcomer | The "mic blocked" message gives no platform steps | It says "Allow it in your browser settings" (`10-mic-denied.png`). | Add the steps per platform (Android Chrome: tap the lock icon → Permissions → Microphone; iOS: aA → Website settings). |
+| R2X-23 | P3 | UX | newcomer | Level 1 promises "note names shown", but the note bars show lyrics | At L1 the names appear only on the left axis. The bar shows the syllable (`02-play-run-1.png`). | Show the note name in the bar at L1–3 (with the lyric below), or adjust the copy. |
+| R2X-24 | P3 | copy | newcomer | Expert row subtitle reads "Row · Whole piece · L2 In time" | `05-expert-mid.png`. | "Row of the day · P0 · with guide tone". |
+| R2X-25 | P3 | UX | newcomer | Settings › Voice & audio › Name shows "–" and can't be edited there | You have to re-run voice setup to set your name (`01-settings.png`). | Make it an inline text field. |
+| R2X-26 | P3 | polish | newcomer | Piece ladder: the "4 Concert" chip wraps to two lines while 1–3 don't | `04-piece-9days.png`. | Shorten it to "4 Concert" with `white-space:nowrap`, or let all chips stack the same way. |
+| R2X-27 | P3 | UX | newcomer | Pasting your own code says "Added 1 ranking" | Nothing new appears (`05-ranks-pasted.png`). | Say "That's your own code" or "Already up to date". |
+
+## Notes on method
+
+- **Newcomer:** first launch at 360×740 with `isMobile`; onboarding (name, Alto); "Practise now" with `?simulate=perfect`; Results; L1→L3 on Bach s0; localStorage timestamps shifted by −1 day and −9 days (streak, then "due for review"); sloppy run on Debussy, then the coach drill; whole-piece arcade, finished early; Expert row; Ranks share and paste.
+- **Director:** imported each of the 11 `content/raw/*.mxl` files through the file input and checked parts, section boundaries and the first lyric line of every section per part (output from `r2x-07-import.mjs`). Also tested cycle name, dates, the piece toggles (`aria-pressed` with "Add/Remove … to cycle" labels: good), and backup save and restore into a fresh context (round-trips correctly).
+- **A11y:** axe on every screen; Tab walk on Home and Play (desktop); tap-target scan; 200% zoom emulated as a 180 px viewport; reduced-motion code search; manual contrast calculation for the heat strip.
+- **Not covered:** real-device audio latency and sync, iOS Safari, an actual screen reader (TalkBack / VoiceOver).

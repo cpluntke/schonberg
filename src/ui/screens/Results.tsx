@@ -111,7 +111,7 @@ export function Results() {
             {measureIdx.map((m) => {
               const v = r.perMeasure[m];
               const bg = v >= 0.85 ? '#4CC9F0' : v >= 0.6 ? '#1D4F63' : '#FF7A45';
-              return <button key={m} aria-label={`Bar ${mnum(m)}: ${Math.round(v * 100)}%`} title={`Bar ${mnum(m)} · ${Math.round(v * 100)}%`} style={{ background: bg, color: '#0B0D1A', fontSize: 11, fontWeight: 700, fontFamily: 'var(--mono)' }} onClick={() => playLoop(m - 1, m + 1)}>{mnum(m)}</button>;
+              return <button key={m} aria-label={`Bar ${mnum(m)}: ${Math.round(v * 100)}%`} title={`Bar ${mnum(m)} · ${Math.round(v * 100)}%`} style={{ background: bg, color: bg === '#1D4F63' ? '#EEF0FF' : '#0B0D1A', fontSize: 11, fontWeight: 700, fontFamily: 'var(--mono)' }} onClick={() => playLoop(m - 1, m + 1)}>{mnum(m)}</button>;
             })}
           </div>
           <div className="row tiny muted" style={{ gap: 14 }}>

@@ -1,0 +1,11 @@
+import { chromium } from '@playwright/test';
+import { BASE, shot } from './r2x-lib.mjs';
+const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-fake-device-for-media-stream', '--deny-permission-prompts'] });
+const ctx = await browser.newContext({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true });
+const page = await ctx.newPage();
+await page.goto(BASE + '#/play/bach-bwv315/P1/s0-m0-5?level=1'); await page.waitForTimeout(1200);
+await page.getByRole('button', { name: /Start singing/ }).click(); await page.waitForTimeout(2500);
+await shot(page, '10-mic-denied');
+console.log((await page.innerText('body')).replace(/\n+/g, ' | ').slice(0, 600));
+console.log('hash', await page.evaluate(() => location.hash));
+await browser.close();

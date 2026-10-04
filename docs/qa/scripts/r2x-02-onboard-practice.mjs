@@ -1,0 +1,46 @@
+import { launch, BASE, nav, shot, axe, targets } from './r2x-lib.mjs';
+const { browser, page } = await launch();
+await page.goto(BASE + '?simulate=perfect#/');
+await page.waitForSelector('main');
+await page.getByText('Start setup').click();
+await page.waitForTimeout(500);
+await page.getByLabel(/name/i).first().fill('Lena Müller').catch((e) => console.log('nofill', e.message));
+await page.getByRole('button', { name: /Alto/ }).click();
+await shot(page, '02-setup-1');
+await page.getByRole('button', { name: 'Continue' }).click();
+await page.waitForTimeout(2500);
+await shot(page, '02-setup-2-range');
+console.log('S2', (await page.innerText('main')).replace(/\n+/g,' | '));
+await axe(page, 'setup2'); await targets(page, 'setup2');
+await page.getByRole('button', { name: 'Continue' }).click();
+await page.waitForTimeout(500);
+await shot(page, '02-setup-3-latency');
+console.log('S3', (await page.innerText('main')).replace(/\n+/g,' | '));
+await page.getByRole('button', { name: 'Continue' }).click();
+await page.waitForTimeout(500);
+await shot(page, '02-setup-4-notation');
+await page.getByTestId('setup-done').click();
+await page.waitForTimeout(800);
+console.log('AFTER SETUP hash', await page.evaluate(() => location.hash));
+await shot(page, '02-home-after-setup');
+// Practise now
+const t = Date.now();
+await page.getByRole('button', { name: /Practise now/ }).click();
+await page.waitForTimeout(1500);
+console.log('play hash', await page.evaluate(() => location.hash), Date.now() - t);
+await shot(page, '02-play-start');
+console.log('PLAY', (await page.innerText('body')).replace(/\n+/g,' | ').slice(0, 800));
+await axe(page, 'play'); await targets(page, 'play');
+// find a start button
+const btns = await page.$$eval('button', (b) => b.map((x) => (x.getAttribute('aria-label') || x.textContent).trim()));
+console.log('BUTTONS', btns);
+await page.screenshot({ path: 'docs/qa/shots-r2x/02-play-pre.png' });
+const start = page.getByRole('button', { name: /start|sing|play|go/i }).first();
+await start.click().catch((e) => console.log('nostart', e.message));
+for (let i = 0; i < 6; i++) { await page.waitForTimeout(3000); await shot(page, `02-play-run-${i}`); if (/results/.test(await page.evaluate(() => location.hash))) break; }
+await page.waitForFunction(() => location.hash.includes('results'), null, { timeout: 60000 }).catch(() => console.log('no results yet'));
+await page.waitForTimeout(1000);
+await shot(page, '02-results', true);
+console.log('RESULTS', (await page.innerText('body')).replace(/\n+/g,' | ').slice(0, 1500));
+await axe(page, 'results'); await targets(page, 'results');
+await browser.close();

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { getPiece, singableSections, chosenPartId, rememberPart, registerVirtual } from '../library';
+import { getPiece, singableSections, chosenPartId, rememberPart, registerVirtual, renameImported } from '../library';
 import { entryPiece } from '../generated';
 import { entryNotes } from '../../game/drills';
 import { useProfile, useStoreVersion } from '../hooks';
@@ -31,6 +31,8 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
   const piece = getPiece(pieceId);
   const [partId, setPartId] = useState(() => (piece ? chosenPartId(piece, profile.voice) : ''));
   const [showHelp, setShowHelp] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState({ title: piece?.title ?? '', composer: piece?.composer ?? '' });
 
   if (!piece) {
     return (
@@ -60,7 +62,24 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
           <h1 className="ellipsis" style={{ margin: 0, fontSize: 22 }}>{piece.title}</h1>
           <span className="small muted ellipsis">{piece.composer}</span>
         </div>
+        {!piece.builtin && !piece.id.includes('~') && (
+          <button className="btn ghost small" onClick={() => { setDraft({ title: piece.title, composer: piece.composer }); setEditing(!editing); }} aria-expanded={editing}>
+            {editing ? 'Close' : 'Rename'}
+          </button>
+        )}
       </div>
+
+      {editing && (
+        <form className="card" onSubmit={async (e) => { e.preventDefault(); await renameImported(piece.id, draft.title, draft.composer); setEditing(false); }}>
+          <label className="field"><span>Title</span>
+            <input type="text" value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} maxLength={120} />
+          </label>
+          <label className="field"><span>Composer</span>
+            <input type="text" value={draft.composer} onChange={(e) => setDraft({ ...draft, composer: e.target.value })} maxLength={80} />
+          </label>
+          <button className="btn primary block" type="submit">Save</button>
+        </form>
+      )}
 
       <div className="col" style={{ gap: 8 }}>
         <span className="eyebrow">Your part</span>

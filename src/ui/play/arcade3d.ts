@@ -197,6 +197,7 @@ export function drawArcade(c: CanvasRenderingContext2D, W: number, H: number, s:
     c.globalAlpha = 1;
   }
 
+  const reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   // Grade popups & sparks for newly finished notes.
   if (s.live) {
     for (let i = Math.max(ra, fx.lastGraded + 1); i <= rb; i++) {
@@ -204,7 +205,7 @@ export function drawArcade(c: CanvasRenderingContext2D, W: number, H: number, s:
       if (!g) break;
       fx.lastGraded = i;
       fx.popups.push({ text: GRADE_TEXT[g], color: g === 'miss' ? COLORS.miss : g === 'ok' ? COLORS.label : COLORS.voice, born: now });
-      if (g === 'perfect' || g === 'good') {
+      if (!reduceMotion && (g === 'perfect' || g === 'good')) {
         const lane = Math.max(0, lanes.indexOf(notes[i].midi));
         const sx = X(lane, 0);
         for (let k = 0; k < (g === 'perfect' ? 14 : 7); k++) {
@@ -227,11 +228,11 @@ export function drawArcade(c: CanvasRenderingContext2D, W: number, H: number, s:
   for (const p of fx.popups) {
     const t = (now - p.born) / 0.8;
     c.globalAlpha = 1 - t;
-    c.font = `italic 800 ${Math.round(36 + 8 * (1 - t))}px "Bricolage Grotesque", sans-serif`;
+    c.font = `italic 800 ${reduceMotion ? 36 : Math.round(36 + 8 * (1 - t))}px "Bricolage Grotesque", sans-serif`;
     c.textBaseline = 'middle';
     const tw = c.measureText(p.text).width;
     c.fillStyle = p.color;
-    c.fillText(p.text, cx - tw / 2, H * 0.3 - t * 20);
+    c.fillText(p.text, cx - tw / 2, H * 0.3 - (reduceMotion ? 0 : t * 20));
   }
   c.globalAlpha = 1;
 }

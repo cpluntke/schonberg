@@ -33,6 +33,18 @@ export function App() {
     const t = window.setTimeout(() => releaseTracker(), 15000);
     return () => clearTimeout(t);
   }, [route.name]);
+  // Accessibility: on every screen change, move focus to the screen's heading and update the title.
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      const h = document.querySelector('main h1') as HTMLElement | null;
+      if (h) {
+        h.setAttribute('tabindex', '-1');
+        h.focus({ preventScroll: true });
+        document.title = `${h.textContent?.trim() || 'Schönberg Hero'} · Schönberg Hero`;
+      }
+    }, 60);
+    return () => clearTimeout(t);
+  }, [route, lib.ready]);
   const showNav = ['home', 'library', 'ranks', 'settings', 'piece', 'expert'].includes(route.name);
 
   let body: React.ReactNode;

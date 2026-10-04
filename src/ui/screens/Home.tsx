@@ -173,9 +173,9 @@ function Countdown({ label, days, date }: { label: string; days: number | null; 
   return (
     <div className="col" style={{ gap: 2 }}>
       <span className="mono" style={{ fontSize: 22, fontWeight: 600 }}>
-        {days == null ? '–' : days < 0 ? 'done' : days === 0 ? 'today' : `${days}d`}
+        {days == null ? '–' : days < 0 ? 'past' : days === 0 ? 'today' : `${days}d`}
       </span>
-      <span className="tiny muted">{label}{date ? ` · ${formatDate(date)}` : ''}</span>
+      <span className="tiny muted">{label}{date ? ` · ${formatDate(date)}` : ' · not set'}</span>
     </div>
   );
 }

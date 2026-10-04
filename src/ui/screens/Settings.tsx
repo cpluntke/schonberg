@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { useProfile, useStoreVersion, toast } from '../hooks';
+import { useProfile, useStoreVersion, toast, daysUntil } from '../hooks';
 import { go } from '../router';
 import { loadCycle, saveCycle, exportBackup, importBackup } from '../../progress/store';
 import { effectiveTolerance } from '../../progress/ladder';
@@ -90,6 +90,12 @@ export function Settings() {
             <input type="date" value={cycle.concertDate ?? ''} onChange={(e) => setCycle({ concertDate: e.target.value || undefined })} />
           </label>
         </div>
+        {cycle.rehearsalDate && cycle.concertDate && cycle.concertDate < cycle.rehearsalDate && (
+          <span className="small" role="alert" style={{ color: 'var(--accent-text)' }}>The concert is before the rehearsal: check the dates.</span>
+        )}
+        {[cycle.rehearsalDate, cycle.concertDate].some((d) => d && (daysUntil(d) ?? 0) < 0) && (
+          <span className="small" style={{ color: 'var(--accent-text)' }}>A date is in the past. Set the next rehearsal so Home can pace your practice.</span>
+        )}
         <button className="btn small" onClick={() => go({ name: 'library' })}>Choose the cycle's pieces</button>
       </section>
 

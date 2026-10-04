@@ -13,8 +13,8 @@ target, movable/fixed solfège and Chinese numbered notation (jianpu), and an at
 
 - **Repertoire:** import your choir's **MusicXML** (`.musicxml`, `.xml`, `.mxl`) or **MIDI**.
   Parts, divisi voices, lyrics, tempo and key changes are read automatically. Built-in demo
-  pieces: public-domain Debussy, Ravel, Bruckner, Brahms, Bach (via the PDMX dataset) plus
-  original study pieces.
+  pieces: public-domain Debussy, Ravel, Bruckner and Brahms (via the PDMX dataset) plus an
+  original warm-up chorale.
 - **Coaching ladder:** each piece is split into sections, and each section climbs
   Listen → 1 Note-learning → 2 In time → 3 Independent → 4 Concert-ready.
   Support is removed step by step: tempo, your part playing along, note names, and the
@@ -64,7 +64,7 @@ synthetic singer replaces the microphone.
 
 ## Licences of demo content
 
-The Debussy, Ravel, Bruckner, Brahms, Reger, Elgar and Bach editions come from the
+The Debussy, Ravel, Bruckner and Brahms editions (and the Reger, Elgar and Bach files in `content/raw/`) come from the
 [PDMX dataset](https://zenodo.org/records/15571083) (CC BY 4.0), which collects
 MuseScore.com scores marked Public Domain / CC0 by their uploaders. The compositions
 themselves are in the public domain.

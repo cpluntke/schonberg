@@ -3,7 +3,7 @@ import { getPiece, chosenPartId, singableSections, type PieceInfo } from '../lib
 import { useProfile, useStoreVersion, toast, initials } from '../hooks';
 import { loadCycle } from '../../progress/store';
 import {
-  computeMyEntry, rankEntries, getLeaderboardBackend, encodeShareCode, importShareCodes,
+  computeMyEntry, rankEntries, getLeaderboardBackend, encodeShareCode, importShareCodes, removeLocalEntry, decodeShareCode,
   type LeaderboardEntry, type RankBy,
 } from '../../progress/leaderboard';
 import { IconShare } from '../icons';
@@ -61,8 +61,13 @@ export function Ranks() {
   });
   const maxAvg = Math.max(0.01, ...sections.map((s) => s.avg));
 
+  const [nameDraft, setNameDraft] = useState('');
   async function share() {
     if (!me) return;
+    if (!profile.name) {
+      toast('Add your name first, so the choir knows who it is.');
+      return;
+    }
     const code = encodeShareCode(me);
     const text = `My Schönberg Hero ranking for “${piece?.title}”: ${Math.round(me.readiness * 100)}% ready. ${code}`;
     try {
@@ -72,6 +77,11 @@ export function Ranks() {
   }
 
   function addCodes() {
+    const codes = (paste.match(/SH1\.[A-Za-z0-9_-]+/g) ?? []).map(decodeShareCode).filter(Boolean);
+    if (codes.length && me && codes.every((c) => c!.name === me.name)) {
+      toast('That’s your own ranking code. Paste codes from other singers.');
+      return;
+    }
     const n = importShareCodes(choir, paste);
     toast(n ? `Added ${n} ranking${n > 1 ? 's' : ''}` : 'No ranking codes found in that text');
     if (n) setPaste('');
@@ -134,6 +144,11 @@ export function Ranks() {
                 <span className="tiny muted">{({ S: 'Soprano', A: 'Alto', T: 'Tenor', B: 'Bass' } as Record<string, string>)[e.voice] ?? ''} · {e.streak}-day streak</span>
               </div>
               <span className="mono" style={{ fontWeight: 600 }}>{metric(e)}</span>
+              {!isMe && backend.kind === 'local' && (
+                <button className="icon-btn" aria-label={`Remove ${e.name}`} title="Remove" onClick={() => { removeLocalEntry(choir, e.name, e.pieceId); setEntries((xs) => xs.filter((x) => x !== e)); }}>
+                  <span aria-hidden="true" style={{ fontSize: 18, color: 'var(--muted)' }}>×</span>
+                </button>
+              )}
             </div>
           );
         })}
@@ -155,7 +170,14 @@ export function Ranks() {
         ) : (
           <span className="small muted">No leaderboard server is configured, so rankings travel as codes. Share yours in the choir chat and paste theirs below.</span>
         )}
-        <button className="btn small" onClick={share} disabled={!me}><IconShare size={16} /> Share my ranking code</button>
+        {!profile.name && (
+          <div className="row">
+            <input type="text" aria-label="Your name" placeholder="Your name for the board" value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} maxLength={40}
+              style={{ flex: 1, minHeight: 44, borderRadius: 10, border: '1px solid var(--line)', background: 'var(--surface)', padding: '0 12px' }} />
+            <button className="btn small" disabled={!nameDraft.trim()} onClick={() => update({ name: nameDraft.trim() })}>Save</button>
+          </div>
+        )}
+        <button className="btn small" onClick={share} disabled={!me || !profile.name}><IconShare size={16} /> Share my ranking code</button>
         <label className="field">
           <span className="small">Paste codes from the chat</span>
           <textarea value={paste} onChange={(e) => setPaste(e.target.value)} placeholder="…SH1.eyJu…" />

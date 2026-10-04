@@ -121,7 +121,7 @@ async function loadAll() {
   // First run: put the built-ins into the cycle so Home isn't empty.
   const cycle = loadCycle();
   if (!cycle.pieceIds.length && !localStorage.getItem('sh:cycleSeeded')) {
-    const preferred = ['bach-bwv315', 'debussy-dieu', 'ravel-nicolette', 'bruckner-locus-iste'].filter((id) => pieces.has(id));
+    const preferred = ['warmup-chorale', 'debussy-dieu', 'ravel-nicolette', 'bruckner-locus-iste'].filter((id) => pieces.has(id));
     cycle.pieceIds = preferred.length ? preferred : [...pieces.values()].filter((p) => p.builtin).slice(0, 4).map((p) => p.id);
     cycle.name = cycle.name === 'This cycle' ? 'Demo cycle' : cycle.name;
     const iso = (days: number) => {
@@ -251,4 +251,14 @@ export function chosenPartId(p: PieceInfo, voice: string): string {
 
 export function rememberPart(pieceId: string, partId: string) {
   try { localStorage.setItem(`sh:part:${pieceId}`, partId); } catch { /* ignore */ }
+}
+
+/** Rename an imported piece (title / composer) and persist it. */
+export async function renameImported(id: string, title: string, composer: string) {
+  const p = pieces.get(id);
+  if (!p || p.builtin) return;
+  p.title = p.score.title = title.trim() || p.title;
+  p.composer = p.score.composer = composer.trim();
+  await saveImportedScore(p.score);
+  emit();
 }

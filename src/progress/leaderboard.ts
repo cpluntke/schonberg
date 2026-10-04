@@ -168,6 +168,12 @@ export function mergeLocalEntries(choirCode: string, entries: LeaderboardEntry[]
   return out;
 }
 
+/** Remove an entry that was added from a share code. */
+export function removeLocalEntry(choirCode: string, name: string, pieceId: string): void {
+  const rest = localEntries(choirCode).filter((e) => !(e.name === name && e.pieceId === pieceId));
+  writeJSON(localKey(choirCode), rest);
+}
+
 /** Paste handler for "Add a ranking code": merges every SH1 code found in the text. Returns how many were added. */
 export function importShareCodes(choirCode: string, text: string): number {
   const found = (text.match(/SH1\.[A-Za-z0-9_-]+/g) ?? [])

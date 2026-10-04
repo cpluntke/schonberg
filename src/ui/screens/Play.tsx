@@ -239,6 +239,7 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
 
   return (
     <main className="play">
+      <h1 className="sr-only">{piece.title}: {part.name}, {section.label}</h1>
       <div className="play-hud">
         <button className="icon-btn" aria-label="Back" onClick={() => { sessionRef.current?.dispose(); leave(); }}><IconBack /></button>
         <div className="grow col" style={{ gap: 0 }}>
@@ -320,10 +321,11 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
             const me = p.id === part.id;
             return (
               <button key={p.id} className={me ? 'me' : undefined} aria-pressed={on}
+                aria-label={`Hear ${p.name}${me ? ' (your part)' : ''}`}
                 disabled={me && !canToggleOwn}
                 title={me && !canToggleOwn ? 'At this level you sing without your part' : undefined}
                 onClick={() => togglePart(p.id)}>
-                {shortName(p.name)}{me ? ' · you' : ''}
+                {shortName(p.name)}{me ? ' · you' : ''}{on ? '' : ' (off)'}
               </button>
             );
           })}
