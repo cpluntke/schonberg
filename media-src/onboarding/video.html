@@ -19,7 +19,7 @@ const at=(i,f,t)=>ease((lp(i,t)-f)/0.12); // reveal at fraction f of line i
 function wrapText(s,maxW){const out=[];let cur='';for(const w of s.split(' ')){const tt=cur?cur+' '+w:w;if(ctx.measureText(tt).width>maxW&&cur){out.push(cur);cur=w}else cur=tt}if(cur)out.push(cur);return out}
 
 /* images */
-const IMG={};['practice-2d','setup-choir','setup-range','setup-delay','piece','results-coach','home'].forEach(n=>{const im=new Image();im.src='img/'+n+'.png';IMG[n]=im});
+const IMG={};['practice-score','practice-toggle','practice-highway','setup-choir','setup-range','setup-delay','piece','results-coach','home'].forEach(n=>{const im=new Image();im.src='img/'+n+'.png';IMG[n]=im});
 const logo=new Image();logo.src='img/icon.svg';
 const imgReady=Promise.all([...Object.values(IMG),logo].map(im=>new Promise(r=>{if(im.complete)r();else{im.onload=r;im.onerror=r}})));
 // visible from line a until line b ends (next line starts), with short fades
@@ -102,14 +102,56 @@ function sceneB(t,A){const x=150,y=110;
         if(on)text('ta',cx,cy-28,DISP6(22),C.orange,'center')}
       text('6 clicks → delay measured',880,512,MONO(20),C.muted,'center');ctx.globalAlpha=1}}}
 
-/* C: the practice screen */
-function sceneC(t,A){const x=170,y=110;phone('practice-2d',x,y,A);
-  const lx=560;
-  callout(...P(143,150,x,y),lx,165,'The white line = now','sing when a bar reaches it',C.ink,A*at(6,0.1,t));
-  callout(...P(122,421,x,y),lx,330,'Blue = your voice','keep it on the orange bars',C.cyan,A*at(6,0.45,t));
-  callout(...P(285,550,x,y),lx,410,'Orange bars = your notes',null,C.orange,A*at(6,0.75,t));
-  callout(...P(210,640,x,y),lx,490,'Dashed = the other voices','see where you sit in the chord',C.purple,A*at(8,0.05,t));
-  callout(...P(174,389,x,y),lx,255,'Bubble = cents sharp (+) / flat (−)',null,C.cyan,A*at(8,0.55,t));}
+/* C: the practice screen. Line 6: score view (sheet music, blue ink, zoom on a flat note) ·
+   7: the pre-start screen with the Score/Highway toggle · 8: tap Highway → highway phone, then both
+   phones side by side for the ± cents bubble. Coordinates are css px of the 390×844 screenshots. */
+const ramp=(i,f,t,d)=>ease((t-L(i).start-f*L(i).dur)/(d||0.45));
+function ring(cx,cy,r,color,A){if(A<=0.01)return;ctx.globalAlpha=A;ctx.strokeStyle=color;ctx.lineWidth=3;ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.stroke();ctx.globalAlpha=1}
+function pill(x,y,sel,A){if(A<=0.01)return;const w=300,h=52,hw=w/2;ctx.globalAlpha=A;
+  ctx.fillStyle=C.panel;rr(x,y,w,h,26);ctx.fill();ctx.strokeStyle=C.rule;ctx.lineWidth=2;rr(x,y,w,h,26);ctx.stroke();
+  ctx.fillStyle=C.orange;rr(x+4+sel*(hw-4),y+4,hw-4,h-8,22);ctx.fill();
+  text('Score',x+hw/2+2,y+34,DISP6(24),sel<0.5?C.paper:C.ink,'center');text('Highway',x+hw+hw/2-2,y+34,DISP6(24),sel>=0.5?C.paper:C.ink,'center');ctx.globalAlpha=1}
+// zoomed view of the flat note (css box ZB of practice-score) drawn at ZD, scale ZS
+const ZB=[205,80,135,75],ZS=2.9,ZD=[560,362];
+const zx=px=>ZD[0]+(px-ZB[0])*ZS,zy=py=>ZD[1]+(py-ZB[1])*ZS;
+function sceneC(t,A){const x=170,y=110,lx=560;
+  const toT=ease((t-L(7).start+0.3)/0.45),toH=ramp(8,0.1,t,0.5),both=ramp(8,0.57,t,0.6);
+  phone('practice-score',x-30*toT,y,A*(1-toT));phone('practice-toggle',x,y,A*toT*(1-toH));phone('practice-highway',x+40*(1-toH),y,A*toH);
+  if(both>0.01)phone('practice-score',440+60*(1-both),y,A*both);
+  // 6: score view
+  const k6=A*(1-toT),zA=k6*at(6,0.7,t),dim=1-0.55*zA/(A||1);
+  callout(...P(200,236,x,y),lx,165,'Sheet music at levels 1–2','your part on a staff, with the words',C.ink,k6*dim*at(6,0.14,t));
+  callout(...P(135,127,x,y),lx,255,'Blue ink = your voice','drawn at the height you sing',C.cyan,k6*dim*at(6,0.4,t));
+  if(zA>0.01){const [bx,by,bw,bh]=ZB,w=bw*ZS,h=bh*ZS,[dx,dy]=ZD,s=PH.s,src=IMG['practice-score'];
+    ctx.globalAlpha=zA;text('On the note = in tune',lx,340,DISP6(28),C.orange);
+    // lens: box on the phone + lines to the zoom
+    const px0=x+bx*s,py0=y+by*s,pw=bw*s,ph=bh*s;ctx.strokeStyle=C.orange;ctx.lineWidth=2;ctx.strokeRect(px0,py0,pw,ph);
+    ctx.globalAlpha=zA*0.5;ctx.beginPath();ctx.moveTo(px0+pw,py0);ctx.lineTo(dx,dy);ctx.moveTo(px0+pw,py0+ph);ctx.lineTo(dx,dy+h);ctx.stroke();ctx.globalAlpha=zA;
+    ctx.fillStyle='#000';rr(dx-4,dy-4,w+8,h+8,14);ctx.fill();ctx.save();rr(dx,dy,w,h,12);ctx.clip();ctx.drawImage(src,bx*2,by*2,bw*2,bh*2,dx,dy,w,h);ctx.restore();
+    ctx.strokeStyle=C.orange;ctx.lineWidth=2;rr(dx-4,dy-4,w+8,h+8,14);ctx.stroke();
+    const f=zA*at(6,0.86,t);ctx.globalAlpha=zA;ctx.font=DISP6(28);const tw=ctx.measureText('On the note = in tune').width;
+    if(f>0.01){ctx.globalAlpha=f;text(' · just under = flat',lx+tw,340,DISP6(28),C.cyan);
+      const ny=zy(135),iy=zy(138.5),ex=dx+w+10;
+      ctx.strokeStyle=C.orange;ctx.lineWidth=2;ctx.setLineDash([7,6]);ctx.beginPath();ctx.moveTo(zx(222),ny);ctx.lineTo(ex,ny);ctx.stroke();ctx.setLineDash([]);
+      text('the note',ex+8,ny+6,MONO(18),C.orange);
+      ctx.strokeStyle=C.cyan;ctx.beginPath();ctx.moveTo(zx(300),iy);ctx.lineTo(ex,iy+28);ctx.stroke();
+      text('your voice: just under',ex+8,iy+34,MONO(18),C.cyan)}
+    ctx.globalAlpha=1}
+  // 7–8: the toggle on the pre-start screen, then tap Highway
+  const kT=A*toT*(1-both);
+  if(kT>0.01){const sel=ramp(8,0.03,t,0.25),[hx,hy]=P(269,253,x,y);
+    ctx.globalAlpha=kT*(1-toH);ctx.strokeStyle=C.orange;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(hx+30,hy-14);ctx.lineTo(lx-8,182);ctx.stroke();
+    const tap=clamp((t-L(8).start-0.02*L(8).dur)/0.7,0,1);if(tap>0&&tap<1&&toH<1){ctx.globalAlpha=kT*(1-tap)*(1-toH);ctx.lineWidth=3;ctx.beginPath();ctx.arc(hx,hy,10+30*tap,0,7);ctx.stroke()}
+    ctx.globalAlpha=1;pill(lx,156,sel,kT);
+    ctx.globalAlpha=kT*(1-toH);text('remembered for next time',lx,236,SERIF(21),C.muted);ctx.globalAlpha=1}
+  const kH=A*toH*(1-both);
+  callout(...P(346,502,x,y),lx,330,'Highway: bars scroll to the line',null,C.orange,kH*ramp(8,0.16,t));
+  const kb=kH*at(8,0.39,t);if(kb>0.01){ctx.globalAlpha=kb;text('keep the blue line on them',lx,362,SERIF(21),C.muted);ctx.globalAlpha=1;ring(...P(150,506,x,y),18,C.cyan,kb)}
+  // both views: the ± cents bubble
+  if(both>0.01){const a=A*both,rr2=A*ramp(8,0.64,t,0.4);
+    ring(...P(177.5,489.5,x,y),32,C.cyan,rr2);ring(...P(316.75,88.75,440,y),30,C.cyan,rr2);
+    ctx.globalAlpha=a*ramp(8,0.62,t,0.4);text('± cents',720,300,DISP(52),C.cyan);
+    text('the bubble: + sharp · − flat',720,342,SERIF(24),C.muted);text('in both views',720,378,MONO(18),C.faint);ctx.globalAlpha=1}}
 
 /* D: the level ladder, five levels */
 const LV=[['1','Note-learning','70% tempo · your part plays'],['2','In time','full tempo · your part plays'],['3','Independent','others only'],['4','Concert-ready','no note names · chord only'],['5','Off book','from memory · on two days']];
