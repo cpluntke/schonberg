@@ -2,7 +2,7 @@
 // Run: node docs/qa/scripts/r3-interrupt.mjs
 import { launch, BASE, SHOTS, sleep } from './r3-lib.mjs';
 const txt = async (page) => (await page.innerText('main').catch(() => '')).replace(/\n+/g, ' | ');
-for (const [i, waitMs] of [[1, 6000], [2, 6000], [3, 2000], [4, 10000]]) {
+for (const [i, waitMs] of (process.argv[2] ? JSON.parse(process.argv[2]) : [[1, 6000], [2, 6000], [3, 2000], [4, 10000]])) {
   const { browser, page, errors } = await launch();
   await page.addInitScript(() => {
     const Orig = window.AudioContext; window.__ctxs = [];

@@ -157,7 +157,15 @@ export function Results() {
       )}
 
       <div className="col" style={{ gap: 8, marginTop: 'auto' }}>
-        {!lr.passed && lr.ladder ? (
+        {!lr.ladder && !lr.notCounted ? (
+          /^row-|^leaps-/.test(piece.id) ? (
+            <button className="btn primary block" onClick={() => go({ name: 'expert' })}>Back to expert mode</button>
+          ) : (
+            <button className="btn primary block" onClick={() => go({ name: 'piece', pieceId: piece.id.split('~')[0] })}>
+              Back to {getPiece(piece.id.split('~')[0])?.title ?? 'the piece'}
+            </button>
+          )
+        ) : !lr.passed && lr.ladder ? (
           <button className="btn primary block" onClick={() => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, level: lr.level, mode: lr.mode })}>
             <IconPlay size={18} /> Try again
           </button>

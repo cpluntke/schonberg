@@ -1,0 +1,46 @@
+# Round 3: acceptance test, alto in a chamber choir (R3A)
+
+Tester persona: 27-year-old alto in a high-level chamber choir, reads movable do. Target: the alto part of Debussy's "Dieu! qu'il la fait bon regarder!" plus the warm-up chorale (Abendlied), rehearsal in 3 days and concert in 3 weeks.
+Setup: Playwright Chromium at 390×844 with a fake mic, dev server on :5179. Each day ran in a fresh browser context with localStorage carried over. A `Date` offset shifted the clock by +0/+1/+2/+3/+11 days. The voice was simulated with `?simulate=sloppy|flat|perfect`.
+Scripts: `docs/qa/scripts/r3a-*.mjs`. Screenshots: `docs/qa/shots-r3a/`.
+
+## Diary
+
+- **Day 1 (Sun 4 Oct, sloppy).** On first open there is a ready-made "DEMO CYCLE" with dates, and Home says "Set up your voice (2 min)". The 4-step setup was quick: name, Alto, rehearsal and concert dates, mic/range, delay, and "Movable do (la-minor)". Home then said: "Rehearsal in 3 days: 19 sections still below level 3, about 7 a day". That frightened me, because the count includes Ravel and Bruckner, which my choir isn't singing. I tapped "Practise now" (warm-up, L1 at 70%) and failed with 52%. The coach notes were musically sensible: "sung clearly but too high, by about a semitone" and "Big leaps miss the target, bar 2", each with a loop button. I listened to Debussy bars 1–5. The highway labels in B major were right: C♯ = Re, E = Fa, D♯ = Mi, F♯ = Sol, and the *p* dynamic was shown. When the listen ended, the app just returned to the "Listen" card with no "now learn it" step. Debussy bars 1–5 L1: not yet, 53%.
+- **Day 2 (flat, ~35¢ under).** Streak "1-day". Debussy bars 1–5 L1 passed with an A, "In tune 83%, avg −34¢". The coach note "You tend to sing flat … think each note slightly higher" was spot on. The loop drill (bars 2–5) worked. L2 in time: not yet, 76/80%, still flagged flat. Fair. Home "Next up" still pointed at the warm-up chorale.
+- **Day 3 (perfect).** Bars 1–5 L2 passed (S, 98%). Arcade unlocked and ran smoothly; lanes are labelled in movable do. Bars 6–13 L1 passed. The entry drill passed, but its results page offered "Next: Bars b.1–b.27, level 1", which is nonsense. A whole-piece run "With your part" scored 99% over 29 bars. Leap drill from my repertoire: ↑M6 bar 27 and ↑P4 bar 2 make sense. Debussy readiness 19%.
+- **Day 4 (rehearsal day).** Home: "Rehearsal today: 19 sections still below level 3". Honest, but demoralising, since most of those sections are in pieces I'm not singing. Settings: I checked all five notation modes on bars 6–13. Letters, fixed do and pitch classes were correct. Jianpu showed B = 1 and D♮ = ♭3, and movable do was consistent with that, so the chromatic mixture is handled right. Strict + just intonation showed "±24¢ at L3" and "Major thirds 14¢ low". Ranks: I exchanged codes with Mathilde (soprano, second context). Both boards and the "Section battle" updated. But the code covers only the piece picked in the dropdown, which defaults to Abendlied, so Mathilde saw me at 0% and missed my Debussy progress. Backup → restore on a "new phone" worked after the confirm dialog, with identical progress, streak and profile.
+- **Day 12 (no practice for 9 days).** Home: "Rehearsal · past", "Concert in 10 days: … about 2 a day". It did not ask for my next rehearsal date. Nothing flagged that my Debussy sections (L1–L2) had gone stale. Review only applies at level ≥3, and "Next up" still pointed at the warm-up chorale.
+
+## Findings
+
+| ID | Priority | Type | Title | Steps / evidence | Suggested fix |
+|---|---|---|---|---|---|
+| R3A-01 | P2 | UX | Daily pacing counts pieces I'm not singing | Fresh install → setup with my own dates → Home: "19 sections still below level 3, about 7 a day" (`d1-06-home.png`). This rises to 10 a day on day 2. All 4 demo pieces are in the cycle. The card still says "DEMO CYCLE" after I set my own dates, and setup never asks which pieces my choir is doing. | Add a setup step "Which pieces is your choir singing?" (or start with an empty cycle). Rename the card to the cycle name or "My cycle" once dates are edited. |
+| R3A-02 | P2 | UX | "Next up" doesn't follow what I'm actually learning | On days 2, 3, 4 and 12, Home "Next up" was always "Abendlied, Upbeat–bar 6, level 1", even though I worked only on Debussy (`d3-00-home.png`, `f-11-home-day12.png`). There is no list of "today's steps". | Prefer the piece practised most recently, or show 2–3 concrete steps for today across the cycle, e.g. "Debussy bars 1–5 L3, bars 6–13 L2, warm-up L1". |
+| R3A-03 | P2 | bug | Entry-drill results show a meaningless "Next" button and bar labels | Piece → Practise entries → finish. The result says "Next: Bars b.1–b.27, level 1" and "99% accuracy across bars b.1–b.27" (`d3-04-Practise_entries-result.png`). The piece screen promises "5 entries", but the drill has 4 (b.1, b.6, b.14, b.27). | For drills, label as "Entry at bar 6", hide the section-style Next button (offer "Again" / "Back to piece"), and make the entry count consistent. |
+| R3A-04 | P2 | UX | Ranking code covers one piece only, and the default piece is wrong | Ranks opens on Abendlied (the first piece), and "Share my ranking code" shares only that piece. After swapping codes, Mathilde's Debussy board doesn't show me, and the choir overview has "–" for my Debussy alto column (`f-08-ranks-after-f.png`, `f-15-ranks-debussy.png`). | Put all cycle pieces into one code. Default the dropdown to the piece practised most recently. |
+| R3A-05 | P2 | UX | Listen mode is a dead end | Piece → 👂 Listen → it plays → returns to the same "Level 0 · Listen" card. There is no "Learn the notes (level 1)" call to action (`d1-d1-listen-result.png`). | After a listen, show "Next: learn the notes (level 1)" plus "Listen again". |
+| R3A-06 | P3 | feature request | No review nudge for half-learned sections | Day 12: Debussy sections at L1–L2 untouched for 9 days, and nothing on Home or the piece screen mentions it (`f-12-piece-day12.png`). Review only starts at level ≥3 (README says "Sections you haven't sung in 7 days come back for review"). | Mark stale L1–L2 sections as well ("Getting rusty"). The README wording could also say "level-3+ sections". |
+| R3A-07 | P3 | UX | Nothing asks for the next rehearsal after it has passed | Day 12 Home: "Rehearsal · past". The pacing switches silently to the concert target. | Prompt "When is your next rehearsal?" or offer a weekly repeating rehearsal day. |
+| R3A-08 | P3 | musical | Flat singing passes L1 with an "A" | Simulated flat at −34¢ throughout: L1 passed, grade A, "In tune 83%". The coach note does flag it correctly. | Acceptable for note-learning (±50¢). Consider capping the grade or adding a badge such as "notes right, intonation flat" when the mean offset is above 25¢. |
+| R3A-09 | P3 | bug (copy) | Coach note title and body give different bars | Day 1 warm-up: the title says "Wrong notes in bars 3–6", and the body says "(bars 1, 2, 3, 4 and elsewhere)". | Use the same bar range in the title and the body. |
+| R3A-10 | P3 | musical (content) | Lyric typos from the edition | "Pour les **gran** biens", "en tous **bien** parfais telle" (should be "grans", "biens"). This is faithful to the PDMX source file, so it is not an import bug. | Correct the built-in content, or note "edition text" in the credits. |
+| R3A-11 | P3 | polish | German greeting for every user | "Guten Morgen, Clara" in an English UI with French repertoire. | Use the browser locale, or English. |
+| R3A-12 | P3 | polish | HUD "combo N" wraps to two lines at 390px | `d1-c2-warm-s1-L1-mid.png`, `d3-02-…-mid.png`. | Add `white-space: nowrap`, or use a shorter "×N". |
+| R3A-13 | P3 | polish | Settings notation preview uses the warm-up's key | "Movable do · in D major" is shown while I'm learning a B-major piece. | Use the current or most recent piece, or drop the key. |
+
+No P0 or P1 issues were found. The core loop, scoring, movable-do labels (including chromatic notes), lyrics alignment, dynamics, arcade, loop drills, whole-piece run, leap drill, ranks code exchange and backup/restore all worked.
+
+## Does it get me ready for rehearsal?
+
+Mostly yes, for learning notes. The ladder (listen → slow with part → in time → alone) is how I would practise anyway. The feedback is trustworthy: flat and sharp were diagnosed correctly with sensible cents, and the leap and trouble-spot loops point at the right bars. The movable-do labels in B major are correct, including D♮ as Me/♭3. With perfect singing each section level takes about 30–40 s, so getting Debussy (4 sections) to level 3 in 3 days is realistic at about 10 minutes a day.
+
+What weakens it is the daily guidance. Home sets a target across pieces I'm not singing and keeps sending me to the warm-up chorale (R3A-01, R3A-02). The leaderboard compares the wrong piece unless you know to switch the dropdown (R3A-04). I would use it daily once I had unticked the other pieces in the Library.
+
+## Recommendation: **GO** for showing it to the choir tomorrow, with two spoken caveats
+
+1. "In Library, tick only the pieces we're singing. Otherwise Home's 'sections a day' is inflated."
+2. "On Ranks, pick the piece before sharing your code (one code per piece)."
+
+Fixing R3A-01 to R3A-05 (all P2) before a wider rollout would noticeably improve day-to-day clarity.

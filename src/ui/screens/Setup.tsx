@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { useProfile, useStoreVersion } from '../hooks';
 import { loadCycle, saveCycle } from '../../progress/store';
+import { allPieces } from '../library';
 import { go, back } from '../router';
 import { Tuner, letterName } from '../components/Tuner';
 import { getTracker } from '../play/session';
@@ -25,6 +26,11 @@ export const NOTATIONS: { mode: NotationMode; big: string; sub: string }[] = [
   { mode: 'jianpu', big: '1 2 3 4', sub: 'Jianpu (numbered)' },
   { mode: 'pc', big: '0 1 2 … e', sub: 'Pitch classes' },
 ];
+
+/** Once the singer sets their own dates, it's no longer the demo cycle. */
+function renamed<T extends { name: string }>(c: T): T {
+  return c.name === 'Demo cycle' ? { ...c, name: 'This cycle' } : c;
+}
 
 function suggestVoice(lo: number, hi: number): VoiceType {
   const mid = (lo + hi) / 2;
@@ -111,13 +117,29 @@ export function Setup() {
           </div>
           <div className="row">
             <label className="field grow"><span>Next rehearsal (optional)</span>
-              <input type="date" value={loadCycle().rehearsalDate ?? ''} onChange={(e) => saveCycle({ ...loadCycle(), rehearsalDate: e.target.value || undefined })} />
+              <input type="date" value={loadCycle().rehearsalDate ?? ''} onChange={(e) => saveCycle(renamed({ ...loadCycle(), rehearsalDate: e.target.value || undefined }))} />
             </label>
             <label className="field grow"><span>Concert (optional)</span>
-              <input type="date" value={loadCycle().concertDate ?? ''} onChange={(e) => saveCycle({ ...loadCycle(), concertDate: e.target.value || undefined })} />
+              <input type="date" value={loadCycle().concertDate ?? ''} onChange={(e) => saveCycle(renamed({ ...loadCycle(), concertDate: e.target.value || undefined }))} />
             </label>
           </div>
           <span className="tiny muted">With dates, Home tells you how many sections to learn per day.</span>
+          <div className="col">
+            <span className="small">Pieces your choir is singing this cycle</span>
+            <div className="chips" role="group" aria-label="Pieces in this cycle">
+              {allPieces().map((pc) => {
+                const on = loadCycle().pieceIds.includes(pc.id);
+                return (
+                  <button key={pc.id} className="chip" aria-pressed={on} onClick={() => {
+                    const c = loadCycle();
+                    c.pieceIds = on ? c.pieceIds.filter((x) => x !== pc.id) : [...c.pieceIds, pc.id];
+                    saveCycle(c);
+                  }}>{pc.title.length > 26 ? pc.title.slice(0, 24) + '…' : pc.title}</button>
+                );
+              })}
+            </div>
+            <span className="tiny muted">Your own scores can be imported later in the Library.</span>
+          </div>
           <button className="btn primary block" style={{ marginTop: 'auto' }} onClick={() => setStep(1)}>Continue</button>
         </>
       )}

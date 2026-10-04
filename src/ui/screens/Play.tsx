@@ -48,6 +48,7 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
   const rate = rateOverride ?? spec?.rate ?? 1;
   const [phase, setPhase] = useState<'ready' | 'running' | 'paused' | 'micError'>('ready');
   const [micMsg, setMicMsg] = useState('');
+  const [listened, setListened] = useState(false);
   const [hud, setHud] = useState({ score: 0, combo: 0, count: 0, lyricIdx: -1 });
   const [gains, setGains] = useState<Record<string, number>>(() => {
     const g: Record<string, number> = {};
@@ -106,7 +107,10 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
     setPhase('ready');
     if (!piece || !part || !section) return;
     if (!r || listenOnly) {
-      if (listenOnly) recordAttempt(piece.id, part.id, section.id, 0, emptyResult(), section.end - section.start);
+      if (listenOnly) {
+        recordAttempt(piece.id, part.id, section.id, 0, emptyResult(), section.end - section.start);
+        setListened(true);
+      }
       return;
     }
     // Uncalibrated singers who are consistently late on entries after rests: that's almost always
@@ -314,7 +318,7 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
         {!listenOnly && (
           <div className="col" style={{ alignItems: 'flex-end', gap: 0, paddingRight: 6 }}>
             <span className="mono" style={{ fontWeight: 600, fontSize: route.mode === '3d' ? 22 : 17 }} data-testid="score">{hud.score.toLocaleString()}</span>
-            <span className="mono tiny" style={{ color: 'var(--accent)' }}>{hud.combo > 1 ? `combo ${hud.combo}` : ' '}</span>
+            <span className="mono tiny" style={{ color: 'var(--accent)', whiteSpace: 'nowrap' }}>{hud.combo > 1 ? `combo ${hud.combo}` : ' '}</span>
           </div>
         )}
       </div>
@@ -352,9 +356,18 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
                 </div>
               )}
               {!listenOnly && <span className="tiny muted">Wear headphones so the mic only hears you.{!profile.latencyMs ? ' Tip: run voice setup once to measure your headphone delay.' : ''}</span>}
-              <button className="btn primary block" onClick={start} data-testid="start">
-                <IconPlay size={18} /> {listenOnly ? 'Listen' : 'Start singing'}
-              </button>
+              {listenOnly && listened && section.id !== 'all' && section.id !== 'drill' && section.id !== 'entries' ? (
+                <>
+                  <button className="btn primary block" onClick={() => go({ ...route, level: 1 }, true)} data-testid="learn-next">
+                    <IconPlay size={18} /> Now learn it: level 1
+                  </button>
+                  <button className="btn block" onClick={start}>Listen again</button>
+                </>
+              ) : (
+                <button className="btn primary block" onClick={start} data-testid="start">
+                  <IconPlay size={18} /> {listenOnly ? 'Listen' : 'Start singing'}
+                </button>
+              )}
             </div>
           </div>
         )}

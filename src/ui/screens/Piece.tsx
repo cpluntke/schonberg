@@ -23,6 +23,11 @@ function snippet(part: { notes: { start: number; lyric?: string; syllabic?: stri
   return out.trim();
 }
 
+function entryCount(part: Parameters<typeof entryNotes>[0]): number {
+  const idx = entryNotes(part, 0.6);
+  return Math.min(10, idx.includes(0) || !part.notes.length ? idx.length : idx.length + 1);
+}
+
 const SHORT: Record<number, string> = { 1: 'Learn', 2: 'In time', 3: 'Alone', 4: 'Concert' };
 
 export function PieceScreen({ pieceId }: { pieceId: string }) {
@@ -177,7 +182,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
           <strong>Entry drill</strong>
           <span className="small muted">
             Hear two beats of the other voices, then come in on your own, with no starting note.
-            {` ${Math.min(10, entryNotes(part, 0.6).length + 1)} entries from this piece.`}
+            {` ${entryCount(part)} entries from this piece.`}
           </span>
           <div className="row wrap">
             <button className="btn small" onClick={() => {

@@ -2,7 +2,7 @@ import React from 'react';
 import { allPieces, getPiece, chosenPartId, singableSections, type PieceInfo } from '../library';
 import { useProfile, useStoreVersion, formatDate, daysUntil, initials } from '../hooks';
 import { go } from '../router';
-import { loadCycle, getProgress, streakDays, dueForReview } from '../../progress/store';
+import { loadCycle, getProgress, streakDays, dueForReview, attemptLog } from '../../progress/store';
 import { pieceReadiness, nextStep, levelSpec } from '../../progress/ladder';
 import { rowOfTheDay } from '../../game/twelvetone';
 import { IconFlame, IconPlay, IconMic } from '../icons';
@@ -49,7 +49,13 @@ export function Home() {
   const cyclePieces = cycle.pieceIds.map((id) => getPiece(id)).filter(Boolean) as PieceInfo[];
   const statuses = cyclePieces.map((p) => pieceStatus(p, profile.voice));
   const streak = streakDays();
-  const focus = statuses.find((s) => s.due.length) ?? statuses.find((s) => s.next && !s.concertReady) ?? null;
+  // Today's plan: reviews first, then continue the piece you practised most recently, then the rest.
+  const lastPractised = new Map<string, number>();
+  for (const e of attemptLog()) lastPractised.set(e.pieceId, Math.max(lastPractised.get(e.pieceId) ?? 0, e.at));
+  const ordered = [...statuses].sort((a, b) =>
+    (b.due.length ? 1 : 0) - (a.due.length ? 1 : 0) || (lastPractised.get(b.piece.id) ?? 0) - (lastPractised.get(a.piece.id) ?? 0));
+  const plan = ordered.filter((s) => s.next && (!s.concertReady || s.due.length)).slice(0, 3);
+  const focus = plan[0] ?? null;
   const row = rowOfTheDay(new Date());
   const toRehearsal = daysUntil(cycle.rehearsalDate);
   const toConcert = daysUntil(cycle.concertDate);
@@ -107,7 +113,21 @@ export function Home() {
         </div>
         {target && <div className="small" style={{ color: 'var(--accent-text)' }}>{target}</div>}
         {focus && focus.next ? (
-          <NextUp status={focus} />
+          <>
+            <NextUp status={focus} />
+            {plan.length > 1 && (
+              <div className="col" style={{ gap: 0 }}>
+                <span className="tiny muted">Also today</span>
+                {plan.slice(1).map((st) => (
+                  <button key={st.piece.id} className="list-row" style={{ padding: '8px 0' }}
+                    onClick={() => go({ name: 'play', pieceId: st.piece.id, partId: st.partId, sectionId: st.next!.sectionId, level: st.next!.level, mode: '2d' })}>
+                    <IconPlay size={14} color="#FF7A45" />
+                    <span className="grow small ellipsis"><strong>{st.piece.title}</strong> · {st.next!.reason}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
         ) : statuses.length ? (
           <div className="notice info">Everything in this cycle is concert-ready. Try the arcade mode or today's Zwölfton row.</div>
         ) : (

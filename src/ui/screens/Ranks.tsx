@@ -77,8 +77,10 @@ export function Ranks() {
       toast('Add your name first, so the choir knows who it is.');
       return;
     }
-    const code = encodeShareCode(me);
-    const text = `My Schönberg Hero ranking for “${piece?.title}”: ${Math.round(me.readiness * 100)}% ready. ${code}`;
+    // One code per piece in the cycle, so friends see all of your progress at once.
+    const mine = pieces.map((pc) => computeMyEntryCached(pc));
+    const summary = mine.map((e, i) => `${pieces[i].title} ${Math.round(e.readiness * 100)}%`).join(', ');
+    const text = `My Schönberg Hero progress: ${summary}. Paste into Ranks: ${mine.map(encodeShareCode).join(' ')}`;
     try {
       if (navigator.share) await navigator.share({ text });
       else { await navigator.clipboard.writeText(text); toast('Copied: paste it into your choir chat'); }
@@ -220,7 +222,7 @@ export function Ranks() {
             <button className="btn small" disabled={!nameDraft.trim()} onClick={() => update({ name: nameDraft.trim() })}>Save</button>
           </div>
         )}
-        <button className="btn small" onClick={share} disabled={!me || !profile.name}><IconShare size={16} /> Share my ranking code</button>
+        <button className="btn small" onClick={share} disabled={!me || !profile.name}><IconShare size={16} /> Share my progress (all pieces)</button>
         <label className="field">
           <span className="small">Paste codes from the chat</span>
           <textarea value={paste} onChange={(e) => setPaste(e.target.value)} placeholder="…SH1.eyJu…" />

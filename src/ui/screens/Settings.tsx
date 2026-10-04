@@ -14,7 +14,11 @@ export function Settings() {
   const fileRef = useRef<HTMLInputElement>(null);
   const dMajor = { beat: 0, time: 0, fifths: 2, mode: 'major' as const };
 
-  const setCycle = (patch: Partial<typeof cycle>) => saveCycle({ ...loadCycle(), ...patch });
+  const setCycle = (patch: Partial<typeof cycle>) => {
+    const c = { ...loadCycle(), ...patch };
+    if (c.name === 'Demo cycle' && (patch.rehearsalDate || patch.concertDate)) c.name = 'This cycle';
+    saveCycle(c);
+  };
 
   function download() {
     const blob = new Blob([exportBackup()], { type: 'application/json' });
