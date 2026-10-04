@@ -97,18 +97,27 @@ describe('median', () => {
 });
 
 describe('PitchSmoother', () => {
-  it('median of last 3 removes single-frame glitches', () => {
+  it('reports each frame one frame later (the look-ahead the timestamps assume)', () => {
+    const s = new PitchSmoother();
+    expect(s.push(60)).toBeNull(); // nothing to report yet
+    expect(s.push(61)).toBe(60);
+    expect(s.push(62)).toBe(61);
+    expect(s.push(null)).toBe(62); // the last voiced frame is reported on the next tick
+    expect(s.push(null)).toBeNull();
+  });
+  it('removes single-frame glitches', () => {
     const s = new PitchSmoother();
     s.push(60);
     s.push(60.1);
-    expect(s.push(63)).toBeCloseTo(60.1); // glitch suppressed
-    expect(s.push(60)).toBeCloseTo(60.1);
+    expect(s.push(63)).toBeCloseTo(60.1);
+    expect(s.push(60)).toBeCloseTo(60.1); // the 63 glitch, judged against both neighbours
+    expect(s.push(60)).toBeCloseTo(60);
   });
   it('ignores a one-frame octave jump that returns', () => {
     const s = new PitchSmoother();
     [57, 57, 57].forEach((m) => s.push(m));
     expect(s.push(69)).toBeCloseTo(57);
-    expect(s.push(57)).toBeCloseTo(57);
+    expect(s.push(57)).toBeCloseTo(57); // the 69
     expect(s.push(57.05)).toBeCloseTo(57, 1);
   });
   it('accepts a confirmed octave leap', () => {
@@ -118,15 +127,21 @@ describe('PitchSmoother', () => {
     expect(s.push(69)).toBeCloseTo(69);
     expect(s.push(69)).toBeCloseTo(69);
   });
-  it('follows normal leaps quickly and resets after silence', () => {
+  it('keeps one- and two-frame notes of a fast run and its turning points (no median smear)', () => {
+    // 16ths at 144 bpm are ~5 frames long, of which only one or two sit on the note.
+    const run = [60, 60.6, 62, 62.1, 63.3, 64, 64.9, 64, 62.8, 62];
     const s = new PitchSmoother();
-    [60, 60, 60].forEach((m) => s.push(m));
-    s.push(65);
+    const out = [...run, null].map((m) => s.push(m)).slice(1);
+    expect(out).toEqual(run);
+  });
+  it('carries nothing across silence', () => {
+    const s = new PitchSmoother();
+    [60, 60, 60, 65].forEach((m) => s.push(m));
     expect(s.push(65)).toBe(65);
-    expect(s.push(null)).toBeNull();
-    s.push(null);
-    s.push(null);
-    expect(s.push(50)).toBe(50); // history cleared, no smear
+    expect(s.push(null)).toBe(65);
+    expect(s.push(50)).toBeNull();
+    expect(s.push(50.2)).toBe(50); // no smear from before the gap
+    expect(s.push(50.1)).toBe(50.2);
   });
 });
 

@@ -6,8 +6,8 @@ import { gitVariant } from './variants';
 import * as cur from '../../src/game/scoring';
 declare const process: { env: Record<string, string | undefined> };
 it('explore', async () => {
-  const head = await gitVariant('HEAD');
-  const headMod = await import(/* @vite-ignore */ require('node:path').resolve(__dirname, 'out/variants/scoring-git-HEAD.ts'));
+  const head = await gitVariant('54ea7b9');
+  const headMod = await import(/* @vite-ignore */ require('node:path').resolve(__dirname, 'out/variants/scoring-git-54ea7b9.ts'));
   const specs = { before: { ...AFTER, impl: head.impl, pitch: head.pitch, pitchKey: head.key }, after: AFTER };
   const ps = await PASSAGES();
   const singers: SingerProfile[] = process.env.ADV ? [SINGERS.wrongNotes, SINGERS.flat40, SINGERS.oneBehind, SINGERS.echo300, SINGERS.lateArriver] : [SINGERS.goodChoir];

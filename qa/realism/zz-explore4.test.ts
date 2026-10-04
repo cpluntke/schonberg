@@ -6,8 +6,8 @@ import { gitVariant } from './variants';
 import { resolve } from 'node:path';
 import * as cur from '../../src/game/scoring';
 it('by passage', async () => {
-  const head = await gitVariant('HEAD');
-  const headMod = await import(/* @vite-ignore */ resolve(__dirname, 'out/variants/scoring-git-HEAD.ts'));
+  const head = await gitVariant('54ea7b9');
+  const headMod = await import(/* @vite-ignore */ resolve(__dirname, 'out/variants/scoring-git-54ea7b9.ts'));
   const before = { ...AFTER, impl: head.impl, pitch: head.pitch, pitchKey: head.key };
   const ps = (await PASSAGES()).filter(p => p.id.includes('16ths') || !p.id.startsWith('synth'));
   for (const p of ps) {

@@ -62,6 +62,20 @@ export function Settings() {
       </section>
 
       <section className="col" style={{ gap: 8 }}>
+        <h2 className="eyebrow">Practice display</h2>
+        <div className="seg" role="group" aria-label="Practice display" data-testid="settings-display">
+          {([[undefined, 'Automatic'], ['score', 'Score'], ['highway', 'Highway']] as const).map(([d, label]) => (
+            <button key={label} aria-pressed={profile.display === d} onClick={() => update({ display: d })}>{label}</button>
+          ))}
+        </div>
+        <span className="small muted">
+          {profile.display === 'score' ? 'Your part as sheet music, with your voice drawn on the staff.'
+            : profile.display === 'highway' ? 'Your notes as bars moving towards a line, with your voice as a line.'
+              : 'Sheet music at levels 1 and 2, the note highway from level 3.'} You can also switch before each run.
+        </span>
+      </section>
+
+      <section className="col" style={{ gap: 8 }}>
         <h2 className="eyebrow">Strictness</h2>
         <div className="seg" role="group" aria-label="Strictness">
           {(['forgiving', 'standard', 'strict'] as const).map((s) => (

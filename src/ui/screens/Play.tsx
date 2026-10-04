@@ -5,7 +5,7 @@ import { getPiece, noteRangeFor, singableSections } from '../library';
 import { useProfile } from '../hooks';
 import { LEVELS, LISTEN, MAX_LEVEL, OFF_BOOK_DAYS, effectiveTolerance, pieceReadiness } from '../../progress/ladder';
 import { shareMyProgress } from '../play/shareProgress';
-import { recordAttempt, getProgress, snapshotReadiness, personalBest } from '../../progress/store';
+import { recordAttempt, getProgress, snapshotReadiness, personalBest, practiceDisplay } from '../../progress/store';
 import { keyAtTime } from '../../music/time';
 import { PracticeSession, estimateLatencyMs } from '../play/session';
 import { medianOnsetMs, scoreAligned } from '../../game/align';
@@ -24,6 +24,7 @@ const GUIDE_LEARN_MAX_ABOVE = 150;
 import { setLastRun } from '../play/runExport';
 import { getBars, knownByHeart, provenOffBook, recordBars } from '../../progress/bars';
 import { drawHighway2D, pitchWindow, wordInitial, type DrawState } from '../play/highway2d';
+import { drawStaff2D } from '../play/staff2d';
 import { drawArcade, lanesFor, newFx } from '../play/arcade3d';
 import { setLastResult } from '../play/lastResult';
 import { IconBack, IconPause, IconPlay, IconRestart, IconStop } from '../icons';
@@ -143,6 +144,8 @@ function SingPlay({ route }: { route: PlayRoute }) {
   const tolerance = spec ? effectiveTolerance(level, profile.strictness) : 50;
   const showNames = spec ? spec.showNames : true;
   const notation = profile.notation as NotationMode;
+  // 2D practice: sheet music or the note highway (the arcade is always 3D).
+  const display = route.mode === '3d' ? 'highway' : practiceDisplay(profile, level);
   const singerIsHigh = profile.voice === 'S' || profile.voice === 'A';
   const partIsHigh = part ? part.voiceType === 'S' || part.voiceType === 'A' : singerIsHigh;
   // Singing a part written for the other voice range (e.g. a tenor practising the soprano line)
@@ -387,6 +390,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
         } : undefined,
       };
       if (route.mode === '3d') drawArcade(c, W, H, st, fxRef.current, (lanes ??= lanesFor(st)), ts / 1000);
+      else if (display === 'score') drawStaff2D(c, W, H, st);
       else drawHighway2D(c, W, H, st);
 
       if (ts - lastHud > 90) {
@@ -414,7 +418,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [piece, part, section, route.mode, notation, showNames, rate, tolerance, offBook, cold]);
+  }, [piece, part, section, route.mode, notation, showNames, rate, tolerance, offBook, cold, display]);
 
   useEffect(() => {
     if (firstTime) try { localStorage.setItem('sh:seenHowto', '1'); } catch { /* ignore */ }
@@ -489,7 +493,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
       </div>
 
       <div className="play-canvas-wrap" ref={wrapRef}>
-        <canvas ref={canvasRef} aria-label="Note highway" role="img" />
+        <canvas ref={canvasRef} aria-label={display === 'score' ? 'Sheet music' : 'Note highway'} role="img" data-display={display} />
         {hud.count > 0 && running && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
             <span style={{ fontSize: 96, fontWeight: 800, color: 'var(--accent)', textShadow: '0 0 24px #FF7A45' }}>{hud.count}</span>
@@ -534,6 +538,12 @@ function SingPlay({ route }: { route: PlayRoute }) {
                   <span className="tiny muted">Hold “Peek” to see the next bars for two seconds. Pass off book on {OFF_BOOK_DAYS} different days and the section is memorised.</span>
                 </div>
               )}
+              {route.mode === '2d' && (
+                <div className="seg" role="group" aria-label="Practice display" data-testid="display-toggle">
+                  <button aria-pressed={display === 'highway'} onClick={() => updateProfile({ display: 'highway' })} data-testid="display-highway">Highway</button>
+                  <button aria-pressed={display === 'score'} onClick={() => updateProfile({ display: 'score' })} data-testid="display-score">Score</button>
+                </div>
+              )}
               {level === 1 && (
                 <label className="field">
                   <span className="small">Tempo {Math.round(rate * 100)}%{rate < (spec?.rate ?? 1) - 1e-6 ? ' (slower than the level: practice only, won’t count)' : ''}</span>
@@ -543,9 +553,19 @@ function SingPlay({ route }: { route: PlayRoute }) {
               {!listenOnly && firstTime && (
                 <div className="col small howto" style={{ gap: 4, background: 'var(--bg-2)', borderRadius: 10, padding: '10px 12px' }} data-testid="howto">
                   <strong>How to read the screen</strong>
-                  <span><span style={{ color: 'var(--accent)' }}>■</span> Orange bars are your notes. They move left to the white line: sing when they reach it.</span>
-                  <span><span style={{ color: 'var(--voice)' }}>━</span> The blue line is your voice. Keep it on the bar: the bar fills with blue when you're on the note.</span>
-                  <span>Dashed outlines are the other voices. The bubble shows how many cents sharp (+) or flat (−) you are.</span>
+                  {display === 'score' ? (
+                    <>
+                      <span>Your part as sheet music. The white line moves through the bar: sing the note it's on (it glows <span style={{ color: 'var(--accent)' }}>orange</span>).</span>
+                      <span><span style={{ color: 'var(--voice)' }}>━</span> Your voice draws a blue line at its exact height on the staff: just under the note means flat, just over means sharp (light orange when out of tune).</span>
+                      <span>Notes turn blue when sung well, red when missed. The bubble shows how many cents sharp (+) or flat (−) you are.</span>
+                    </>
+                  ) : (
+                    <>
+                      <span><span style={{ color: 'var(--accent)' }}>■</span> Orange bars are your notes. They move left to the white line: sing when they reach it.</span>
+                      <span><span style={{ color: 'var(--voice)' }}>━</span> The blue line is your voice. Keep it on the bar: the bar fills with blue when you're on the note.</span>
+                      <span>Dashed outlines are the other voices. The bubble shows how many cents sharp (+) or flat (−) you are.</span>
+                    </>
+                  )}
                 </div>
               )}
               {!listenOnly && <span className="tiny muted">Wear headphones so the mic only hears you.{!profile.latencyMs ? ' Tip: run voice setup once to measure your headphone delay.' : ''}</span>}

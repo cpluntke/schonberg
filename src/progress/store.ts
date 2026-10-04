@@ -47,6 +47,16 @@ export interface Profile {
   choirCode?: string;
   /** Share per-bar progress with the section lead (opt-in). */
   shareProgress?: boolean;
+  /**
+   * Practice screen (2D): the note highway or sheet music. Unset = not chosen yet: sheet music at
+   * levels 1–2, the highway from level 3.
+   */
+  display?: 'highway' | 'score';
+}
+
+/** The practice display to use at a level (the singer's choice, else score at levels 0–2). */
+export function practiceDisplay(p: Pick<Profile, 'display'>, level: number): 'highway' | 'score' {
+  return p.display ?? (level <= 2 ? 'score' : 'highway');
 }
 
 export interface SectionProgress {
