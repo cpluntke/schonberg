@@ -155,3 +155,21 @@ describe('cycle, backup, scores', () => {
     expect(await loadImportedScores()).toEqual([]);
   });
 });
+
+describe('programme slots', () => {
+  it('matches titles loosely and files an import into the cycle and the rehearsal focus', async () => {
+    const { sameWork, fillWantedSlot, saveCycle, loadCycle } = await import('./store');
+    expect(sameWork('Madrigal', 'Madrigal, Op. 35')).toBe(true);
+    expect(sameWork('Huit chansons francaises: 1. Clic, clac', 'Huit chansons françaises')).toBe(true);
+    expect(sameWork('Vinea mea electa', 'Kyrie')).toBe(false);
+    saveCycle({ name: 'X', pieceIds: ['a'], focusPieceIds: ['a'], wanted: [
+      { title: 'Madrigal, Op. 35', composer: 'Fauré', focus: true },
+      { title: 'Vinea mea electa', composer: 'Poulenc' }] });
+    expect(fillWantedSlot('imp-1', 'Madrigal')?.composer).toBe('Fauré');
+    expect(fillWantedSlot('imp-2', 'Vinea mea electa')).not.toBeNull();
+    expect(fillWantedSlot('imp-3', 'Something else')).toBeNull();
+    const c = loadCycle();
+    expect(c.pieceIds).toEqual(['a', 'imp-1', 'imp-2']);
+    expect(c.focusPieceIds).toEqual(['a', 'imp-1']);
+  });
+});

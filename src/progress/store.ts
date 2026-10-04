@@ -71,7 +71,26 @@ export interface AttemptLog {
   durationSec?: number;
 }
 
-export interface WantedPiece { title: string; composer: string; note?: string }
+/** A programme piece the app can't ship (e.g. still in copyright): shown as an "import your score" slot. */
+export interface WantedPiece { title: string; composer: string; note?: string; focus?: boolean }
+
+/** Loose title match so an imported "Vinea mea electa" fills the "Vinea mea electa" slot. */
+export function sameWork(a: string, b: string): boolean {
+  const n = (x: string) => x.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  const A = n(a), B = n(b);
+  return !!A && !!B && (A.includes(B) || B.includes(A));
+}
+
+/** When an imported score fills a programme slot, put it in the cycle (and in the next rehearsal's focus if the slot was). */
+export function fillWantedSlot(pieceId: string, title: string): WantedPiece | null {
+  const c = loadCycle();
+  const slot = (c.wanted ?? []).find((w) => sameWork(title, w.title));
+  if (!slot) return null;
+  if (!c.pieceIds.includes(pieceId)) c.pieceIds = [...c.pieceIds, pieceId];
+  if (slot.focus && !(c.focusPieceIds ?? []).includes(pieceId)) c.focusPieceIds = [...(c.focusPieceIds ?? []), pieceId];
+  saveCycle(c);
+  return slot;
+}
 export interface Cycle {
   name: string;
   concertDate?: string;

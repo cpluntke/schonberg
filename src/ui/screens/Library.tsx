@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import { allPieces, addImported, removeImported } from '../library';
 import { useStoreVersion, toast } from '../hooks';
 import { go } from '../router';
-import { loadCycle, saveCycle } from '../../progress/store';
+import { loadCycle, saveCycle, fillWantedSlot } from '../../progress/store';
 import { importScoreFile } from '../../music/import';
 import { IconPlus, IconTrash, IconCheck } from '../icons';
 
@@ -25,8 +25,9 @@ export function Library() {
         const singable = score.parts.filter((p) => p.notes.length > 0);
         if (!singable.length) throw new Error('No notes found in this file.');
         const p = await addImported(score);
+        const slot = fillWantedSlot(p.id, p.title);
         toast(p.persisted
-          ? `Imported “${p.title}” with ${singable.length} parts`
+          ? `Imported “${p.title}” with ${singable.length} parts${slot ? ' and added it to this cycle' : ''}`
           : `Imported “${p.title}”, but this browser won't keep it after a reload (private mode or storage blocked).`);
         if (files.length === 1) go({ name: 'piece', pieceId: p.id });
       } catch (e) {
@@ -86,6 +87,7 @@ export function Library() {
                   {p.composer || 'Unknown composer'} · {p.score.parts.filter((x) => x.notes.length).length} parts · {p.score.measures.length} bars
                 </span>
                 {p.description && <span className="tiny muted">{p.description}</span>}
+                {p.credit && <span className="tiny muted" style={{ opacity: 0.8 }}>{p.credit}</span>}
               </button>
               {p.level && <span className="badge muted">{p.level}</span>}
               {!p.builtin && (

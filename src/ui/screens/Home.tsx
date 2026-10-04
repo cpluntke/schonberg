@@ -2,7 +2,7 @@ import React from 'react';
 import { allPieces, getPiece, chosenPartId, singableSections, type PieceInfo } from '../library';
 import { useProfile, useStoreVersion, formatDate, daysUntil, initials } from '../hooks';
 import { go } from '../router';
-import { loadCycle, getProgress, streakDays, dueForReview, attemptLog } from '../../progress/store';
+import { loadCycle, getProgress, streakDays, dueForReview, attemptLog, sameWork } from '../../progress/store';
 import { pieceReadiness, nextStep, levelSpec } from '../../progress/ladder';
 import { nextRehearsal } from '../../progress/rehearsal';
 import { rowOfTheDay } from '../../game/twelvetone';
@@ -67,6 +67,7 @@ export function Home() {
   const toRehearsal = nr ? nr.days : null;
   const toConcert = daysUntil(cycle.concertDate);
   const focusStatuses = statuses.filter((s) => focusIds.has(s.piece.id));
+  const focusMissing = (cycle.wanted ?? []).filter((w) => w.focus && !statuses.some((s) => sameWork(s.piece.title, w.title)));
   const target = cycleTarget(statuses, toRehearsal, toConcert, focusStatuses.length ? focusStatuses : null);
   const avg = statuses.length ? statuses.reduce((a, s) => a + s.pct, 0) / statuses.length : 0;
 
@@ -120,12 +121,16 @@ export function Home() {
             <span className="tiny muted">cycle readiness</span>
           </div>
         </div>
-        {focusStatuses.length > 0 && nr && nr.days >= 0 && (
+        {focusStatuses.length + focusMissing.length > 0 && nr && nr.days >= 0 && (
           <div className="small" data-testid="rehearsal-focus">
             <span className="muted">{nr.days === 0 ? 'Tonight' : `Next rehearsal (${nr.label})`}:</span>{' '}
             {focusStatuses.map((s, i) => (
               <span key={s.piece.id}>{i ? ', ' : ''}<button className="linklike" onClick={() => go({ name: 'piece', pieceId: s.piece.id })}>{s.piece.title}</button>
                 <span className="muted"> {Math.round(s.pct * 100)}%</span></span>
+            ))}
+            {focusMissing.map((w, i) => (
+              <span key={w.title}>{i || focusStatuses.length ? ', ' : ''}<button className="linklike" onClick={() => go({ name: 'library' })}>{w.title}</button>
+                <span className="muted"> (import first)</span></span>
             ))}
           </div>
         )}
@@ -230,12 +235,7 @@ function NextUp({ status }: { status: PieceStatus }) {
   );
 }
 
-/** Loose title match so an imported "Vinea mea electa" fills the "Vinea mea electa" slot. */
-export function sameWork(a: string, b: string): boolean {
-  const n = (x: string) => x.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
-  const A = n(a), B = n(b);
-  return !!A && !!B && (A.includes(B) || B.includes(A));
-}
+export { sameWork };
 
 function Countdown({ label, days, date, raw }: { label: string; days: number | null; date?: string; raw?: boolean }) {
   return (

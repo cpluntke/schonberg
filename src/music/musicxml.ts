@@ -56,10 +56,10 @@ export function voiceTypeFromName(name: string): VoiceType | undefined {
   if (!n) return undefined;
   if (/basso\s*continuo|continuo|bass\s*guitar|contrabass|double\s*bass|kontrabass|bass\s*clarinet|bassklarinette/i.test(n)) return 'other';
   if (INSTRUMENT_RE.test(n)) return 'other';
-  if (/(sopran|soprano|sopr\b|canto|cantus|dessus|treble|discant|superius)/i.test(n)) return 'S';
+  if (/(sopran|soprano|sopraan|sopr\b|canto|cantus|dessus|treble|discant|superius)/i.test(n)) return 'S';
   if (/(\balt\b|\balto|\balti\b|contralto|altus|mezzo|\bcontra\b)/i.test(n)) return 'A';
   if (/(t[eé]nor|ténor)/i.test(n)) return 'T';
-  if (/(\bbass(?:es|e|i|o|us)?\b|\bbajos?\b|bariton|baryton|\bbässe\b)/i.test(n)) return 'B';
+  if (/(\bbass(?:es|e|i|o|us)?\b|\bbas\b|\bbajos?\b|bariton|baryton|\bbässe\b)/i.test(n)) return 'B';
   // abbreviations: "S.", "S1", "S 2", "A.", "T. 1", "B", "Bar."
   const m = n.match(/^([SATB])(?:\.|\s*\d|\s*[IV]+\b|$)/);
   if (m) return m[1] as VoiceType;

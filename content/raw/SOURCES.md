@@ -38,3 +38,37 @@ Debussy (d. 1918), Ravel (d. 1937; *Trois chansons* published 1916), Reger (d. 1
 - **Webern, *Entflieht auf leichten Kähnen* Op. 2** is PD in the EU (Webern died 1945) and in the US (published 1921). IMSLP has a CC BY-SA 4.0 MIDI (`PMLP62108-entflieht.mid`) and a CC0 typeset PDF edited by Antoine Portes, but downloading them needs the captcha. Fetch the MIDI by hand in a browser if wanted.
 - **Ravel, *Trois beaux oiseaux du paradis*** (Trois chansons II) is not in PDMX with lyrics.
 - **Poulenc** (*Quatre motets pour le temps de Noël*, *Un soir de neige*) has MuseScore uploads marked CC0 in PDMX. They were **deliberately excluded**: Poulenc died in 1963 and these works are in copyright, so the uploaders' CC0 marks are not valid.
+
+## Added 2026-10-04 (second pass): Vierne Kyrie and Fauré Madrigal
+
+### `public/pieces/pd/vierne-kyrie.mxl`: Vierne, *Messe solennelle* Op. 16, I. Kyrie (published 1900)
+
+- **Work status:** Vierne died in 1937, so the work is PD in the EU (since 2008). It was published in 1900, so it is also PD in the US.
+- **Edition:** Manfred Hößl (www.Manfreds-Notenpool.de), reduced from two organs to one. It is on CPDL as **CPDL #30138**, submitted 2013-09-15, under the CPDL licence (free to copy, perform and distribute; credit the editor). Every page of the file carries the rights line "Manfred Hößl - www.Manfreds-Notenpool.de".
+- **Source file:** PDMX `mxl/17/1/QmZ2WALgqTccdkU6m4aPhBXH1UGCsUihemtESckqPvj2zG.mxl`. This is the complete Mass (479 bars). It was uploaded to MuseScore by *leenders-jongenelen* as https://musescore.com/user/36264/scores/5382059 and marked CC0. PDMX flags it `license_conflict=True` because of the embedded rights line. The underlying edition is the CPDL one, so the CPDL licence applies. Credit Manfred Hößl.
+- **What was changed:**
+  - Bars 1–94 were cut out. The Kyrie ends at the light-heavy barline in bar 94; the Gloria starts in bar 95. No slur, tie or wedge crosses that cut.
+  - Part names were changed from Dutch to English (Sopraan/Alt/Tenor/Bas/Orgel/Orgel → Soprano/Alto/Tenor/Bass/Organ/Organ Pedal). The app's voice detection read "Bas" as a tenor.
+  - The title was set to "Messe solennelle, Op. 16 – I. Kyrie" and the `<rights>` line was extended with the CPDL number.
+  - Credits for pages after page 6 were dropped.
+  - Notes and lyrics were not touched.
+- **Contents:** 6 parts, 94 bars, 4/4, C♯ minor, ♩=80 "Maestoso ma non troppo", about 4:42 at the written tempo.
+  - Soprano: 168 notes, 155 with lyrics.
+  - Alto: 186 notes, 162 with lyrics.
+  - Tenor: 230 notes, 200 with lyrics.
+  - Bass: 218 notes, 183 with lyrics.
+  - Organ: 2 staves. Organ Pedal: 1 staff.
+  - Every voice is monophonic, with Latin lyrics ("Kyrie eleison / Christe eleison").
+- **Import check:** `importScoreFile` returns voiceTypes S/A/T/B plus two `other` parts and 11 sections of 8–9 bars each, with no errors.
+- **Alternative not used:** PDMX `mxl/16/40/QmYrY97QB7n64JH5tiUMsfXMjDZSQBbFwWFQ2rGw6NLSN1.mxl`, a standalone Kyrie by the same uploader (https://musescore.com/user/36264/scores/5380279, CC0, 94 bars, SATB with two organs). It was rejected because only the alto part has lyrics.
+
+### Fauré, *Madrigal* Op. 35: not found
+
+- **PDMX:** no version under any title, composer or lyric search ("Madrigal" with Fauré, "Inconnues", "Silvestre", "Op. 35").
+- **CPDL:** has a MusicXML/MIDI edition at `Madrigal,_Op._35_(Gabriel_Fauré)`, according to a web search. The site still returns Cloudflare 403. The web.archive.org copy is blocked by this session's egress proxy.
+- **IMSLP:** has only a PDF scan of the SATB and piano version (PMLP60197, public domain).
+- **Mutopia:** has Fauré songs, but not this piece.
+- **Wikimedia Commons:** has only JPG images of the autograph manuscript.
+- **GitHub code search:** nothing found.
+- **MuseScore.com:** has uploads (for example user/21243506/scores/7158795 and user/79422424/scores/11808895), but the pages return 403 and downloads need a login.
+- **To get it:** download the CPDL MusicXML by hand in a browser, or export one of the MuseScore uploads if its licence is PD/CC0.

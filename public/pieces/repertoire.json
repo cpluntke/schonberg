@@ -52,5 +52,14 @@
     "level": "hard",
     "description": "Trois chansons de Charles d'Orléans, no. 3. Fast, rhythmic, chromatic.",
     "credit": "PDMX / MuseScore (Public Domain Mark)"
+  },
+  {
+    "id": "vierne-kyrie",
+    "file": "pd/vierne-kyrie.mxl",
+    "title": "Kyrie (Messe solennelle, Op. 16)",
+    "composer": "Louis Vierne",
+    "level": "medium",
+    "description": "SATB with organ (two-organ original, here with one organ and pedal as backing).",
+    "credit": "Edition: Manfred Hößl (CPDL #30138), via PDMX/MuseScore"
   }
 ]

@@ -388,7 +388,7 @@ describe('importer hardening: MIDI', () => {
     const t0 = performance.now();
     const s = parseMidi(midi.toArray());
     expect(invariantViolations(s, computeSections(s))).toEqual([]);
-    expect(performance.now() - t0).toBeLessThan(3000);
+    expect(performance.now() - t0).toBeLessThan(10000); // generous: guards against quadratic blow-ups, not machine speed
   });
 
   it('MIDI with a stray event far in the future, zero-length notes and weird time signatures', () => {

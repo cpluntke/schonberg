@@ -18,7 +18,13 @@ Good morning! Here is what happened between midnight and 7.
 - **LIVE:** **https://messiermarathon-latest.onrender.com/schonberg/**, deployed through messiermarathon
   (PR #291, merged and deployed 4 Oct 12:15 UTC). The choir leaderboard runs on that service's disk.
 - **Onboarding video:** a 100-second narrated intro (coach + singer dialogue over the real app), playable from
-  Home, voice setup and Settings. Sources are in `media-src/onboarding/`.
+  Home, voice setup and Settings. Sources are in `media-src/onboarding/`. "Schönberg" is now pronounced with a German "sch".
+- **Next cycle programme** (preset in `public/pieces/cycle.json`): Fauré *Madrigal*, Debussy *Trois chansons*,
+  Poulenc *Vinea mea* and *Huit chansons françaises*, Vierne *Kyrie* (Messe solennelle). Weekly rehearsals on Thursdays at 19:30;
+  the next one focuses on the Fauré, Debussy no. 2 (*Quand j'ai ouy le tabourin*) and the Vierne.
+  - Bundled: Debussy nos. 1–3 and the Vierne *Kyrie* (Hößl edition from CPDL, choir + organ + pedal reduction rather than two organs).
+  - Import slots: the Poulenc pieces (in copyright) and the Fauré *Madrigal* (CPDL blocks automated downloads; download
+    it in a browser and import it). Home shows each one as "import your score" and links it automatically once imported.
 
 ## Try it
 

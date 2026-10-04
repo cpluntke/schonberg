@@ -18,3 +18,13 @@ describe('pickup bars', () => {
     expect(n[1].startBeat).toBe(1); // C5 right after the upbeat, no padding
   });
 });
+
+import { voiceTypeFromName } from './musicxml';
+describe('voice names in other languages', () => {
+  it('recognises Dutch part names', () => {
+    expect(voiceTypeFromName('Sopraan')).toBe('S');
+    expect(voiceTypeFromName('Alt')).toBe('A');
+    expect(voiceTypeFromName('Tenor')).toBe('T');
+    expect(voiceTypeFromName('Bas')).toBe('B');
+  });
+});

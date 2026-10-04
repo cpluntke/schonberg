@@ -207,6 +207,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
           </div>
         </div>
       )}
+      {piece.credit && <span className="tiny muted">{piece.credit}</span>}
     </main>
   );
 }

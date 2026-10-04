@@ -10,6 +10,8 @@ export interface PieceInfo {
   composer: string;
   level?: string;
   description?: string;
+  /** Edition / licence credit (shown in the Library and on the piece screen). */
+  credit?: string;
   builtin: boolean;
   score: Score;
   sections: Section[];
@@ -141,7 +143,7 @@ async function loadAll() {
           });
         }
         pieces.set(m.id, makePiece(score, {
-          id: m.id, title: m.title, composer: m.composer, level: m.level, description: m.description, builtin: true,
+          id: m.id, title: m.title, composer: m.composer, level: m.level, description: m.description, credit: m.credit, builtin: true,
         }));
       } catch (e) {
         console.error('Failed to load built-in piece', m.id, e);
@@ -168,7 +170,7 @@ async function loadAll() {
     const own = cycle.pieceIds.filter((id) => pieces.get(id) && !pieces.get(id)!.builtin);
     const ids = preset.pieceIds.filter((id) => pieces.has(id));
     // Programme pieces we couldn't ship become "import your score" slots.
-    const missing = preset.pieceIds.filter((id) => !pieces.has(id) && preset.titles?.[id]).map((id) => ({ ...preset.titles![id], note: 'import your choir’s score' }));
+    const missing = preset.pieceIds.filter((id) => !pieces.has(id) && preset.titles?.[id]).map((id) => ({ ...preset.titles![id], note: 'import your choir’s score', focus: preset.focusPieceIds?.includes(id) || undefined }));
     saveCycle({
       name: preset.name,
       pieceIds: [...ids, ...own.filter((id) => !ids.includes(id))],
