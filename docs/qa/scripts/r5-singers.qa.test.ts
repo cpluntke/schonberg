@@ -5,7 +5,10 @@
 // 50 Hz samples with ±2 ms timestamp jitter. L4 standard = ±25 c, pass 85 %.
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
-import { scoreAttempt } from '../../../src/game/scoring';
+import { scoreAttempt as headScore } from '../../../src/game/scoring';
+import { scoreAttempt as oldScore } from './r5-old/src/game/scoring';
+const scoreAttempt = process.env.R5_OLD ? (oldScore as unknown as typeof headScore) : headScore;
+console.log('R5 scoring source:', process.env.R5_OLD ? 'bf37269 (pre-round-4)' : 'HEAD');
 import { importScoreFile } from '../../../src/music/import';
 import { computeSections } from '../../../src/music/sections';
 import { effectiveTolerance, levelSpec } from '../../../src/progress/ladder';
@@ -99,6 +102,9 @@ async function matrix(name: string, sg: Singer, seeds = [1, 2, 3]): Promise<Row[
   const accs = rows.map((r) => r.acc).sort((p, q) => p - q);
   const med = rows.map((r) => r.medOn ?? 0).sort((p, q) => p - q);
   console.log(`## ${name}: runs ${n}, pass@L4 ${pass}/${n}, acc min ${(accs[0] * 100).toFixed(0)} med ${(accs[n >> 1] * 100).toFixed(0)}, medOnset median ${med[n >> 1].toFixed(0)} ms, insights ${JSON.stringify(kindCount)}`);
+  const perSec: Record<string, [number, number]> = {};
+  for (const r of rows) { const k = r.file.replace(/\.m.*$/, '') + ' ' + r.sec; perSec[k] ??= [0, 0]; perSec[k][1]++; if (r.acc >= PASS) perSec[k][0]++; }
+  if (process.env.R5_PERSEC) console.log('   perSec', JSON.stringify(Object.fromEntries(Object.entries(perSec).map(([k, v]) => [k, `${v[0]}/${v[1]}`]))));
   const fails = rows.filter((r) => r.acc < PASS).slice(0, 6);
   for (const r of fails) console.log('   FAIL', r.file, r.part, r.sec, 'seed', r.seed, 'acc', (r.acc * 100).toFixed(0), 'rh', (r.rhythm * 100).toFixed(0), r.kinds.join(','));
   // Global invariant: never 'great' on a failed run.
@@ -120,6 +126,9 @@ it('R5 good singer (lag 50) passes L4 and is not told it is behind/scooping/flat
 
 it('R5 good singer, consonant-only (no jitter) and lag 0 variants', async () => {
   await matrix('good lag0', { ...base, lag: 0 });
+  await matrix('good lag50 jitter 0-45', { ...base, jitter: [0, 45] });
+  await matrix('good lag50 cons 40-60 jitter 0-45', { ...base, cons: [40, 60], jitter: [0, 45] });
+  await matrix('good lag50 cons 60-80 no jitter', { ...base, jitter: [0, 0] });
   await matrix('good lag50 cons80 jitter late-only', { ...base, cons: [80, 80], jitter: [30, 60], bias: 45 });
 });
 

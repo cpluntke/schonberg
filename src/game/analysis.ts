@@ -81,6 +81,9 @@ function addTo(map: Map<number, number>, k: number, v: number) {
  * Analyze one attempt. `samples` (optional) enables early-entry detection, which needs the pitch
  * sung before the written start of a note.
  */
+/** Median onset (ms, incl. detection lag and consonant) above which a run counts as behind the beat. */
+export const BEHIND_MS = 180;
+
 export function analyze(ctx: ScoringContext, notes: NoteResult[], samples?: PitchSample[]): Insight[] {
   const { score, part } = ctx;
   if (!notes.length) return [];
@@ -92,7 +95,8 @@ export function analyze(ctx: ScoringContext, notes: NoteResult[], samples?: Pitc
   const window = (bad: Map<number, number>) => worstWindow(bad, bounds);
   const out: Candidate[] = [];
 
-  const sungNotes = notes.filter((n) => n.cents !== null && !n.octave && Math.abs(n.cents) < 100);
+  // Scooped notes have a biased median (the glide); judge intonation on the others.
+  const sungNotes = notes.filter((n) => n.cents !== null && !n.octave && Math.abs(n.cents) < 100 && n.scoop === null);
 
   // 1. Overall flat / sharp tendency.
   const overall = median(sungNotes.map((n) => n.cents!));
@@ -185,19 +189,26 @@ export function analyze(ctx: ScoringContext, notes: NoteResult[], samples?: Pitc
   // 3b. Consistently behind the beat on every note (not just entries): usually an uncalibrated
   // headphone delay, or dragging. Onsets include ~50 ms of natural detection lag.
   // Scooped notes start "late" because the pitch arrives late, not the voice: leave them out.
-  const onsets = notes.filter((n) => n.onsetMs !== null && n.scoop === null).map((n) => n.onsetMs!);
+  // Repeated pitches carry no timing information (the voice is already there): leave them out too.
+  const timed = (n: NoteResult) => {
+    const prev = n.index > 0 ? pn[n.index - 1] : null;
+    return n.onsetMs !== null && n.scoop === null && !(prev && prev.midi === pn[n.index].midi && pn[n.index].start - (prev.start + prev.dur) < 1.0);
+  };
+  const onsets = notes.filter(timed).map((n) => n.onsetMs!);
   const medOnset = median(onsets);
-  if (onsets.length >= 6 && medOnset !== null && medOnset > 120) {
-    const lateNotes = notes.filter((n) => n.onsetMs !== null && n.scoop === null && n.onsetMs > 120);
+  // An on-time singer measures ~50 ms (detection lag) + up to ~80 ms (consonant before the vowel):
+  // only flag clearly later than that.
+  if (onsets.length >= 4 && medOnset !== null && medOnset > BEHIND_MS) {
+    const lateNotes = notes.filter((n) => timed(n) && n.onsetMs! > BEHIND_MS);
     const bad = new Map<number, number>();
     for (const n of lateNotes) addTo(bad, noteOf(n).measure, n.onsetMs!);
     out.push({
       kind: 'behind-beat',
       title: 'Behind the beat',
-      detail: `Your notes started about ${Math.round(medOnset - 40)} ms after the beat, quite evenly. If you wear Bluetooth headphones that's probably their delay: run the delay check in Voice setup. Otherwise, listen to the other voices and place each syllable's consonant before the beat.`,
+      detail: `Your notes started about ${Math.round(medOnset - 70)} ms after the beat, quite evenly. Place each syllable's consonant just before the beat so the vowel lands on it. (With Bluetooth headphones, run the delay check in Voice setup once.)`,
       measures: window(bad),
       severity: 3,
-      weight: medOnset,
+      weight: 500 + medOnset, // the root cause: rank above the symptoms it produces
     });
   }
 
@@ -214,8 +225,8 @@ export function analyze(ctx: ScoringContext, notes: NoteResult[], samples?: Pitc
       title: 'Scooping up into notes',
       detail: `${pct}% of your notes started from below and slid up (e.g. ${barsText(score, m)}). Aim for the centre of the pitch from the very start: hear it first, then sing it on the consonant.`,
       measures: m,
-      severity: pct >= 50 ? 2 : 1,
-      weight: pct,
+      severity: pct >= 50 ? 3 : pct >= 40 ? 2 : 1,
+      weight: pct * 3,
     });
   }
 
@@ -284,7 +295,7 @@ export function analyze(ctx: ScoringContext, notes: NoteResult[], samples?: Pitc
   }
 
   // 8. Wrong notes: clearly voiced, but a semitone or more away (not an octave slip).
-  const wrong = notes.filter((n) => n.voicedRatio >= 0.4 && n.cents !== null && !n.octave && Math.abs(n.cents) >= 70);
+  const wrong = notes.filter((n) => n.voicedRatio >= 0.4 && n.cents !== null && !n.octave && Math.abs(n.cents) >= 70 && n.scoop === null);
   if (wrong.length >= 2 || (wrong.length === 1 && notes.length <= 4)) {
     const bad = new Map<number, number>();
     for (const n of wrong) addTo(bad, noteOf(n).measure, Math.min(3, Math.abs(n.cents!) / 100));
@@ -318,7 +329,7 @@ export function analyze(ctx: ScoringContext, notes: NoteResult[], samples?: Pitc
   if (out.some((c) => c.kind === 'quiet')) out.splice(0, out.length, ...out.filter((c) => c.kind === 'quiet'));
   // Behind the beat explains "scoops" and pitch misses at note starts: drop those then.
   if (out.some((c) => c.kind === 'behind-beat')) {
-    for (let i = out.length - 1; i >= 0; i--) if (out[i].kind === 'scooping' || out[i].kind === 'wrong-notes' || out[i].kind === 'late-entries') out.splice(i, 1);
+    for (let i = out.length - 1; i >= 0; i--) if (out[i].kind === 'wrong-notes' || out[i].kind === 'late-entries') out.splice(i, 1);
   }
 
   // Sort: severity desc, then weight desc. Keep at most 3; reserve a slot for praise.

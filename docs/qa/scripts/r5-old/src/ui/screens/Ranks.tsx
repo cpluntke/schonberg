@@ -1,0 +1,235 @@
+import React, { useEffect, useState } from 'react';
+import { getPiece, chosenPartId, singableSections, type PieceInfo } from '../library';
+import { useProfile, useStoreVersion, toast, initials } from '../hooks';
+import { loadCycle } from '../../progress/store';
+import {
+  computeMyEntry, rankEntries, getLeaderboardBackend, encodeShareCode, importShareCodes, removeLocalEntry, decodeShareCode,
+  type LeaderboardEntry, type RankBy,
+} from '../../progress/leaderboard';
+import { IconShare } from '../icons';
+
+const TABS: { by: RankBy; label: string; sub: string }[] = [
+  { by: 'readiness', label: 'Ready', sub: 'readiness' },
+  { by: 'improved', label: 'Climbers', sub: '7-day gain' },
+  { by: 'streak', label: 'Streaks', sub: 'days' },
+  { by: 'weekly', label: 'Points', sub: 'this week' },
+];
+
+const CODE_RE = /^[A-Za-z0-9_-]{3,40}$/;
+
+export function Ranks() {
+  const [profile, update] = useProfile();
+  useStoreVersion();
+  const cycle = loadCycle();
+  const pieces = cycle.pieceIds.map((id) => getPiece(id)).filter(Boolean) as PieceInfo[];
+  const [pieceId, setPieceId] = useState(pieces[0]?.id ?? '');
+  const [by, setBy] = useState<RankBy>('readiness');
+  const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const [allEntries, setAllEntries] = useState<LeaderboardEntry[]>([]);
+  const [refresh, setRefresh] = useState(0);
+  const [err, setErr] = useState<string | null>(null);
+  const [paste, setPaste] = useState('');
+  const [codeDraft, setCodeDraft] = useState(profile.choirCode ?? '');
+  const backend = getLeaderboardBackend();
+  const choir = profile.choirCode || 'local';
+  const piece = getPiece(pieceId);
+
+  const computeMyEntryCached = (pc: PieceInfo) => {
+    const pid = chosenPartId(pc, profile.voice);
+    return computeMyEntry(pc.id, pid, singableSections(pc, pid));
+  };
+  const me: LeaderboardEntry | null = piece
+    ? computeMyEntry(piece.id, chosenPartId(piece, profile.voice), singableSections(piece, chosenPartId(piece, profile.voice)))
+    : null;
+
+  useEffect(() => {
+    let alive = true;
+    if (!pieceId) return;
+    (async () => {
+      try {
+        // Only post named entries, and only to a real (server) board — posting to the local
+        // store would bump the store version and re-run this effect in a loop.
+        if (me && profile.leaderboardOptIn && profile.name && backend.kind === 'http') await backend.put(choir, me);
+        const list = await backend.list(choir, pieceId);
+        const everything = await backend.list(choir);
+        if (alive) { setEntries(list); setAllEntries(everything); setErr(null); }
+      } catch (e) {
+        if (alive) setErr((e as Error).message);
+      }
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pieceId, choir, profile.leaderboardOptIn, profile.name, refresh]);
+
+  const others = entries.filter((e) => !(me && e.name === me.name && e.pieceId === me.pieceId));
+  const all = me ? [...others, { ...me, name: me.name }] : others;
+  const ranked = rankEntries(all, by);
+  const sections = (['S', 'A', 'T', 'B'] as const).map((vt) => {
+    const es = all.filter((e) => e.voice === vt);
+    return { vt, n: es.length, avg: es.length ? es.reduce((a, e) => a + e.readiness, 0) / es.length : 0 };
+  });
+  const maxAvg = Math.max(0.01, ...sections.map((s) => s.avg));
+
+  const [nameDraft, setNameDraft] = useState('');
+  async function share() {
+    if (!me) return;
+    if (!profile.name) {
+      toast('Add your name first, so the choir knows who it is.');
+      return;
+    }
+    // One code per piece in the cycle, so friends see all of your progress at once.
+    const mine = pieces.map((pc) => computeMyEntryCached(pc));
+    const summary = mine.map((e, i) => `${pieces[i].title} ${Math.round(e.readiness * 100)}%`).join(', ');
+    const text = `My Schönberg Hero progress: ${summary}. Paste into Ranks: ${mine.map(encodeShareCode).join(' ')}`;
+    try {
+      if (navigator.share) await navigator.share({ text });
+      else { await navigator.clipboard.writeText(text); toast('Copied: paste it into your choir chat'); }
+    } catch { /* cancelled */ }
+  }
+
+  function addCodes() {
+    const codes = (paste.match(/SH1\.[A-Za-z0-9_-]+/g) ?? []).map(decodeShareCode).filter(Boolean);
+    if (codes.length && me && codes.every((c) => c!.name === me.name)) {
+      toast('That’s your own ranking code. Paste codes from other singers.');
+      return;
+    }
+    const n = importShareCodes(choir, paste);
+    toast(n ? `Added ${n} ranking${n > 1 ? 's' : ''}` : 'No ranking codes found in that text');
+    if (n) { setPaste(''); setRefresh((x) => x + 1); }
+  }
+
+  function metric(e: LeaderboardEntry): string {
+    switch (by) {
+      case 'readiness': return `${Math.round(e.readiness * 100)}%`;
+      case 'improved': return `${e.improved >= 0 ? '+' : '−'}${Math.round(Math.abs(e.improved) * 100)}%`;
+      case 'streak': return `${e.streak}d`;
+      case 'weekly': return e.weeklyScore.toLocaleString();
+    }
+  }
+
+  return (
+    <main className="screen">
+      <div className="topbar">
+        <h1>Ranks</h1>
+        {pieces.length > 0 && (
+          <select aria-label="Piece" value={pieceId} onChange={(e) => setPieceId(e.target.value)}
+            style={{ maxWidth: 190, minHeight: 40, borderRadius: 20, background: 'var(--surface)', border: '1px solid var(--line)', padding: '0 10px', fontWeight: 600 }}>
+            {pieces.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
+          </select>
+        )}
+      </div>
+
+      {!pieces.length && <div className="notice info">Add pieces to your cycle to see rankings.</div>}
+
+      <div className="seg" role="group" aria-label="Rank by">
+        {TABS.map((t) => (
+          <button key={t.by} aria-pressed={by === t.by} onClick={() => setBy(t.by)}>{t.label}<span className="sub">{t.sub}</span></button>
+        ))}
+      </div>
+
+      <div className="card">
+        <div className="row between"><h2 style={{ fontSize: 15 }}>Section battle</h2><span className="tiny muted">avg. readiness</span></div>
+        {sections.map((s) => (
+          <div key={s.vt} className="row">
+            <span style={{ width: 22, fontWeight: 800 }}>{s.vt}</span>
+            <div className="bar grow" style={{ height: 14, borderRadius: 7 }}>
+              <span style={{ width: `${(s.avg / maxAvg) * 100}%`, background: s.vt === profile.voice ? 'var(--accent)' : '#4A5288', borderRadius: 7 }} />
+            </div>
+            <span className="mono small" style={{ width: 70, textAlign: 'right' }}>{s.n ? `${Math.round(s.avg * 100)}% · ${s.n}` : '–'}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="col" style={{ gap: 0 }}>
+        {ranked.map((e, i) => {
+          const isMe = me && e.name === me.name && e.updatedAt === me.updatedAt;
+          return (
+            <div key={`${e.name}-${i}`} className="row" style={{
+              minHeight: 56, padding: '0 10px', borderRadius: 12,
+              ...(isMe ? { background: 'var(--voice-bg)', border: '1px solid var(--voice)' } : { borderBottom: '1px solid var(--surface-2)' }),
+            }}>
+              <span className="mono muted" style={{ width: 22 }}>{i + 1}</span>
+              <span style={{ width: 36, height: 36, borderRadius: 18, background: 'var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13 }}>{initials(e.name)}</span>
+              <div className="grow col" style={{ gap: 0 }}>
+                <span style={{ fontWeight: 600 }}>{isMe ? (profile.name ? `${e.name} (you)` : 'You') : e.name}</span>
+                <span className="tiny muted">{({ S: 'Soprano', A: 'Alto', T: 'Tenor', B: 'Bass' } as Record<string, string>)[e.voice] ?? ''} · {e.streak}-day streak</span>
+              </div>
+              <span className="mono" style={{ fontWeight: 600 }}>{metric(e)}</span>
+              {!isMe && backend.kind === 'local' && (
+                <button className="icon-btn" aria-label={`Remove ${e.name}`} title="Remove" onClick={() => { removeLocalEntry(choir, e.name, e.pieceId); setRefresh((x) => x + 1); }}>
+                  <span aria-hidden="true" style={{ fontSize: 18, color: 'var(--muted)' }}>×</span>
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {pieces.length > 0 && (
+        <div className="card">
+          <div className="row between"><h2 style={{ fontSize: 15 }}>Choir overview</h2><span className="tiny muted">avg. readiness per section of the choir</span></div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 13 }}>
+              <thead>
+                <tr>
+                  <th scope="col" style={{ textAlign: 'left', padding: '4px 6px' }}>Piece</th>
+                  {(['S', 'A', 'T', 'B'] as const).map((vt) => <th key={vt} scope="col" style={{ padding: '4px 6px' }}>{vt}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {pieces.map((pc) => {
+                  const mine = getPiece(pc.id) ? computeMyEntryCached(pc) : null;
+                  const es = [...allEntries.filter((e) => e.pieceId === pc.id && !(mine && e.name === mine.name)), ...(mine ? [mine] : [])];
+                  return (
+                    <tr key={pc.id} style={{ borderTop: '1px solid var(--surface-2)' }}>
+                      <th scope="row" style={{ textAlign: 'left', padding: '6px', fontWeight: 600, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pc.title}</th>
+                      {(['S', 'A', 'T', 'B'] as const).map((vt) => {
+                        const v = es.filter((e) => e.voice === vt);
+                        const avg = v.length ? v.reduce((a, e) => a + e.readiness, 0) / v.length : null;
+                        const bg = avg == null ? 'transparent' : avg >= 0.75 ? '#1D4F63' : avg >= 0.4 ? '#2A2F55' : '#4A2418';
+                        return <td key={vt} className="mono" style={{ textAlign: 'center', padding: '6px', background: bg }}>{avg == null ? '–' : `${Math.round(avg * 100)}%`}</td>;
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <span className="tiny muted">Built from your own progress plus the rankings you've collected. Rehearsal-ready ≈ 75%.</span>
+        </div>
+      )}
+
+      <div className="card">
+        <strong>Compare with your choir</strong>
+        {backend.kind === 'http' ? (
+          <>
+            <span className="small muted">Join your choir's board with the code your director shares. Only your name, voice and these numbers are sent.</span>
+            <div className="row">
+              <input type="text" aria-label="Choir code" value={codeDraft} onChange={(e) => setCodeDraft(e.target.value)} placeholder="choir code"
+                style={{ flex: 1, minHeight: 44, borderRadius: 10, border: '1px solid var(--line)', background: 'var(--surface)', padding: '0 12px' }} />
+              <button className="btn small" disabled={!CODE_RE.test(codeDraft)} onClick={() => update({ choirCode: codeDraft.toLowerCase(), leaderboardOptIn: true })}>Join</button>
+            </div>
+            <label className="toggle-row"><span>Post my results</span>
+              <input type="checkbox" checked={profile.leaderboardOptIn} onChange={(e) => update({ leaderboardOptIn: e.target.checked })} /></label>
+          </>
+        ) : (
+          <span className="small muted">No leaderboard server is configured, so rankings travel as codes. Share yours in the choir chat and paste theirs below.</span>
+        )}
+        {!profile.name && (
+          <div className="row">
+            <input type="text" aria-label="Your name" placeholder="Your name for the board" value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} maxLength={40}
+              style={{ flex: 1, minHeight: 44, borderRadius: 10, border: '1px solid var(--line)', background: 'var(--surface)', padding: '0 12px' }} />
+            <button className="btn small" disabled={!nameDraft.trim()} onClick={() => update({ name: nameDraft.trim() })}>Save</button>
+          </div>
+        )}
+        <button className="btn small" onClick={share} disabled={!me || !profile.name}><IconShare size={16} /> Share my progress (all pieces)</button>
+        <label className="field">
+          <span className="small">Paste codes from the chat</span>
+          <textarea value={paste} onChange={(e) => setPaste(e.target.value)} placeholder="…SH1.eyJu…" />
+        </label>
+        <button className="btn small" disabled={!paste.trim()} onClick={addCodes}>Add rankings</button>
+        {err && <span className="small" style={{ color: 'var(--accent-text)' }}>{err}</span>}
+      </div>
+    </main>
+  );
+}

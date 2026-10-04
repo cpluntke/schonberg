@@ -262,7 +262,8 @@ export class PitchTracker {
     const gated = gatePitch(r);
     const midi = this.smoother.push(gated);
     const p: RawPitch = {
-      ctxTime: this.ctx.currentTime - this.windowSec / 2,
+      // Centre of the analysis window, minus the median-of-3 smoother's one-frame delay.
+      ctxTime: this.ctx.currentTime - this.windowSec / 2 - INTERVAL_MS / 1000,
       hz: gated == null ? null : r.hz,
       midi,
       clarity: r.clarity,

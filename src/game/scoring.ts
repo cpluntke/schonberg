@@ -156,6 +156,10 @@ class NoteAcc {
   /** Start of the current run of qualifying voiced samples (onset needs ~60 ms of sound). */
   runStart: number | null = null;
   runMiss = 0;
+  /** An unvoiced gap (consonant/breath) occurred since the note's written start. */
+  broke = false;
+  /** First voiced sample of this note's own sound (after a consonant / not the held previous pitch). */
+  voiceStart: number | null = null;
   scoopDevs: number[] = [];
   /** Causal moving-average window over body deviations (vibrato smoothing). */
   smT: number[] = [];
@@ -179,7 +183,8 @@ function noteWindows(ctx: ScoringContext, opts: ScoringOptions): NoteWindow[] {
   const graceOpt = opts.onsetGrace ?? DEFAULT_ONSET_GRACE;
   for (let i = Math.max(0, a); i <= Math.min(b, notes.length - 1); i++) {
     const note = notes[i];
-    const grace = Math.min(graceOpt, 0.3 * note.dur);
+    // Short notes: allow a larger share for the attack (detection lag + consonant).
+    const grace = Math.min(graceOpt, (note.dur < 0.3 ? 0.4 : 0.3) * note.dur);
     const tail = Math.min(TAIL, 0.2 * note.dur);
     const bodyStart = note.start + grace;
     const bodyEnd = Math.max(bodyStart + 1e-3, note.start + note.dur - tail);
@@ -187,7 +192,8 @@ function noteWindows(ctx: ScoringContext, opts: ScoringOptions): NoteWindow[] {
       ? justOffsetCents(note.midi, soundingOthers(ctx.score, note.start + note.dur / 2, ctx.part.id))
       : 0;
     const prev = i > 0 ? notes[i - 1] : null;
-    const legatoFrom = prev && prev.start + prev.dur >= note.start - 0.25 ? prev.midi : null;
+    // The previous pitch still matters across short rests: a late singer may still be on it.
+    const legatoFrom = prev && prev.start + prev.dur >= note.start - 1.0 ? prev.midi : null;
     // Just intonation: aim halfway between pure and tempered and widen the window by the same
     // amount, so singing either what the (tempered) backing plays or the pure interval is fine.
     const half = targetOffset / 2;
@@ -351,8 +357,15 @@ export class LiveScorer {
         }
       }
       // Still on the previous note's pitch = coming in late, not scooping.
-      const holdingPrev = midi !== null && w.legatoFrom !== null && w.legatoFrom !== w.note.midi && Math.abs(midi - w.legatoFrom) < 0.5;
-      if (dev !== null && t < w.start + SCOOP_WINDOW && !holdingPrev) a.scoopDevs.push(dev);
+      // Dragging = the previous vowel continues past the beat without a break; a scoop starts
+      // a new syllable (consonant gap) and glides up. So "holding the previous pitch" only counts
+      // while the voice hasn't broken since the note began.
+      if (midi === null && t >= w.start) a.broke = true;
+      const holdingPrev = !a.broke && midi !== null && w.legatoFrom !== null && w.legatoFrom !== w.note.midi
+        && Math.abs(midi - w.legatoFrom) < Math.min(0.75, 0.6 * Math.abs(w.note.midi - w.legatoFrom)); // vibrato-tolerant
+      // The scoop window starts when the (new) voice starts — after any consonant — not at the beat.
+      if (dev !== null && !holdingPrev && a.voiceStart === null) a.voiceStart = t;
+      if (dev !== null && !holdingPrev && a.voiceStart !== null && t < a.voiceStart + SCOOP_WINDOW && t < w.start + 0.45) a.scoopDevs.push(dev);
     }
     // Body coverage. In-tune is judged on the vibrato-smoothed deviation (mean over the last
     // ~one vibrato cycle of this note's body), so a centred vibrato is not punished.
@@ -433,7 +446,11 @@ export class LiveScorer {
       drift = median(a.devs.slice(-third))! - median(a.devs.slice(0, third))!;
     }
     const scoopMed = median(a.scoopDevs);
-    const scoop = scoopMed === null ? null : scoopMed < -60 ? 'below' : scoopMed > 60 ? 'above' : null;
+    // A scoop is a glide INTO the note: the body must end up clearly closer to the target than the
+    // start was (a note sung steadily wrong is not a scoop).
+    const tailDev = a.devs.length ? median(a.devs.slice(-Math.max(1, Math.ceil(a.devs.length / 3)))) : null;
+    const arrived = scoopMed !== null && tailDev !== null && Math.abs(tailDev) < Math.abs(scoopMed) - 40;
+    const scoop = scoopMed === null || !arrived ? null : scoopMed < -60 ? 'below' : scoopMed > 60 ? 'above' : null;
 
     let points = 0;
     if (grade === 'miss') {
