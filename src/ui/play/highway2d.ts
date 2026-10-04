@@ -121,6 +121,32 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
     c.fillText(ms.number, bx + 3, 3);
   }
 
+  // Directions (dynamics, tempo words) along the bottom edge.
+  const dirs = [
+    ...(s.part.directions ?? []),
+    ...s.ghostParts.flatMap((g) => (g.directions ?? []).filter((d) => d.kind === 'words')),
+  ];
+  if (dirs.length) {
+    let lastX = -1e9;
+    let lastText = '';
+    const sorted = [...dirs].sort((a, b) => a.time - b.time);
+    for (const d of sorted) {
+      if (d.time < tMin - 2 || d.time > tMax) continue;
+      if (/\d{4}/.test(d.text) || (d.kind === 'words' && (s.score.title.includes(d.text) || s.score.composer.includes(d.text) || /^[A-ZÀ-Ý][\p{L}'’-]+(\s[A-ZÀ-Ý][\p{L}'’-]+)+$/u.test(d.text)))) continue;
+      if (d.text === lastText && Math.abs(x(d.time) - lastX) < 4) continue;
+      const dx = Math.max(gutter + 2, x(d.time));
+      if (dx - lastX < 30 && d.text === lastText) continue;
+      c.font = d.kind === 'dynamic' ? 'italic 800 15px Georgia, serif' : 'italic 500 12px Georgia, serif';
+      c.textBaseline = 'alphabetic';
+      c.fillStyle = COLORS.targetText;
+      c.globalAlpha = 0.85;
+      c.fillText(d.text, dx + 2, H - 6);
+      c.globalAlpha = 1;
+      lastX = dx;
+      lastText = d.text;
+    }
+  }
+
   // Other voices as dashed ghosts.
   c.setLineDash([4, 3]);
   c.lineWidth = 1;

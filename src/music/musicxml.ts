@@ -5,7 +5,7 @@
 // - Grace notes and cue notes are ignored.
 // - Tenor parts in treble-8vb clef are already written at sounding octave in MusicXML (octave 3),
 //   so clef-octave-change is NOT applied; only <transpose> (chromatic + octave-change) is.
-import type { KeySig, Measure, Part, Score, ScoreNote, VoiceType } from './types';
+import type { Direction, KeySig, Measure, Part, Score, ScoreNote, VoiceType } from './types';
 import { beatToTime, buildTempoMap, DEFAULT_BPM } from './time';
 
 const EPS = 1e-6;
@@ -119,6 +119,7 @@ interface RawMeasure {
   notes: RawNote[];
   tempos: { beat: number; bpm: number }[];
   rehearsal?: string;
+  words: { beat: number; text: string; kind: 'dynamic' | 'words' }[];
   doubleBarRight: boolean;
   doubleBarLeft: boolean;
   keys: { beat: number; fifths: number; mode: 'major' | 'minor' }[];
@@ -197,6 +198,7 @@ function parseRawPart(id: string, name: string, srcs: MeasureSrc[]): RawPart {
       len: 0,
       notes: [],
       tempos: [],
+      words: [],
       doubleBarRight: false,
       doubleBarLeft: false,
       keys: [],
@@ -255,6 +257,19 @@ function parseRawPart(id: string, name: string, srcs: MeasureSrc[]): RawPart {
           for (const dt of kids(c, 'direction-type')) {
             const reh = kid(dt, 'rehearsal');
             if (reh && txt(reh) && rm.rehearsal === undefined) rm.rehearsal = txt(reh);
+            for (const w of kids(dt, 'words')) {
+              const t = txt(w).trim();
+              if (t && t.length <= 40) rm.words.push({ beat: at, text: t, kind: 'words' });
+            }
+            const dyn = kid(dt, 'dynamics');
+            if (dyn) {
+              const names = Array.from(dyn.children).map((e) => (e.localName === 'other-dynamics' ? txt(e) : e.localName)).filter(Boolean);
+              if (names.length) rm.words.push({ beat: at, text: names.join(''), kind: 'dynamic' });
+            }
+            if (kid(dt, 'wedge')) {
+              const wt = kid(dt, 'wedge')!.getAttribute('type');
+              if (wt === 'crescendo' || wt === 'diminuendo') rm.words.push({ beat: at, text: wt === 'crescendo' ? 'cresc.' : 'dim.', kind: 'words' });
+            }
             const met = kid(dt, 'metronome');
             if (met && (bpm === null || !isFinite(bpm))) bpm = parseMetronome(met);
           }
@@ -693,10 +708,23 @@ export function parseMusicXML(xml: string, opts?: { id?: string }): Score {
     }
     return sn;
   };
+  const directionsOf = (rp: RawPart): Direction[] => {
+    const out: Direction[] = [];
+    rp.measures.forEach((m, i) => {
+      for (const w of m.words ?? []) {
+        if (!measures[i]) continue;
+        out.push({ time: beatToTime(tempos, measures[i].startBeat + w.beat), text: w.text, kind: w.kind });
+      }
+    });
+    return out;
+  };
+  let currentDirections: Direction[] = [];
   const finishPart = (id: string, name: string, voiceType: VoiceType, notes: ScoreNote[]): Part => {
     notes.sort((a, b) => a.start - b.start || b.midi - a.midi);
     const midis = notes.map((n) => n.midi);
-    return { id, name, voiceType, notes, low: midis.length ? Math.min(...midis) : 0, high: midis.length ? Math.max(...midis) : 0 };
+    const p: Part = { id, name, voiceType, notes, low: midis.length ? Math.min(...midis) : 0, high: midis.length ? Math.max(...midis) : 0 };
+    if (currentDirections.length) p.directions = currentDirections;
+    return p;
   };
 
   // ---- octave sanity for tenor parts (common exporter quirks)
@@ -720,6 +748,7 @@ export function parseMusicXML(xml: string, opts?: { id?: string }): Score {
 
   const unnamed = new Set<string>();
   for (const rp of rawParts) {
+    currentDirections = directionsOf(rp);
     const allNotes = rp.measures.flatMap((m) => m.notes.filter((n) => n.midi !== null));
     const hasLyrics = allNotes.some((n) => n.lyric);
     const nameType = voiceTypeFromName(rp.name);

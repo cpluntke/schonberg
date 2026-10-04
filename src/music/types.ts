@@ -29,6 +29,14 @@ export interface Part {
   /** Lowest / highest MIDI pitch in the part (0 if empty). */
   low: number;
   high: number;
+  /** Performance directions for this part (dynamics, tempo words, "cresc.", "doux"…). */
+  directions?: Direction[];
+}
+
+export interface Direction {
+  time: number;
+  text: string;
+  kind: 'dynamic' | 'words';
 }
 
 export interface KeySig {
