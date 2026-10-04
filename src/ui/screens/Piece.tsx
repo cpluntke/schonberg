@@ -8,6 +8,9 @@ import { getProgress, dueForReview } from '../../progress/store';
 import { LEVELS, pieceReadiness, nextStep, sectionStatus } from '../../progress/ladder';
 import { IconBack, IconEar, IconCube, IconPlay } from '../icons';
 import { voiceName } from './Home';
+import { PieceMap } from '../components/PieceMap';
+import { getBars } from '../../progress/bars';
+import { startColdStart } from '../play/cold';
 
 /** First few words of the lyric in a section, to recognise the phrase. */
 function snippet(part: { notes: { start: number; lyric?: string; syllabic?: string }[] }, from: number, to: number): string {
@@ -28,7 +31,7 @@ function entryCount(part: Parameters<typeof entryNotes>[0]): number {
   return Math.min(10, idx.includes(0) || !part.notes.length ? idx.length : idx.length + 1);
 }
 
-const SHORT: Record<number, string> = { 1: 'Learn', 2: 'In time', 3: 'Alone', 4: 'Concert' };
+const SHORT: Record<number, string> = { 1: 'Learn', 2: 'In time', 3: 'Alone', 4: 'Concert', 5: 'By heart' };
 
 export function PieceScreen({ pieceId }: { pieceId: string }) {
   const [profile] = useProfile();
@@ -103,13 +106,13 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
           <div className="col" style={{ gap: 2 }}>
             <span className="eyebrow">Readiness</span>
             <span style={{ fontWeight: 800, fontSize: 18 }}>
-              {r.concertReady ? 'Concert-ready' : r.rehearsalReady ? 'Rehearsal-ready' : `${sections.length} sections to learn`}
+              {r.memorised ? 'Memorised' : r.concertReady ? 'Concert-ready' : r.rehearsalReady ? 'Rehearsal-ready' : `${sections.length} sections to learn`}
             </span>
           </div>
           <span className="mono" style={{ fontSize: 28, fontWeight: 600 }}>{Math.round(r.pct * 100)}%</span>
         </div>
         <div className="bar"><span style={{ width: `${r.pct * 100}%` }} /></div>
-        <span className="small muted">Rehearsal-ready = every section at level 3 (Independent). Concert-ready = level 4.</span>
+        <span className="small muted">Rehearsal-ready = every section at level 3 (Independent). Concert-ready = level 4. Memorised = level 5 (off book){r.memorisedSections > 0 && !r.memorised ? `: ${r.memorisedSections} of ${sections.length} sections so far` : ''}.</span>
         {next && (
           <button className="btn primary block" onClick={() => play(next.sectionId, next.level)}>
             <IconPlay size={18} /> {sections.find((s) => s.id === next.sectionId)?.label}: level {next.level}
@@ -136,6 +139,21 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
         )}
       </div>
 
+      {part && sections.length > 0 && (
+        <details className="card" open>
+          <summary style={{ cursor: 'pointer', fontWeight: 700 }}>Your map of the piece</summary>
+          <PieceMap score={piece.score} part={part} sections={sections} bars={getBars(piece.id, part.id)}
+            onLoop={(m) => {
+              const ms = piece.score.measures;
+              const sec = sections.find((s) => m >= s.startMeasure && m <= s.endMeasure);
+              const lvl = Math.max(1, Math.min(2, sec ? prog?.sections[sec.id]?.level ?? 1 : 1));
+              const a = ms[Math.max(sec?.startMeasure ?? 0, m - 1)];
+              const b = ms[Math.min(sec?.endMeasure ?? ms.length - 1, m + 1)];
+              go({ name: 'play', pieceId: piece.id, partId: part.id, sectionId: 'drill', level: lvl, mode: '2d', from: a.start, to: b.start + b.dur });
+            }} />
+        </details>
+      )}
+
       <section className="ladder" aria-label="Sections">
         <h2 style={{ marginBottom: 4 }}>Sections</h2>
         {sections.map((s) => {
@@ -160,7 +178,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
                   <IconCube size={20} color={lvl >= 2 ? '#B3A6FF' : undefined} />
                 </button>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 6 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 5 }}>
                 {LEVELS.map((L) => {
                   const l = L.level;
                   const cls = l <= lvl ? 'lvl-btn done' : l === lvl + 1 ? 'lvl-btn next' : 'lvl-btn';
@@ -195,6 +213,19 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
         </div>
       )}
 
+      {part && part.notes.length > 0 && (
+        <div className="card flat">
+          <strong>Learning it by heart</strong>
+          <span className="small muted">
+            Cold start: you're dropped into a random bar (bars you don't know yet come up more often), hear two bars of the
+            other voices, and carry on from memory. The best practice for finding your place again after a slip.
+          </span>
+          <div className="row wrap">
+            <button className="btn small" data-testid="cold-start" onClick={() => startColdStart(piece, part.id)}>Cold start</button>
+          </div>
+        </div>
+      )}
+
       {sections.length > 1 && (
         <div className="card flat">
           <strong>Run the whole piece</strong>
@@ -203,6 +234,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
             <button className="btn small" onClick={() => play('all', 2)}>With your part</button>
             <button className="btn small" onClick={() => play('all', 3)}>Others only</button>
             <button className="btn small" onClick={() => play('all', 4)}>Concert mode</button>
+            <button className="btn small" onClick={() => play('all', 5)}>From memory</button>
             <button className="btn small" onClick={() => play('all', 3, '3d')}><IconCube size={16} color="#B3A6FF" /> Arcade</button>
           </div>
         </div>

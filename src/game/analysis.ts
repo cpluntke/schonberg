@@ -395,3 +395,53 @@ function sungEarly(index: number, samples: PitchSample[], ctx: ScoringContext): 
   }
   return total > 0 && near / total >= 0.5;
 }
+
+/**
+ * Where you sing alone (no audible part playing), tempo drifts: compare when each of your notes
+ * starts with the written beat (signed: early counts too) and say if you rushed or dragged.
+ * `exposed` = indices of your notes in such passages; `samples` = readings against the applied delay.
+ */
+export function soloTimingInsight(ctx: ScoringContext, exposed: number[], samples: PitchSample[]): Insight | null {
+  const pn = ctx.part.notes;
+  const sorted = [...samples].filter((s) => s.midi !== null).sort((a, b) => a.time - b.time);
+  const near = (m: number, target: number) => {
+    let d = m - target;
+    d -= 12 * Math.round(d / 12);
+    return Math.abs(d);
+  };
+  const devs: { m: number; d: number }[] = [];
+  for (const i of exposed) {
+    const n = pn[i];
+    const prev = i > 0 ? pn[i - 1] : null;
+    if (prev && prev.midi === n.midi && n.start - (prev.start + prev.dur) < 0.25) continue; // no audible change
+    const legato = prev && prev.start + prev.dur >= n.start - 0.25;
+    const lo = Math.max(n.start - 0.35, legato ? prev!.start + prev!.dur * 0.5 : -Infinity);
+    const hi = n.start + Math.min(0.5, n.dur);
+    let hit: number | null = null;
+    let run = 0;
+    for (const s of sorted) {
+      if (s.time < lo) continue;
+      if (s.time > hi) break;
+      const ok = legato ? near(s.midi!, n.midi) < near(s.midi!, prev!.midi) && near(s.midi!, n.midi) <= 1.5 : near(s.midi!, n.midi) <= 1.5;
+      if (ok) {
+        if (++run >= 2) { hit = s.time - 0.02; break; } // first of two in a row
+      } else run = 0;
+    }
+    if (hit !== null) devs.push({ m: n.measure, d: hit - n.start });
+  }
+  if (devs.length < 4) return null;
+  const med = median(devs.map((x) => x.d))!;
+  const rush = med < -0.09;
+  const drag = med > 0.13;
+  if (!rush && !drag) return null;
+  const ms = devs.map((x) => x.m);
+  const range: [number, number] = [Math.min(...ms), Math.max(...ms)];
+  const amt = Math.round(Math.abs(med) * 1000);
+  return {
+    kind: 'tempo-drift',
+    title: rush ? 'You rushed where you sing alone' : 'You dragged where you sing alone',
+    detail: `With nobody else playing (${barsText(ctx.score, range)}) your notes came about ${amt} ms ${rush ? 'early' : 'late'}. Keep the pulse going in your head through the solo, or switch on the practice beat in Settings ("Beat when you sing alone").`,
+    measures: range,
+    severity: amt > 200 ? 3 : 2,
+  };
+}

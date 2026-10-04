@@ -189,3 +189,22 @@ describe('timing gate and delay migration', () => {
     expect(loadProfile().latencySource).toBe('learned');
   });
 });
+
+describe('off book needs two days', () => {
+  it('reaches level 5 only after passes on two different days', async () => {
+    const { recordAttempt, _resetAllForTests } = await import('./store');
+    _resetAllForTests();
+    const ok = { accuracy: 0.95, pitch: 0.95, rhythm: 1, score: 100, maxCombo: 5, counts: { perfect: 5, good: 0, ok: 0, miss: 0 }, notes: [], perMeasure: {}, insights: [] };
+    const d1 = new Date(2026, 9, 5, 20).getTime();
+    expect(recordAttempt('p', 'A', 's1', 4, ok, 10, d1 - 3600e3).newLevel).toBe(4);
+    let r = recordAttempt('p', 'A', 's1', 5, ok, 10, d1);
+    expect(r.passed).toBe(true);
+    expect(r.newLevel).toBe(4);
+    expect(r.offBookDays).toBe(1);
+    r = recordAttempt('p', 'A', 's1', 5, ok, 10, d1 + 3600e3); // same day
+    expect(r.newLevel).toBe(4);
+    r = recordAttempt('p', 'A', 's1', 5, ok, 10, d1 + 86400e3);
+    expect(r.newLevel).toBe(5);
+    expect(r.offBookDays).toBe(2);
+  });
+});

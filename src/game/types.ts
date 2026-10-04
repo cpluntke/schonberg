@@ -68,6 +68,7 @@ export type InsightKind =
   | 'wrong-notes'
   | 'quiet'
   | 'octave'
+  | 'tempo-drift'
   | 'great';
 
 export interface Insight {

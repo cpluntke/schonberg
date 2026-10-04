@@ -24,6 +24,19 @@ export interface DrawState {
   to: number;
   /** Length of one felt beat in score seconds at the current position (entry countdowns). */
   beatSec: number;
+  /**
+   * Off book: how to draw your note `i` before it has been sung. 'show' = normally, 'letters' =
+   * no pitch, just the first letter of its word on the bottom line, 'none' = nothing.
+   * Notes already sung are always shown (with their grade), as feedback.
+   */
+  hide?: (i: number) => 'show' | 'letters' | 'none';
+}
+
+/** First letter of the word a syllable starts ("" for a syllable inside a word). */
+export function wordInitial(n: { lyric?: string; syllabic?: string }): string {
+  if (!n.lyric || n.syllabic === 'middle' || n.syllabic === 'end') return '';
+  const m = /[\p{L}\p{N}]/u.exec(n.lyric);
+  return m ? m[0] : '';
 }
 
 export const COLORS = {
@@ -177,6 +190,22 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
     const isNow = n.start <= s.pos && s.pos < n.start + n.dur;
     if (isNow && inRange) current = i;
     const past = n.start + n.dur <= s.pos;
+    const vis = past || !s.hide ? 'show' : s.hide(i);
+    if (vis !== 'show') {
+      if (vis === 'letters' && inRange) {
+        const ch = wordInitial(n);
+        c.fillStyle = isNow ? COLORS.target : COLORS.targetText;
+        c.globalAlpha = isNow ? 1 : 0.8;
+        c.fillRect(nx, H - 44, Math.max(2, nw), 2); // rhythm: where the note sits, not its pitch
+        if (ch) {
+          c.font = '800 15px "Bricolage Grotesque", sans-serif';
+          c.textBaseline = 'alphabetic';
+          c.fillText(ch, nx, H - 50);
+        }
+        c.globalAlpha = 1;
+      }
+      continue;
+    }
     if (!inRange) {
       c.globalAlpha = 0.35;
       c.strokeStyle = COLORS.target;
@@ -267,7 +296,8 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
       const ahead = n.start - s.pos;
       if (afterRest && ahead <= 3 * beat && s.pos >= s.from - 0.01) {
         const k = Math.ceil(ahead / beat - 1e-6);
-        const ey = y(Math.max(lo, Math.min(hi, n.midi)));
+        // Off book the countdown mustn't give the pitch away.
+        const ey = s.hide && s.hide(i) !== 'show' ? top + 40 : y(Math.max(lo, Math.min(hi, n.midi)));
         c.font = '800 22px "Bricolage Grotesque", sans-serif';
         c.textBaseline = 'middle';
         c.fillStyle = COLORS.target;
@@ -307,7 +337,7 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
         if (last.time < notes[i].start + notes[i].dur) heard = i;
       }
     }
-    if (heard >= 0) {
+    if (heard >= 0 && !(s.hide && s.hide(heard) === 'none' && notes[heard].start + notes[heard].dur > s.pos)) {
       const target = notes[heard].midi;
       // Average over ~one vibrato cycle so the readout doesn't flicker.
       let sum = 0;

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { getLastRun, shareRun } from '../play/runExport';
+import { startColdStart } from '../play/cold';
 import { toast } from '../hooks';
 import { getLastResult } from '../play/lastResult';
 import { getPiece, singableSections } from '../library';
 import { go } from '../router';
-import { LEVELS, nextStep } from '../../progress/ladder';
+import { LEVELS, OFF_BOOK_DAYS, nextStep } from '../../progress/ladder';
 import { getProgress } from '../../progress/store';
 import { IconDown, IconUp, IconClock, IconLoop, IconStar, IconPlay, IconCube } from '../icons';
 import type { Insight } from '../../game/types';
@@ -74,7 +75,7 @@ export function Results() {
     <main className="screen">
       <div className="col" style={{ gap: 2, paddingTop: 8 }}>
         <span className="eyebrow">
-          {section?.label ?? (lr.sectionId === 'all' ? 'Whole piece' : 'Drill')} · {part?.name} · {spec ? `L${lr.level} ${spec.name}` : ''}
+          {section?.label ?? (lr.sectionId === 'all' ? 'Whole piece' : lr.sectionId === 'cold' ? 'Cold start' : 'Drill')} · {part?.name} · {spec ? `L${lr.level} ${spec.name}` : ''}
         </span>
         <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800 }}>{piece.title}</h1>
       </div>
@@ -91,14 +92,18 @@ export function Results() {
       )}
       {lr.notCounted && (
         <div className="notice info" role="status" data-testid="pass-banner">
-          <strong>Practice run:</strong> {lr.notCounted}{lr.timingUnsure != null ? '.' : <>, so it doesn't count toward the level. Sing the whole section at the level's tempo to level up.</>}
+          <strong>Practice run:</strong> {lr.notCounted}{lr.timingUnsure != null ? '.'
+            : lr.level === 5 && !/stopped early/.test(lr.notCounted) ? <>, so it doesn't count toward memorising the section yet. When the map shows it's ready, choose “Test: all hidden” and sing it without peeking.</>
+              : <>, so it doesn't count toward the level. Sing the whole section at the level's tempo to level up.</>}
           {lr.timingUnsure != null && <> <button className="linklike" onClick={() => go({ name: 'setup' })}>Open Voice setup</button></>}
         </div>
       )}
       {lr.ladder && (
         <div className={lr.passed ? 'notice info' : 'notice'} role="status" data-testid="pass-banner">
           {leveledUp
-            ? <><strong>Level {lr.newLevel} reached: {LEVELS[lr.newLevel - 1]?.name}!</strong> {lr.newLevel >= 4 ? 'This section is concert-ready.' : lr.newLevel >= 3 ? 'This section is rehearsal-ready.' : ''}</>
+            ? <><strong>Level {lr.newLevel} reached: {LEVELS[lr.newLevel - 1]?.name}!</strong> {lr.newLevel >= 5 ? 'This section is memorised.' : lr.newLevel >= 4 ? 'This section is concert-ready.' : lr.newLevel >= 3 ? 'This section is rehearsal-ready.' : ''}</>
+            : lr.passed && lr.level === 5 && lr.newLevel < 5
+              ? <><strong>Sung from memory!</strong> That's day {lr.offBookDays ?? 1} of {OFF_BOOK_DAYS}: do it again on another day and the section counts as memorised.</>
             : lr.passed
               ? <><strong>Passed.</strong> You keep level {lr.newLevel}.</>
               : lr.timingFail != null && r.accuracy >= (spec?.pass ?? 0.8)
@@ -171,7 +176,14 @@ export function Results() {
       )}
 
       <div className="col" style={{ gap: 8, marginTop: 'auto' }}>
-        {!lr.ladder && !lr.notCounted ? (
+        {lr.sectionId === 'cold' ? (
+          <button className="btn primary block" data-testid="cold-again" onClick={() => {
+            try { sessionStorage.setItem('sh:fromResults', '1'); } catch { /* ignore */ }
+            startColdStart(piece, lr.partId, lr.from, true);
+          }}>
+            <IconPlay size={18} /> Another cold start
+          </button>
+        ) : !lr.ladder && !lr.notCounted ? (
           /^row-|^leaps-/.test(piece.id) ? (
             <button className="btn primary block" onClick={() => go({ name: 'expert' })}>Back to expert mode</button>
           ) : (
@@ -198,7 +210,7 @@ export function Results() {
               Easier: level {lr.level - 1}
             </button>
           ) : !(!lr.passed && lr.ladder) ? (
-            <button className="btn block" onClick={() => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, level: lr.level, mode: lr.mode, ...(lr.sectionId === 'drill' ? { from: lr.from, to: lr.to } : {}) })}>Again</button>
+            <button className="btn block" onClick={() => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, level: lr.level, mode: lr.mode, ...(lr.sectionId === 'drill' || lr.sectionId === 'cold' ? { from: lr.from, to: lr.to } : {}) })}>Again</button>
           ) : null}
           <button className="btn block" onClick={() => go({ name: 'piece', pieceId: piece.id })}>All sections</button>
         </div>

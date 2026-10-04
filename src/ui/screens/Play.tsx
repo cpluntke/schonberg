@@ -3,18 +3,25 @@ import type { Route } from '../router';
 import { go, back } from '../router';
 import { getPiece, noteRangeFor, singableSections } from '../library';
 import { useProfile } from '../hooks';
-import { LEVELS, LISTEN, effectiveTolerance, pieceReadiness } from '../../progress/ladder';
+import { LEVELS, LISTEN, MAX_LEVEL, OFF_BOOK_DAYS, effectiveTolerance, pieceReadiness } from '../../progress/ladder';
 import { recordAttempt, getProgress, snapshotReadiness, personalBest } from '../../progress/store';
 import { keyAtTime } from '../../music/time';
 import { PracticeSession, estimateLatencyMs } from '../play/session';
 import { medianOnsetMs, scoreAligned } from '../../game/align';
+import { soloTimingInsight } from '../../game/analysis';
+import { exposedNotes } from '../../music/exposure';
+import { leadInFrom } from '../../game/coldstart';
+import { beatGrid } from '../../audio/player';
 
 /** Median entry this late (real ms) fails a level-2+ run even with the right notes (measured delay only). */
 const LATE_FAIL_MS = 250;
+/** Section ids that are not ladder sections (runs never change levels). */
+const GENERATED_SECTIONS = new Set(['all', 'drill', 'entries', 'cold']);
 /** Singing along with the guide, a run can only teach a delay this far above the device estimate. */
 const GUIDE_LEARN_MAX_ABOVE = 150;
 import { setLastRun } from '../play/runExport';
-import { drawHighway2D, pitchWindow, type DrawState } from '../play/highway2d';
+import { getBars, knownByHeart, recordBars } from '../../progress/bars';
+import { drawHighway2D, pitchWindow, wordInitial, type DrawState } from '../play/highway2d';
 import { drawArcade, lanesFor, newFx } from '../play/arcade3d';
 import { setLastResult } from '../play/lastResult';
 import { IconBack, IconPause, IconPlay, IconRestart, IconStop } from '../icons';
@@ -27,16 +34,18 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
   const [profile, updateProfile] = useProfile();
   const piece = getPiece(route.pieceId);
   const part = piece?.score.parts.find((p) => p.id === route.partId);
-  const level = Math.max(0, Math.min(4, route.level | 0));
+  const level = Math.max(0, Math.min(MAX_LEVEL, route.level | 0));
   const spec = level === 0 ? null : LEVELS[level - 1];
   const listenOnly = level === 0;
 
   const section = useMemo(() => {
     if (!piece) return null;
-    if (route.sectionId === 'all' || route.sectionId === 'drill' || route.sectionId === 'entries') {
+    if (GENERATED_SECTIONS.has(route.sectionId)) {
       const from = route.from ?? 0;
       const to = route.to ?? piece.score.duration;
-      const label = route.sectionId === 'all' ? 'Whole piece' : route.sectionId === 'entries' ? 'Entry drill' : 'Drill';
+      const bar = piece.score.measures.find((m) => Math.abs(m.start - from) < 1e-3);
+      const label = route.sectionId === 'all' ? 'Whole piece' : route.sectionId === 'entries' ? 'Entry drill'
+        : route.sectionId === 'cold' ? `Cold start: bar ${bar?.number ?? ''}` : 'Drill';
       return { id: route.sectionId, label, start: from, end: to };
     }
     const s = piece.sections.find((x) => x.id === route.sectionId);
@@ -80,6 +89,45 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
   }
 
   const range = piece && part && section ? noteRangeFor(piece, part.id, section.start, section.end) : null;
+
+  // Off book (level 5): your notes and words fade out bar by bar as you know them by heart
+  // ("practise"), or are all hidden ("test", the run that counts). Hold Peek to see the next bars.
+  const offBook = level === 5;
+  const sectionMeasures = useMemo(() => {
+    if (!piece || !section) return [] as number[];
+    return piece.score.measures.filter((m) => m.start >= section.start - 1e-6 && m.start < section.end - 1e-6).map((m) => m.index);
+  }, [piece, section]);
+  const known = useMemo(() => {
+    if (!offBook || !piece || !part || /~|^(row|leaps)-/.test(piece.id)) return new Set<number>();
+    const bars = getBars(piece.id, part.id);
+    return new Set(sectionMeasures.filter((m) => knownByHeart(bars[m])));
+  }, [offBook, piece, part, sectionMeasures]);
+  const allKnown = sectionMeasures.length > 0 && known.size === sectionMeasures.length;
+  const [obMode, setObMode] = useState<'fade' | 'test'>(() => 'fade');
+  const cold = route.sectionId === 'cold';
+  const effMode: 'fade' | 'test' = allKnown || cold ? 'test' : obMode;
+  const hiddenRef = useRef<Set<number>>(new Set());
+  hiddenRef.current = !offBook ? new Set() : effMode === 'test' ? new Set(sectionMeasures) : known;
+  const modeRef = useRef(effMode);
+  modeRef.current = effMode;
+  const peekRef = useRef<{ until: number; measures: Set<number> }>({ until: 0, measures: new Set() });
+  const [peeks, setPeeks] = useState(0);
+  function peekStart() {
+    const s = sessionRef.current;
+    if (!s || !piece) return;
+    const pos = s.position;
+    const ms = piece.score.measures;
+    const cur = ms.findIndex((m) => pos >= m.start - 1e-6 && pos < m.start + m.dur - 1e-6);
+    const at = cur >= 0 ? cur : ms.findIndex((m) => m.start >= pos);
+    const show = new Set([at, at + 1].filter((m) => m >= 0 && hiddenRef.current.has(m)));
+    if (!show.size) return;
+    for (const m of show) s.peeked.add(m);
+    peekRef.current = { until: performance.now() + 2000, measures: show };
+    setPeeks((n) => n + 1);
+  }
+  function peekEnd() {
+    peekRef.current = { until: 0, measures: new Set() };
+  }
   const tolerance = spec ? effectiveTolerance(level, profile.strictness) : 50;
   const showNames = spec ? spec.showNames : true;
   const notation = profile.notation as NotationMode;
@@ -100,7 +148,8 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
         rate,
         guide: listenOnly || !!spec?.guide,
         listenOnly,
-        cue: route.sectionId === 'entries' ? 'none' : spec?.cue ?? 'note',
+        cue: route.sectionId === 'entries' || route.sectionId === 'cold' ? 'none' : spec?.cue ?? 'note',
+        leadFrom: route.sectionId === 'cold' ? leadInFrom(piece.score, piece.score.measures.findIndex((m) => Math.abs(m.start - section.start) < 1e-3)) : undefined,
         scoring: { toleranceCents: tolerance, tuning: profile.tuning, octaveTolerant },
         latencyMs: profile.latencyMs || 0,
         range,
@@ -108,6 +157,7 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
         // (The short window needs a known range: someone singing the part an octave down mustn't get it.)
         lowestMidi: profile.voice === 'T' || profile.voice === 'B' || profile.rangeLow == null ? null : Math.min(part.low, profile.rangeLow),
         record: profile.keepRecording !== false && !listenOnly,
+        beat: profile.beat ?? 'alone',
         simulate: simulateMode(),
       },
       (r) => onDone(r),
@@ -181,6 +231,15 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
         timingUnsure = Math.round(al.beyondCapMs ?? med!);
       }
     }
+    // Tempo where you sing alone: rushing or dragging with nobody else playing.
+    if (sess && sess.exposed.size) {
+      const idx = new Set(r.notes.map((n) => n.index));
+      const ex = exposedNotes(piece.score, part.id, sess.exposed, beatGrid(piece.score, sess.cfg.from, sess.cfg.to)).filter((i) => idx.has(i));
+      const ins = soloTimingInsight({ score: piece.score, part, range: [Math.min(...idx), Math.max(...idx)] }, ex, sess.samples);
+      if (ins) r = { ...r, insights: [ins, ...r.insights.filter((i) => i.kind !== 'great')] };
+    }
+    // Per-bar history for the piece map and off-book fading (real pieces only, not generated drills).
+    if (!/~|^(row|leaps)-/.test(piece.id)) recordBars(piece.id, part.id, r, level, { peeked: sess?.peeked });
     setLastRun(sess?.recording ? {
       recording: sess.recording,
       at: Date.now(),
@@ -191,9 +250,12 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
         alignedMs: alignedMs ?? 0, samples: sess.samples, result: r,
       },
     } : null);
-    const realSection = section.id !== 'all' && section.id !== 'drill' && section.id !== 'entries';
+    const realSection = !GENERATED_SECTIONS.has(section.id);
     const partial = !!sessionRef.current?.partial;
-    const ladder = realSection && !partial && timingUnsure == null && (rateOverride == null || rateOverride >= (spec?.rate ?? 1) - 1e-6);
+    // Off book only counts when everything was hidden and nothing was peeked at.
+    const peekedN = sess?.peeked.size ?? 0;
+    const offBookPractice = offBook && (peekedN > 0 || hiddenRef.current.size < sectionMeasures.length);
+    const ladder = realSection && !partial && timingUnsure == null && !offBookPractice && (rateOverride == null || rateOverride >= (spec?.rate ?? 1) - 1e-6);
     // Practice runs (slower tempo, stopped early) are logged but never change section levels.
     const recId = ladder || !realSection ? section.id : 'practice';
     const durationSec = (section.end - section.start) / rate;
@@ -212,8 +274,10 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
       timingFail,
       latencyUsedMs: sess ? Math.round(sess.latencyMs) : undefined,
       timingUnsure,
+      offBookDays: rec.offBookDays,
       notCounted: realSection && !ladder
         ? (partial ? 'stopped early'
+          : offBookPractice ? (peekedN > 0 ? `you peeked at ${peekedN} bar${peekedN > 1 ? 's' : ''}` : 'some bars were still showing (practice mode)')
           : timingUnsure != null ? `your voice reached the app about ${timingUnsure} ms after the beat, and without the delay check the app can't tell whether that's your timing or your phone and headphones. Do the 10-second delay check in Voice setup`
             : 'slower than the level’s tempo')
         : undefined,
@@ -295,6 +359,13 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
         ghostParts,
         lo, hi, from: section.start, to: section.end,
         beatSec: s ? s.beatSec(Math.max(0, pos)) : 60 / tempoAt(piece.score.tempos, Math.max(0, pos)),
+        hide: offBook ? (i: number) => {
+          const m = part.notes[i]?.measure ?? -1;
+          if (!hiddenRef.current.has(m)) return 'show';
+          const pk = peekRef.current;
+          if (pk.until > performance.now() && pk.measures.has(m)) return 'show';
+          return modeRef.current === 'test' ? 'none' : 'letters';
+        } : undefined,
       };
       if (route.mode === '3d') drawArcade(c, W, H, st, fxRef.current, (lanes ??= lanesFor(st)), ts / 1000);
       else drawHighway2D(c, W, H, st);
@@ -310,6 +381,7 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
         if (s && s.phase === 'countin') {
           const target = sessionStartTarget(s, section.start);
           if (pos < target) count = Math.ceil((target - pos) / s.beatSec(target) - 1e-6);
+          if (count > 4) count = 0; // a cold start's lead-in bars: only count the last beats
         }
         let lyricIdx = -1;
         for (let i = 0; i < part.notes.length; i++) {
@@ -323,7 +395,7 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [piece, part, section, route.mode, notation, showNames, rate, tolerance]);
+  }, [piece, part, section, route.mode, notation, showNames, rate, tolerance, offBook]);
 
   useEffect(() => {
     if (firstTime) try { localStorage.setItem('sh:seenHowto', '1'); } catch { /* ignore */ }
@@ -353,7 +425,11 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
     );
   }
 
-  const lyric = lyricLine(part.notes, hud.lyricIdx, range);
+  const lyricNotes = offBook && hiddenRef.current.size
+    ? part.notes.map((n, i) => (i <= hud.lyricIdx || !hiddenRef.current.has(n.measure) ? n
+      : { ...n, lyric: effMode === 'fade' ? wordInitial(n) || undefined : undefined, syllabic: 'single' as const }))
+    : part.notes;
+  const lyric = lyricLine(lyricNotes, hud.lyricIdx, range);
   const vocal = piece.score.parts.filter((p) => p.notes.length > 0 || p.voiceType === 'other');
   const levelInfo = spec ?? null;
   const running = phase === 'running';
@@ -411,6 +487,31 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
                   {Math.round(rate * 100)}% tempo · ±{tolerance}¢ · pass at {Math.round(levelInfo.pass * 100)}% · start: {levelInfo.cue === 'chord' ? 'chord only' : 'your note'}
                 </span>
               )}
+              {cold && (
+                <span className="small">You'll hear two bars of the other voices, then come in at bar {piece.score.measures.find((m) => Math.abs(m.start - section.start) < 1e-3)?.number} from memory: no starting note, nothing of your part shown.</span>
+              )}
+              {offBook && !cold && (
+                <div className="col" style={{ gap: 6 }} data-testid="offbook-mode">
+                  {allKnown ? (
+                    <span className="small">You know every bar of this section by heart: this is the real test. Everything is hidden.</span>
+                  ) : (
+                    <>
+                      <div className="chips" role="group" aria-label="Off-book mode">
+                        <button className="chip" aria-pressed={obMode === 'fade'} onClick={() => setObMode('fade')}>Practise: fade out</button>
+                        <button className="chip" aria-pressed={obMode === 'test'} onClick={() => setObMode('test')}>Test: all hidden</button>
+                      </div>
+                      <span className="small muted">
+                        {obMode === 'fade'
+                          ? known.size === 0
+                            ? 'All bars still show. Bars you sing well from memory disappear, leaving the first letter of each word.'
+                            : `${known.size} of ${sectionMeasures.length} bars are hidden (you know them). Hidden bars show only the first letter of each word.`
+                          : 'Nothing of your part is shown. Only a run with no peeking counts.'}
+                      </span>
+                    </>
+                  )}
+                  <span className="tiny muted">Hold “Peek” to see the next bars for two seconds. Pass off book on {OFF_BOOK_DAYS} different days and the section is memorised.</span>
+                </div>
+              )}
               {level === 1 && (
                 <label className="field">
                   <span className="small">Tempo {Math.round(rate * 100)}%{rate < (spec?.rate ?? 1) - 1e-6 ? ' (slower than the level: practice only, won’t count)' : ''}</span>
@@ -426,7 +527,7 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
                 </div>
               )}
               {!listenOnly && <span className="tiny muted">Wear headphones so the mic only hears you.{!profile.latencyMs ? ' Tip: run voice setup once to measure your headphone delay.' : ''}</span>}
-              {listenOnly && listened && section.id !== 'all' && section.id !== 'drill' && section.id !== 'entries' ? (
+              {listenOnly && listened && !GENERATED_SECTIONS.has(section.id) ? (
                 <>
                   <button className="btn primary block" onClick={() => go({ ...route, level: 1 }, true)} data-testid="learn-next">
                     <IconPlay size={18} /> Now learn it: level 1
@@ -489,6 +590,14 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
             <IconRestart size={16} /> Restart
           </button>
           <div className="grow" />
+          {offBook && running && hiddenRef.current.size > 0 && (
+            <button className="btn small" data-testid="peek"
+              onPointerDown={(e) => { e.preventDefault(); peekStart(); }} onPointerUp={peekEnd} onPointerLeave={peekEnd} onPointerCancel={peekEnd}
+              onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); peekStart(); } }} onKeyUp={peekEnd}
+              onContextMenu={(e) => e.preventDefault()} style={{ touchAction: 'none', userSelect: 'none' }}>
+              Peek{peeks ? ` (${peeks})` : ''}
+            </button>
+          )}
           {running ? (
             <>
               {!listenOnly && <button className="btn small" onClick={() => sessionRef.current?.finish()}><IconStop size={14} color="#EEF0FF" /> Finish</button>}

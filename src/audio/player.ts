@@ -19,7 +19,8 @@ export interface PlayOptions {
   rate: number;
   partGains: Record<string, number>;
   countInBeats?: number;
-  click?: boolean;
+  /** Beat clicks during playback: on every beat, or only on beats the predicate picks. */
+  click?: boolean | ((scoreTime: number) => boolean);
   cuePartId?: string;
   cue?: 'note' | 'chord' | 'none';
 }
@@ -241,7 +242,10 @@ export class ScorePlayer {
       }
     }
     if (opts.click) {
-      for (const b of beatGrid(this.score, from, to)) events.push({ kind: 'click', t: b.time, downbeat: b.downbeat });
+      const pick = opts.click;
+      for (const b of beatGrid(this.score, from, to)) {
+        if (pick === true || pick(b.time)) events.push({ kind: 'click', t: b.time, downbeat: b.downbeat });
+      }
     }
     events.sort((a, b) => a.t - b.t);
 

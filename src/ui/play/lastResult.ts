@@ -24,6 +24,8 @@ export interface LastResult {
   alignedMs?: number;
   /** Without a measured delay the entries came this late (ms): the run didn't count, the delay check is needed. */
   timingUnsure?: number;
+  /** Level 5: different days passed off book so far. */
+  offBookDays?: number;
   /** Delay the app applied during the run (ms). */
   latencyUsedMs?: number;
   /** The measured delay looks off: suggest redoing the delay check. */

@@ -3,7 +3,7 @@
 import type { Section } from '../music/types';
 import type { PieceProgress, SectionProgress } from './store';
 
-export type LevelNumber = 1 | 2 | 3 | 4;
+export type LevelNumber = 1 | 2 | 3 | 4 | 5;
 export type Strictness = 'forgiving' | 'standard' | 'strict';
 
 export interface LevelSpec {
@@ -41,7 +41,16 @@ export const LEVELS: LevelSpec[] = [
     level: 4, name: 'Concert-ready', rate: 1.0, guide: false, showNames: false, cue: 'chord', tolerance: 25, pass: 0.85,
     description: 'No guide, no note names (lyrics only), starting chord only. Concert-ready.',
   },
+  {
+    level: 5, name: 'Off book', rate: 1.0, guide: false, showNames: false, cue: 'chord', tolerance: 25, pass: 0.85,
+    description: 'From memory: your notes and words fade out as you learn them, while the other voices play. Passed off book on two different days = memorised.',
+  },
 ];
+
+/** The highest level. Concert-ready (4) is the top of readiness; off book (5) is memorisation on top. */
+export const MAX_LEVEL = 5;
+/** Off-book passes needed on different days before a section counts as memorised. */
+export const OFF_BOOK_DAYS = 2;
 
 /** Level 0 pseudo-level: listen once, all parts, unscored. */
 export const LISTEN = {
@@ -56,9 +65,9 @@ export const LISTEN = {
 export const REVIEW_AFTER_DAYS = 7;
 const DAY_MS = 86_400_000;
 
-/** Spec for level 1..4 (values outside are clamped). */
+/** Spec for level 1..5 (values outside are clamped). */
 export function levelSpec(level: number): LevelSpec {
-  const i = Math.min(4, Math.max(1, Math.round(level || 1))) - 1;
+  const i = Math.min(MAX_LEVEL, Math.max(1, Math.round(level || 1))) - 1;
   return LEVELS[i];
 }
 
@@ -93,18 +102,33 @@ export function sectionStatus(sp: SectionProgress | undefined, now: number = Dat
   return 'learning';
 }
 
-export interface Readiness { pct: number; minLevel: number; rehearsalReady: boolean; concertReady: boolean }
+export interface Readiness {
+  /** Share of the way to concert-ready (levels above 4 don't add to it). */
+  pct: number;
+  minLevel: number;
+  rehearsalReady: boolean;
+  concertReady: boolean;
+  /** Every section passed off book (level 5). */
+  memorised: boolean;
+  /** Sections at level 5. */
+  memorisedSections: number;
+}
 
 export function pieceReadiness(sections: Section[], prog: PieceProgress | undefined): Readiness {
-  if (sections.length === 0) return { pct: 0, minLevel: 0, rehearsalReady: false, concertReady: false };
+  if (sections.length === 0) return { pct: 0, minLevel: 0, rehearsalReady: false, concertReady: false, memorised: false, memorisedSections: 0 };
   let sum = 0;
-  let min = 4;
+  let min = MAX_LEVEL;
+  let mem = 0;
   for (const s of sections) {
-    const l = Math.min(4, Math.max(0, levelOf(prog, s.id)));
-    sum += l;
+    const l = Math.min(MAX_LEVEL, Math.max(0, levelOf(prog, s.id)));
+    sum += Math.min(4, l);
     min = Math.min(min, l);
+    if (l >= 5) mem++;
   }
-  return { pct: sum / (4 * sections.length), minLevel: min, rehearsalReady: min >= 3, concertReady: min >= 4 };
+  return {
+    pct: sum / (4 * sections.length), minLevel: min, rehearsalReady: min >= 3, concertReady: min >= 4,
+    memorised: min >= 5, memorisedSections: mem,
+  };
 }
 
 export interface NextStep { sectionId: string; level: number; reason: string }
@@ -136,12 +160,14 @@ export function nextStep(sections: Section[], prog: PieceProgress | undefined, n
     const l = levelOf(prog, s.id);
     if (l < bestLevel) { best = s; bestLevel = l; }
   }
-  if (!best || bestLevel >= 4) return null;
-  const target = Math.min(4, bestLevel + 1);
+  if (!best || bestLevel >= MAX_LEVEL) return null;
+  const target = Math.min(MAX_LEVEL, bestLevel + 1);
   const spec = levelSpec(target);
   const reason = bestLevel === 0
     ? `Start ${best.label}: learn the notes at ${Math.round(spec.rate * 100)}% tempo.`
-    : `${best.label} is your weakest section. Take it to ${spec.name}.`;
+    : target === 5
+      ? `Everything is concert-ready. Now learn ${best.label} by heart.`
+      : `${best.label} is your weakest section. Take it to ${spec.name}.`;
   return { sectionId: best.id, level: target, reason };
 }
 

@@ -151,6 +151,14 @@ export function Settings() {
             onChange={(e) => update({ latencyMs: Math.max(0, Math.min(600, Number(e.target.value) || 0)), latencySource: 'measured' })}
             style={{ width: 90, minHeight: 40, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--line)', padding: '0 8px' }} />
         </label>
+        <label className="toggle-row"><span>Practice beat<span className="tiny muted" style={{ display: 'block' }}>A soft click keeps the tempo where you sing on your own.</span></span>
+          <select aria-label="Practice beat" value={profile.beat ?? 'alone'} onChange={(e) => update({ beat: e.target.value as 'off' | 'alone' | 'always' })}
+            style={{ minHeight: 40, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--line)', padding: '0 8px' }}>
+            <option value="alone">When I sing alone</option>
+            <option value="always">Always</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
         <label className="toggle-row"><span>Keep a recording of my last run<span className="tiny muted" style={{ display: 'block' }}>Only on this phone, so you can share it if the scoring seems off.</span></span>
           <input type="checkbox" checked={profile.keepRecording !== false} onChange={(e) => { update({ keepRecording: e.target.checked }); if (!e.target.checked) setLastRun(null); }} />
         </label>

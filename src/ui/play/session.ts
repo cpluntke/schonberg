@@ -3,7 +3,8 @@ import type { Part, Score } from '../../music/types';
 import type { AttemptResult, PitchSample, ScoringOptions } from '../../game/types';
 import { getAudioContext, unlockAudio, outputLatencySec } from '../../audio/context';
 import { PitchTracker, fixSubharmonic, type RawPitch } from '../../audio/pitch';
-import { ScorePlayer, beatsInMeasure, beatSecAt } from '../../audio/player';
+import { ScorePlayer, beatGrid, beatsInMeasure, beatSecAt } from '../../audio/player';
+import { exposedBeats } from '../../music/exposure';
 import { LiveScorer, scoreAttempt, type ScoringContext } from '../../game/scoring';
 import { RunRecorder, type Recording } from '../../audio/recorder';
 
@@ -51,6 +52,10 @@ export interface SessionConfig {
   range: [number, number] | null;
   /** Lowest note the singer is expected to sing (selects the pitch tracker's window). */
   lowestMidi?: number | null;
+  /** Cold start: playback begins here (earlier than `from`, no count-in, no cue); scoring at `from`. */
+  leadFrom?: number;
+  /** Practice beat: 'alone' = only where nothing you can hear is playing. */
+  beat?: 'off' | 'alone' | 'always';
   /** Keep a recording of the run (memory only) so it can be shared as a reference recording. */
   record?: boolean;
   /** Testing / demo: synthesise the singer instead of using the mic. */
@@ -85,6 +90,10 @@ export class PracticeSession {
   private wakeLock: { release(): Promise<void> } | null = null;
   private onDone: (r: AttemptResult | null) => void;
   latest: PitchSample | null = null;
+  /** Beats (score time) where the singer was on their own in the last playback. */
+  exposed = new Set<number>();
+  /** Measures the singer peeked at during an off-book run. */
+  readonly peeked = new Set<number>();
   private recorder: RunRecorder | null = null;
   private plays = 0;
   /** The run's recording (only for uninterrupted runs), with the score time of its first sample. */
@@ -157,18 +166,34 @@ export class PracticeSession {
       if (this.cfg.listenOnly) return this.finish();
       this.endTimer = window.setTimeout(() => this.finish(), Math.min(700, this.latencyMs + 120));
     });
+    // Cold start: the other voices lead in for a couple of bars instead of a count-in.
+    const lead = this.cfg.leadFrom != null && this.cfg.leadFrom < from - 1e-6 && Math.abs(from - this.cfg.from) < 1e-6 ? this.cfg.leadFrom : null;
     this.player.play({
-      from,
+      from: lead ?? from,
       to: this.cfg.to,
       rate: this.cfg.rate,
       partGains: this.partGains,
-      countInBeats: countIn ? this.countInBeats(from) : 0,
-      click: false,
+      countInBeats: lead != null ? 0 : countIn ? this.countInBeats(from) : 0,
+      click: this.clickFor(lead ?? from),
       cuePartId: this.cfg.part.id,
       // After a resume, give the note as a reminder — except at concert level, which only gets the chord.
-      cue: from === this.cfg.from || this.cfg.cue !== 'note' ? this.cfg.cue : 'note',
+      cue: lead != null ? 'none' : from === this.cfg.from || this.cfg.cue !== 'note' ? this.cfg.cue : 'note',
     });
     this.phase = 'countin';
+  }
+
+  /** The practice beat for a playback starting at `from`. */
+  private clickFor(from: number): boolean | ((t: number) => boolean) {
+    const mode = this.cfg.beat ?? 'alone';
+    if (mode === 'always' && !this.cfg.listenOnly) return true;
+    if (mode !== 'alone' || this.cfg.listenOnly) return false;
+    const audible = new Set(Object.entries(this.partGains).filter(([, g]) => g > 0).map(([id]) => id));
+    const beats = beatGrid(this.cfg.score, from, this.cfg.to);
+    const m = this.cfg.score.measures.find((x) => from >= x.start - 1e-6 && from < x.start + x.dur - 1e-6);
+    // A stretch of at least a bar on your own.
+    this.exposed = exposedBeats(this.cfg.score, audible, beats, Math.max(2, beatsInMeasure(m?.timeSig ?? [4, 4])));
+    const ex = this.exposed;
+    return ex.size ? (t: number) => ex.has(t) : false;
   }
 
   /** Count-in: one bar of felt beats (2/2 → 2, 6/8 → 2, 3/4 → 3), at least 2 and at most 4. */

@@ -26,10 +26,11 @@ describe('ladder', () => {
       [2, 'In time', 1.0, true, true, 'note', 35, 0.8],
       [3, 'Independent', 1.0, false, true, 'note', 30, 0.8],
       [4, 'Concert-ready', 1.0, false, false, 'chord', 25, 0.85],
+      [5, 'Off book', 1.0, false, false, 'chord', 25, 0.85],
     ]);
     expect(LISTEN.level).toBe(0);
     expect(levelSpec(3).name).toBe('Independent');
-    expect(levelSpec(9).level).toBe(4);
+    expect(levelSpec(9).level).toBe(5);
   });
   it('strictness scales tolerance', () => {
     expect(strictnessFactor('forgiving')).toBe(1.3);
@@ -38,20 +39,27 @@ describe('ladder', () => {
     expect(effectiveTolerance(4, 'strict')).toBe(20);
   });
   it('readiness', () => {
-    expect(pieceReadiness(secs, undefined)).toEqual({ pct: 0, minLevel: 0, rehearsalReady: false, concertReady: false });
+    expect(pieceReadiness(secs, undefined)).toEqual({ pct: 0, minLevel: 0, rehearsalReady: false, concertReady: false, memorised: false, memorisedSections: 0 });
     const r = pieceReadiness(secs, prog([4, 3, 3, 2]));
     expect(r.pct).toBeCloseTo(12 / 16);
     expect(r.minLevel).toBe(2);
     expect(r.rehearsalReady).toBe(false);
     expect(pieceReadiness(secs, prog([3, 3, 4, 3])).rehearsalReady).toBe(true);
     expect(pieceReadiness(secs, prog([4, 4, 4, 4])).concertReady).toBe(true);
+    // Off book is memorisation on top: it doesn't push readiness past 100%.
+    const m = pieceReadiness(secs, prog([5, 5, 4, 5]));
+    expect(m.pct).toBe(1);
+    expect(m.memorised).toBe(false);
+    expect(m.memorisedSections).toBe(3);
+    expect(pieceReadiness(secs, prog([5, 5, 5, 5])).memorised).toBe(true);
     expect(pieceReadiness([], undefined).pct).toBe(0);
   });
   it('nextStep: earliest lowest section, attempt current+1', () => {
     expect(nextStep(secs, undefined, NOW)).toMatchObject({ sectionId: 's0', level: 1 });
     expect(nextStep(secs, prog([2, 1, 3, 1]), NOW)).toMatchObject({ sectionId: 's1', level: 2 });
     expect(nextStep(secs, prog([4, 4, 4, 3]), NOW)).toMatchObject({ sectionId: 's3', level: 4 });
-    expect(nextStep(secs, prog([4, 4, 4, 4]), NOW)).toBeNull();
+    expect(nextStep(secs, prog([4, 4, 4, 4]), NOW)).toMatchObject({ sectionId: 's0', level: 5 });
+    expect(nextStep(secs, prog([5, 5, 5, 5]), NOW)).toBeNull();
   });
   it('nextStep: due review first, most overdue, at current level', () => {
     const p = prog([4, 1, 3, 4], {

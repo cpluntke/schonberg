@@ -4,7 +4,7 @@
 import { get as idbGet, set as idbSet, del as idbDel, keys as idbKeys } from 'idb-keyval';
 import type { Score, Section, VoiceType } from '../music/types';
 import type { AttemptResult, TuningMode } from '../game/types';
-import { LEVELS, isDue, type Strictness } from './ladder';
+import { LEVELS, MAX_LEVEL, OFF_BOOK_DAYS, isDue, type Strictness } from './ladder';
 
 /** Structurally identical to game/notation.ts NotationMode. */
 export type NotationMode = 'letter' | 'fixed' | 'movable' | 'jianpu' | 'pc';
@@ -36,6 +36,8 @@ export interface Profile {
   latencySource?: 'measured' | 'learned';
   /** Delay suggested by the last run (ms), waiting for a second run to agree before it's learned. */
   latencyHint?: number;
+  /** Practice beat: never, only where you sing alone (default), or always. */
+  beat?: 'off' | 'alone' | 'always';
   /** Keep the last run's recording in memory so it can be shared (default on). */
   keepRecording?: boolean;
   rangeLow?: number;
@@ -55,6 +57,8 @@ export interface SectionProgress {
   attempts: number;
   lastPracticed?: number;
   lastPassed?: number;
+  /** Local dates (YYYY-MM-DD) of off-book (level 5) passes; level 5 needs two different days. */
+  offBookDays?: string[];
 }
 
 export interface PieceProgress {
@@ -257,11 +261,18 @@ export function resetProgress(pieceId: string, partId: string): void {
   emit();
 }
 
-export interface RecordResult { passed: boolean; newLevel: number; prevLevel: number }
+export interface RecordResult {
+  passed: boolean;
+  newLevel: number;
+  prevLevel: number;
+  /** Level 5: different days passed off book so far (memorised at OFF_BOOK_DAYS). */
+  offBookDays?: number;
+}
 
 /**
  * Record one attempt. Level 0 (listen) only updates lastPracticed (and the log).
- * Any level 1..4 may be attempted (skip-ahead allowed); passing sets level = max(current, level).
+ * Any level 1..5 may be attempted (skip-ahead allowed); passing sets level = max(current, level).
+ * Level 5 (off book) is only reached after passes on OFF_BOOK_DAYS different days.
  */
 export function recordAttempt(
   pieceId: string,
@@ -279,7 +290,7 @@ export function recordAttempt(
   const sp: SectionProgress = prog.sections[sectionId] ?? { level: 0, best: {}, attempts: 0 };
   sp.best ??= {};
   const prevLevel = sp.level ?? 0;
-  const lvl = Math.max(0, Math.min(4, Math.round(level)));
+  const lvl = Math.max(0, Math.min(MAX_LEVEL, Math.round(level)));
   const accuracy = Number.isFinite(result.accuracy) ? result.accuracy : 0;
   const score = Number.isFinite(result.score) ? result.score : 0;
 
@@ -293,8 +304,16 @@ export function recordAttempt(
     sp.bestScore = { ...(sp.bestScore ?? {}) };
     sp.bestScore[lvl] = Math.max(sp.bestScore[lvl] ?? 0, score);
     sp.lastPracticed = now;
+    let reach = lvl;
+    if (passed && lvl === 5) {
+      const d = new Date(now);
+      const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      sp.offBookDays = [...new Set([...(sp.offBookDays ?? []), day])].slice(-5);
+      // Memorised only once it held on a second day; until then it stays concert-ready.
+      if (sp.offBookDays.length < OFF_BOOK_DAYS) reach = 4;
+    }
     if (passed) {
-      sp.level = Math.max(prevLevel, lvl);
+      sp.level = Math.max(prevLevel, reach);
       // Passing at (or above) the current level counts as a review.
       if (lvl >= prevLevel) sp.lastPassed = now;
     }
@@ -310,7 +329,7 @@ export function recordAttempt(
   log.push(entry);
   writeJSON(K.log, log.length > LOG_CAP ? log.slice(log.length - LOG_CAP) : log, false);
   emit();
-  return { passed, newLevel: sp.level, prevLevel };
+  return { passed, newLevel: sp.level, prevLevel, ...(lvl === 5 ? { offBookDays: sp.offBookDays?.length ?? 0 } : {}) };
 }
 
 export function personalBest(
