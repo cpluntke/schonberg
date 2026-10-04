@@ -3,6 +3,7 @@ import { IconPlay } from '../icons';
 import { go, type Route } from '../router';
 import { allPieces, getPiece, chosenPartId, singableSections } from '../library';
 import { loadCycle, loadProfile } from '../../progress/store';
+import { nextUpRoute } from '../plan';
 
 const BASE = import.meta.env.BASE_URL || './';
 export const INTRO_SRC = `${BASE}media/onboarding.mp4`;
@@ -65,8 +66,13 @@ export function IntroVideoModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-/** Level 1 of the first section of the first piece in the cycle (what the video's last step asks for). */
+/**
+ * What the video's last step asks for: the run Home's "Next up" starts (for a new singer, level 1
+ * of a first section), else level 1 of the first section of the first piece in the cycle.
+ */
 export function firstRunRoute(): Route | null {
+  const next = nextUpRoute();
+  if (next) return next.route;
   const profile = loadProfile();
   const piece = loadCycle().pieceIds.map((id) => getPiece(id)).find(Boolean) ?? allPieces()[0];
   if (!piece) return null;
@@ -90,7 +96,7 @@ function TryItNow({ onClose }: { onClose: () => void }) {
         <strong className="small">{title}</strong>
         <span className="tiny muted">{sub}</span>
       </span>
-      <button className={`btn small${primary ? ' primary' : ''}`} onClick={() => { onClose(); onGo(); }}>{label}</button>
+      <button className={`btn small${primary ? ' primary' : ''}`} style={{ whiteSpace: 'nowrap', flex: 'none' }} onClick={() => { onClose(); onGo(); }}>{label}</button>
     </div>
   );
   return (
@@ -98,7 +104,8 @@ function TryItNow({ onClose }: { onClose: () => void }) {
       <span className="eyebrow">Try it now · about 5 minutes</span>
       {step(1, setupDone, 'Put on headphones, do the voice setup', 'Choir code, a short do-re-mi, and the delay check', setupDone ? 'Redo' : 'Start voice setup',
         () => go({ name: 'setup' }), !setupDone)}
-      {first && step(2, false, 'Sing level 1 of your first section', firstPiece ? `${firstPiece.title}: slow, with your part playing` : 'Slow, with your part playing', 'Sing it',
+      {first && first.name === 'play' && step(2, false, first.level <= 1 ? 'Sing level 1 of your first section' : `Sing your next step: level ${first.level}`,
+        firstPiece ? `${firstPiece.title}${first.level <= 1 ? ': slow, with your part playing' : ''}` : 'Slow, with your part playing', 'Sing it',
         () => go(first), setupDone)}
     </div>
   );

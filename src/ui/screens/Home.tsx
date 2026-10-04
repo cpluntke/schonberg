@@ -1,13 +1,16 @@
 import React from 'react';
-import { allPieces, getPiece, chosenPartId, singableSections, type PieceInfo } from '../library';
+import { allPieces, getPiece, singableSections, type PieceInfo } from '../library';
 import { useProfile, useStoreVersion, formatDate, daysUntil, initials } from '../hooks';
 import { go } from '../router';
-import { loadCycle, getProgress, streakDays, dueForReview, attemptLog, sameWork } from '../../progress/store';
-import { pieceReadiness, nextStep, levelSpec } from '../../progress/ladder';
+import { loadCycle, getProgress, streakDays, sameWork } from '../../progress/store';
+import { levelSpec } from '../../progress/ladder';
 import { nextRehearsal } from '../../progress/rehearsal';
 import { rowOfTheDay } from '../../game/twelvetone';
 import { IconFlame, IconPlay, IconMic } from '../icons';
 import { IntroVideoButton } from '../components/IntroVideo';
+import { pieceStatus, todaysPlan, type PieceStatus } from '../plan';
+
+export { pieceStatus, type PieceStatus };
 
 function pcSym(p: number) { return p === 10 ? 't' : p === 11 ? 'e' : String(p); }
 
@@ -19,31 +22,6 @@ export function greeting(now = new Date()): string {
   return 'Guten Abend';
 }
 
-export interface PieceStatus {
-  piece: PieceInfo;
-  partId: string;
-  partName: string;
-  pct: number;
-  minLevel: number;
-  rehearsalReady: boolean;
-  concertReady: boolean;
-  due: string[];
-  next: ReturnType<typeof nextStep>;
-}
-
-export function pieceStatus(piece: PieceInfo, voice: string): PieceStatus {
-  const partId = chosenPartId(piece, voice);
-  const part = piece.score.parts.find((x) => x.id === partId);
-  const sections = singableSections(piece, partId);
-  const prog = getProgress(piece.id, partId);
-  const r = pieceReadiness(sections, prog);
-  return {
-    piece, partId, partName: part?.name ?? '', ...r,
-    due: dueForReview(piece.id, partId, sections),
-    next: nextStep(sections, prog),
-  };
-}
-
 export function Home() {
   const [profile] = useProfile();
   useStoreVersion();
@@ -51,16 +29,8 @@ export function Home() {
   const cyclePieces = cycle.pieceIds.map((id) => getPiece(id)).filter(Boolean) as PieceInfo[];
   const statuses = cyclePieces.map((p) => pieceStatus(p, profile.voice));
   const streak = streakDays();
-  // Today's plan: reviews first, then continue the piece you practised most recently, then the rest.
-  const lastPractised = new Map<string, number>();
-  for (const e of attemptLog()) lastPractised.set(e.pieceId, Math.max(lastPractised.get(e.pieceId) ?? 0, e.at));
-  // Pieces the next rehearsal works on come first (if they still need work), then reviews, then recency.
   const focusIds = new Set(cycle.focusPieceIds ?? []);
-  const ordered = [...statuses].sort((a, b) =>
-    (focusIds.has(b.piece.id) && !b.rehearsalReady ? 1 : 0) - (focusIds.has(a.piece.id) && !a.rehearsalReady ? 1 : 0)
-    || (b.due.length ? 1 : 0) - (a.due.length ? 1 : 0)
-    || (lastPractised.get(b.piece.id) ?? 0) - (lastPractised.get(a.piece.id) ?? 0));
-  const plan = ordered.filter((s) => s.next && (!s.concertReady || s.due.length)).slice(0, 3);
+  const plan = todaysPlan(statuses, cycle);
   const focus = plan[0] ?? null;
   const row = rowOfTheDay(new Date());
   const nr = nextRehearsal(cycle);

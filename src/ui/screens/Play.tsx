@@ -508,8 +508,9 @@ function SingPlay({ route }: { route: PlayRoute }) {
           </div>
         )}
         {phase === 'ready' && (
-          <div className="overlay">
-            <div className="card">
+          // Scrolls on short phones; the card stays centred when it fits.
+          <div className="overlay" style={{ overflowY: 'auto', alignItems: 'flex-start' }}>
+            <div className="card" style={{ margin: 'auto 0', flex: 'none' }}>
               <span className="eyebrow">{listenOnly ? 'Level 0 · Listen' : `Level ${level} · ${levelInfo?.name}`}</span>
               <strong style={{ fontSize: 18 }}>{section.label}</strong>
               {!cold && <span className="small muted">{listenOnly ? LISTEN.description : levelInfo?.description}</span>}
