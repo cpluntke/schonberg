@@ -64,8 +64,12 @@ export class PracticeSession {
   private simTimer: number | null = null;
   /** Samples earlier than this are ignored (count-in before the start, or before a resume point). */
   private minTime: number;
-  /** Effective mic round-trip latency: calibrated, else a conservative estimate. */
-  readonly latencyMs: number;
+  /** Effective mic round-trip latency: calibrated, else a conservative estimate (set in start()). */
+  latencyMs: number;
+  private disposed = false;
+  private onStateChange: (() => void) | null = null;
+  /** Called when the audio system interrupts playback (phone call, Siri, other app). */
+  onInterrupted: (() => void) | null = null;
   private wakeLock: { release(): Promise<void> } | null = null;
   private onDone: (r: AttemptResult | null) => void;
   latest: PitchSample | null = null;
@@ -90,6 +94,18 @@ export class PracticeSession {
   /** Must be called from a user gesture (tap) for iOS. */
   async start(): Promise<void> {
     await unlockAudio();
+    // Now that the context runs, outputLatency is meaningful.
+    if (!(this.cfg.latencyMs > 0)) this.latencyMs = estimateLatencyMs();
+    const ctx = getAudioContext();
+    if (!this.onStateChange) {
+      this.onStateChange = () => {
+        if (ctx.state !== 'running' && (this.phase === 'playing' || this.phase === 'countin')) {
+          this.pause();
+          this.onInterrupted?.();
+        }
+      };
+      ctx.addEventListener('statechange', this.onStateChange);
+    }
     if (!this.cfg.listenOnly && this.cfg.simulate) {
       this.startSimulation(this.cfg.simulate);
     } else if (!this.cfg.listenOnly && !this.tracker) {
@@ -215,7 +231,11 @@ export class PracticeSession {
   private async requestWakeLock() {
     try {
       const wl = (navigator as Navigator & { wakeLock?: { request(t: 'screen'): Promise<{ release(): Promise<void> }> } }).wakeLock;
-      if (wl && !this.wakeLock) this.wakeLock = await wl.request('screen');
+      if (wl && !this.wakeLock) {
+        const lock = await wl.request('screen');
+        if (this.disposed || this.phase === 'paused' || this.phase === 'done') lock.release().catch(() => {});
+        else this.wakeLock = lock;
+      }
     } catch { /* not allowed / unsupported */ }
   }
 
@@ -241,7 +261,10 @@ export class PracticeSession {
       // Score only the notes that had started when the singer stopped.
       const [a, b] = this.cfg.range;
       let last = a - 1;
-      for (let i = a; i <= b; i++) if (this.cfg.part.notes[i].start < pos) last = i;
+      for (let i = a; i <= b; i++) {
+        const n = this.cfg.part.notes[i];
+        if (n.start + n.dur <= pos + 0.05) last = i; // only notes that were completely sung
+      }
       result = last < a ? null : scoreAttempt({ score: this.cfg.score, part: this.cfg.part, range: [a, last] }, this.samples, this.cfg.scoring);
     }
     this.onDone(result);
@@ -249,6 +272,9 @@ export class PracticeSession {
 
   /** Stop without producing a result (navigating away). */
   dispose() {
+    this.disposed = true;
+    if (this.onStateChange) getAudioContext().removeEventListener('statechange', this.onStateChange);
+    this.onStateChange = null;
     this.stopSimulation();
     this.releaseWakeLock();
     this.unsubPitch?.();

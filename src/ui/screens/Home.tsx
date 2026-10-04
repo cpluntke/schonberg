@@ -77,6 +77,8 @@ export function Home() {
         </div>
       </div>
 
+      <Notice />
+
       {!profile.onboarded && (
         <div className="card" style={{ borderColor: 'var(--voice-deep)' }}>
           <div className="row">
@@ -149,6 +151,17 @@ export function Home() {
         <span className="small" style={{ color: '#D4CCFF' }}>Plus leap drills built from the hardest intervals in your parts.</span>
       </button>
     </main>
+  );
+}
+
+function Notice() {
+  const [msg, setMsg] = React.useState(() => { try { return localStorage.getItem('sh:notice'); } catch { return null; } });
+  if (!msg) return null;
+  return (
+    <div className="notice info row" role="status">
+      <span className="grow small">{msg}</span>
+      <button className="btn ghost small" onClick={() => { localStorage.removeItem('sh:notice'); setMsg(null); }}>OK</button>
+    </div>
   );
 }
 

@@ -50,7 +50,12 @@ async function loadManifest(base: string, file: string): Promise<ManifestEntry[]
 }
 
 /** Ids of built-in pieces that were renamed; progress and cycle entries are moved over. */
-const RENAMED: Record<string, string> = { 'bach-bwv512': 'bach-bwv315' };
+const RENAMED: Record<string, string> = {};
+/** Built-in pieces that were withdrawn (e.g. an edition with wrong notes). */
+const REMOVED: Record<string, string> = {
+  'bach-bwv512': 'The Bach chorale “Gib dich zufrieden” was removed from the demo pieces because the edition had wrong notes.',
+  'bach-bwv315': 'The Bach chorale “Gib dich zufrieden” was removed from the demo pieces because the edition had wrong notes.',
+};
 
 function migrateIds() {
   try {
@@ -73,6 +78,14 @@ function migrateIds() {
         c.pieceIds = c.pieceIds.map((x) => (x === from ? to : x));
         saveCycle(c);
       }
+    }
+    const c = loadCycle();
+    const gone = c.pieceIds.filter((id) => REMOVED[id]);
+    if (gone.length) {
+      c.pieceIds = c.pieceIds.filter((id) => !REMOVED[id]);
+      if (!c.pieceIds.includes('warmup-chorale')) c.pieceIds.unshift('warmup-chorale');
+      saveCycle(c);
+      localStorage.setItem('sh:notice', REMOVED[gone[0]]);
     }
   } catch { /* storage unavailable */ }
 }

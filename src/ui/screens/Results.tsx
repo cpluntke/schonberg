@@ -74,6 +74,17 @@ export function Results() {
         <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800 }}>{piece.title}</h1>
       </div>
 
+      {lr.latencyAdjusted != null && (
+        <div className="notice info" role="status">
+          You came in consistently late after rests, which is usually headphone delay, not you. We've set your delay to {lr.latencyAdjusted} ms and re-scored this run with it.
+          For best accuracy run the delay check in Voice setup.
+        </div>
+      )}
+      {lr.notCounted && (
+        <div className="notice info" role="status" data-testid="pass-banner">
+          <strong>Practice run:</strong> {lr.notCounted}, so it doesn't count toward the level. Sing the whole section at the level's tempo to level up.
+        </div>
+      )}
       {lr.ladder && (
         <div className={lr.passed ? 'notice info' : 'notice'} role="status" data-testid="pass-banner">
           {leveledUp

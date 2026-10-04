@@ -1,6 +1,6 @@
 # Round 2: regression verification
 
-**Build:** HEAD `a8dbb78`, dev server http://localhost:5179. Round-1 baseline: `bb83fbc` (the three round-1 reports cover `bb83fbc`…`baa0d5a`). Fix commits checked: `b0f7a35`, `9122c91`, `baa0d5a`, `9cb0777`, `a8dbb78`.
+**Build:** mostly `a8dbb78`, dev server http://localhost:5179. Two commits landed while I was testing: `9c52b25` (08:57, which removes the Bach piece, adds date checks, imported-piece rename and more) and `d2dedc4` (08:58, Ranks grid). Vite hot-reloaded them. Every result that involves Bach was produced before the removal. Items those commits touch were re-checked on HEAD `d2dedc4` with `docs/qa/scripts/r2-bach-removed.mjs`: F2, F13, F17, UX-12 and the new R2-11. Round-1 baseline: `bb83fbc` (the three round-1 reports cover `bb83fbc`…`baa0d5a`). Fix commits checked: `b0f7a35`, `9122c91`, `baa0d5a`, `9cb0777`, `a8dbb78`.
 **Device:** Chromium (Playwright) at 390×844 phone size, plus 844×390 landscape, fake mic and `?simulate=`.
 **Priorities:** per `docs/priorities.md`.
 
@@ -20,13 +20,13 @@
 | | Count |
 |---|---|
 | Round-1 findings re-checked | 62 (19 functional, 24 UX, 19 audio/perf) |
-| Fixed | 32 |
-| Partially fixed | 13 |
-| Not fixed | 15 |
+| Fixed | 29 |
+| Partially fixed | 14 |
+| Not fixed | 17 |
 | Won't-verify | 2 |
-| **New findings** | P0: 0 · P1: 0 · P2: 4 · P3: 6 |
+| **New findings** | P0: 0 · P1: 1 · P2: 4 · P3: 6 |
 
-No round-1 P1 is still fully open. A1 (latency default) and A5 (iOS resume) are only partially fixed; details in the table.
+The only open P1 is R2-11, a regression: removing the Bach piece in `9c52b25` throws away existing Bach progress without telling the singer, which undoes the F2 fix. Of the round-1 P1s, only F2 is open again, through R2-11. A1 (latency default) and A5 (iOS resume) are only partially fixed; details in the table.
 
 ## 1. Status of round-1 findings
 
@@ -35,7 +35,7 @@ No round-1 P1 is still fully open. A1 (latency default) and A5 (iOS resume) are 
 | ID | Pri | Status | Evidence |
 |---|---|---|---|
 | F1 | P1 | **Fixed** | `r2-rerun/10-data.mjs`: Bach `#1 beats 0+1` (was 0+4). Warm-up is unchanged. `src/music/pickup.test.ts` passes. The Bach play screen goes straight from "Gib" into bar 2 (`shots-r2/r2-land-play.png`). |
-| F2 | P1 | **Fixed** (small gap) | `r2-browser.mjs migrate`: the seeded `sh:progress:bach-bwv512:P1` is moved to `bach-bwv315`. The cycle id is rewritten. Home shows Bach at 25% "in progress". The old link `#/piece/bach-bwv512` resolves to the piece. Gap: `sh:log` entries keep `bach-bwv512` (log not migrated), so per-piece history and stats lose those attempts. Low impact. |
+| F2 | P1 | **Not fixed (regressed)**: it was fixed in `9cb0777`, then `9c52b25` removed the piece. See R2-11. Before the removal (small gap) | `r2-browser.mjs migrate`: the seeded `sh:progress:bach-bwv512:P1` is moved to `bach-bwv315`. The cycle id is rewritten. Home shows Bach at 25% "in progress". The old link `#/piece/bach-bwv512` resolves to the piece. Gap: `sh:log` entries keep `bach-bwv512` (log not migrated), so per-piece history and stats lose those attempts. Low impact. |
 | F3 | P1 | **Fixed** | `r2-rerun/11-results-flow.mjs`: after the 40% run, progress is `{"practice":1}`. `s0-m0-5` is unchanged. See R2-02 for the "practice" bookkeeping and the Results copy. |
 | F4 | P2 | **Fixed** | 11-results-flow: "Quit after Again → `#/piece/bach-bwv315`". `r2-browser nav`: Back from play goes to the piece. Small side effect: R2-07. |
 | F5 | P2 | **Partially fixed** | Ladder and scoring part fixed. `r2-browser partial`: Finish at 16 s scores only bars 1–5 (95%), and the level is not awarded. Finish during the count-in records nothing (log 1 → 1) and goes back to the ready card. Still wrong: the Results screen gives no sign the run was partial or uncounted, and the note in flight is scored as a miss. See R2-02. |
@@ -46,11 +46,11 @@ No round-1 P1 is still fully open. A1 (latency default) and A5 (iOS resume) are 
 | F10 | P3 | **Fixed** | `03-import`: empty → "the file is empty."; random .mid/.mxl → "doesn't look like a valid MusicXML or MIDI file…"; .txt → supported-types hint. Multi-file imports still show only the last error (not re-tested). |
 | F11 | P3 | **Fixed** | Library footer now names public-domain works and the original warm-up (`Library.tsx`). |
 | F12 | P3 | **Fixed** | 13-ranks-settings HOME: "38% · in progress". |
-| F13 | P3 | **Not fixed** | Concert 2026-10-06 before rehearsal 2026-10-10 is still accepted. Home: "6d Rehearsal · 2d Concert". |
+| F13 | P3 | **Fixed** (on `9c52b25`) | `r2-bach-removed.mjs`: Settings shows the alert "The concert is before the rehearsal: check the dates." There is also a past-date hint. On `a8dbb78` it was still accepted silently (13-ranks-settings). |
 | F14 | P3 | **Not fixed** | 15-robust: `#/arcade/...?level=1` still runs. `level=abc` still becomes Listen. `drill?from=30&to=5` still counts in "29". New variant: a real section id plus `&from=&to=` shrinks a ladder section and still counts (`Play.tsx` `start: route.from ?? s.start`). |
 | F15 | P3 | **Not fixed** | `Expert.tsx` row card still uses the sharp-only `NAMES`; the highway still spells by key. |
 | F16 | P3 | **Not fixed** | `Results.tsx` next-step logic is unchanged for generated row/leap drills. |
-| F17 | P3 | **Not fixed** | 03-import: Elgar still imports as "elgar_there-is-sweet-music_op53-1". No rename option. |
+| F17 | P3 | **Fixed** (code, on `9c52b25`) | `library.ts` `renameImported(id, title, composer)` exists, and the Piece screen got a rename UI in the same commit. Not exercised in the browser. The import default is still the raw file name. |
 | F18 | P3 | **Fixed** | 13-ranks-settings: `confirm("Replace your current progress and settings with this backup?")` is shown before every restore. |
 | F19 | P3 | **Won't-verify** | Brahms Bass II perfect 92%. Not re-run within the time box. No related code change except scoring, which now scores perfect runs at 100% everywhere in the e2e and simulated runs. |
 
@@ -68,8 +68,8 @@ No round-1 P1 is still fully open. A1 (latency default) and A5 (iOS resume) are 
 | UX-08 | P2 | **Partially fixed** | Dynamics, words and wedges are parsed and drawn on the highway (`r2-dieu-directions.png`: "mf", "Très modéré…"). They overlap at the section start (R2-06). Tempo words such as *Plus lent* still don't change playback. |
 | UX-09 | P2 | **Partially fixed** | Sections show a lyric incipit ("Bars 1–5 · “Dieu! qu'il la fait bon regarder…”"). Breath marks, caesuras and a phrase view are still missing. |
 | UX-10 | P2 | **Partially fixed** | "undsei" is fixed: Bach now shows "und sei". Still wrong: Bach shows "zu frie den" (file marks the syllables `single`), and Yver shows "Yver, ver, Yver" (stray repeated `end` syllable). The demo files' syllabic data was not corrected. |
-| UX-11 | P2 | **Fixed** | Title "Gib dich zufrieden, BWV 315". The file and id were renamed, with migration (F2). |
-| UX-12 | P2 | **Partially fixed** | `.btn.small`, `.chip` and `.lvl-btn` are 44 px; heat cells are 44 px. `r2-rerun/ux-targets.mjs` still finds "Edit dates" at 106×32 (inline `height: 32` in `Home.tsx:96`), the Settings selects "Voice part" and "Delay" at 40 px, and the Ranks "Piece" select at 40 px. |
+| UX-11 | P2 | **Fixed**, now moot | Title "Gib dich zufrieden, BWV 315". The file and id were renamed, with migration (F2). |
+| UX-12 | P2 | **Partially fixed** | `.btn.small`, `.chip` and `.lvl-btn` are 44 px; heat cells are 44 px. `r2-rerun/ux-targets.mjs` (and HEAD `d2dedc4`) still finds "Edit dates" at 106×32 (inline `height: 32` in `Home.tsx:96`), the Settings selects "Voice part" and "Delay" at 40 px, and the Ranks "Piece" select at 40 px. |
 | UX-13 | P2 | **Not fixed** | Ranks still uses copy/paste codes, with no `navigator.share` or daily plan. |
 | UX-14 | P3 | **Not fixed** | `lanesFor` is unchanged (lanes are still one per used pitch). |
 | UX-15 | P3 | **Not fixed** | Same as F14: arcade L1 via URL still runs. |
@@ -92,7 +92,7 @@ No round-1 P1 is still fully open. A1 (latency default) and A5 (iOS resume) are 
 | A3 | P1 | **Fixed** (regression introduced) | Octave-below pro on S parts: Bach 99/97/97/94 PPPP, Bruckner 100/96/94/93, Ravel 98/94/93/91 (all were 50/50/50/50). `scoring.test` updated. Side effects: R2-03 (rhythm) and R2-08 (L1 octave errors no longer flagged). |
 | A4 | P1 | **Fixed** | `session.ts` `resume()` sets `minTime = resumeFrom − 0.02`, so count-in samples are dropped. `r2-browser partial`: pause at 9 s → Resume → 100%, 27/27 perfect, "Level 2 reached". 07-controls: pause/resume in count-in also completes. |
 | A5 | P1 | **Partially fixed** | `resume()` now `await unlockAudio()` first, inside the tap gesture. No `ctx.onstatechange` / `interrupted` handling: if iOS suspends the context mid-run without a visibility change (call, Siri, route change), the highway still freezes silently. Can't verify on a real iOS device. |
-| A6 | P2 | **Fixed** (code) / see note | `latencyFromOnsets` now needs ≥ max(3, 60%) of onsets within ±60 ms of the median. `fakemic-wav` re-run: see note below the table. |
+| A6 | P2 | **Fixed** | `latencyFromOnsets` now needs ≥ max(3, 60%) of onsets within ±60 ms of the median. `r2-rerun/fakemic-wav.mjs`: the default fake-device beep now gives "Couldn't hear…" and saves 0 (round 1 saved 73 ms). A sustained A3 is rejected. The "ta" WAV at 90 bpm gives 96 ms (consistent onsets, unknown phase: expected). Tuner readings are unchanged. |
 | A7 | P2 | **Fixed** | `countInBeats` returns felt beats (2/2 → 2, 6/8 → 2). The HUD count uses `beatSecAt` from the player. Not re-measured in the browser: my HUD selector didn't match. |
 | A8 | P2 | **Fixed** | `App.tsx`: `releaseTracker()` 15 s after leaving play/setup/tuner. |
 | A9 | P2 | **Fixed** (minor race) | `requestWakeLock()` in `start`/`resume`, released in pause/finish/dispose. Race: R2-09. |
@@ -101,18 +101,19 @@ No round-1 P1 is still fully open. A1 (latency default) and A5 (iOS resume) are 
 | A12 | P2 | **Partially fixed** | `RMS_GATE` 0.01 → 0.005 (static). No adaptive noise-floor gate and no input meter. |
 | A13 | P2 | **Fixed** (mostly) | `setHud` only on change; `ghostParts`, `pitchWindow` and `lanes` hoisted out of the frame loop. `highway2d` still loops over all notes per frame (not binary-searched). |
 | A14 | P2 | **Not fixed** | Pitch analysis is still `setInterval` on the main thread (no worklet). |
-| A19 | P2 | see perf note | `shadowBlur` removed from arcade notes and popups; dpr capped at 1.5 in arcade. |
+| A19 | P2 | **Fixed** (6× still marginal) | `shadowBlur` removed and dpr capped at 1.5 in arcade. `r2-rerun/perf-play.mjs` on Brahms: Arcade 4× **50.4 fps** (was 19.9), p95 33 ms, no long tasks. Arcade 6× **29.8 fps** (was 13.6), 20 long tasks, max 65 ms (was 108, max 138). 2D stays at 59–60 fps. There is still no automatic fallback to 2D on slow devices. |
 | A15 | P3 | **Not fixed** | `session.ts` `play()`: `cue: from === this.cfg.from ? this.cfg.cue : 'note'`. After Resume, L4 still cues "your note". |
 | A16 | P3 | **Won't-verify** | iOS output routing needs a device. No code change. |
 | A17 | P3 | **Not fixed** | No "your entries were +X ms late" chip on Results. |
 | A18 | P3 | **Not fixed** | Precache config unchanged. Still fine at the current repertoire size. |
 
-PERF_NOTE_PLACEHOLDER
+**Restarts (perf-play):** heap 9.0 → 10.3 → 10.4 MB over 10 restarts, one `getUserMedia` call and one live track. No leak, no regression.
 
 ## 2. New findings (regressions and gaps from the fixes)
 
 | ID | Priority | Type | Title | Steps | Expected / Actual | Evidence |
 |---|---|---|---|---|---|---|
+| R2-11 | **P1** (P0 if a build with Bach ever reached singers) | bug (regression, `9c52b25`) | Removing the built-in Bach piece silently discards existing Bach progress and cycle membership | 1. On a build before `9c52b25`, practise Bach (`sh:progress:bach-bwv315:*`, or `bach-bwv512` migrated by F2's fix). It was the default "ideal first piece" in the demo cycle. 2. Update to HEAD. | **Expected:** keep the piece (or a replacement edition under the same id), or tell the singer it was withdrawn and keep or export the progress. **Actual:** Home just drops it: no message, cycle readiness 0%, the repertoire list has no Bach. `sh:cycle` still contains `bach-bwv315`, and the level-3 progress stays in storage unused. `#/piece/bach-bwv315` shows "This piece isn't on this device any more". The `RENAMED` migration now points `bach-bwv512` at a removed id. `priorities.md` lists "practice progress is lost" under P0; I rate it P1 to match round-1 F2 (pre-release). | `r2-bach-removed.mjs` log; `shots-r2/r2-bach-removed-home.png`; `git show 9c52b25 --stat` (`public/pieces/pd/bach-bwv315.mxl` deleted) |
 | R2-01 | P2 | bug (regression from UX-07 fix) | Highway entry countdown is mistimed at reduced tempo (every L1 run) and in 2/2 / 6/8 | 1. Any piece, Level 1 (70% tempo). 2. Watch the 3·2·1 that appears before an entry after a rest. | **Expected:** one number per felt beat, reaching 1 on the beat before the entry. **Actual:** `Play.tsx` passes `bpm: tempoAt(...) * rate`, and `highway2d.ts` computes `beat = 60/bpm` (real seconds) but compares it with `ahead = n.start − s.pos` (score seconds). At 70% the countdown starts about 4.3 beats early and changes every 1.43 beats, off the beat. It also counts quarter notes, so in 2/2 (Yver) it counts 3 quarters, not half-note beats. That is the same unit mismatch A7 fixed for the HUD count-in. | Code: `highway2d.ts` "Entry countdown" block; `Play.tsx` `bpm:` in `DrawState` |
 | R2-02 | P2 | UX / bug (from F3/F5 fixes) | Partial and slow-tempo runs show a full "S / Excellent run, move on to the next level" Results page with no sign the run didn't count | 1. Bach Tenor Bars 1–6 L2, `simulate=perfect`. 2. Tap Finish after about 16 s. | **Expected:** "Stopped early: bars 1–5 scored, level not awarded" (or "practice tempo, not counted"), and the coach shouldn't say "move on". **Actual:** grade S, 95%, "Excellent run… Move on to the next level or the next section", and the primary button "Next: Bars 1–6, level 1". The singer can't tell why no level was awarded. The note in flight at Finish is graded as a miss ("miss 1"). Both runs are stored under a shared pseudo-section `practice` (`{"practice":{"lvl":2,...}}`), whose `best`/PB mixes all sections and tempos. | `shots-r2/r2-partial-results.png`; `r2-browser partial` log; 11-results-flow progress `{"practice":1,...}` |
 | R2-03 | P2 | bug (regression from UX-02 + A3 fixes) | Octave-transposed singers get a wrong Rhythm % (about 55–80%) despite perfect timing | Man singing the soprano part an octave down (octave tolerance on), stepwise legato line. | **Expected:** Rhythm about 100%, as for the in-octave singer. **Actual:** the legato onset rule compares the **unfolded** sung midi with the target and the previous note (`scoring.ts` `addToNote`, `Math.abs(midi - w.target) < Math.abs(midi - w.legatoFrom)`). Ascending steps never register an onset (rhythm 0 for that note). Descending steps register immediately. Unit probe: rhythm 0.56, onsets `[0,null,null,null,null,0,0,0,0]`. Realism matrix "octave below" rhythm: Bach 66–67, Bruckner 80, Yver 70–71, Ravel 74–76 (in-octave pro: 98–100). Accuracy and levels are unaffected. | `r2-regressions.qa.test.ts` "R2-octave-rhythm"; `r2-scoring-realism` second column |

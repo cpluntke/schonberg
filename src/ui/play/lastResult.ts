@@ -16,6 +16,10 @@ export interface LastResult {
   ladder: boolean;
   /** Best score at this section+level before this attempt (null if first). */
   prevBest?: number | null;
+  /** Why a run of a real section didn't count toward its level. */
+  notCounted?: string;
+  /** Headphone/mic delay learned from this run (ms), if any. */
+  latencyAdjusted?: number;
 }
 
 let last: LastResult | null = null;

@@ -7,6 +7,7 @@ import { LEVELS, LISTEN, effectiveTolerance, pieceReadiness } from '../../progre
 import { recordAttempt, getProgress, snapshotReadiness, personalBest } from '../../progress/store';
 import { keyAtTime } from '../../music/time';
 import { PracticeSession } from '../play/session';
+import { scoreAttempt } from '../../game/scoring';
 import { drawHighway2D, pitchWindow, type DrawState } from '../play/highway2d';
 import { drawArcade, lanesFor, newFx } from '../play/arcade3d';
 import { setLastResult } from '../play/lastResult';
@@ -17,7 +18,7 @@ import type { NotationMode } from '../../game/notation';
 type PlayRoute = Extract<Route, { name: 'play' }>;
 
 export function PlayScreen({ route }: { route: PlayRoute }) {
-  const [profile] = useProfile();
+  const [profile, updateProfile] = useProfile();
   const piece = getPiece(route.pieceId);
   const part = piece?.score.parts.find((p) => p.id === route.partId);
   const level = Math.max(0, Math.min(4, route.level | 0));
@@ -53,6 +54,11 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const fxRef = useRef(newFx());
+  const fromResultsRef = useRef<boolean | null>(null);
+  if (fromResultsRef.current === null) {
+    fromResultsRef.current = sessionStorage.getItem('sh:fromResults') === '1';
+    sessionStorage.removeItem('sh:fromResults');
+  }
 
   const range = piece && part && section ? noteRangeFor(piece, part.id, section.start, section.end) : null;
   const tolerance = spec ? effectiveTolerance(level, profile.strictness) : 50;
@@ -60,7 +66,9 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
   const notation = profile.notation as NotationMode;
   const singerIsHigh = profile.voice === 'S' || profile.voice === 'A';
   const partIsHigh = part ? part.voiceType === 'S' || part.voiceType === 'A' : singerIsHigh;
-  const octaveTolerant = level <= 1 || singerIsHigh !== partIsHigh;
+  // Singing a part written for the other voice range (e.g. a tenor practising the soprano line)
+  // is scored in the singer's own octave.
+  const octaveTolerant = singerIsHigh !== partIsHigh;
 
   function makeSession(): PracticeSession | null {
     if (!piece || !part || !section) return null;
@@ -86,12 +94,43 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
     return s;
   }
 
-  function onDone(r: AttemptResult | null) {
+  function onDone(result: AttemptResult | null) {
+    let r = result;
     setPhase('ready');
     if (!piece || !part || !section) return;
     if (!r || listenOnly) {
       if (listenOnly) recordAttempt(piece.id, part.id, section.id, 0, emptyResult(), section.end - section.start);
       return;
+    }
+    // Uncalibrated singers who are consistently late on entries after rests: that's almost always
+    // headphone/output delay, not the singer. Learn it once so the next run is scored fairly.
+    let latencyAdjusted: number | undefined;
+    const sess = sessionRef.current;
+    if (sess && !profile.latencyMs && !simulateMode()) {
+      const entryOnsets = r.notes
+        .filter((n) => {
+          const i = n.index;
+          const prev = i > 0 ? part.notes[i - 1] : null;
+          return n.onsetMs != null && (!prev || part.notes[i].start - (prev.start + prev.dur) >= 0.4);
+        })
+        .map((n) => n.onsetMs!)
+        .sort((a, b) => a - b);
+      if (entryOnsets.length >= 4) {
+        const med = entryOnsets[Math.floor(entryOnsets.length / 2)];
+        const iqr = entryOnsets[Math.floor(entryOnsets.length * 0.75)] - entryOnsets[Math.floor(entryOnsets.length * 0.25)];
+        if (med > 120 && iqr < 160) {
+          latencyAdjusted = Math.round(Math.min(500, sess.latencyMs + (med - 40)));
+          updateProfile({ latencyMs: latencyAdjusted });
+          // Re-score this run with the learned delay.
+          const shift = (latencyAdjusted - sess.latencyMs) / 1000;
+          const idx = r.notes.map((n) => n.index);
+          r = scoreAttempt(
+            { score: piece.score, part, range: [Math.min(...idx), Math.max(...idx)] },
+            sess.samples.map((x) => ({ ...x, time: x.time - shift })),
+            sess.cfg.scoring,
+          );
+        }
+      }
     }
     const realSection = section.id !== 'all' && section.id !== 'drill' && section.id !== 'entries';
     const partial = !!sessionRef.current?.partial;
@@ -108,6 +147,8 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
     setLastResult({
       pieceId: piece.id, partId: part.id, sectionId: section.id, level, mode: route.mode,
       from: section.start, to: section.end, result: r, ladder, prevBest,
+      latencyAdjusted,
+      notCounted: realSection && !ladder ? (partial ? 'stopped early' : 'slower than the level’s tempo') : undefined,
       passed: rec.passed, prevLevel: rec.prevLevel, newLevel: rec.newLevel,
     });
     go({ name: 'results' }, true);
@@ -119,6 +160,7 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
     const s = makeSession();
     if (!s) return;
     sessionRef.current = s;
+    s.onInterrupted = () => setPhase('paused');
     try {
       await s.start();
       setPhase('running');
@@ -164,7 +206,7 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
         notation, showNames, key: keyAtTime(piece.score, Math.max(0, pos)), tolerance,
         ghostParts,
         lo, hi, from: section.start, to: section.end,
-        bpm: tempoAt(piece.score.tempos, Math.max(0, pos)) * rate,
+        beatSec: s ? s.beatSec(Math.max(0, pos)) : 60 / tempoAt(piece.score.tempos, Math.max(0, pos)),
       };
       if (route.mode === '3d') drawArcade(c, W, H, st, fxRef.current, (lanes ??= lanesFor(st)), ts / 1000);
       else drawHighway2D(c, W, H, st);
@@ -221,9 +263,7 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
 
   /** Leave to the piece (or the screen that launched a generated drill), never to a stale Results. */
   function leave() {
-    const fromResults = sessionStorage.getItem('sh:fromResults') === '1';
-    sessionStorage.removeItem('sh:fromResults');
-    if (fromResults || piece!.builtin && /~entries~|^row-|^leaps-/.test(piece!.id)) {
+    if (fromResultsRef.current || piece!.builtin && /~entries~|^row-|^leaps-/.test(piece!.id)) {
       go(/^row-|^leaps-/.test(piece!.id) ? { name: 'expert' } : { name: 'piece', pieceId: piece!.id.split('~')[0] }, true);
     } else back({ name: 'piece', pieceId: piece!.id });
   }

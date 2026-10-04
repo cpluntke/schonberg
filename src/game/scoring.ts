@@ -15,6 +15,8 @@ export interface ScoringContext {
 }
 
 export const DEFAULT_ONSET_GRACE = 0.08;
+/** Sustained sound needed before a note counts as started (seconds; shorter for very short notes). */
+export const ONSET_RUN = 0.06;
 /** Seconds ignored at the end of each note (release / next consonant). */
 const TAIL = 0.04;
 /** Max time one sample may stand for, on each side of it. */
@@ -151,6 +153,8 @@ class NoteAcc {
   /** Count of voiced body samples that needed octave folding to be in tolerance. */
   octaveSamples = 0;
   onsetMs: number | null = null;
+  /** Start of the current run of qualifying voiced samples (onset needs ~60 ms of sound). */
+  runStart: number | null = null;
   scoopDevs: number[] = [];
   /** Causal moving-average window over body deviations (vibrato smoothing). */
   smT: number[] = [];
@@ -321,13 +325,23 @@ export class LiveScorer {
     if (t >= w.start && t < w.bodyEnd) {
       // Timing is judged independently of intonation: the note "starts" with the first voiced
       // sound after a rest, or (legato) once the voice has moved closer to this note than the last.
-      if (a.onsetMs === null && midi !== null && Number.isFinite(midi)) {
-        const started = w.legatoFrom === null
-          ? true
-          : w.legatoFrom === w.note.midi
-            ? inTol
-            : Math.abs(midi - w.target) < Math.abs(midi - w.legatoFrom);
-        if (started) a.onsetMs = Math.max(0, (t - w.start) * 1000);
+      if (a.onsetMs === null) {
+        let qualifies = false;
+        if (midi !== null && Number.isFinite(midi)) {
+          // Octave-tolerant singers: compare in the target's octave.
+          let m = midi;
+          if (this.opts.octaveTolerant) m -= 12 * Math.round((m - w.target) / 12);
+          qualifies = w.legatoFrom === null
+            ? true
+            : w.legatoFrom === w.note.midi
+              ? inTol
+              : Math.abs(m - w.target) < Math.abs(m - w.legatoFrom);
+        }
+        if (qualifies) {
+          if (a.runStart === null) a.runStart = t;
+          // A real entry is sustained sound, not a 20 ms blip (or speaker bleed).
+          if (t - a.runStart >= Math.min(ONSET_RUN, 0.4 * w.note.dur) - 1e-9) a.onsetMs = Math.max(0, (a.runStart - w.start) * 1000);
+        } else a.runStart = null;
       }
       if (dev !== null && t < w.start + SCOOP_WINDOW) a.scoopDevs.push(dev);
     }
@@ -374,7 +388,8 @@ export class LiveScorer {
       if (win === 0) {
         for (let k = 0; k < a.bT.length; k++) if (Math.abs(a.bD[k]) <= tolN) hitTime += a.bW[k];
       } else if (bodyDur < 1.5 * win) {
-        const m = a.bD.reduce((x, y) => x + y, 0) / a.bD.length;
+        // Median, not mean: a short pitch glitch shouldn't sink a short note.
+        const m = median(a.bD)!;
         if (Math.abs(m) <= tolN) hitTime = a.bW.reduce((x, y) => x + y, 0);
       } else {
         let lo = 0;
@@ -389,10 +404,10 @@ export class LiveScorer {
     }
     const hitRatio = clamp(hitTime / bodyDur, 0, 1);
     const voicedRatio = clamp(a.voicedTime / bodyDur, 0, 1);
-    const cents = median(a.devs);
+    const medDev = median(a.devs);
     const tol = tolN;
     let grade: Grade =
-      hitRatio >= 0.8 && cents !== null && Math.abs(cents) <= tol / 2 ? 'perfect'
+      hitRatio >= 0.8 && medDev !== null && Math.abs(medDev) <= tol / 2 ? 'perfect'
         : hitRatio >= 0.6 ? 'good'
           : hitRatio >= 0.35 ? 'ok'
             : 'miss';
@@ -418,6 +433,8 @@ export class LiveScorer {
       this._maxCombo = Math.max(this._maxCombo, this._combo);
     }
     this._score += points;
+    // Report deviation from the written (just-intonation: pure) target.
+    const cents = medDev === null ? null : medDev - (w.targetOffset / 2 - 0);
     a.final = {
       index: w.index, grade, cents, hitRatio, voicedRatio, onsetMs: a.onsetMs, drift, scoop,
       targetOffset: w.targetOffset, points, ...(octave ? { octave: true } : {}),

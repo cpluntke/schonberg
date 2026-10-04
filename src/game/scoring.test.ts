@@ -203,7 +203,7 @@ describe('just intonation', () => {
     expect(pure.notes[0].grade).toBe('perfect');
     // Tempered (what the backing plays) is accepted too: the target sits halfway, window widened.
     const tempered = scoreAttempt(c, sampleSinging(sop, (n) => n.midi), justOpts);
-    expect(tempered.notes[0].cents).toBeCloseTo(6.85);
+    expect(tempered.notes[0].cents).toBeCloseTo(13.7); // reported against the pure target
     expect(tempered.notes[0].grade).not.toBe('miss');
     // …but a third sung 25 cents sharp of tempered is still out.
     const sharp = scoreAttempt(c, sampleSinging(sop, (n) => n.midi + 0.25), justOpts);

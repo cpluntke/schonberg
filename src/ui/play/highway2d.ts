@@ -22,8 +22,8 @@ export interface DrawState {
   hi: number;
   from: number;
   to: number;
-  /** Tempo (quarter bpm) at the current position, for entry countdowns. */
-  bpm: number;
+  /** Length of one felt beat in score seconds at the current position (entry countdowns). */
+  beatSec: number;
 }
 
 export const COLORS = {
@@ -140,7 +140,7 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
       c.textBaseline = 'alphabetic';
       c.fillStyle = COLORS.targetText;
       c.globalAlpha = 0.85;
-      c.fillText(d.text, dx + 2, H - 6);
+      c.fillText(d.text, dx + 2, d.kind === 'dynamic' ? H - 6 : H - 24);
       c.globalAlpha = 1;
       lastX = dx;
       lastText = d.text;
@@ -263,7 +263,7 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
       if (n.start < s.pos) continue;
       const prev = i > 0 ? notes[i - 1] : null;
       const afterRest = !prev || n.start - (prev.start + prev.dur) >= 0.6;
-      const beat = 60 / Math.max(30, s.bpm);
+      const beat = Math.max(0.15, s.beatSec);
       const ahead = n.start - s.pos;
       if (afterRest && ahead <= 3 * beat && s.pos >= s.from - 0.01) {
         const k = Math.ceil(ahead / beat - 1e-6);
