@@ -143,6 +143,11 @@ export function analyze(ctx: ScoringContext, notes: NoteResult[], samples?: Pitc
     });
   }
 
+  // Both "sink" and "creep" at once is noise (wide vibrato), not a tendency: drop both.
+  if (out.some((c) => c.kind === 'flat-long-notes') && out.some((c) => c.kind === 'sharp-long-notes')) {
+    for (let i = out.length - 1; i >= 0; i--) if (out[i].kind === 'flat-long-notes' || out[i].kind === 'sharp-long-notes') out.splice(i, 1);
+  }
+
   // 3. Entries after rests: late (onset) and early (voiced before the written start).
   const entries = notes.filter((n) => {
     const i = n.index;

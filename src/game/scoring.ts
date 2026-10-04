@@ -440,10 +440,22 @@ export class LiveScorer {
     // folding is expected and not an error.
     const octave = !this.opts.octaveTolerant && a.devs.length > 0 && a.octaveSamples > a.devs.length / 2;
 
+    // Drift: compare the first and last third of the note on the vibrato-smoothed pitch
+    // (a centred ~one-cycle average), so a normal vibrato doesn't read as sagging or creeping.
     let drift: number | null = null;
-    if (a.devs.length >= 6) {
-      const third = Math.floor(a.devs.length / 3);
-      drift = median(a.devs.slice(-third))! - median(a.devs.slice(0, third))!;
+    if (a.bD.length >= 6) {
+      const win = this.vibWin > 0 ? this.vibWin : 0.18;
+      const sm: number[] = [];
+      let lo = 0;
+      let hi = 0;
+      let sum = 0;
+      for (let k = 0; k < a.bT.length; k++) {
+        while (hi < a.bT.length && a.bT[hi] <= a.bT[k] + win / 2) sum += a.bD[hi++];
+        while (a.bT[lo] < a.bT[k] - win / 2) sum -= a.bD[lo++];
+        sm.push(sum / (hi - lo));
+      }
+      const third = Math.floor(sm.length / 3);
+      drift = median(sm.slice(-third))! - median(sm.slice(0, third))!;
     }
     const scoopMed = median(a.scoopDevs);
     // A scoop is a glide INTO the note: the body must end up clearly closer to the target than the
