@@ -141,7 +141,7 @@ export function Home() {
           <button className="btn ghost small" onClick={() => go({ name: 'library' })}>Library</button>
         </div>
         {statuses.map((s) => (
-          <button key={s.piece.id} className="list-row" onClick={() => go({ name: 'piece', pieceId: s.piece.id })}>
+          <button key={s.piece.id} className="list-row" data-testid="piece-row" onClick={() => go({ name: 'piece', pieceId: s.piece.id })}>
             <div className="mono-tile">{initials(s.piece.composer || s.piece.title)}</div>
             <div className="grow col" style={{ gap: 2 }}>
               <span className="ellipsis" style={{ fontWeight: 600, fontSize: 15 }}>{s.piece.title}</span>

@@ -123,6 +123,13 @@ export function Setup() {
               <input type="date" value={loadCycle().concertDate ?? ''} onChange={(e) => saveCycle(renamed({ ...loadCycle(), concertDate: e.target.value || undefined }))} />
             </label>
           </div>
+          {(() => {
+            const c = loadCycle();
+            const today = new Date().toISOString().slice(0, 10);
+            if (c.rehearsalDate && c.concertDate && c.concertDate < c.rehearsalDate) return <span className="small" role="alert" style={{ color: 'var(--accent-text)' }}>The concert is before the rehearsal: check the dates.</span>;
+            if ([c.rehearsalDate, c.concertDate].some((d) => d && d < today)) return <span className="small" role="alert" style={{ color: 'var(--accent-text)' }}>That date is in the past.</span>;
+            return null;
+          })()}
           <span className="tiny muted">With dates, Home tells you how many sections to learn per day.</span>
           <div className="col">
             <span className="small">Pieces your choir is singing this cycle</span>

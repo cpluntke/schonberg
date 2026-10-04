@@ -256,6 +256,8 @@ input[type='range'] { accent-color: var(--accent); width: 100%; }
   .lyrics { font-size: 16px; padding-top: 4px; min-height: 26px; }
   .big-play { width: 48px; height: 48px; }
   .play-hud { padding-top: 2px; padding-bottom: 0; }
+  .howto { display: none !important; }
+  .overlay { align-items: flex-start; overflow-y: auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {

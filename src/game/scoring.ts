@@ -155,6 +155,7 @@ class NoteAcc {
   onsetMs: number | null = null;
   /** Start of the current run of qualifying voiced samples (onset needs ~60 ms of sound). */
   runStart: number | null = null;
+  runMiss = 0;
   scoopDevs: number[] = [];
   /** Causal moving-average window over body deviations (vibrato smoothing). */
   smT: number[] = [];
@@ -334,14 +335,20 @@ export class LiveScorer {
           qualifies = w.legatoFrom === null
             ? true
             : w.legatoFrom === w.note.midi
-              ? inTol
+              // Repeated pitch: the voice is already there; vibrato swings ±50¢, so accept a semitone.
+              ? Math.abs(m - w.target) <= Math.max(1, (this.tol + w.tolExtra) / 100)
               : Math.abs(m - w.target) < Math.abs(m - w.legatoFrom);
         }
         if (qualifies) {
+          a.runMiss = 0;
           if (a.runStart === null) a.runStart = t;
           // A real entry is sustained sound, not a 20 ms blip (or speaker bleed).
           if (t - a.runStart >= Math.min(ONSET_RUN, 0.4 * w.note.dur) - 1e-9) a.onsetMs = Math.max(0, (a.runStart - w.start) * 1000);
-        } else a.runStart = null;
+        } else if (++a.runMiss >= 2) {
+          // Tolerate a single tracker dropout inside the run.
+          a.runStart = null;
+          a.runMiss = 0;
+        }
       }
       if (dev !== null && t < w.start + SCOOP_WINDOW) a.scoopDevs.push(dev);
     }

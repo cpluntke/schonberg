@@ -283,7 +283,8 @@ export class PracticeSession {
       let last = a - 1;
       for (let i = a; i <= b; i++) {
         const n = this.cfg.part.notes[i];
-        if (n.start + n.dur <= pos + 0.05) last = i; // only notes that were completely sung
+        // Only notes that were completely sung and whose sound has reached us (mic lags by the latency).
+        if (n.start + n.dur <= pos - (this.latencyMs / 1000) * this.cfg.rate + 0.05) last = i;
       }
       result = last < a ? null : scoreAttempt({ score: this.cfg.score, part: this.cfg.part, range: [a, last] }, this.samples, this.cfg.scoring);
     }

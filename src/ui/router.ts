@@ -31,7 +31,7 @@ export function parseHash(hash: string): Route {
         const lv = Math.round(Number(q.get('level') ?? 1));
         const mode = seg[0] === 'arcade' ? '3d' : '2d';
         // Arcade is a reward from level 2 up; clamp hand-edited levels.
-        const level = Number.isFinite(lv) ? Math.max(mode === '3d' ? 2 : 0, Math.min(4, lv)) : 1;
+        const level = Math.max(mode === '3d' ? 2 : 0, Math.min(4, Number.isFinite(lv) ? lv : 1));
         return {
           name: 'play', pieceId: seg[1], partId: seg[2], sectionId: seg[3], level, mode,
           from: okRange ? fromN : undefined, to: okRange ? toN : undefined,

@@ -8,7 +8,7 @@ test('a perfect simulated singer passes level 1 and levels up', async ({ page })
   await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
 
   // Open the first piece in the cycle.
-  await page.locator('.list-row').first().click();
+  await page.getByTestId('piece-row').first().click();
   await expect(page.getByRole('heading', { name: 'Sections' })).toBeVisible();
 
   // Level 1 of the first section.
@@ -26,7 +26,7 @@ test('a perfect simulated singer passes level 1 and levels up', async ({ page })
 test('a flat simulated singer does not pass level 4', async ({ page }) => {
   await page.goto('/?simulate=flat#/');
   await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
-  await page.locator('.list-row').first().click();
+  await page.getByTestId('piece-row').first().click();
   await page.getByRole('button', { name: /level 4/ }).first().click();
   await page.getByTestId('start').click();
   await expect(page.getByTestId('pass-banner')).toBeVisible({ timeout: 90_000 });

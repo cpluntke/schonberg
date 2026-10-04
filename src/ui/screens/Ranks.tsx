@@ -151,7 +151,7 @@ export function Ranks() {
               <span className="mono muted" style={{ width: 22 }}>{i + 1}</span>
               <span style={{ width: 36, height: 36, borderRadius: 18, background: 'var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13 }}>{initials(e.name)}</span>
               <div className="grow col" style={{ gap: 0 }}>
-                <span style={{ fontWeight: 600 }}>{isMe ? `${e.name} (you)` : e.name}</span>
+                <span style={{ fontWeight: 600 }}>{isMe ? (profile.name ? `${e.name} (you)` : 'You') : e.name}</span>
                 <span className="tiny muted">{({ S: 'Soprano', A: 'Alto', T: 'Tenor', B: 'Bass' } as Record<string, string>)[e.voice] ?? ''} · {e.streak}-day streak</span>
               </div>
               <span className="mono" style={{ fontWeight: 600 }}>{metric(e)}</span>

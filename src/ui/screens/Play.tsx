@@ -125,13 +125,18 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
           return n.onsetMs != null && (!prev || part.notes[i].start - (prev.start + prev.dur) >= 0.4);
         })
         .map((n) => n.onsetMs!)
-        .sort((a, b) => a - b);
-      if (entryOnsets.length >= 4) {
+        .sort((a, b) => a - b) as number[];
+      // Few entries in this section? Every onset shifts with the delay, so use all of them.
+      const allOnsets = r.notes.filter((n) => n.onsetMs != null).map((n) => n.onsetMs!).sort((a, b) => a - b);
+      const useAll = entryOnsets.length < 2 && allOnsets.length >= 6;
+      if (useAll) entryOnsets.splice(0, entryOnsets.length, ...allOnsets);
+      if (entryOnsets.length >= 2) {
         const med = entryOnsets[Math.floor(entryOnsets.length / 2)];
         const iqr = entryOnsets[Math.floor(entryOnsets.length * 0.75)] - entryOnsets[Math.floor(entryOnsets.length * 0.25)];
-        if (med / rate > 120 && iqr / rate < 160) {
+        // Conservative: only clearly late and consistent (a singer who is genuinely late varies more).
+        if (med / rate > 150 && iqr / rate < 120) {
           // Onsets are in score time; at reduced tempo one score-ms lasts 1/rate real ms.
-          latencyAdjusted = Math.round(Math.min(500, sess.latencyMs + (med / rate - 40)));
+          latencyAdjusted = Math.round(Math.min(400, sess.latencyMs + (med / rate - 40)));
           updateProfile({ latencyMs: latencyAdjusted });
           // Re-score this run with the learned delay (converted back to score seconds).
           const shift = ((latencyAdjusted - sess.latencyMs) / 1000) * rate;
@@ -348,10 +353,10 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
                 </label>
               )}
               {!listenOnly && firstTime && (
-                <div className="col small" style={{ gap: 4, background: 'var(--bg-2)', borderRadius: 10, padding: '10px 12px' }} data-testid="howto">
+                <div className="col small howto" style={{ gap: 4, background: 'var(--bg-2)', borderRadius: 10, padding: '10px 12px' }} data-testid="howto">
                   <strong>How to read the screen</strong>
                   <span><span style={{ color: 'var(--accent)' }}>■</span> Orange bars are your notes. They move left to the white line: sing when they reach it.</span>
-                  <span><span style={{ color: 'var(--voice)' }}>━</span> The blue line is your voice. Keep it on the bar; it turns blue when you hit it.</span>
+                  <span><span style={{ color: 'var(--voice)' }}>━</span> The blue line is your voice. Keep it on the bar: the bar fills with blue when you're on the note.</span>
                   <span>Dashed outlines are the other voices. The bubble shows how many cents sharp (+) or flat (−) you are.</span>
                 </div>
               )}
