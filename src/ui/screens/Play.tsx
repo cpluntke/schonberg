@@ -41,9 +41,10 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
   const [rateOverride, setRateOverride] = useState<number | null>(null);
   const [firstTime] = useState(() => {
     try {
+      if (route.mode !== '2d' || route.level === 0) return false;
       const seen = localStorage.getItem('sh:seenHowto') === '1';
       localStorage.setItem('sh:seenHowto', '1');
-      return !seen && route.mode === '2d';
+      return !seen;
     } catch { return false; }
   });
   const rate = rateOverride ?? spec?.rate ?? 1;
