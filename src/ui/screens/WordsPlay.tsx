@@ -8,7 +8,7 @@ import { setLastResult } from '../play/lastResult';
 import { lyricLine, simulateMode } from './Play';
 import { wordInitial } from '../play/highway2d';
 import { IconBack, IconPause, IconPlay, IconRestart, IconStop } from '../icons';
-import { STAGE_NAMES, scoreWords, syllableOnsets, syllablesOf, type Syllable, type WordsResult, type WordsStage } from '../../game/textrhythm';
+import { STAGE_NAMES, scoreWords, syllableOnsets, syllableOnsetsWithLevels, syllablesOf, type Syllable, type WordsResult, type WordsStage } from '../../game/textrhythm';
 import { getWords, recordWords } from '../../progress/words';
 import type { AttemptResult } from '../../game/types';
 
@@ -75,9 +75,10 @@ export function WordsPlay({ route }: { route: PlayRoute }) {
     const samples = sess.samples.filter((x) => x.time >= section.start - 0.3 && x.time <= section.end + 0.3);
     // Simulated speaker for tests/demos: a syllable burst on every written start.
     const sim = simulateMode();
-    const onsets = sim ? syl.map((x) => x.start + (sim === 'perfect' ? 0.01 : sim === 'flat' ? 0.03 : (x.index % 3 === 0 ? 0.4 : 0.02))) : syllableOnsets(samples);
+    const heard = syllableOnsetsWithLevels(samples);
+    const onsets = sim ? syl.map((x) => x.start + (sim === 'perfect' ? 0.01 : sim === 'flat' ? 0.03 : (x.index % 3 === 0 ? 0.4 : 0.02))) : heard.times;
     const calibrated = profile.latencySource === 'measured' && profile.latencyMs > 0;
-    const res = scoreWords(syl, onsets, { rate: sess.cfg.rate, relative: !calibrated });
+    const res = scoreWords(syl, onsets, { rate: sess.cfg.rate, relative: !calibrated, levels: sim ? undefined : heard.levels });
     const counted = !sess.partial && section.id !== 'all' && rate >= 1 - 1e-6;
     const rec = counted ? recordWords(piece.id, part.id, section.id, stageRef.current, res.accuracy) : { passed: res.accuracy >= 0.8, newStage: false };
     const counts = { perfect: 0, good: 0, ok: 0, miss: 0 };

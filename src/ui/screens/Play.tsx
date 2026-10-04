@@ -21,7 +21,7 @@ const GENERATED_SECTIONS = new Set(['all', 'drill', 'entries', 'cold']);
 /** Singing along with the guide, a run can only teach a delay this far above the device estimate. */
 const GUIDE_LEARN_MAX_ABOVE = 150;
 import { setLastRun } from '../play/runExport';
-import { getBars, knownByHeart, recordBars } from '../../progress/bars';
+import { getBars, knownByHeart, provenOffBook, recordBars } from '../../progress/bars';
 import { drawHighway2D, pitchWindow, wordInitial, type DrawState } from '../play/highway2d';
 import { drawArcade, lanesFor, newFx } from '../play/arcade3d';
 import { setLastResult } from '../play/lastResult';
@@ -108,7 +108,12 @@ function SingPlay({ route }: { route: PlayRoute }) {
     const bars = getBars(piece.id, part.id);
     return new Set(sectionMeasures.filter((m) => knownByHeart(bars[m])));
   }, [offBook, piece, part, sectionMeasures]);
-  const allKnown = sectionMeasures.length > 0 && known.size === sectionMeasures.length;
+  // Straight to the test only when every bar has been sung well while hidden.
+  const allKnown = useMemo(() => {
+    if (!offBook || !piece || !part || !sectionMeasures.length || /~|^(row|leaps)-/.test(piece.id)) return false;
+    const bars = getBars(piece.id, part.id);
+    return sectionMeasures.every((m) => provenOffBook(bars[m]));
+  }, [offBook, piece, part, sectionMeasures]);
   const [obMode, setObMode] = useState<'fade' | 'test'>(() => 'fade');
   const cold = route.sectionId === 'cold';
   const effMode: 'fade' | 'test' = allKnown || cold ? 'test' : obMode;

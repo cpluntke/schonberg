@@ -93,6 +93,11 @@ export function knownByHeart(s: BarStat | undefined): boolean {
   return (s.mem ?? 0) >= 0.9;
 }
 
+/** Sung well with the bar actually hidden (not just fading candidates). */
+export function provenOffBook(s: BarStat | undefined): boolean {
+  return s?.off != null && s.off >= SOLID;
+}
+
 /** Contiguous runs of weak bars, worst first: "bars 12–13, 27". */
 export function troubleSpots(bars: BarMap, measures: number[], max = 3): [number, number][] {
   const weak = measures.filter((m) => mastery(bars[m]) === 'weak');

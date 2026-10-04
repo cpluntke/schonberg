@@ -35,11 +35,16 @@ const db = (rms: number) => 20 * Math.log10(Math.max(rms, 1e-5));
  * between syllables, so speaking or whispering in rhythm works best; legato singing gives fewer.
  */
 export function syllableOnsets(samples: PitchSample[]): number[] {
+  return syllableOnsetsWithLevels(samples).times;
+}
+
+/** Onsets plus the peak level (dB) of the 100 ms after each, to tell weak consonant releases apart. */
+export function syllableOnsetsWithLevels(samples: PitchSample[]): { times: number[]; levels: number[] } {
   const s = [...samples].filter((x) => Number.isFinite(x.rms) && Number.isFinite(x.time)).sort((a, b) => a.time - b.time);
-  if (s.length < 5) return [];
+  if (s.length < 5) return { times: [], levels: [] };
   const env = s.map((x) => db(x.rms));
   const sorted = [...env].sort((a, b) => a - b);
-  const globalFloor = sorted[Math.floor(sorted.length * 0.15)];
+  const globalFloor = sorted[Math.floor(sorted.length * 0.1)];
   // The floor around each moment (quietest point in the last second): music bleeding into the mic
   // raises it, and a syllable must stand clearly above what's around it.
   const localFloor = env.map((_, k) => {
@@ -47,8 +52,9 @@ export function syllableOnsets(samples: PitchSample[]): number[] {
     for (let j = k; j >= 0 && s[k].time - s[j].time <= 1; j--) m = Math.min(m, env[j]);
     return m;
   });
-  const loudAt = (k: number) => Math.max(globalFloor + 8, localFloor[k] + 9, -50);
+  const loudAt = (k: number) => Math.max(globalFloor + 6, localFloor[k] + 9, -50);
   const out: number[] = [];
+  const levels: number[] = [];
   let last = -Infinity;
   for (let k = 1; k < s.length; k++) {
     const loud = loudAt(k);
@@ -65,9 +71,12 @@ export function syllableOnsets(samples: PitchSample[]): number[] {
     // Only take the first frame of each rise.
     if (env[k - 1] >= loudAt(k - 1) && env[k - 1] - lo >= 6) continue;
     out.push(t);
+    let peak = env[k];
+    for (let j = k; j < s.length && s[j].time - s[k].time <= 0.1; j++) peak = Math.max(peak, env[j]);
+    levels.push(peak);
     last = t;
   }
-  return out;
+  return { times: out, levels };
 }
 
 export type WordGrade = 'perfect' | 'good' | 'ok' | 'miss';
@@ -93,7 +102,7 @@ const GRADE_VALUE: Record<WordGrade, number> = { perfect: 1, good: 0.85, ok: 0.5
  * Match onsets to syllables in order (each onset used once) within ±300 ms real time, then grade
  * each by its offset. `relative`: judge against the median offset (device delay unknown).
  */
-export function scoreWords(syl: Syllable[], onsets: number[], opts: { rate: number; relative?: boolean }): WordsResult {
+export function scoreWords(syl: Syllable[], onsets: number[], opts: { rate: number; relative?: boolean; levels?: number[] }): WordsResult {
   const rate = opts.rate > 0 ? opts.rate : 1;
   const win = 0.3 * rate; // score seconds
   // First the speaker's overall offset (device delay, or simply speaking late): the shift under
@@ -144,11 +153,31 @@ export function scoreWords(syl: Syllable[], onsets: number[], opts: { rate: numb
   for (const [m, e] of per) perMeasure[m] = e.s / e.n;
   // Extra syllables count against you: chattering steadily through the section mustn't pass.
   // (A few spare onsets, e.g. a consonant cluster heard twice, are tolerated.)
+  // A spare onset inside a sung syllable that is clearly weaker than the syllable itself (a final
+  // consonant's release, an "s" before the next word) is forgiven, one per syllable; "ta ta ta"
+  // chatter is as strong as the syllables and still counts.
   const first = syl.length ? syl[0].start + bestD - win : 0;
   const last = syl.length ? syl[syl.length - 1].start + bestD + win : 0;
-  const inWindow = onsets.filter((t) => t >= first && t <= last).length;
-  const extra = Math.max(0, inWindow - used.size);
-  const penalty = Math.max(0, extra - 0.2 * syl.length);
+  const spans = syl.map((x, k) => [x.start + bestD, (k + 1 < syl.length ? syl[k + 1].start : x.start + win) + bestD] as const);
+  const matchedLevel = new Map<number, number>();
+  if (opts.levels) {
+    syl.forEach((x, k) => {
+      if (raw[k] === null) return;
+      const t = x.start + (raw[k]! / 1000) * rate;
+      const j = onsets.findIndex((o) => Math.abs(o - t) < 1e-6);
+      if (j >= 0) matchedLevel.set(k, opts.levels![j]);
+    });
+  }
+  const forgiven = new Set<number>();
+  let extra = 0;
+  onsets.forEach((t, j) => {
+    if (used.has(j) || t < first || t > last) return;
+    const k = spans.findIndex(([a, b]) => t > a && t < b);
+    const own = k >= 0 ? matchedLevel.get(k) : undefined;
+    if (own !== undefined && opts.levels && opts.levels[j] <= own - 6 && !forgiven.has(k)) { forgiven.add(k); return; }
+    extra++;
+  });
+  const penalty = Math.max(0, extra - Math.max(2, 0.2 * syl.length));
   const sum = syllables.reduce((a, x) => a + GRADE_VALUE[x.grade], 0);
   const accuracy = syl.length ? sum / (syl.length + penalty) : 0;
   return { syllables, accuracy, perMeasure, medianMs: medianMs === null ? null : Math.round(medianMs), missed: syllables.filter((x) => x.ms === null).length, extra };

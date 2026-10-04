@@ -190,7 +190,7 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
     const isNow = n.start <= s.pos && s.pos < n.start + n.dur;
     if (isNow && inRange) current = i;
     const past = n.start + n.dur <= s.pos;
-    const vis = past || !s.hide ? 'show' : s.hide(i);
+    const vis = (past && inRange) || !s.hide ? 'show' : s.hide(i);
     if (vis !== 'show') {
       if (vis === 'letters' && inRange) {
         const ch = wordInitial(n);

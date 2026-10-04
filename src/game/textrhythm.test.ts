@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { scoreWords, syllableOnsets, syllablesOf } from './textrhythm';
+import { scoreWords, syllableOnsets, syllableOnsetsWithLevels, syllablesOf } from './textrhythm';
 import { makePart } from './testutil';
 import type { PitchSample } from './types';
 
@@ -57,7 +57,8 @@ describe('words in rhythm can not be gamed', () => {
     // "ta ta ta…" every 200 ms: short bursts with clear gaps.
     const chatter: PitchSample[] = [];
     for (let t = 0; t < 6; t += 0.02) chatter.push({ time: t, midi: null, clarity: 0, rms: (t % 0.2) < 0.1 ? 0.1 : 0.002 });
-    const r = scoreWords(syl, syllableOnsets(chatter), { rate: 1, relative: true });
+    const o = syllableOnsetsWithLevels(chatter);
+    const r = scoreWords(syl, o.times, { rate: 1, relative: true, levels: o.levels });
     expect(r.accuracy).toBeLessThan(0.6);
     expect(r.extra).toBeGreaterThan(5);
   });
@@ -65,5 +66,19 @@ describe('words in rhythm can not be gamed', () => {
     const clean = speak(syl.map((s) => s.start));
     const bled = clean.map((x, k) => ({ ...x, rms: Math.sqrt(x.rms ** 2 + (0.02 * (1 + 0.3 * Math.sin(k / 3))) ** 2) }));
     expect(scoreWords(syl, syllableOnsets(bled), { rate: 1 }).accuracy).toBeGreaterThan(0.8);
+  });
+});
+
+describe('crisp consonants are not penalised', () => {
+  const syl = syllablesOf(part, [0, part.notes.length - 1]);
+  it('a release burst after many syllables still passes', () => {
+    const starts = syl.map((s) => s.start);
+    const releases = syl.filter((_, k) => k % 2 === 0).map((s, k) => s.start + 0.22 + 0.01 * k);
+    const samples = speak(starts).map((x) => {
+      const r = releases.find((t) => x.time >= t && x.time < t + 0.04);
+      return r != null ? { ...x, rms: Math.max(x.rms, 0.05) } : x;
+    });
+    const o = syllableOnsetsWithLevels(samples);
+    expect(scoreWords(syl, o.times, { rate: 1, levels: o.levels }).accuracy).toBeGreaterThan(0.85);
   });
 });
