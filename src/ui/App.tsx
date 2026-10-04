@@ -18,6 +18,7 @@ import './generated';
 import { Diagnostics } from './screens/Diagnostics';
 import { LyricsQuiz } from './screens/LyricsQuiz';
 import { MemoryMap } from './screens/MemoryMap';
+import { ChoirScreen, ChoirAdmin, SectionLead, SuperAdmin } from './screens/Choir';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { UpdatePrompt } from './components/UpdatePrompt';
 
@@ -82,6 +83,10 @@ export function App() {
       case 'diagnostics': body = <Diagnostics />; break;
       case 'lyrics': body = <LyricsQuiz key={route.pieceId + route.partId} pieceId={route.pieceId} partId={route.partId} />; break;
       case 'memorymap': body = <MemoryMap key={route.pieceId + route.partId} pieceId={route.pieceId} partId={route.partId} />; break;
+      case 'choir': body = <ChoirScreen />; break;
+      case 'choiradmin': body = <ChoirAdmin />; break;
+      case 'section': body = <SectionLead />; break;
+      case 'superadmin': body = <SuperAdmin />; break;
     }
   }
 

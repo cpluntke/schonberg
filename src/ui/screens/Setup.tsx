@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useProfile, useStoreVersion } from '../hooks';
-import { loadCycle, saveCycle } from '../../progress/store';
+import { loadCycle, saveCycle, type Profile } from '../../progress/store';
+import { apiBase, cachedChoir } from '../../progress/choir';
+import { JoinChoir } from './Choir';
 import { allPieces } from '../library';
 import { IntroVideoButton, introSeen } from '../components/IntroVideo';
 import { go, back } from '../router';
@@ -41,7 +43,7 @@ export function Setup() {
     profile.rangeLow && profile.rangeHigh ? { lo: profile.rangeLow, hi: profile.rangeHigh } : null,
   );
   const [lat, setLat] = useState<{ state: 'idle' | 'running' | 'done' | 'fail'; beat: number; ms: number }>({ state: 'idle', beat: 0, ms: profile.latencyMs });
-  const steps = 4;
+  const steps = 5;
 
   async function runLatency() {
     setLat({ state: 'running', beat: 0, ms: 0 });
@@ -77,9 +79,13 @@ export function Setup() {
       </div>
 
       {step === 0 && (
+        <ChoirStep profile={profile} update={update} onNext={() => setStep(1)} />
+      )}
+
+      {step === 1 && (
         <>
           <h1 className="hero">Who's singing?</h1>
-          {!introSeen() && <IntroVideoButton label="New here? Watch the 1½-minute intro" className="btn block" />}
+          {!apiBase() && !introSeen() && <IntroVideoButton label="New here? Watch the 1½-minute intro" className="btn block" />}
           <label className="field">
             <span>Your name (shown on the choir leaderboard)</span>
             <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="First name" autoComplete="given-name" maxLength={40} />
@@ -112,7 +118,7 @@ export function Setup() {
           })()}
           <span className="tiny muted">With dates, Home tells you how many sections to learn per day.</span>
           <div className="col">
-            <span className="small">Pieces your choir is singing this cycle</span>
+            <span className="small">{cachedChoir() && profile.choirCode ? `Pieces ${cachedChoir()!.name} is singing (from the choir; change them any time)` : 'Pieces your choir is singing this cycle'}</span>
             <div className="chips" role="group" aria-label="Pieces in this cycle">
               {allPieces().map((pc) => {
                 const on = loadCycle().pieceIds.includes(pc.id);
@@ -127,22 +133,22 @@ export function Setup() {
             </div>
             <span className="tiny muted">Your own scores can be imported later in the Library.</span>
           </div>
-          <button className="btn primary block" style={{ marginTop: 'auto' }} onClick={() => setStep(1)}>Continue</button>
+          <button className="btn primary block" style={{ marginTop: 'auto' }} onClick={() => setStep(2)}>Continue</button>
         </>
       )}
 
-      {step === 1 && (
+      {step === 2 && (
         <RangeCheck
-          onSkip={() => setStep(2)}
+          onSkip={() => setStep(3)}
           onDone={(r) => {
             // Keep it right away, even if setup isn't finished.
             if (r) { setRange(r); update({ rangeLow: r.lo, rangeHigh: r.hi }); }
-            setStep(2);
+            setStep(3);
           }}
         />
       )}
 
-      {step === 2 && (
+      {step === 3 && (
         <>
           <h1 className="hero">Headphones &amp; delay</h1>
           <div className="card">
@@ -169,11 +175,11 @@ export function Setup() {
               {lat.state === 'done' || lat.state === 'fail' ? 'Measure again' : 'Start the clicks'}
             </button>
           </div>
-          <button className="btn primary block" style={{ marginTop: 'auto' }} onClick={() => setStep(3)}>Continue</button>
+          <button className="btn primary block" style={{ marginTop: 'auto' }} onClick={() => setStep(4)}>Continue</button>
         </>
       )}
 
-      {step === 3 && (
+      {step === 4 && (
         <>
           <h1 className="hero">How do you read notes?</h1>
           <div className="choice-grid">
@@ -188,5 +194,48 @@ export function Setup() {
         </>
       )}
     </main>
+  );
+}
+
+/** First step: the choir code (connects programme, scores and leaderboard), or practise alone. */
+function ChoirStep({ profile, update, onNext }: { profile: Profile; update: (p: Partial<Profile>) => void; onNext: () => void }) {
+  const choir = cachedChoir();
+  const joined = !!profile.choirCode && choir?.code === profile.choirCode;
+  if (!apiBase()) {
+    return (
+      <>
+        <h1 className="hero">Welcome</h1>
+        <span className="muted">This copy of the app works on its own: no choir server is connected.</span>
+        <button className="btn primary block" style={{ marginTop: 'auto' }} onClick={onNext}>Continue</button>
+      </>
+    );
+  }
+  return (
+    <>
+      <h1 className="hero">Your choir</h1>
+      {!introSeen() && <IntroVideoButton label="New here? Watch the 1½-minute intro" className="btn block" />}
+      {joined ? (
+        <div className="card" data-testid="setup-choir-joined">
+          <span className="eyebrow">Joined</span>
+          <strong style={{ fontSize: 20 }}>{choir!.name}</strong>
+          <span className="small muted">
+            {choir!.cycle ? `Programme: ${choir!.cycle.name}. ` : ''}{choir!.pieces.length ? `${choir!.pieces.length} score${choir!.pieces.length === 1 ? '' : 's'} from the choir are on their way to your phone.` : ''}
+          </span>
+          <label className="row small" style={{ gap: 8, alignItems: 'flex-start' }}>
+            <input type="checkbox" checked={!!profile.shareProgress} onChange={(e) => update({ shareProgress: e.target.checked })} />
+            <span>Share my progress with my section lead (which bars are hard for me). You can change this any time under Settings › Your choir.</span>
+          </label>
+        </div>
+      ) : (
+        <div className="card">
+          <span className="muted">Got a code from your choir? It brings in your choir's programme, its scores and its leaderboard.</span>
+          <JoinChoir onJoined={() => update({})} />
+        </div>
+      )}
+      <button className="btn primary block" style={{ marginTop: 'auto' }} onClick={onNext} data-testid="choir-step-next">
+        {joined ? 'Continue' : 'Practise on my own'}
+      </button>
+      {!joined && <span className="tiny muted" style={{ textAlign: 'center' }}>You can join a choir later in Settings.</span>}
+    </>
   );
 }

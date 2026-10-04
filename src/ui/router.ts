@@ -13,7 +13,11 @@ export type Route =
   | { name: 'tuner' }
   | { name: 'diagnostics' }
   | { name: 'lyrics'; pieceId: string; partId: string }
-  | { name: 'memorymap'; pieceId: string; partId: string };
+  | { name: 'memorymap'; pieceId: string; partId: string }
+  | { name: 'choir' }
+  | { name: 'choiradmin' }
+  | { name: 'section' }
+  | { name: 'superadmin' };
 
 export function parseHash(hash: string): Route {
   const h = hash.replace(/^#\/?/, '');
@@ -51,6 +55,10 @@ export function parseHash(hash: string): Route {
     case 'expert': return { name: 'expert' };
     case 'tuner': return { name: 'tuner' };
     case 'diagnostics': return { name: 'diagnostics' };
+    case 'choir': return { name: 'choir' };
+    case 'choiradmin': return { name: 'choiradmin' };
+    case 'section': return { name: 'section' };
+    case 'superadmin': return { name: 'superadmin' };
   }
   return { name: 'home' };
 }

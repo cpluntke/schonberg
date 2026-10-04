@@ -4,6 +4,7 @@ import { go, back } from '../router';
 import { getPiece, noteRangeFor, singableSections } from '../library';
 import { useProfile } from '../hooks';
 import { LEVELS, LISTEN, MAX_LEVEL, OFF_BOOK_DAYS, effectiveTolerance, pieceReadiness } from '../../progress/ladder';
+import { shareMyProgress } from '../play/shareProgress';
 import { recordAttempt, getProgress, snapshotReadiness, personalBest } from '../../progress/store';
 import { keyAtTime } from '../../music/time';
 import { PracticeSession, estimateLatencyMs } from '../play/session';
@@ -280,6 +281,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
       const secs = singableSections(piece, part.id);
       snapshotReadiness(piece.id, part.id, pieceReadiness(secs, getProgress(piece.id, part.id)).pct);
     }
+    void shareMyProgress();
     setLastResult({
       pieceId: piece.id, partId: part.id, sectionId: section.id, level, mode: route.mode,
       from: section.start, to: section.end, result: r, ladder, prevBest,

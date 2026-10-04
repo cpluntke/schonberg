@@ -45,6 +45,8 @@ export interface Profile {
   onboarded: boolean;
   leaderboardOptIn: boolean;
   choirCode?: string;
+  /** Share per-bar progress with the section lead (opt-in). */
+  shareProgress?: boolean;
 }
 
 export interface SectionProgress {

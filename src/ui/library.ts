@@ -3,6 +3,7 @@ import type { Score, Section } from '../music/types';
 import { importScoreFile } from '../music/import';
 import { computeSections } from '../music/sections';
 import { loadImportedScores, saveImportedScore, deleteImportedScore, loadCycle, saveCycle, subscribe } from '../progress/store';
+import { syncChoir } from '../progress/choir';
 
 export interface PieceInfo {
   id: string;
@@ -165,7 +166,8 @@ async function loadAll() {
     seeded = !!localStorage.getItem('sh:cycleSeeded');
     presetApplied = localStorage.getItem('sh:cyclePreset');
   } catch { /* storage blocked */ }
-  const untouched = !cycle.pieceIds.length || cycle.name === 'Demo cycle' || cycle.preset != null;
+  // A choir's own programme (synced from the server) wins over the built-in preset.
+  const untouched = !cycle.preset?.startsWith('choir:') && (!cycle.pieceIds.length || cycle.name === 'Demo cycle' || cycle.preset != null);
   if (preset && presetApplied !== preset.id && untouched) {
     const own = cycle.pieceIds.filter((id) => pieces.get(id) && !pieces.get(id)!.builtin);
     const ids = preset.pieceIds.filter((id) => pieces.has(id));
@@ -200,6 +202,25 @@ async function loadAll() {
   }
   loaded = true;
   emit();
+  // Your choir's programme and scores (in the background; works offline from the last sync).
+  void syncChoirNow();
+}
+
+let syncing: Promise<Awaited<ReturnType<typeof syncChoir>>> | null = null;
+/** Download the choir's new scores and apply its programme. */
+export function syncChoirNow(): Promise<Awaited<ReturnType<typeof syncChoir>>> {
+  if (!syncing) {
+    syncing = syncChoir(async (name, data, meta) => {
+      const score = await importScoreFile(name, data);
+      score.id = meta.id;
+      if (meta.title) score.title = meta.title;
+      if (meta.composer) score.composer = meta.composer;
+      await saveImportedScore(score);
+      pieces.set(score.id, makePiece(score));
+      emit();
+    }, (id) => pieces.has(id)).finally(() => { syncing = null; emit(); });
+  }
+  return syncing;
 }
 
 export function ensureLoaded(): Promise<void> {

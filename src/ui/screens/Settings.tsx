@@ -5,6 +5,7 @@ import { nextRehearsal, WEEKDAYS } from '../../progress/rehearsal';
 import { getPiece } from '../library';
 import { go } from '../router';
 import { loadCycle, saveCycle, exportBackup, importBackup } from '../../progress/store';
+import { cachedChoir } from '../../progress/choir';
 import { effectiveTolerance } from '../../progress/ladder';
 import { NOTATIONS } from './Setup';
 import { noteLabel } from '../../game/notation';
@@ -83,6 +84,14 @@ export function Settings() {
           <span className="big" style={{ fontSize: 15 }}>Just intonation (chord-aware)</span>
           <span className="sub">Major thirds 14¢ low, fifths pure: tuned to the chord the others are singing</span>
         </button>
+      </section>
+
+      <section className="col" style={{ gap: 8 }}>
+        <h2 className="eyebrow">Your choir</h2>
+        <button className="btn block" onClick={() => go({ name: 'choir' })} data-testid="settings-choir">
+          {profile.choirCode ? `Choir: ${cachedChoir()?.name ?? profile.choirCode}` : 'Join your choir'}
+        </button>
+        {cycle.preset?.startsWith('choir:') && <span className="tiny muted">The programme below comes from your choir; your changes last until the choir publishes a new one.</span>}
       </section>
 
       <section className="col" style={{ gap: 8 }}>
