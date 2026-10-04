@@ -50,7 +50,7 @@ export function IntroVideoModal({ onClose }: { onClose: () => void }) {
             onEnded={() => { markSeen(); }}
             data-testid="intro-video">
             {/* H.264 for Safari/iOS, VP9 for browsers without H.264 (e.g. some Chromium builds). */}
-            <source src={INTRO_SRC} type='video/mp4; codecs="avc1.640028, mp4a.40.2"' />
+            <source src={INTRO_SRC} type='video/mp4; codecs="avc1.64001F, mp4a.40.2"' />
             <source src={INTRO_WEBM} type='video/webm; codecs="vp9, opus"' onError={() => setFailed(true)} />
           </video>
         )}
