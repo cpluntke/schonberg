@@ -46,6 +46,8 @@ export function Results() {
   const isPB = lr.prevBest != null && r.score > lr.prevBest;
   const leveledUp = lr.ladder && lr.newLevel > lr.prevLevel;
 
+  const sungCents = r.notes.map((n) => n.cents).filter((c): c is number => c != null && Math.abs(c) < 100).sort((a, b) => a - b);
+  const avgCents = sungCents.length ? Math.round(sungCents[Math.floor(sungCents.length / 2)]) : null;
   const measureIdx = Object.keys(r.perMeasure).map(Number).sort((a, b) => a - b);
   const mnum = (i: number) => piece.score.measures[i]?.number ?? String(i + 1);
 
@@ -79,7 +81,7 @@ export function Results() {
       <div className="row" style={{ gap: 20 }}>
         <div className="grade-tile" aria-label={`Grade ${gradeLetter(r.accuracy)}`}>{gradeLetter(r.accuracy)}</div>
         <div className="col" style={{ gap: 4 }}>
-          <span className="mono" style={{ fontSize: 30, fontWeight: 600 }} data-testid="result-score">{r.score.toLocaleString('de-DE')}</span>
+          <span className="mono" style={{ fontSize: 30, fontWeight: 600 }} data-testid="result-score">{r.score.toLocaleString()}</span>
           <span className="small" style={{ color: 'var(--voice)' }}>
             {Math.round(r.accuracy * 100)}% accuracy{isPB ? ' · new personal best!' : ''}
           </span>
@@ -87,7 +89,7 @@ export function Results() {
       </div>
 
       <div className="stats3">
-        <div className="stat"><span className="k">Pitch</span><span className="v">{Math.round(r.pitch * 100)}%</span></div>
+        <div className="stat"><span className="k">In tune</span><span className="v">{Math.round(r.pitch * 100)}%</span>{avgCents != null && <span className="k mono">avg {avgCents > 0 ? '+' : avgCents < 0 ? '−' : '±'}{Math.abs(avgCents)}¢</span>}</div>
         <div className="stat"><span className="k">Rhythm</span><span className="v">{Math.round(r.rhythm * 100)}%</span></div>
         <div className="stat"><span className="k">Best combo</span><span className="v">{r.maxCombo}</span></div>
       </div>

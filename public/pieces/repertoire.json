@@ -1,5 +1,5 @@
 [
-  { "id": "bach-bwv512", "file": "pd/bach-bwv512.mxl", "title": "Gib dich zufrieden, BWV 512", "composer": "J. S. Bach", "level": "easy",
+  { "id": "bach-bwv315", "file": "pd/bach-bwv315.mxl", "title": "Gib dich zufrieden, BWV 315", "composer": "J. S. Bach", "level": "easy",
     "description": "Four-part chorale: the ideal first piece to learn the app.", "partNames": ["Soprano", "Alto", "Tenor", "Bass"], "credit": "PDMX / MuseScore (Public Domain Mark)" },
   { "id": "bruckner-locus-iste", "file": "pd/bruckner-locus-iste.mxl", "title": "Locus iste, WAB 23", "composer": "Anton Bruckner", "level": "easy",
     "description": "Gradual for SATB. Clean lines, chromatic surprises.", "credit": "PDMX / MuseScore (CC0)" },

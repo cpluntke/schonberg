@@ -92,7 +92,7 @@ async function loadAll() {
   // First run: put the built-ins into the cycle so Home isn't empty.
   const cycle = loadCycle();
   if (!cycle.pieceIds.length && !localStorage.getItem('sh:cycleSeeded')) {
-    const preferred = ['bach-bwv512', 'debussy-dieu', 'ravel-nicolette', 'bruckner-locus-iste'].filter((id) => pieces.has(id));
+    const preferred = ['bach-bwv315', 'debussy-dieu', 'ravel-nicolette', 'bruckner-locus-iste'].filter((id) => pieces.has(id));
     cycle.pieceIds = preferred.length ? preferred : [...pieces.values()].filter((p) => p.builtin).slice(0, 4).map((p) => p.id);
     cycle.name = cycle.name === 'This cycle' ? 'Demo cycle' : cycle.name;
     const iso = (days: number) => {

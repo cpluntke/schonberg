@@ -157,6 +157,7 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
         notation, showNames, key: keyAtTime(piece.score, Math.max(0, pos)), tolerance,
         ghostParts: piece.score.parts.filter((p) => p.id !== part.id && p.voiceType !== 'other' && p.notes.length),
         lo, hi, from: section.start, to: section.end,
+        bpm: tempoAt(piece.score.tempos, Math.max(0, pos)) * rate,
       };
       if (route.mode === '3d') drawArcade(c, W, H, st, fxRef.current, lanesFor(st), ts / 1000);
       else drawHighway2D(c, W, H, st);
@@ -231,7 +232,7 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
         </div>
         {!listenOnly && (
           <div className="col" style={{ alignItems: 'flex-end', gap: 0, paddingRight: 6 }}>
-            <span className="mono" style={{ fontWeight: 600, fontSize: route.mode === '3d' ? 22 : 17 }} data-testid="score">{hud.score.toLocaleString('de-DE')}</span>
+            <span className="mono" style={{ fontWeight: 600, fontSize: route.mode === '3d' ? 22 : 17 }} data-testid="score">{hud.score.toLocaleString()}</span>
             <span className="mono tiny" style={{ color: 'var(--accent)' }}>{hud.combo > 1 ? `combo ${hud.combo}` : ' '}</span>
           </div>
         )}
@@ -350,10 +351,12 @@ function shortName(n: string): string {
 
 function joinSyl(notes: { lyric?: string; syllabic?: string }[]): string {
   let out = '';
+  let open = false; // previous syllable was begin/middle → this one continues the word
   for (const n of notes) {
     if (!n.lyric) continue;
-    const cont = n.syllabic === 'middle' || n.syllabic === 'end';
+    const cont = open && (n.syllabic === 'middle' || n.syllabic === 'end');
     out += (cont || !out ? '' : ' ') + n.lyric;
+    open = n.syllabic === 'begin' || n.syllabic === 'middle';
   }
   return out;
 }

@@ -91,7 +91,7 @@ export function Library() {
         })}
         {!pieces.length && <span className="muted">No pieces yet.</span>}
       </section>
-      <span className="tiny muted">Built-in pieces are original study pieces written for this app.</span>
+      <span className="tiny muted">Built-in pieces: public-domain choral works (editions from the PDMX/MuseScore community) and an original warm-up chorale.</span>
     </main>
   );
 }

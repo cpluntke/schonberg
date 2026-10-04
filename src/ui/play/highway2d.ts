@@ -22,6 +22,8 @@ export interface DrawState {
   hi: number;
   from: number;
   to: number;
+  /** Tempo (quarter bpm) at the current position, for entry countdowns. */
+  bpm: number;
 }
 
 export const COLORS = {
@@ -39,6 +41,16 @@ export const COLORS = {
   text: '#EEF0FF',
   measure: '#262B4D',
 };
+
+const MAJOR = [0, 2, 4, 5, 7, 9, 11];
+/** Is `midi` in the scale of `key` (major, or natural/harmonic minor)? */
+export function inKey(midi: number, key: { fifths: number; mode: 'major' | 'minor' }): boolean {
+  const majorTonic = ((key.fifths * 7) % 12 + 12) % 12;
+  const rel = (((midi - majorTonic) % 12) + 12) % 12;
+  if (MAJOR.includes(rel)) return true;
+  // raised 7th of the relative minor (e.g. G♯ in A minor)
+  return key.mode === 'minor' && rel === 8;
+}
 
 export function pitchWindow(part: Part, range: [number, number] | null): [number, number] {
   const notes = range ? part.notes.slice(range[0], range[1] + 1) : part.notes;
@@ -217,6 +229,31 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
   }
   c.stroke();
 
+  // Entry countdown: when your next note comes after a rest, count the last beats in.
+  if (s.range) {
+    const [a2, b2] = s.range;
+    for (let i = a2; i <= b2; i++) {
+      const n = notes[i];
+      if (n.start < s.pos) continue;
+      const prev = i > 0 ? notes[i - 1] : null;
+      const afterRest = !prev || n.start - (prev.start + prev.dur) >= 0.6;
+      const beat = 60 / Math.max(30, s.bpm);
+      const ahead = n.start - s.pos;
+      if (afterRest && ahead <= 3 * beat && s.pos >= s.from - 0.01) {
+        const k = Math.ceil(ahead / beat - 1e-6);
+        const ey = y(Math.max(lo, Math.min(hi, n.midi)));
+        c.font = '800 22px "Bricolage Grotesque", sans-serif';
+        c.textBaseline = 'middle';
+        c.fillStyle = COLORS.target;
+        c.globalAlpha = 0.9;
+        const txt = k > 0 ? String(k) : '';
+        if (txt) c.fillText(txt, Math.min(W - 24, x(n.start) - 22), ey - bh / 2 - 14);
+        c.globalAlpha = 1;
+      }
+      break;
+    }
+  }
+
   // Now line.
   c.fillStyle = 'rgba(238,240,255,0.85)';
   c.fillRect(Math.round(nowX) - 1, top - 6, 2, H - top + 6);
@@ -235,7 +272,15 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
     c.fill();
     if (current >= 0) {
       const target = notes[current].midi;
-      let cents = (last.midi - target) * 100;
+      // Average over ~one vibrato cycle so the readout doesn't flicker.
+      let sum = 0;
+      let cnt = 0;
+      for (let k = s.samples.length - 1; k >= 0 && last.time - s.samples[k].time < 0.2; k--) {
+        const mm = s.samples[k].midi;
+        if (mm != null && Math.abs(mm - last.midi) < 1.5) { sum += mm; cnt++; }
+      }
+      const shown = cnt ? sum / cnt : last.midi;
+      let cents = (shown - target) * 100;
       if (Math.abs(cents) > 600) cents = ((cents % 1200) + 1800) % 1200 - 600; // show octave-folded
       const txt = `${cents >= 0 ? '+' : '−'}${Math.round(Math.abs(cents))}¢`;
       c.font = '600 12px "JetBrains Mono", monospace';
@@ -263,7 +308,7 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
     for (let m = lo; m <= hi; m++) {
       const lab = noteLabel(m, s.notation, s.key);
       const isCur = current >= 0 && notes[current].midi === m;
-      const diatonic = !/[♯♭#b]|^(di|ri|fi|si|li|ra|me|se|le|te)$/i.test(lab.text) || s.notation === 'pc';
+      const diatonic = inKey(m, s.key) || s.notation === 'pc';
       if (!diatonic && rowH < 16 && !isCur) continue;
       c.font = `${isCur ? 800 : diatonic ? 600 : 400} ${rowH < 14 ? 10 : 12}px "JetBrains Mono", monospace`;
       c.fillStyle = isCur ? COLORS.target : diatonic ? COLORS.label : '#6B739C';

@@ -154,14 +154,13 @@ export function Home() {
 
 function NextUp({ status }: { status: PieceStatus }) {
   const n = status.next!;
-  const sec = status.piece.sections.find((s) => s.id === n.sectionId);
   const spec = levelSpec(n.level);
   return (
     <div className="col" style={{ gap: 10 }}>
       <div className="col" style={{ gap: 2 }}>
         <span className="small muted">Next up</span>
         <span style={{ fontSize: 20, fontWeight: 800 }}>{status.piece.title}</span>
-        <span className="small muted">{sec?.label} · Level {n.level}: {spec?.name} · {n.reason}</span>
+        <span className="small muted">{n.reason}{spec && !n.reason.includes(spec.name) ? ` (level ${n.level}, ${spec.name})` : ''}</span>
       </div>
       <button className="btn primary block" onClick={() => go({ name: 'play', pieceId: status.piece.id, partId: status.partId, sectionId: n.sectionId, level: n.level, mode: '2d' })}>
         <IconPlay size={18} /> Practise now

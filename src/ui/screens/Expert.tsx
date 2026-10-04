@@ -5,6 +5,7 @@ import { registerVirtual } from '../library';
 import { rowOfTheDay, rowForms } from '../../game/twelvetone';
 import { rowPiece, leapPiece, cycleLeaps, singerRange, ROW_FORMS } from '../generated';
 import { IconBack, IconPlay, IconCube } from '../icons';
+import { letterName } from '../components/Tuner';
 
 const NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
 const sym = (p: number) => (p === 10 ? 't' : p === 11 ? 'e' : String(p));
@@ -61,7 +62,7 @@ export function Expert() {
             </div>
           ))}
         </div>
-        <span className="small" style={{ color: '#D4CCFF' }}>P = prime, R = retrograde, I = inversion, RI = retrograde inversion. Set to your range ({lo}–{hi}).</span>
+        <span className="small" style={{ color: '#D4CCFF' }}>P = prime, R = retrograde, I = inversion, RI = retrograde inversion. Set to your range ({letterName(lo)}–{letterName(hi)}).</span>
         <div className="row wrap">
           <button className="btn small" onClick={() => playRow(2, '2d')}>With guide tone</button>
           <button className="btn small" onClick={() => playRow(4, '2d')}>No help</button>

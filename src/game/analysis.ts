@@ -264,6 +264,37 @@ export function analyze(ctx: ScoringContext, notes: NoteResult[], samples?: Pitc
     });
   }
 
+  // 8. Wrong notes: clearly voiced, but a semitone or more away (not an octave slip).
+  const wrong = notes.filter((n) => n.voicedRatio >= 0.4 && n.cents !== null && !n.octave && Math.abs(n.cents) >= 70);
+  if (wrong.length >= 2 || (wrong.length === 1 && notes.length <= 4)) {
+    const bad = new Map<number, number>();
+    for (const n of wrong) addTo(bad, noteOf(n).measure, Math.min(3, Math.abs(n.cents!) / 100));
+    const m = window(bad);
+    const up = wrong.filter((n) => n.cents! > 0).length;
+    const dir = up > wrong.length * 0.7 ? 'too high' : up < wrong.length * 0.3 ? 'too low' : 'off';
+    const semis = Math.round(mean(wrong.map((n) => Math.abs(n.cents!))) / 100);
+    out.push({
+      kind: 'wrong-notes',
+      title: `Wrong notes in ${barsText(score, m)}`,
+      detail: `${wrong.length} note${wrong.length > 1 ? 's were' : ' was'} sung clearly but ${dir}, typically by ${semis <= 1 ? 'about a semitone' : `about ${semis} semitones`} (${barList(score, wrong.map((n) => noteOf(n).measure))}). Learn the pitches first: loop these bars slowly with your part playing and note names on.`,
+      measures: m,
+      severity: wrong.length >= 0.3 * notes.length ? 3 : 2,
+      weight: wrong.length * 15,
+    });
+  }
+
+  // 9. Barely heard: likely a mic / volume problem rather than singing.
+  const voicedAvg = mean(notes.map((n) => n.voicedRatio));
+  if (voicedAvg < 0.25) {
+    out.push({
+      kind: 'quiet',
+      title: 'We could hardly hear you',
+      detail: 'Your voice was detected on only a small part of the notes. Sing out at rehearsal volume, keep the phone 20–50 cm away, and check that the microphone isn’t blocked or muted. The Tuner in Settings shows whether your voice comes through.',
+      severity: 3,
+      weight: 1000,
+    });
+  }
+
   // Sort: severity desc, then weight desc. Keep at most 3; reserve a slot for praise.
   out.sort((a, b) => b.severity - a.severity || b.weight - a.weight);
   const accuracy = mean(notes.map((n) => GRADE_VALUE[n.grade]));
@@ -272,6 +303,16 @@ export function analyze(ctx: ScoringContext, notes: NoteResult[], samples?: Pitc
   for (const c of out.slice(0, great ? 2 : 3)) {
     const { weight: _w, ...ins } = c;
     result.push(ins);
+  }
+  // A weak run always gets at least one concrete pointer.
+  if (!result.length && accuracy < 0.85) {
+    result.push({
+      kind: 'missed-notes',
+      title: `Weakest spot: ${barsText(score, mm)}`,
+      detail: `Most points were lost in ${barsText(score, mm)}. Loop these bars slowly, first with your part playing, then without.`,
+      measures: mm,
+      severity: 2,
+    });
   }
   if (great) {
     result.push({

@@ -181,3 +181,29 @@ test('LiveScorer cost over a whole piece', async () => {
     console.log(`${f}: dur ${score.duration.toFixed(0)}s, ${part.notes.length} notes, ${samples.length} samples; push total ${(t1 - t0).toFixed(1)}ms (${((t1 - t0) / samples.length * 1000).toFixed(1)}µs/sample); finish(samples) re-score ${(t2 - t1).toFixed(1)}ms`);
   }
 });
+
+test('ablation: why pros fail fast pieces at L4', async () => {
+  const score = await load('pd/debussy-yver.mxl');
+  const part = score.parts[0];
+  const notes = part.notes;
+  const a = 0, b = 20;
+  const from = notes[a].start, to = notes[b].start + notes[b].dur;
+  const pro = SINGERS[1];
+  const variants: [string, Partial<Singer>, object][] = [
+    ['pro (all effects)', {}, {}],
+    ['no vibrato', { vibCents: 0 }, {}],
+    ['no offset', { offsetCents: 0 }, {}],
+    ['no scoop', { scoopCents: 0, scoopMs: 0 }, {}],
+    ['no lag/consonant', { lagMs: 0, consonantMs: 0 }, {}],
+    ['no dropout', { dropoutProb: 0 }, {}],
+    ['pro, onsetGrace 0.12', {}, { onsetGrace: 0.12 }],
+    ['pro, centred vib window (non-causal sim: vibratoWindow 0.09)', {}, { vibratoWindow: 0.09 }],
+  ];
+  const out: string[] = ['\n## ablation Yver S notes 0-20 @L4 25c'];
+  for (const [name, patch, o] of variants) {
+    const samples = sing(part, a, b, from, to, 1, { ...pro, ...patch });
+    const r = scoreAttempt({ score, part, range: [a, b] }, samples, { toleranceCents: 25, tuning: 'equal', octaveTolerant: false, ...o });
+    out.push(`${name.padEnd(62)} acc ${fmt(r.accuracy)} ${JSON.stringify(r.counts)} meanHit ${fmt(r.pitch)}`);
+  }
+  console.log(out.join('\n'));
+});

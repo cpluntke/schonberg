@@ -64,6 +64,8 @@ export type InsightKind =
   | 'scooping'
   | 'leaps'
   | 'missed-notes'
+  | 'wrong-notes'
+  | 'quiet'
   | 'octave'
   | 'great';
 

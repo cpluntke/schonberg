@@ -137,6 +137,8 @@ interface NoteWindow {
   start: number;
   bodyStart: number;
   bodyEnd: number;
+  /** Pitch of the previous note when it runs legato into this one (null after a rest). */
+  legatoFrom: number | null;
 }
 
 class NoteAcc {
@@ -173,7 +175,9 @@ function noteWindows(ctx: ScoringContext, opts: ScoringOptions): NoteWindow[] {
     const targetOffset = opts.tuning === 'just'
       ? justOffsetCents(note.midi, soundingOthers(ctx.score, note.start + note.dur / 2, ctx.part.id))
       : 0;
-    out.push({ index: i, note, target: note.midi + targetOffset / 100, targetOffset, start: note.start, bodyStart, bodyEnd });
+    const prev = i > 0 ? notes[i - 1] : null;
+    const legatoFrom = prev && prev.start + prev.dur >= note.start - 0.25 ? prev.midi : null;
+    out.push({ index: i, note, target: note.midi + targetOffset / 100, targetOffset, start: note.start, bodyStart, bodyEnd, legatoFrom });
   }
   return out;
 }
@@ -305,7 +309,16 @@ export class LiveScorer {
     const inTol = dev !== null && Math.abs(dev) <= this.tol;
     // Onset & scoop use samples from the note start (grace included).
     if (t >= w.start && t < w.bodyEnd) {
-      if (inTol && a.onsetMs === null) a.onsetMs = Math.max(0, (t - w.start) * 1000);
+      // Timing is judged independently of intonation: the note "starts" with the first voiced
+      // sound after a rest, or (legato) once the voice has moved closer to this note than the last.
+      if (a.onsetMs === null && midi !== null && Number.isFinite(midi)) {
+        const started = w.legatoFrom === null
+          ? true
+          : w.legatoFrom === w.note.midi
+            ? inTol
+            : Math.abs(midi - w.target) < Math.abs(midi - w.legatoFrom);
+        if (started) a.onsetMs = Math.max(0, (t - w.start) * 1000);
+      }
       if (dev !== null && t < w.start + SCOOP_WINDOW) a.scoopDevs.push(dev);
     }
     // Body coverage. In-tune is judged on the vibrato-smoothed deviation (mean over the last

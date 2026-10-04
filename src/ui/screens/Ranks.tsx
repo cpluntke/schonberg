@@ -82,7 +82,7 @@ export function Ranks() {
       case 'readiness': return `${Math.round(e.readiness * 100)}%`;
       case 'improved': return `${e.improved >= 0 ? '+' : '−'}${Math.round(Math.abs(e.improved) * 100)}%`;
       case 'streak': return `${e.streak}d`;
-      case 'weekly': return e.weeklyScore.toLocaleString('de-DE');
+      case 'weekly': return e.weeklyScore.toLocaleString();
     }
   }
 
