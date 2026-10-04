@@ -240,7 +240,8 @@ export function runSession(spec: PipelineSpec, setup: RunSetup, profile: Profile
     if (gateOn && level >= 2 && medOnset !== null && medOnset > pol.lateFailMs) timingFailMs = Math.round(medOnset);
     // Play.tsx: uncalibrated runs with clearly late entries (L2+) or a delay beyond the plausible
     // range don't count for the level (reported as a timing failure with the onset/shift).
-    if (!calibrated && ((level >= 2 && medOnset !== null && medOnset > pol.lateFailMs) || al.beyondCapMs != null)) {
+    const medLinedUp = medOnset !== null ? medOnset - Math.max(0, al.shiftMs) : null;
+    if (!calibrated && ((level >= 2 && medLinedUp !== null && medLinedUp > pol.lateFailMs) || al.beyondCapMs != null)) {
       timingFailMs = Math.round(al.beyondCapMs ?? medOnset!);
       unsure = true; void unsure;
     }

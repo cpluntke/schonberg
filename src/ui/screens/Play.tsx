@@ -175,7 +175,9 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
       if (calibrated && level >= 2 && med !== null && med > LATE_FAIL_MS) timingFail = Math.round(med);
       // Without a measured delay, clearly late entries (or a delay beyond anything we'd assume)
       // could be the singer or the device: don't count the run for the level, ask for the check.
-      if (!calibrated && ((level >= 2 && med !== null && med > LATE_FAIL_MS) || al.beyondCapMs != null)) {
+      // (Entries are judged against the lined-up delay: the part the line-up corrected is device delay.)
+      const medLinedUp = med !== null ? med - Math.max(0, al.shiftMs) : null;
+      if (!calibrated && ((level >= 2 && medLinedUp !== null && medLinedUp > LATE_FAIL_MS) || al.beyondCapMs != null)) {
         timingUnsure = Math.round(al.beyondCapMs ?? med!);
       }
     }

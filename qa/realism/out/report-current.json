@@ -1,11 +1,8 @@
 {
  "meta": {
-  "head": "27b6dff",
+  "head": "5eae9fe",
   "dirty": [
-   "src/game/align.ts",
-   "src/ui/play/lastResult.ts",
-   "src/ui/screens/Play.tsx",
-   "src/ui/screens/Results.tsx"
+   "rc/ui/screens/Play.tsx"
   ],
   "policy": [
    "LATE_FAIL_MS=250",
@@ -21879,8 +21876,8 @@
        "rhythm": 0.5302380952380938,
        "accuracy": 1,
        "letter": "S",
-       "passed": false,
-       "timingFailMs": 331,
+       "passed": true,
+       "timingFailMs": null,
        "alignedMs": 150,
        "match": 0.7365623350203356,
        "learnedMs": null,
@@ -21916,8 +21913,8 @@
        "rhythm": 0.5391269841269843,
        "accuracy": 1,
        "letter": "S",
-       "passed": false,
-       "timingFailMs": 326,
+       "passed": true,
+       "timingFailMs": null,
        "alignedMs": 150,
        "match": 0.719546290396906,
        "learnedMs": 280,
@@ -24922,8 +24919,8 @@
        "rhythm": 0.6896031746031795,
        "accuracy": 0.9928571428571429,
        "letter": "S",
-       "passed": false,
-       "timingFailMs": 257,
+       "passed": true,
+       "timingFailMs": null,
        "alignedMs": 140,
        "match": 0.7503157937283709,
        "learnedMs": null,
@@ -24959,8 +24956,8 @@
        "rhythm": 0.6915079365079368,
        "accuracy": 0.9928571428571429,
        "letter": "S",
-       "passed": false,
-       "timingFailMs": 258,
+       "passed": true,
+       "timingFailMs": null,
        "alignedMs": 150,
        "match": 0.7316452567942805,
        "learnedMs": 275,

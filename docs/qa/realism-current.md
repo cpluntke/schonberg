@@ -1,9 +1,9 @@
 # Realism: before / after the scoring fixes
 
-Generated 2026-10-04T17:01:49.377Z by `npx vitest run --config vitest.realism.config.ts` (files `qa/realism/cmp-*.test.ts`). The same rendered takes are scored by both pipelines:
+Generated 2026-10-04T17:09:16.145Z by `npx vitest run --config vitest.realism.config.ts` (files `qa/realism/cmp-*.test.ts`). The same rendered takes are scored by both pipelines:
 
 - **before** = baseline app (frozen `qa/realism/baseline/`, as in `docs/qa/realism-baseline.md`): N=2048 window, `scoreAttempt`, onset-based delay learning that re-scores the same run, pass = accuracy only, and an uncalibrated estimate of 80 ms.
-- **after** = current app at `27b6dff` plus uncommitted changes in `src/game/align.ts`, `src/ui/play/lastResult.ts`, `src/ui/screens/Play.tsx`, `src/ui/screens/Results.tsx`. The analysis window comes from `windowFor(part.low)` (1024 for these alto parts). Then `scoreAttempt` → `scoreAligned`, two-run delay learning and the Android estimate of 130 ms. Play.tsx/session policy detected from the source: LATE_FAIL_MS=250; GUIDE_LEARN_MAX_ABOVE=150; timing gate: measured; liftSubharmonics: true; session stores raw samples.
+- **after** = current app at `5eae9fe` plus uncommitted changes in `rc/ui/screens/Play.tsx`. The analysis window comes from `windowFor(part.low)` (1024 for these alto parts). Then `scoreAttempt` → `scoreAligned`, two-run delay learning and the Android estimate of 130 ms. Play.tsx/session policy detected from the source: LATE_FAIL_MS=250; GUIDE_LEARN_MAX_ABOVE=150; timing gate: measured; liftSubharmonics: true; session stores raw samples.
 - **after (80 ms estimate)** = the current app with the old 80 ms estimate (an iPhone-like device). It separates the estimate change from the rest.
 
 Run cells: `grade accuracy%` (✗ = run failed), `al±N` = the voice was shifted N ms for intonation, `→N ms` = the stored delay changed to N, `TF` = failed by the timing gate (median entry in ms), `[…]` = timing/wrong-note tips. Sequences are 3 consecutive runs (new performance each run) on a phone whose stored delay carries over.
@@ -231,7 +231,7 @@ Uncalibrated phone (fresh profile, then runs 2–3 with whatever the app stored)
 | echo (300 ms behind) | warmup-7-12 | 2 | measured 130 | B 81 [behind-beat] | S 98 ✗ al+80 TF337 [behind-beat] |
 | echo (300 ms behind) | warmup-7-12 | 4 | measured 130 | B 84 ✗ [behind-beat] | S 97 ✗ al+80 TF321 [behind-beat] |
 | echo (300 ms behind) | warmup-7-12 | 1 | uncalibrated (true 130) | S 100 →400ms · S 100 · S 100 | S 100 al+140 [behind-beat] · S 99 al+140 →270ms [behind-beat] · S 100 al+70 |
-| echo (300 ms behind) | warmup-7-12 | 2 | uncalibrated (true 130) | S 99 →400ms · S 99 · S 100 | S 100 ✗ al+150 TF331 [behind-beat] · S 100 ✗ al+150 →280ms TF326 [behind-beat] · S 100 al+80 |
+| echo (300 ms behind) | warmup-7-12 | 2 | uncalibrated (true 130) | S 99 →400ms · S 99 · S 100 | S 100 al+150 [behind-beat] · S 100 al+150 →280ms [behind-beat] · S 100 al+80 |
 | one note behind | dieu-1-5 | 1 | measured 130 | D 17 ✗ [wrong-notes] | D 17 ✗ [wrong-notes] |
 | one note behind | dieu-1-5 | 2 | measured 130 | D 17 ✗ [wrong-notes] | D 17 ✗ [wrong-notes] |
 | one note behind | dieu-1-5 | 4 | measured 130 | D 17 ✗ [wrong-notes] | D 17 ✗ [wrong-notes] |
@@ -251,7 +251,7 @@ Uncalibrated phone (fresh profile, then runs 2–3 with whatever the app stored)
 | late pitch arrival (200 ms) | warmup-7-12 | 2 | measured 130 | A 91 [behind-beat] | S 99 ✗ al+70 TF265 [behind-beat] |
 | late pitch arrival (200 ms) | warmup-7-12 | 4 | measured 130 | A 86 [behind-beat] | S 97 ✗ al+70 TF257 [behind-beat] |
 | late pitch arrival (200 ms) | warmup-7-12 | 1 | uncalibrated (true 130) | S 99 →336ms · S 95 · S 100 | S 100 al+140 [behind-beat] · S 95 al+140 →270ms · S 100 al+60 |
-| late pitch arrival (200 ms) | warmup-7-12 | 2 | uncalibrated (true 130) | S 99 →337ms · S 99 · S 100 | S 99 ✗ al+140 TF257 [behind-beat] · S 99 ✗ al+150 →275ms TF258 [behind-beat] · S 100 al+70 |
+| late pitch arrival (200 ms) | warmup-7-12 | 2 | uncalibrated (true 130) | S 99 →337ms · S 99 · S 100 | S 99 al+140 [behind-beat] · S 99 al+150 →275ms [behind-beat] · S 100 al+70 |
 
 ## 5. TRANSITION_MAX sweep (current scorer + alignment, calibrated 150 ms)
 
