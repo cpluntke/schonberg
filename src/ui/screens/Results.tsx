@@ -76,13 +76,14 @@ export function Results() {
         <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800 }}>{piece.title}</h1>
       </div>
 
-      {lr.alignedMs != null && Math.abs(lr.alignedMs) >= 25 && (
+      {lr.alignedMs != null && Math.abs(lr.alignedMs) >= 25 && lr.timingFail == null && (
         <div className="notice info" role="status" data-testid="aligned-note">
-          Your voice reached the app {Math.abs(lr.alignedMs)} ms {lr.alignedMs > 0 ? 'later' : 'earlier'} than expected (headphone and phone audio delay),
-          so we lined it up with the music before scoring.
-          {lr.latencyAdjusted != null ? ` From now on we'll allow ${lr.latencyAdjusted} ms for your device.`
+          {lr.latencyUsedMs != null
+            ? <>Your phone and headphones seem to delay sound by about {lr.latencyUsedMs + lr.alignedMs} ms (we allowed {lr.latencyUsedMs} ms), so we lined your voice up with the music before judging intonation.</>
+            : <>We lined your voice up with the music (sound delay of your phone and headphones) before judging intonation.</>}
+          {lr.latencyAdjusted != null ? ` From now on we'll allow ${lr.latencyAdjusted} ms.`
             : lr.suggestDelayCheck ? ' Your measured delay may be out of date (new headphones?): redo the delay check in Voice setup.'
-              : ' If the next run shows the same, we’ll adjust to your device. The delay check in Voice setup is faster and more exact.'}
+              : ' If the next run shows the same, we’ll adjust. The 10-second delay check in Voice setup is quicker and more exact, and lets the app judge your timing.'}
         </div>
       )}
       {lr.notCounted && (
@@ -97,7 +98,9 @@ export function Results() {
             : lr.passed
               ? <><strong>Passed.</strong> You keep level {lr.newLevel}.</>
               : lr.timingFail != null && r.accuracy >= (spec?.pass ?? 0.8)
-                ? <><strong>Not yet:</strong> the notes were right ({Math.round(r.accuracy * 100)}%), but you came in about {lr.timingFail} ms behind the beat. Breathe early and sing with the music, not after it. (Changed headphones since your delay check? Redo it in Voice setup.)</>
+                ? lr.suggestDelayCheck
+                  ? <><strong>Not yet:</strong> the notes were right ({Math.round(r.accuracy * 100)}%), but your voice reached the app about {lr.timingFail} ms after the beat. Either your headphones changed since the delay check (redo it in Voice setup, it takes 10 seconds) or you're singing behind the music: breathe early and sing with it, not after it.</>
+                  : <><strong>Not yet:</strong> the notes were right ({Math.round(r.accuracy * 100)}%), but you came in about {lr.timingFail} ms behind the beat. Breathe early and sing with the music, not after it.</>
                 : <><strong>Not yet:</strong> {Math.round(r.accuracy * 100)}% of {Math.round((spec?.pass ?? 0.8) * 100)}% needed. Use the tips below and try again.</>}
         </div>
       )}

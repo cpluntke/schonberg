@@ -200,6 +200,7 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
       alignedMs,
       suggestDelayCheck,
       timingFail,
+      latencyUsedMs: sess ? Math.round(sess.latencyMs) : undefined,
       notCounted: realSection && !ladder ? (partial ? 'stopped early' : 'slower than the level’s tempo') : undefined,
       passed: rec.passed, prevLevel: rec.prevLevel, newLevel: rec.newLevel,
     });

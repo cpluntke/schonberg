@@ -311,7 +311,7 @@ export function analyze(ctx: ScoringContext, notes: NoteResult[], samples?: Pitc
     out.push({
       kind: 'wrong-notes',
       title: `Wrong notes in ${barsText(score, m)}`,
-      detail: `${wrong.length} note${wrong.length > 1 ? 's were' : ' was'} sung clearly but ${dir}, typically by ${semis <= 1 ? 'about a semitone' : `about ${semis} semitones`} (${barList(score, wrong.map((n) => noteOf(n).measure))}). Learn the pitches first: loop these bars slowly with your part playing and note names on.`,
+      detail: `${wrong.length} note${wrong.length > 1 ? 's were' : ' was'} sung clearly but ${dir}, typically by ${semis <= 1 ? 'about a semitone' : `about ${semis} semitones`} (in ${barList(score, wrong.map((n) => noteOf(n).measure))}; worst in ${barsText(score, m)}). Learn the pitches first: loop these bars slowly with your part playing and note names on.`,
       measures: m,
       severity: wrong.length >= 0.3 * notes.length ? 3 : 2,
       weight: wrong.length * 15,
