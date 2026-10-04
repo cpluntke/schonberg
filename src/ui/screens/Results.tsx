@@ -97,7 +97,7 @@ export function Results() {
             : lr.passed
               ? <><strong>Passed.</strong> You keep level {lr.newLevel}.</>
               : lr.timingFail != null && r.accuracy >= (spec?.pass ?? 0.8)
-                ? <><strong>Not yet:</strong> the notes were right ({Math.round(r.accuracy * 100)}%), but you came in about {lr.timingFail} ms behind the beat. Breathe early and sing with the music, not after it.</>
+                ? <><strong>Not yet:</strong> the notes were right ({Math.round(r.accuracy * 100)}%), but you came in about {lr.timingFail} ms behind the beat. Breathe early and sing with the music, not after it. (Changed headphones since your delay check? Redo it in Voice setup.)</>
                 : <><strong>Not yet:</strong> {Math.round(r.accuracy * 100)}% of {Math.round((spec?.pass ?? 0.8) * 100)}% needed. Use the tips below and try again.</>}
         </div>
       )}

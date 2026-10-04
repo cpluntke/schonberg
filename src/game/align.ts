@@ -120,26 +120,86 @@ export function scoreAligned(
   ctx: ScoringContext,
   samples: PitchSample[],
   opts: ScoringOptions,
-  run: { rate: number; latencyMs: number; calibrated: boolean },
+  run: { rate: number; latencyMs: number; calibrated: boolean; liftSubharmonics?: boolean },
 ): AlignedResult {
   const rate = run.rate > 0 ? run.rate : 1;
+  const prep = (xs: PitchSample[]) => (run.liftSubharmonics ? liftSubharmonics(ctx.part, xs) : xs);
   // Search a plausible range of device delays around the current setting (total ≥ ~20 ms).
   const lo = run.calibrated ? -0.08 : Math.max(-0.25, -(run.latencyMs - 20) / 1000);
   const hi = run.calibrated ? 0.08 : 0.3;
-  const plain = scoreAttempt(ctx, samples, opts);
   const estimate = estimateLag(ctx.part, ctx.range, samples, { minLag: Math.min(0, lo) * rate, maxLag: hi * rate, step: 0.01 * rate });
   const shiftMs = estimate.confident ? Math.round((estimate.lag / rate) * 1000) : 0;
   // Small shifts aren't worth second-guessing the delay setting for.
-  if (Math.abs(shiftMs) < 25) return { result: plain, estimate, shiftMs: 0 };
-  const aligned = scoreAttempt(ctx, shiftSamples(samples, estimate.lag), opts);
-  const notes = aligned.notes.map((n, i) => ({ ...n, onsetMs: plain.notes[i]?.onsetMs ?? n.onsetMs }));
+  if (Math.abs(shiftMs) < 25) return { result: scoreAttempt(ctx, prep(samples), opts), estimate, shiftMs: 0 };
+  const aligned = scoreAttempt(ctx, prep(shiftSamples(samples, estimate.lag)), opts);
+  // Timing is reported against the delay we applied: add the shift back to every onset.
+  const lagMs = estimate.lag * 1000;
+  const notes = aligned.notes.map((n) => ({ ...n, onsetMs: n.onsetMs === null ? null : Math.max(0, n.onsetMs + lagMs) }));
   const rhythm = notes.length ? notes.reduce((x, n) => x + rhythmValue(n.onsetMs), 0) / notes.length : 0;
   const result: AttemptResult = { ...aligned, notes, rhythm, insights: analyze(ctx, notes, samples) };
   return { result, estimate, shiftMs };
 }
 
+/**
+ * Practising on the phone speaker, the mic hears the backing too, and McLeod can lock onto the
+ * common period of voice + chord: an octave and a fifth (×⅓) or two octaves (×¼) below the voice,
+ * or an octave (×½). Such readings are moved onto the note that is due. An octave below is only
+ * corrected when the same note also has readings at the right octave (the tracker flickering), so a
+ * note genuinely sung an octave low still counts as an octave error. Readings matching the
+ * previous or next written note are left alone (that's the voice moving, not a subharmonic).
+ */
+export function liftSubharmonics(part: Part, samples: PitchSample[]): PitchSample[] {
+  const notes = part.notes;
+  if (!notes.length) return samples;
+  const starts = notes.map((n) => n.start);
+  const at = (t: number) => {
+    let lo = 0;
+    let hi = notes.length - 1;
+    let idx = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (starts[mid] <= t) { idx = mid; lo = mid + 1; } else hi = mid - 1;
+    }
+    return idx >= 0 && t < notes[idx].start + notes[idx].dur ? idx : -1;
+  };
+  const near = (a: number, b: number) => Math.abs(a - b) <= 1.5;
+  // Per note: how many readings sit on the note, and an octave below it.
+  const onNote = new Map<number, number>();
+  const octBelow = new Map<number, number>();
+  const idx = samples.map((s) => (s.midi === null ? -1 : at(s.time)));
+  samples.forEach((s, k) => {
+    const i = idx[k];
+    if (i < 0 || s.midi === null) return;
+    if (near(s.midi, notes[i].midi)) onNote.set(i, (onNote.get(i) ?? 0) + 1);
+    else if (near(s.midi + 12, notes[i].midi)) octBelow.set(i, (octBelow.get(i) ?? 0) + 1);
+  });
+  return samples.map((s, k) => {
+    const i = idx[k];
+    if (i < 0 || s.midi === null) return s;
+    const due = notes[i].midi;
+    if (s.midi > due - 7) return s;
+    const prev = i > 0 ? notes[i - 1].midi : null;
+    const next = i + 1 < notes.length ? notes[i + 1].midi : null;
+    if ((prev !== null && near(s.midi, prev)) || (next !== null && near(s.midi, next))) return s;
+    for (const kk of [19, 24]) if (near(s.midi + kk, due)) return { ...s, midi: s.midi + kk };
+    if (near(s.midi + 12, due)) {
+      const on = onNote.get(i) ?? 0;
+      const below = octBelow.get(i) ?? 0;
+      if (on >= 0.3 * (on + below)) return { ...s, midi: s.midi + 12 };
+    }
+    return s;
+  });
+}
+
 /** Median onset (real ms) of the notes whose timing is meaningful, or null. */
-export function medianOnsetMs(result: AttemptResult, rate: number): number | null {
-  const xs = result.notes.filter((n) => n.onsetMs !== null && n.scoop === null).map((n) => n.onsetMs! / (rate > 0 ? rate : 1)).sort((a, b) => a - b);
+export function medianOnsetMs(result: AttemptResult, rate: number, part?: Part): number | null {
+  const timed = result.notes.filter((n) => {
+    if (n.onsetMs === null || n.scoop !== null) return false;
+    // A repeated pitch sung legato has no audible onset of its own.
+    const cur = part?.notes[n.index];
+    const prev = part && n.index > 0 ? part.notes[n.index - 1] : null;
+    return !(cur && prev && prev.midi === cur.midi && cur.start - (prev.start + prev.dur) < 1.0);
+  });
+  const xs = timed.map((n) => n.onsetMs! / (rate > 0 ? rate : 1)).sort((a, b) => a - b);
   return xs.length >= 3 ? xs[Math.floor(xs.length / 2)] : null;
 }

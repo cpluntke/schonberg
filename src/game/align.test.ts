@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { estimateLag, scoreAligned } from './align';
+import { estimateLag, medianOnsetMs, scoreAligned } from './align';
 import { makePart, makeScore, singRealistic } from './testutil';
 import type { ScoringOptions } from './types';
 import type { ScoringContext } from './scoring';
@@ -64,5 +64,40 @@ describe('scoreAligned keeps timing honest', () => {
     expect(al.result.pitch).toBeGreaterThan(0.9);
     expect(al.result.rhythm).toBeLessThan(0.7);
     expect(al.result.insights.some((i) => i.kind === 'behind-beat' || i.kind === 'late-entries')).toBe(true);
+  });
+});
+
+describe('re-review scenarios', () => {
+  const strict: ScoringOptions = { toleranceCents: 35, tuning: 'equal', octaveTolerant: false };
+  it('late onsets stay late on notes shorter than the lateness', () => {
+    const eighths = makePart('A', [[62, 0.5], [64, 0.5], [65, 0.5], [67, 0.5], [69, 0.5], [67, 0.5], [65, 0.5], [64, 0.5], [62, 0.5], [64, 0.5], [65, 0.5], [67, 0.5], [69, 2]], 100);
+    const c: ScoringContext = { score: makeScore([eighths], 100), part: eighths, range: [0, eighths.notes.length - 1] };
+    const al = scoreAligned(c, singRealistic(eighths, { lag: 0.3, fn: 12, zeta: 0.7 }), opts, { rate: 1, latencyMs: 130, calibrated: false });
+    expect(al.shiftMs).toBeGreaterThan(250);
+    expect(medianOnsetMs(al.result, 1, eighths)!).toBeGreaterThan(250);
+  });
+  it('lifting subharmonics after the line-up does not invent octave errors on octave leaps', () => {
+    const leaps = makePart('B', [[48, 1], [60, 1], [48, 1], [60, 1], [null, 1], [50, 1], [62, 1], [50, 1], [62, 2]], 120);
+    const c: ScoringContext = { score: makeScore([leaps], 120), part: leaps, range: [0, leaps.notes.length - 1] };
+    const al = scoreAligned(c, singRealistic(leaps, { lag: 0.25 }), strict, { rate: 1, latencyMs: 130, calibrated: false, liftSubharmonics: true });
+    expect(al.result.accuracy).toBeGreaterThan(0.9);
+    expect(al.result.notes.some((n) => n.octave)).toBe(false);
+  });
+  it('a note really sung an octave low stays an octave error', () => {
+    const leaps = makePart('A', [[57, 1], [69, 1], [57, 1], [69, 1], [57, 1], [69, 2]], 90);
+    const c: ScoringContext = { score: makeScore([leaps], 90), part: leaps, range: [0, leaps.notes.length - 1] };
+    const low = singRealistic(leaps).map((s) => ({ ...s, midi: s.midi !== null && s.midi > 63 ? s.midi - 12 : s.midi }));
+    const al = scoreAligned(c, low, strict, { rate: 1, latencyMs: 130, calibrated: true, liftSubharmonics: true });
+    expect(al.result.accuracy).toBeLessThan(0.7);
+  });
+  it('speaker-bleed subharmonics (×⅓, flickering ×½) are corrected', () => {
+    let k = 0;
+    const bleed = singRealistic(part).map((s) => {
+      if (s.midi === null) return s;
+      k++;
+      return { ...s, midi: k % 5 === 0 ? s.midi - 19 : k % 5 === 2 ? s.midi - 12 : s.midi };
+    });
+    const al = scoreAligned(ctx, bleed, { ...opts, octaveTolerant: false }, { rate: 1, latencyMs: 130, calibrated: true, liftSubharmonics: true });
+    expect(al.result.accuracy).toBeGreaterThan(0.9);
   });
 });

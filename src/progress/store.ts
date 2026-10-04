@@ -225,8 +225,9 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
 
 export function loadProfile(): Profile {
   const p = readJSON<Partial<Profile>>(K.profile, {}, isObj);
-  // Delays saved before the source was recorded came from the delay check (or a typed value).
-  if (typeof p.latencyMs === 'number' && p.latencyMs > 0 && !p.latencySource) p.latencySource = 'measured';
+  // Delays saved before the source was recorded may have been measured or learned: treat them as
+  // learned (kept, refined when two runs agree, never used to fail a run on timing).
+  if (typeof p.latencyMs === 'number' && p.latencyMs > 0 && !p.latencySource) p.latencySource = 'learned';
   return { ...DEFAULT_PROFILE, ...p };
 }
 export function saveProfile(p: Profile): void { writeJSON(K.profile, p); }

@@ -186,12 +186,14 @@ export class PracticeSession {
   private onPitch(p: RawPitch) {
     if (this.phase !== 'playing' && this.phase !== 'countin') return;
     const t = this.player.scoreTimeAt(p.ctxTime - this.latencyMs / 1000);
-    const midi = p.midi != null && !this.cfg.scoring.octaveTolerant ? fixSubharmonic(p.midi, this.noteDueAt(t)) : p.midi;
-    const s: PitchSample = { time: t, midi, clarity: p.clarity, rms: p.rms };
-    this.latest = s;
+    // Raw readings are kept (and exported); the end of the run corrects speaker-bleed subharmonics
+    // after lining the voice up (game/align.ts). The live display corrects them on the fly.
+    const s: PitchSample = { time: t, midi: p.midi, clarity: p.clarity, rms: p.rms };
+    const shown = p.midi != null && !this.cfg.scoring.octaveTolerant ? { ...s, midi: fixSubharmonic(p.midi, this.noteDueAt(t)) } : s;
+    this.latest = shown;
     if (t < this.minTime) return;
     this.samples.push(s);
-    this.live?.push(s);
+    this.live?.push(shown);
   }
 
   /** Written pitch of the singer's note sounding at score time t (null in rests). */

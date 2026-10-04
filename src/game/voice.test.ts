@@ -73,3 +73,12 @@ describe('leniency has limits', () => {
     expect(r.counts.good + r.counts.perfect).toBeLessThan(4);
   });
 });
+
+describe('arrival must be real', () => {
+  it('a flat note that only glides through the target is not credited', () => {
+    const p = makePart('A', [[67, 0.5], [60, 0.5], [67, 0.5], [60, 0.5], [67, 0.5], [60, 0.5], [67, 0.5], [60, 0.5]], 100);
+    const c: ScoringContext = { score: makeScore([p], 100), part: p, range: [0, p.notes.length - 1] };
+    const r = scoreAttempt(c, sing(p, { offsetCents: -60, vibCents: 0, fn: 5, zeta: 0.9 }), L4);
+    expect(r.accuracy).toBeLessThan(0.25);
+  });
+});

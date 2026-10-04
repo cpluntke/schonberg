@@ -496,8 +496,10 @@ export function judgedSpan(a: { w: NoteWindow; bT: number[]; bD: number[]; bW: n
   const w = a.w;
   const n = a.bT.length;
   const capStart = Math.max(w.bodyStart, Math.min(w.bodyEnd, w.start + Math.min(TRANSITION_MAX, 0.35 * w.note.dur)));
+  // Arrived = three readings in a row within tolerance (~60 ms), not just passing through it.
+  const ok = (k: number) => k >= n || Math.abs(a.bD[k]) <= tol;
   let k0 = 0;
-  while (k0 < n && a.bT[k0] <= capStart && Math.abs(a.bD[k0]) > tol) k0++;
+  while (k0 < n && a.bT[k0] <= capStart && !(ok(k0) && ok(k0 + 1) && ok(k0 + 2))) k0++;
   // Silence or gliding before the arrival is excused, up to the cap.
   const from = k0 < n ? clamp(a.bT[k0] - a.bW[k0] / 2, w.bodyStart, capStart) : capStart;
   let k1 = n;

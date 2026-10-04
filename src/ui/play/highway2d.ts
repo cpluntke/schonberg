@@ -300,8 +300,8 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
     // the note under the playhead: the voice reaches us a moment later, and comparing it with the
     // next note made every note change look like a big overshoot.
     let heard = -1;
-    if (current >= 0 || s.range) {
-      const [h0, h1] = s.range ?? [0, notes.length - 1];
+    if (s.range) {
+      const [h0, h1] = s.range;
       for (let i = h0; i <= h1; i++) {
         if (notes[i].start > last.time) break;
         if (last.time < notes[i].start + notes[i].dur) heard = i;

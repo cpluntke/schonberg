@@ -6,11 +6,13 @@ import { useProfile } from '../hooks';
 import { LEVELS, LISTEN, effectiveTolerance, pieceReadiness } from '../../progress/ladder';
 import { recordAttempt, getProgress, snapshotReadiness, personalBest } from '../../progress/store';
 import { keyAtTime } from '../../music/time';
-import { PracticeSession } from '../play/session';
+import { PracticeSession, estimateLatencyMs } from '../play/session';
 import { medianOnsetMs, scoreAligned } from '../../game/align';
 
-/** Median entry this late (real ms) fails a level-2+ run even with the right notes. */
-const LATE_FAIL_MS = 200;
+/** Median entry this late (real ms) fails a level-2+ run even with the right notes (measured delay only). */
+const LATE_FAIL_MS = 250;
+/** Singing along with the guide, a run can only teach a delay this far above the device estimate. */
+const GUIDE_LEARN_MAX_ABOVE = 150;
 import { setLastRun } from '../play/runExport';
 import { drawHighway2D, pitchWindow, type DrawState } from '../play/highway2d';
 import { drawArcade, lanesFor, newFx } from '../play/arcade3d';
@@ -140,18 +142,20 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
       const al = scoreAligned(
         { score: piece.score, part, range: [Math.min(...idx), Math.max(...idx)] },
         sess.samples, sess.cfg.scoring,
-        { rate: sess.cfg.rate, latencyMs: sess.latencyMs, calibrated },
+        { rate: sess.cfg.rate, latencyMs: sess.latencyMs, calibrated, liftSubharmonics: !sess.cfg.scoring.octaveTolerant },
       );
       r = al.result;
       if (al.shiftMs !== 0) alignedMs = al.shiftMs;
       // Learn the delay on uncalibrated phones, but only from complete, clearly matching runs, and
       // only once two runs agree (one run sung behind the guide, or a headset switch, must not
-      // teach a wrong delay).
+      // teach a wrong delay). While the guide plays the singer's own part they may be following it
+      // by ear, so those runs can't teach a delay much above what the device itself suggests.
       if (!calibrated && !simulateMode() && !sess.partial && al.estimate.match >= 0.6) {
         const suggested = sess.latencyMs + al.shiftMs;
         const hint = profile.latencyHint;
         if (hint != null && Math.abs(suggested - hint) <= 60) {
-          const learned = Math.round(Math.max(20, Math.min(450, (suggested + hint) / 2)));
+          const cap = sess.cfg.guide ? estimateLatencyMs() + GUIDE_LEARN_MAX_ABOVE : 450;
+          const learned = Math.round(Math.max(20, Math.min(cap, (suggested + hint) / 2)));
           if (Math.abs(learned - (profile.latencyMs || sess.latencyMs)) >= 25) latencyAdjusted = learned;
           updateProfile({ latencyMs: learned, latencySource: 'learned', latencyHint: undefined });
         } else {
@@ -159,11 +163,10 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
         }
       }
       if (calibrated && Math.abs(al.shiftMs) >= 60) suggestDelayCheck = true;
-      // From level 2 ("In time") on, coming in clearly late fails the run, once the delay is
-      // trustworthy (measured, or learned from runs that agreed).
-      const trusted = calibrated || profile.latencySource === 'learned';
-      const med = medianOnsetMs(r, sess.cfg.rate);
-      if (trusted && level >= 2 && med !== null && med > LATE_FAIL_MS) timingFail = Math.round(med);
+      // From level 2 ("In time") on, coming in clearly late fails the run. Only with a measured
+      // delay: without it, device delay and late singing can't be told apart.
+      const med = medianOnsetMs(r, sess.cfg.rate, part);
+      if (calibrated && level >= 2 && med !== null && med > LATE_FAIL_MS) timingFail = Math.round(med);
     }
     setLastRun(sess?.recording ? {
       recording: sess.recording,

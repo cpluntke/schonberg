@@ -182,10 +182,10 @@ describe('timing gate and delay migration', () => {
     expect(recordAttempt('p', 'A', 's1', 2, res, 10, Date.now(), { timingFail: true }).passed).toBe(false);
     expect(recordAttempt('p', 'A', 's1', 2, res, 10).passed).toBe(true);
   });
-  it('treats a delay saved before the source was recorded as measured', async () => {
+  it('treats a delay saved before the source was recorded as learned', async () => {
     const { loadProfile, _resetAllForTests } = await import('./store');
     _resetAllForTests();
     localStorage.setItem('sh:profile', JSON.stringify({ name: 'X', latencyMs: 180 }));
-    expect(loadProfile().latencySource).toBe('measured');
+    expect(loadProfile().latencySource).toBe('learned');
   });
 });
