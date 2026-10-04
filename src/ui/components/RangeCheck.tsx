@@ -213,11 +213,13 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
           {comfy === null ? (
             <>
               <div className="bar" aria-label="Holding the note"><span style={{ width: `${hold * 100}%` }} /></div>
+              <div style={{ minHeight: 64 }}>
               {silentFor > 5 && hold === 0 ? (
                 <span className="small muted" role="status">Can't hear you yet. Is the microphone on (tap the tuner above)? Then sing a little louder, close to the phone.</span>
               ) : waited > 8 && hold < 0.5 ? (
                 <span className="small muted" role="status">Hold one note on the same pitch: the bar fills after two seconds. Any comfortable “ah” is fine. In a noisy room, move closer to the phone.</span>
               ) : null}
+              </div>
             </>
           ) : (
             <div className="notice info" role="status">Got it: <strong>{letterName(comfy)}</strong>. Next, a short tune to sing back.</div>
@@ -240,7 +242,8 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
             {phase === 'low' && <>Each round starts a step lower. Low notes get quieter, that's fine. <strong>Stop when it starts to croak.</strong></>}
           </span>
           <div className="card" style={{ alignItems: 'center', textAlign: 'center', gap: 6 }} aria-live="polite">
-            <span style={{ fontSize: 28, fontWeight: 800, color: round === 'sing' ? 'var(--accent)' : undefined }}>
+            {/* Room for two lines, so the buttons below don't move when the text wraps. */}
+            <span style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.2, minHeight: '2.4em', display: 'flex', alignItems: 'center', justifyContent: 'center', color: round === 'sing' ? 'var(--accent)' : undefined }}>
               {round === 'listen' ? 'Listen…' : round === 'sing' ? 'Your turn: sing it back' : busy ? (stopping ? 'Stopping…' : 'Next round…') : lastDone ? 'Done' : 'Ready'}
             </span>
             <span className="tiny muted">Headphones help: the app only listens while it's your turn.</span>

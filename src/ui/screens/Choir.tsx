@@ -273,6 +273,8 @@ function ScoresEditor({ code, admin, info, onChanged }: { code: string; admin: s
   const [composer, setComposer] = useState('');
   const [busy, setBusy] = useState(false);
   const [fileKey, setFileKey] = useState(0);
+  // The title filled in from the file name (replaced when another file is chosen).
+  const [autoTitle, setAutoTitle] = useState('');
   return (
     <div className="card" data-testid="scores-editor">
       <strong>Scores</strong>
@@ -289,7 +291,11 @@ function ScoresEditor({ code, admin, info, onChanged }: { code: string; admin: s
       <input key={fileKey} type="file" accept=".musicxml,.xml,.mxl,.mid,.midi" aria-label="Score file" style={{ minHeight: 44 }} onChange={(e) => {
         const f = e.target.files?.[0] ?? null;
         setFile(f);
-        if (f && !title) setTitle(f.name.replace(/\.[^.]+$/, ''));
+        if (f && (!title || title === autoTitle)) {
+          const t = f.name.replace(/\.[^.]+$/, '');
+          setTitle(t);
+          setAutoTitle(t);
+        }
       }} />
       <div className="row" style={{ gap: 6 }}>
         <input type="text" aria-label="Title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" style={{ ...inputStyle, flex: 2, minWidth: 0 }} />
@@ -303,7 +309,11 @@ function ScoresEditor({ code, admin, info, onChanged }: { code: string; admin: s
           try {
             parsed = await importScoreFile(file!.name, await file!.arrayBuffer());
           } catch (e) {
-            toast(`This file can't be read as a score: ${(e as Error).message}`);
+            const why = ((e as Error).message || '').split(/[.\n]/)[0].slice(0, 100);
+            toast(`This file can't be read as a score${why ? ` (${why})` : ''}. Export it again as MusicXML or MIDI.`);
+            if (title === autoTitle) { setTitle(''); setAutoTitle(''); }
+            setFile(null);
+            setFileKey((k) => k + 1);
             return;
           }
           await uploadChoirPiece(code, admin, file!, title.trim() || parsed.title, composer.trim() || parsed.composer || '');
