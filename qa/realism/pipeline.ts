@@ -18,7 +18,7 @@ import { bubbleStats, lossBreakdown, type BubbleStats, type LossBreakdown } from
 import { avgCents, emulateLatencyLearn, gradeLetter, levelSetup, readingsToSamples, type Scorer } from './harness';
 import { hashSeed } from './prng';
 import type { RenderedTake } from './singer';
-import { PITCH_CURRENT, PITCH_HEAD, trackOffline, type TrackReading } from './tracker';
+import { PITCH_CURRENT, PITCH_HEAD, trackOffline, type PitchImpl, type TrackReading } from './tracker';
 import { REPO_ROOT } from './scores';
 
 /**
@@ -101,6 +101,9 @@ export interface PipelineSpec {
   /** estimateLatencyMs() on the test phone: BEFORE (any mobile) max(80, out+40) = 80; AFTER (Android) max(130, out+70) = 130. */
   estimateMs: number;
   impl?: AfterImpl;
+  /** Pitch tracker functions for the AFTER pipeline (default: src/audio/pitch.ts); `pitchKey` names it for the readings cache. */
+  pitch?: PitchImpl;
+  pitchKey?: string;
 }
 
 export const BEFORE: PipelineSpec = { id: 'before', estimateMs: 80 };
@@ -181,8 +184,9 @@ export function runSession(spec: PipelineSpec, setup: RunSetup, profile: Profile
   const stopSec = (setup.to - take.scoreTimeAtSample0) / rate + Math.min(0.7, latencyUsed / 1000 + 0.12);
   const after = spec.id === 'after';
   const N = setup.windowN ?? (after ? windowFor(part.low, take.sampleRate) : 2048);
-  const all = readingsFor(take, `${spec.id}:${N}`, () =>
-    trackOffline(take.pcm, take.sampleRate, { windowN: N, jitterMs: 3, seed: hashSeed('hop', setup.microSeed), impl: after ? PITCH_CURRENT : PITCH_HEAD }));
+  const pitchImpl = after ? spec.pitch ?? PITCH_CURRENT : PITCH_HEAD;
+  const all = readingsFor(take, `${spec.id}:${N}:${after && spec.pitch ? spec.pitchKey ?? 'custom' : ''}`, () =>
+    trackOffline(take.pcm, take.sampleRate, { windowN: N, jitterMs: 3, seed: hashSeed('hop', setup.microSeed), impl: pitchImpl }));
   const readings = all.filter((r) => r.centreSec + N / 2 / take.sampleRate <= stopSec);
   const mapping = { scoreTimeAtSample0: take.scoreTimeAtSample0, rate, latencyMs: latencyUsed, from: setup.from };
   let samples = readingsToSamples(readings, mapping);

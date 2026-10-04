@@ -24,7 +24,14 @@ const HALF_COVER_MAX = 0.025;
 /** Assumed half-period for the first/last sample (no neighbour known). */
 const EDGE_HALF_COVER = 0.01;
 const SCOOP_WINDOW = 0.15;
+/** A note whose body is shorter than this is "very short" (fast passages): judged as a whole, see below. */
 const SHORT_BODY = 0.15;
+/**
+ * Very short notes are also judged on all their own readings, from the written start to the written
+ * end, widened by this much on a side where the neighbour is another pitch (the singer is a little
+ * early or late; readings are attributed by pitch there).
+ */
+const SHORT_SLACK = 0.03;
 /** Default vibrato smoothing window (≈ one vibrato cycle at 5.5 Hz). */
 export const DEFAULT_VIBRATO_WINDOW = 0.18;
 /**
@@ -157,6 +164,12 @@ interface NoteWindow {
   legatoTo: number | null;
   /** Extra tolerance (cents) — just-intonation mode accepts both the pure and the tempered pitch. */
   tolExtra: number;
+  /** Very short note (body < SHORT_BODY): also judged on all its readings in [judgeFrom, judgeTo). */
+  short: boolean;
+  judgeFrom: number;
+  judgeTo: number;
+  /** The note can be finalized once samples are past this time. */
+  doneAt: number;
 }
 
 class NoteAcc {
@@ -184,6 +197,9 @@ class NoteAcc {
   bT: number[] = [];
   bD: number[] = [];
   bW: number[] = [];
+  /** Very short notes: every voiced reading in [judgeFrom, judgeTo) (time, deviation). */
+  nT: number[] = [];
+  nD: number[] = [];
   final: NoteResult | null = null;
   constructor(readonly w: NoteWindow) {}
 }
@@ -211,7 +227,13 @@ function noteWindows(ctx: ScoringContext, opts: ScoringOptions): NoteWindow[] {
     // Just intonation: aim halfway between pure and tempered and widen the window by the same
     // amount, so singing either what the (tempered) backing plays or the pure interval is fine.
     const half = targetOffset / 2;
-    out.push({ index: i, note, target: note.midi + half / 100, targetOffset, start: note.start, bodyStart, bodyEnd, legatoFrom, legatoTo, tolExtra: Math.abs(half) });
+    const short = bodyEnd - bodyStart < SHORT_BODY;
+    const judgeFrom = note.start - (short && prev && prev.midi !== note.midi ? SHORT_SLACK : 0);
+    const judgeTo = note.start + note.dur + (short && next?.midi !== note.midi ? SHORT_SLACK : 0);
+    out.push({
+      index: i, note, target: note.midi + half / 100, targetOffset, start: note.start, bodyStart, bodyEnd, legatoFrom, legatoTo, tolExtra: Math.abs(half),
+      short, judgeFrom, judgeTo, doneAt: short ? Math.max(bodyEnd, judgeTo) : bodyEnd,
+    });
   }
   return out;
 }
@@ -314,14 +336,14 @@ export class LiveScorer {
 
   private apply(c: Covered): void {
     const t = c.s.time;
-    // Finalize notes whose body is completely before this sample's coverage.
-    while (this.cur < this.accs.length && this.accs[this.cur].w.bodyEnd <= c.from) {
+    // Finalize notes whose body (very short notes: whole judged span) is completely before this sample's coverage.
+    while (this.cur < this.accs.length && this.accs[this.cur].w.doneAt <= c.from) {
       this.finalize(this.accs[this.cur]);
       this.cur++;
     }
     for (let j = this.cur; j < this.accs.length; j++) {
       const a = this.accs[j];
-      if (a.w.start > c.to) break;
+      if (Math.min(a.w.start, a.w.judgeFrom) > c.to) break;
       if (a.final) continue;
       this.addToNote(a, c, t);
     }
@@ -341,7 +363,10 @@ export class LiveScorer {
       }
     }
     const tol = this.tol + w.tolExtra;
-    const inTol = dev !== null && Math.abs(dev) <= tol;
+    if (w.short && dev !== null && t >= w.judgeFrom && t < w.judgeTo) {
+      a.nT.push(t);
+      a.nD.push(dev);
+    }
     // Onset & scoop use samples from the note start (grace included).
     if (t >= w.start && t < w.bodyEnd) {
       // Timing is judged independently of intonation: the note "starts" with the first voiced
