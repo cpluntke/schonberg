@@ -1,81 +1,33 @@
 import React, { useState } from 'react';
 import { useProfile } from '../hooks';
 import { go, back } from '../router';
-import { getPiece, chosenPartId, registerVirtual, makePiece, type PieceInfo } from '../library';
-import { loadCycle } from '../../progress/store';
-import { rowOfTheDay, rowForms, rowToScore } from '../../game/twelvetone';
-import { hardestIntervals } from '../../game/drills';
-import { intervalName } from '../../game/notation';
-import type { Score, ScoreNote, Measure, Part } from '../../music/types';
+import { registerVirtual } from '../library';
+import { rowOfTheDay, rowForms } from '../../game/twelvetone';
+import { rowPiece, leapPiece, cycleLeaps, singerRange, ROW_FORMS } from '../generated';
 import { IconBack, IconPlay, IconCube } from '../icons';
 
 const NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
 const sym = (p: number) => (p === 10 ? 't' : p === 11 ? 'e' : String(p));
 
-const VOICE_RANGE: Record<string, [number, number]> = { S: [62, 77], A: [57, 72], T: [50, 65], B: [45, 60], other: [55, 70] };
-
-function dayId(d = new Date()) {
-  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
-}
-
-/** Build a one-part drill score from (from, to) note pairs, one pair per bar. */
-export function leapDrillScore(id: string, title: string, pairs: { a: number; b: number; label: string }[], bpm = 66): Score {
-  const q = 60 / bpm;
-  const notes: ScoreNote[] = [];
-  const measures: Measure[] = [];
-  pairs.forEach((p, i) => {
-    const t0 = i * 4 * q;
-    measures.push({ index: i, number: String(i + 1), startBeat: i * 4, durBeats: 4, start: t0, dur: 4 * q, timeSig: [4, 4] });
-    notes.push({ midi: p.a, start: t0, dur: 1.5 * q, startBeat: i * 4, durBeats: 1.5, measure: i, lyric: p.label, syllabic: 'single' });
-    notes.push({ midi: p.b, start: t0 + 1.5 * q, dur: 1.5 * q, startBeat: i * 4 + 1.5, durBeats: 1.5, measure: i, lyric: '↦', syllabic: 'single' });
-  });
-  const ms = notes.map((n) => n.midi);
-  const part: Part = { id: 'drill', name: 'Leaps', voiceType: 'other', notes, low: Math.min(...ms), high: Math.max(...ms) };
-  return {
-    id, title, composer: 'From your repertoire', source: 'builtin', parts: [part], measures,
-    keys: [{ beat: 0, time: 0, fifths: 0, mode: 'major' }], tempos: [{ beat: 0, time: 0, bpm }], duration: pairs.length * 4 * q,
-  };
-}
-
 export function Expert() {
-  const [profile] = useProfile();
+  useProfile();
   const row = rowOfTheDay(new Date());
   const allForms = rowForms(row);
-  const forms: Record<string, number[]> = { P0: allForms.P0, R0: allForms.R0, I0: allForms.I0, RI0: allForms.RI0 };
+  const forms: Record<string, number[]> = Object.fromEntries(ROW_FORMS.map((f) => [f, allForms[f]]));
   const [form, setForm] = useState<string>('P0');
-  const [lo, hi] = profile.rangeLow && profile.rangeHigh && profile.rangeHigh - profile.rangeLow >= 12
-    ? [profile.rangeLow + 2, profile.rangeHigh - 2] : VOICE_RANGE[profile.voice] ?? VOICE_RANGE.other;
+  const [lo, hi] = singerRange();
 
   function playRow(level: number, mode: '2d' | '3d') {
-    const chosen = forms[form] ?? row;
-    const score = rowToScore(chosen, { low: lo, high: hi, seed: Number(dayId()) });
-    score.id = `row-${dayId()}-${form}`;
-    score.title = `Zwölfton ${form} · ${new Date().toLocaleDateString()}`;
-    const p = makePiece(score, { builtin: true, title: score.title, composer: 'Row of the day' });
+    const p = rowPiece(new Date(), form);
     registerVirtual(p);
-    const part = score.parts[0];
-    go({ name: 'play', pieceId: p.id, partId: part.id, sectionId: 'all', level, mode });
+    go({ name: 'play', pieceId: p.id, partId: p.score.parts[0].id, sectionId: 'all', level, mode });
   }
 
-  // Leap drill from the cycle's pieces.
-  const cycle = loadCycle();
-  const pieces = cycle.pieceIds.map((id) => getPiece(id)).filter(Boolean) as PieceInfo[];
-  const leaps: { a: number; b: number; label: string; where: string }[] = [];
-  for (const pc of pieces) {
-    const part = pc.score.parts.find((x) => x.id === chosenPartId(pc, profile.voice));
-    if (!part) continue;
-    for (const h of hardestIntervals(part, 4)) {
-      const a = part.notes[h.index - 1];
-      const b = part.notes[h.index];
-      if (!a || !b) continue;
-      leaps.push({ a: a.midi, b: b.midi, label: `${h.semitones > 0 ? '↑' : '↓'}${intervalName(Math.abs(h.semitones))}`, where: `${pc.title}, bar ${pc.score.measures[h.measure]?.number ?? h.measure + 1}` });
-    }
-  }
-  const drillPairs = leaps.slice(0, 12);
+  const drillPairs = cycleLeaps();
 
   function playLeaps(level: number, mode: '2d' | '3d') {
-    const score = leapDrillScore(`leaps-${dayId()}`, 'Leap drill', drillPairs);
-    const p = makePiece(score, { builtin: true, title: 'Leap drill', composer: 'Hardest intervals of your parts' });
+    const p = leapPiece();
+    if (!p) return;
     registerVirtual(p);
     go({ name: 'play', pieceId: p.id, partId: 'drill', sectionId: 'all', level, mode });
   }

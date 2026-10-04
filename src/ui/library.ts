@@ -107,8 +107,25 @@ export function ensureLoaded(): Promise<void> {
   return loading;
 }
 
+type Resolver = (id: string) => PieceInfo | undefined;
+const resolvers: Resolver[] = [];
+
+/** Generated pieces (drills, rows) can be rebuilt from their id after a reload. */
+export function registerResolver(r: Resolver) {
+  resolvers.push(r);
+}
+
 export function getPiece(id: string): PieceInfo | undefined {
-  return pieces.get(id) ?? virtual.get(id);
+  const p = pieces.get(id) ?? virtual.get(id);
+  if (p) return p;
+  for (const r of resolvers) {
+    const v = r(id);
+    if (v) {
+      virtual.set(id, v);
+      return v;
+    }
+  }
+  return undefined;
 }
 
 export function registerVirtual(p: PieceInfo) {

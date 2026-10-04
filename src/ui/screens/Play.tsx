@@ -4,7 +4,7 @@ import { go, back } from '../router';
 import { getPiece, noteRangeFor, singableSections } from '../library';
 import { useProfile } from '../hooks';
 import { LEVELS, LISTEN, effectiveTolerance, pieceReadiness } from '../../progress/ladder';
-import { recordAttempt, getProgress, snapshotReadiness } from '../../progress/store';
+import { recordAttempt, getProgress, snapshotReadiness, personalBest } from '../../progress/store';
 import { keyAtTime } from '../../music/time';
 import { PracticeSession } from '../play/session';
 import { drawHighway2D, pitchWindow, type DrawState } from '../play/highway2d';
@@ -26,10 +26,11 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
 
   const section = useMemo(() => {
     if (!piece) return null;
-    if (route.sectionId === 'all' || route.sectionId === 'drill') {
+    if (route.sectionId === 'all' || route.sectionId === 'drill' || route.sectionId === 'entries') {
       const from = route.from ?? 0;
       const to = route.to ?? piece.score.duration;
-      return { id: route.sectionId, label: route.sectionId === 'all' ? 'Whole piece' : 'Drill', start: from, end: to };
+      const label = route.sectionId === 'all' ? 'Whole piece' : route.sectionId === 'entries' ? 'Entry drill' : 'Drill';
+      return { id: route.sectionId, label, start: from, end: to };
     }
     const s = piece.sections.find((x) => x.id === route.sectionId);
     return s ? { id: s.id, label: s.label, start: route.from ?? s.start, end: route.to ?? s.end } : null;
@@ -72,7 +73,7 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
         rate,
         guide: listenOnly || !!spec?.guide,
         listenOnly,
-        cue: spec?.cue ?? 'note',
+        cue: route.sectionId === 'entries' ? 'none' : spec?.cue ?? 'note',
         scoring: { toleranceCents: tolerance, tuning: profile.tuning, octaveTolerant },
         latencyMs: profile.latencyMs || 0,
         range,
@@ -92,8 +93,9 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
       if (listenOnly) recordAttempt(piece.id, part.id, section.id, 0, emptyResult(), section.end - section.start);
       return;
     }
-    const ladder = section.id !== 'all' && section.id !== 'drill' && (rateOverride == null || rateOverride >= (spec?.rate ?? 1) - 1e-6);
+    const ladder = section.id !== 'all' && section.id !== 'drill' && section.id !== 'entries' && (rateOverride == null || rateOverride >= (spec?.rate ?? 1) - 1e-6);
     const durationSec = (section.end - section.start) / rate;
+    const prevBest = personalBest(piece.id, part.id, section.id, level)?.score ?? null;
     const rec = recordAttempt(piece.id, part.id, section.id, level, r, durationSec);
     if (ladder) {
       const secs = singableSections(piece, part.id);
@@ -101,7 +103,7 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
     }
     setLastResult({
       pieceId: piece.id, partId: part.id, sectionId: section.id, level, mode: route.mode,
-      from: section.start, to: section.end, result: r, ladder,
+      from: section.start, to: section.end, result: r, ladder, prevBest,
       passed: rec.passed, prevLevel: rec.prevLevel, newLevel: rec.newLevel,
     });
     go({ name: 'results' }, true);

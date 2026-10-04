@@ -13,6 +13,7 @@ import { Settings } from './screens/Settings';
 import { Ranks } from './screens/Ranks';
 import { Expert } from './screens/Expert';
 import { TunerScreen } from './screens/TunerScreen';
+import './generated';
 
 const TABS: { name: Route['name']; label: string; icon: React.ReactNode }[] = [
   { name: 'home', label: 'Home', icon: <IconHome /> },

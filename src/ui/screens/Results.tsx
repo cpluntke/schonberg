@@ -3,7 +3,7 @@ import { getLastResult } from '../play/lastResult';
 import { getPiece, singableSections } from '../library';
 import { go } from '../router';
 import { LEVELS, nextStep } from '../../progress/ladder';
-import { getProgress, personalBest } from '../../progress/store';
+import { getProgress } from '../../progress/store';
 import { IconDown, IconUp, IconClock, IconLoop, IconStar, IconPlay, IconCube } from '../icons';
 import type { Insight } from '../../game/types';
 
@@ -43,7 +43,7 @@ export function Results() {
   const sections = singableSections(piece, lr.partId);
   const prog = getProgress(piece.id, lr.partId);
   const next = nextStep(sections, prog);
-  const pb = lr.ladder ? personalBest(piece.id, lr.partId, lr.sectionId, lr.level) : null;
+  const isPB = lr.prevBest != null && r.score > lr.prevBest;
   const leveledUp = lr.ladder && lr.newLevel > lr.prevLevel;
 
   const measureIdx = Object.keys(r.perMeasure).map(Number).sort((a, b) => a - b);
@@ -81,7 +81,7 @@ export function Results() {
         <div className="col" style={{ gap: 4 }}>
           <span className="mono" style={{ fontSize: 30, fontWeight: 600 }} data-testid="result-score">{r.score.toLocaleString('de-DE')}</span>
           <span className="small" style={{ color: 'var(--voice)' }}>
-            {Math.round(r.accuracy * 100)}% accuracy{pb && pb.score <= r.score && r.score > 0 ? ' · personal best' : ''}
+            {Math.round(r.accuracy * 100)}% accuracy{isPB ? ' · new personal best!' : ''}
           </span>
         </div>
       </div>
@@ -152,7 +152,13 @@ export function Results() {
           </button>
         )}
         <div className="row">
-          <button className="btn block" onClick={() => go({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, level: lr.level, mode: lr.mode, ...(lr.sectionId === 'drill' ? { from: lr.from, to: lr.to } : {}) })}>Again</button>
+          {!lr.passed && lr.ladder && lr.level > 1 ? (
+            <button className="btn block" onClick={() => go({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, level: lr.level - 1, mode: '2d' })}>
+              Easier: level {lr.level - 1}
+            </button>
+          ) : !(!lr.passed && lr.ladder) ? (
+            <button className="btn block" onClick={() => go({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, level: lr.level, mode: lr.mode, ...(lr.sectionId === 'drill' ? { from: lr.from, to: lr.to } : {}) })}>Again</button>
+          ) : null}
           <button className="btn block" onClick={() => go({ name: 'piece', pieceId: piece.id })}>All sections</button>
         </div>
         <button className="btn ghost block" onClick={() => go({ name: 'ranks' })}>Leaderboard</button>

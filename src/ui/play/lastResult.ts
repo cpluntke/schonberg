@@ -14,6 +14,8 @@ export interface LastResult {
   newLevel: number;
   /** True when the attempt counted toward the section ladder. */
   ladder: boolean;
+  /** Best score at this section+level before this attempt (null if first). */
+  prevBest?: number | null;
 }
 
 let last: LastResult | null = null;

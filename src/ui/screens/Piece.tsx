@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { getPiece, singableSections, chosenPartId, rememberPart } from '../library';
+import { getPiece, singableSections, chosenPartId, rememberPart, registerVirtual } from '../library';
+import { entryPiece } from '../generated';
+import { entryNotes } from '../../game/drills';
 import { useProfile, useStoreVersion } from '../hooks';
 import { go, back } from '../router';
 import { getProgress, dueForReview } from '../../progress/store';
@@ -135,6 +137,24 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
         })}
         {!sections.length && <span className="muted">This part has no notes.</span>}
       </section>
+
+      {part && part.notes.length > 0 && (
+        <div className="card flat">
+          <strong>Entry drill</strong>
+          <span className="small muted">
+            Hear two beats of the other voices, then come in on your own, with no starting note.
+            {` ${Math.min(10, entryNotes(part, 0.6).length + 1)} entries from this piece.`}
+          </span>
+          <div className="row wrap">
+            <button className="btn small" onClick={() => {
+              const ep = entryPiece(piece, part.id);
+              if (!ep) return;
+              registerVirtual(ep);
+              go({ name: 'play', pieceId: ep.id, partId: part.id, sectionId: 'entries', level: 3, mode: '2d' });
+            }}>Practise entries</button>
+          </div>
+        </div>
+      )}
 
       {sections.length > 1 && (
         <div className="card flat">
