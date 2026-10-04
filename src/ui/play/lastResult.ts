@@ -1,4 +1,5 @@
 import type { AttemptResult } from '../../game/types';
+import type { WordsResult, WordsStage } from '../../game/textrhythm';
 
 export interface LastResult {
   pieceId: string;
@@ -24,6 +25,8 @@ export interface LastResult {
   alignedMs?: number;
   /** Without a measured delay the entries came this late (ms): the run didn't count, the delay check is needed. */
   timingUnsure?: number;
+  /** A words-in-rhythm run (text only, no pitch). */
+  words?: { stage: WordsStage; result: WordsResult; counted: boolean; newStage: boolean; calibrated: boolean };
   /** Level 5: different days passed off book so far. */
   offBookDays?: number;
   /** Delay the app applied during the run (ms). */

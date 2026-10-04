@@ -11,6 +11,7 @@ import { medianOnsetMs, scoreAligned } from '../../game/align';
 import { soloTimingInsight } from '../../game/analysis';
 import { exposedNotes } from '../../music/exposure';
 import { leadInFrom } from '../../game/coldstart';
+import { WordsPlay } from './WordsPlay';
 import { beatGrid } from '../../audio/player';
 
 /** Median entry this late (real ms) fails a level-2+ run even with the right notes (measured delay only). */
@@ -31,6 +32,10 @@ import type { NotationMode } from '../../game/notation';
 type PlayRoute = Extract<Route, { name: 'play' }>;
 
 export function PlayScreen({ route }: { route: PlayRoute }) {
+  return route.words ? <WordsPlay route={route} /> : <SingPlay route={route} />;
+}
+
+function SingPlay({ route }: { route: PlayRoute }) {
   const [profile, updateProfile] = useProfile();
   const piece = getPiece(route.pieceId);
   const part = piece?.score.parts.find((p) => p.id === route.partId);

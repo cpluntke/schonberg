@@ -4,14 +4,16 @@ export type Route =
   | { name: 'home' }
   | { name: 'library' }
   | { name: 'piece'; pieceId: string }
-  | { name: 'play'; pieceId: string; partId: string; sectionId: string; level: number; mode: '2d' | '3d'; from?: number; to?: number }
+  | { name: 'play'; pieceId: string; partId: string; sectionId: string; level: number; mode: '2d' | '3d'; from?: number; to?: number; words?: boolean }
   | { name: 'results' }
   | { name: 'setup' }
   | { name: 'settings' }
   | { name: 'ranks' }
   | { name: 'expert' }
   | { name: 'tuner' }
-  | { name: 'diagnostics' };
+  | { name: 'diagnostics' }
+  | { name: 'lyrics'; pieceId: string; partId: string }
+  | { name: 'memorymap'; pieceId: string; partId: string };
 
 export function parseHash(hash: string): Route {
   const h = hash.replace(/^#\/?/, '');
@@ -36,9 +38,12 @@ export function parseHash(hash: string): Route {
         return {
           name: 'play', pieceId: seg[1], partId: seg[2], sectionId: seg[3], level, mode,
           from: okRange ? fromN : undefined, to: okRange ? toN : undefined,
+          ...(q.get('words') === '1' ? { words: true } : {}),
         };
       }
       break;
+    case 'lyrics': if (seg[1] && seg[2]) return { name: 'lyrics', pieceId: seg[1], partId: seg[2] }; break;
+    case 'memorymap': if (seg[1] && seg[2]) return { name: 'memorymap', pieceId: seg[1], partId: seg[2] }; break;
     case 'results': return { name: 'results' };
     case 'setup': return { name: 'setup' };
     case 'settings': return { name: 'settings' };
@@ -58,8 +63,11 @@ export function href(r: Route): string {
       const q = new URLSearchParams({ level: String(r.level) });
       if (r.from != null) q.set('from', String(r.from));
       if (r.to != null) q.set('to', String(r.to));
+      if (r.words) q.set('words', '1');
       return `#/${r.mode === '3d' ? 'arcade' : 'play'}/${e(r.pieceId)}/${e(r.partId)}/${e(r.sectionId)}?${q}`;
     }
+    case 'lyrics':
+    case 'memorymap': return `#/${r.name}/${e(r.pieceId)}/${e(r.partId)}`;
     default: return r.name === 'home' ? '#/' : `#/${r.name}`;
   }
 }

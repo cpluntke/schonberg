@@ -132,7 +132,7 @@ export function LyricsQuiz({ pieceId, partId }: { pieceId: string; partId: strin
 
   if (done) {
     const score = results.filter((r) => r.correct).length;
-    const missed = [...new Map(results.filter((r) => !r.correct).map((r) => [r.q.lineKey, r.q])).values()];
+    const missed = [...new Map(results.filter((r) => !r.correct).map((r) => [r.q.lineKey, r.q])).values()].sort((a, b) => a.lineIndex - b.lineIndex);
     const best = loadQuizStats(pieceId, partId).bestScore;
     return (
       <Shell title="Lyrics quiz" sub={sub} onBack={goBack}>

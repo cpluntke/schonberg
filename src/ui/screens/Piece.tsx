@@ -11,6 +11,8 @@ import { voiceName } from './Home';
 import { PieceMap } from '../components/PieceMap';
 import { getBars } from '../../progress/bars';
 import { startColdStart } from '../play/cold';
+import { getWords } from '../../progress/words';
+import { STAGE_NAMES } from '../../game/textrhythm';
 
 /** First few words of the lyric in a section, to recognise the phrase. */
 function snippet(part: { notes: { start: number; lyric?: string; syllabic?: string }[] }, from: number, to: number): string {
@@ -213,15 +215,49 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
         </div>
       )}
 
+      {part && sections.some((s) => part.notes.some((n) => n.lyric && n.start >= s.start - 1e-6 && n.start < s.end - 1e-6)) && (() => {
+        const wp = getWords(piece.id, part.id);
+        return (
+          <div className="card flat" data-testid="words-card">
+            <strong>The words</strong>
+            <span className="small muted">
+              Learn the text on its own: speak it in rhythm with the music (pitch doesn't matter), first reading along, then from first letters, then from memory.
+              Or take the quiz, no singing needed.
+            </span>
+            <div className="col" style={{ gap: 6 }}>
+              {sections.filter((s) => part.notes.some((n) => n.lyric && n.start >= s.start - 1e-6 && n.start < s.end - 1e-6)).map((s) => {
+                const passed = wp[s.id]?.passed ?? -1;
+                return (
+                  <div key={s.id} className="row" style={{ gap: 8 }}>
+                    <span className="grow small ellipsis">{s.label}</span>
+                    <span className="tiny muted" aria-label={passed >= 0 ? `${STAGE_NAMES[passed]} done` : 'not started'}>
+                      {[0, 1, 2].map((k) => (k <= passed ? '●' : '○')).join(' ')}
+                    </span>
+                    <button className="btn small" onClick={() => go({ name: 'play', pieceId: piece.id, partId: part.id, sectionId: s.id, level: 0, mode: '2d', words: true })}>
+                      {passed >= 2 ? 'Again' : STAGE_NAMES[Math.min(2, passed + 1)]}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="row wrap">
+              <button className="btn small" onClick={() => go({ name: 'lyrics', pieceId: piece.id, partId: part.id })}>Lyrics quiz</button>
+            </div>
+          </div>
+        );
+      })()}
+
       {part && part.notes.length > 0 && (
         <div className="card flat">
           <strong>Learning it by heart</strong>
           <span className="small muted">
             Cold start: you're dropped into a random bar (bars you don't know yet come up more often), hear two bars of the
             other voices, and carry on from memory. The best practice for finding your place again after a slip.
+            The memory map is a one-page outline of your entries, cues and solos to read (or print) before sleeping.
           </span>
           <div className="row wrap">
             <button className="btn small" data-testid="cold-start" onClick={() => startColdStart(piece, part.id)}>Cold start</button>
+            <button className="btn small" onClick={() => go({ name: 'memorymap', pieceId: piece.id, partId: part.id })}>Memory map</button>
           </div>
         </div>
       )}

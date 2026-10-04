@@ -16,6 +16,8 @@ import { Expert } from './screens/Expert';
 import { TunerScreen } from './screens/TunerScreen';
 import './generated';
 import { Diagnostics } from './screens/Diagnostics';
+import { LyricsQuiz } from './screens/LyricsQuiz';
+import { MemoryMap } from './screens/MemoryMap';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { UpdatePrompt } from './components/UpdatePrompt';
 
@@ -78,6 +80,8 @@ export function App() {
       case 'expert': body = <Expert />; break;
       case 'tuner': body = <TunerScreen />; break;
       case 'diagnostics': body = <Diagnostics />; break;
+      case 'lyrics': body = <LyricsQuiz key={route.pieceId + route.partId} pieceId={route.pieceId} partId={route.partId} />; break;
+      case 'memorymap': body = <MemoryMap key={route.pieceId + route.partId} pieceId={route.pieceId} partId={route.partId} />; break;
     }
   }
 

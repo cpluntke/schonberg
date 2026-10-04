@@ -88,3 +88,38 @@ test('a real-microphone run can be shared as a recording (WAV + run.json)', asyn
   expect(secs).toBeGreaterThan(3);
   expect(errors).toEqual([]);
 });
+
+test('memorisation: piece map, off-book test with peek, cold start, words in rhythm, quiz and memory map', async ({ page }) => {
+  test.setTimeout(240_000);
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await page.goto('/?simulate=perfect#/piece/warmup-chorale');
+  await expect(page.getByTestId('piece-map')).toBeVisible({ timeout: 20_000 });
+  // Level 5, all hidden, with a peek: shown as a practice run.
+  await page.getByRole('button', { name: /level 5/ }).first().click();
+  await page.getByRole('button', { name: 'Test: all hidden' }).click();
+  await page.getByTestId('start').click();
+  await expect(page.getByTestId('peek')).toBeVisible({ timeout: 15_000 });
+  await page.getByTestId('peek').dispatchEvent('pointerdown');
+  await page.getByTestId('peek').dispatchEvent('pointerup');
+  await expect(page.getByTestId('pass-banner')).toContainText(/peeked/, { timeout: 90_000 });
+  // Cold start never counts for a level.
+  await page.goto('/?simulate=perfect#/piece/warmup-chorale');
+  await page.getByTestId('cold-start').click();
+  await page.getByTestId('start').click();
+  await expect(page.getByTestId('cold-again')).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByText(/Level \d reached/)).toHaveCount(0);
+  // Words in rhythm.
+  await page.goto('/?simulate=perfect#/piece/warmup-chorale');
+  await page.getByTestId('words-card').getByRole('button', { name: 'Read along' }).first().click();
+  await page.getByTestId('start').click();
+  await expect(page.getByTestId('words-banner')).toContainText(/done|Well done/, { timeout: 90_000 });
+  // Quiz and memory map open.
+  await page.goto('/#/piece/warmup-chorale');
+  await page.getByTestId('words-card').getByRole('button', { name: 'Lyrics quiz' }).click();
+  await expect(page.getByText(/Question 1 of/)).toBeVisible({ timeout: 10_000 });
+  await page.goto('/#/piece/warmup-chorale');
+  await page.getByRole('button', { name: 'Memory map' }).click();
+  await expect(page.getByRole('button', { name: 'Print' })).toBeVisible({ timeout: 10_000 });
+  expect(errors).toEqual([]);
+});

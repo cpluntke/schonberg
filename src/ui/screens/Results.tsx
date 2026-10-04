@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { getLastRun, shareRun } from '../play/runExport';
 import { startColdStart } from '../play/cold';
+import { STAGE_NAMES, WORDS_PASS, type WordsStage } from '../../game/textrhythm';
 import { toast } from '../hooks';
 import { getLastResult } from '../play/lastResult';
 import { getPiece, singableSections } from '../library';
@@ -45,6 +46,7 @@ export function Results() {
       </main>
     );
   }
+  if (lr.words) return <WordsResults lr={lr} words={lr.words} />;
   const r = lr.result;
   const part = piece.score.parts.find((p) => p.id === lr.partId);
   const section = piece.sections.find((s) => s.id === lr.sectionId);
@@ -249,5 +251,75 @@ function ShareRecording({ pieceId, partId }: { pieceId: string; partId: string }
         It stays on this phone unless you share it.
       </span>
     </div>
+  );
+}
+
+/** Results of a words-in-rhythm run: which syllables came in time, shown on the text itself. */
+function WordsResults({ lr, words }: { lr: NonNullable<ReturnType<typeof getLastResult>>; words: NonNullable<NonNullable<ReturnType<typeof getLastResult>>['words']> }) {
+  const piece = getPiece(lr.pieceId)!;
+  const part = piece.score.parts.find((p) => p.id === lr.partId);
+  const section = piece.sections.find((s) => s.id === lr.sectionId);
+  const res = words.result;
+  const pct = Math.round(res.accuracy * 100);
+  const inTime = res.syllables.filter((x) => x.grade === 'perfect' || x.grade === 'good').length;
+  const mnum = (i: number) => piece.score.measures[i]?.number ?? String(i + 1);
+  const measureIdx = Object.keys(res.perMeasure).map(Number).sort((a, b) => a - b);
+  const nextStage = words.stage < 2 && res.accuracy >= WORDS_PASS ? ((words.stage + 1) as WordsStage) : null;
+  // The words screen opens at the next step that isn't passed yet.
+  const again = () => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, level: 0, mode: '2d', words: true });
+  const color = { perfect: 'var(--voice)', good: 'var(--voice)', ok: '#7FB8CC', miss: '#FF7A45' } as const;
+  return (
+    <main className="screen">
+      <div className="col" style={{ gap: 2, paddingTop: 8 }}>
+        <span className="eyebrow">{section?.label ?? 'Whole piece'} · {part?.name} · Words: {STAGE_NAMES[words.stage]}</span>
+        <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800 }}>{piece.title}</h1>
+      </div>
+      <div className={res.accuracy >= WORDS_PASS ? 'notice info' : 'notice'} role="status" data-testid="words-banner">
+        {!words.counted
+          ? <><strong>Practice run</strong> (slower tempo or stopped early): sing it at 100% to move on.</>
+          : words.newStage
+            ? <><strong>{STAGE_NAMES[words.stage]}: done!</strong> {words.stage === 2 ? 'You know the words of this section by heart.' : `Next: ${STAGE_NAMES[words.stage + 1]}.`}</>
+            : res.accuracy >= WORDS_PASS
+              ? <><strong>Well done.</strong> {pct}% of the syllables in time.</>
+              : <><strong>Not yet:</strong> {pct}% of {Math.round(WORDS_PASS * 100)}%. Say the words in rhythm, with crisp consonants.</>}
+      </div>
+      <div className="stats3">
+        <div className="stat"><span className="k">In time</span><span className="v">{pct}%</span></div>
+        <div className="stat"><span className="k">Syllables</span><span className="v">{inTime}/{res.syllables.length}</span></div>
+        <div className="stat"><span className="k">Missed</span><span className="v">{res.missed}</span></div>
+      </div>
+      {words.calibrated && res.medianMs !== null && Math.abs(res.medianMs) > 120 && (
+        <span className="small muted">On average you were about {Math.abs(res.medianMs)} ms {res.medianMs > 0 ? 'late' : 'early'}.</span>
+      )}
+      {part && (
+        <div className="card" data-testid="words-text">
+          <span className="tiny muted">Blue: in time · orange: missing or off the beat</span>
+          <p style={{ margin: 0, fontSize: 18, lineHeight: 1.5 }}>
+            {res.syllables.map((x, k) => {
+              const n = part.notes[x.index];
+              const sep = k > 0 && n.syllabic !== 'middle' && n.syllabic !== 'end' ? ' ' : '';
+              return <React.Fragment key={k}>{sep}<span style={{ color: color[x.grade], textDecoration: x.grade === 'miss' ? 'underline wavy' : undefined }}>{n.lyric}</span></React.Fragment>;
+            })}
+          </p>
+        </div>
+      )}
+      {measureIdx.length > 1 && (
+        <div className="heat">
+          {measureIdx.map((m) => {
+            const v = res.perMeasure[m];
+            const bg = v >= 0.85 ? '#4CC9F0' : v >= 0.6 ? '#1D4F63' : '#FF7A45';
+            return <span key={m} aria-label={`Bar ${mnum(m)}: ${Math.round(v * 100)}%`} style={{ background: bg, height: 30, borderRadius: 3, color: bg === '#1D4F63' ? '#EEF0FF' : '#0B0D1A', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--mono)' }}>{mnum(m)}</span>;
+          })}
+        </div>
+      )}
+      <span className="tiny muted">The app hears when each syllable starts, not which word it is: use the lyrics quiz to check the words themselves.</span>
+      <div className="col" style={{ gap: 8, marginTop: 'auto' }}>
+        <button className="btn primary block" onClick={again}><IconPlay size={18} /> {nextStage != null ? `Next: ${STAGE_NAMES[nextStage]}` : 'Again'}</button>
+        <div className="row">
+          <button className="btn block" onClick={() => go({ name: 'lyrics', pieceId: piece.id, partId: lr.partId })}>Lyrics quiz</button>
+          <button className="btn block" onClick={() => go({ name: 'piece', pieceId: piece.id })}>Back to the piece</button>
+        </div>
+      </div>
+    </main>
   );
 }
