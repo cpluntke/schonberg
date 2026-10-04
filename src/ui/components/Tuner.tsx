@@ -25,12 +25,18 @@ export function Tuner({ notation, onReading, autoStart = false }: {
   const cbRef = useRef(onReading);
   cbRef.current = onReading;
   const unsubRef = useRef<(() => void) | null>(null);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; unsubRef.current?.(); unsubRef.current = null; };
+  }, []);
 
   async function startMic() {
     setState('starting');
     try {
       await unlockAudio();
       const t = await getTracker();
+      if (!mountedRef.current) return;
       unsubRef.current?.();
       let last = 0;
       unsubRef.current = t.onPitch((p) => {

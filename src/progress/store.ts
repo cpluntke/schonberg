@@ -376,10 +376,12 @@ async function tryIdb<T>(fn: () => Promise<T>): Promise<T | undefined> {
   }
 }
 
-export async function saveImportedScore(s: Score): Promise<void> {
+/** Save an imported score. Resolves false when it could only be kept in memory (lost on reload). */
+export async function saveImportedScore(s: Score): Promise<boolean> {
   memScores.set(s.id, s);
-  await tryIdb(() => idbSet(SCORE_PREFIX + s.id, s));
+  const ok = (await tryIdb(async () => { await idbSet(SCORE_PREFIX + s.id, s); return true; })) === true;
   emit();
+  return ok;
 }
 
 export async function loadImportedScores(): Promise<Score[]> {

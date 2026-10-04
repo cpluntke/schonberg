@@ -74,7 +74,13 @@ function measureAt(measures: Measure[], t: number): Measure | undefined {
 /** Duration of one felt beat in score seconds at score time `t`. */
 export function beatSecAt(score: Score, t: number): number {
   const m = measureAt(score.measures, t);
-  if (m && m.dur > 0) return m.dur / beatsInMeasure(m.timeSig);
+  if (m && m.dur > 0 && m.durBeats > 0) {
+    // Seconds per quarter in this bar × quarters per felt beat. Works for short pickup bars too
+    // (which aren't a full bar long, so bar length / beats would be far too fast).
+    const secPerQuarter = m.dur / m.durBeats;
+    const quartersPerBar = (m.timeSig[0] * 4) / m.timeSig[1];
+    return secPerQuarter * (quartersPerBar / beatsInMeasure(m.timeSig));
+  }
   let bpm = 90;
   for (const te of score.tempos) if (te.time <= t + 1e-9) bpm = te.bpm;
   return 60 / bpm;
@@ -154,6 +160,8 @@ export class ScorePlayer {
   private endedCbs = new Set<() => void>();
   private gains: Record<string, number> = {};
   private lastPos = 0;
+  /** Time mapping of the most recent playback, kept after it ends (late mic samples still map). */
+  private lastMap: { startCtx: number; from: number; rate: number } | null = null;
 
   constructor(
     private ctx: AudioContext,
@@ -171,8 +179,9 @@ export class ScorePlayer {
   }
 
   scoreTimeAt(ctxTime: number): number {
-    if (!this.s) return this.lastPos;
-    return scoreTimeFromCtx(this.s.startCtx, this.s.from, this.s.rate, ctxTime);
+    const m = this.s ?? this.lastMap;
+    if (!m) return this.lastPos;
+    return scoreTimeFromCtx(m.startCtx, m.from, m.rate, ctxTime);
   }
 
   /** AudioContext time at which score time `t` is scheduled in the current playback (NaN if stopped). */
@@ -314,6 +323,7 @@ export class ScorePlayer {
   }
 
   private teardown(s: Session, fade: boolean): void {
+    this.lastMap = { startCtx: s.startCtx, from: s.from, rate: s.rate };
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
     this.s = null;

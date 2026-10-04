@@ -8,6 +8,9 @@ services:
     buildCommand: "true"
     startCommand: node server/index.mjs
     healthCheckPath: /health
+    envVars:
+      - key: TRUST_PROXY
+        value: "1"
   - type: web
     name: schonberg-hero
     runtime: static

@@ -1,0 +1,18 @@
+import { launch, ctxFor, nav, shot, text, run } from './r3a-lib.mjs';
+const b = await launch();
+const { page, save } = await ctxFor('alto', 0, 'sloppy');
+const t0 = Date.now();
+await nav(page, '#/piece/debussy-dieu');
+await page.getByRole('button', { name: 'Alto' }).click().catch(()=>{});
+await page.getByRole('button', { name: 'Listen to Bars 1–5' }).click(); await page.waitForTimeout(800);
+const listenHash = '#' + page.url().split('#')[1]; console.log('LISTEN URL', listenHash);
+let r = await run(page, listenHash, 'd1-d1-listen');
+console.log('LISTEN END', page.url(), r.slice(0, 300), (Date.now() - t0) / 1000);
+await nav(page, '#/piece/debussy-dieu');
+await page.getByRole('button', { name: 'Bars 1–5, level 1 Note-learning' }).click(); await page.waitForTimeout(800);
+const h = '#' + page.url().split('#')[1];
+r = await run(page, h, 'd1-d2-deb-s1-L1');
+console.log('RES', r, (Date.now() - t0) / 1000);
+await save();
+await nav(page, '#/'); await shot(page, 'd1-d3-home-after', true); console.log('HOME', await text(page));
+await b.close();

@@ -16,10 +16,21 @@ const RATE_WINDOW_MS = 60_000;
 const RATE_MAX = 60;                  // requests per IP per window
 const VOICES = ['S', 'A', 'T', 'B', 'other'];
 const CODE_RE = /^[A-Za-z0-9_-]{3,40}$/;
+const RESERVED = new Set(['__proto__', 'constructor', 'prototype', 'hasownproperty', 'tostring', 'valueof']);
+const validCode = (c) => CODE_RE.test(c || '') && !RESERVED.has(String(c).toLowerCase());
+// Behind a proxy (Render, Fly…) set TRUST_PROXY=1: the client IP is then the LAST
+// X-Forwarded-For hop (added by the proxy itself), not the client-controlled first one.
+const TRUST_PROXY = process.env.TRUST_PROXY === '1';
 
 /** @type {Record<string, Record<string, object>>} choir → (name|pieceId) → entry */
-let db = {};
-try { db = JSON.parse(readFileSync(DATA_FILE, 'utf8')) || {}; } catch { db = {}; }
+let db = Object.create(null);
+try {
+  const raw = JSON.parse(readFileSync(DATA_FILE, 'utf8')) || {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (!validCode(k) || !v || typeof v !== 'object') continue;
+    db[k] = Object.assign(Object.create(null), v);
+  }
+} catch { db = Object.create(null); }
 
 let saveTimer = null;
 function scheduleSave() {
@@ -31,7 +42,7 @@ function scheduleSave() {
       writeFileSync(DATA_FILE + '.tmp', JSON.stringify(db));
       renameSync(DATA_FILE + '.tmp', DATA_FILE);
     } catch (e) { console.error('save failed', e); }
-  }, 500);
+  }, 2000);
 }
 
 const hits = new Map();
@@ -88,7 +99,8 @@ function readBody(req) {
 
 const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') return send(res, 204);
-  const ip = (req.headers['x-forwarded-for'] || '').toString().split(',')[0].trim() || req.socket.remoteAddress || '?';
+  const xff = TRUST_PROXY ? (req.headers['x-forwarded-for'] || '').toString().split(',').map((x) => x.trim()).filter(Boolean) : [];
+  const ip = xff[xff.length - 1] || req.socket.remoteAddress || '?';
   if (rateLimited(ip)) return send(res, 429, { error: 'Too many requests' });
 
   const url = new URL(req.url || '/', 'http://x');
@@ -96,7 +108,7 @@ const server = http.createServer(async (req, res) => {
   if (parts.includes(null)) return send(res, 400, { error: 'Bad path' });
 
   if (req.method === 'GET' && (parts.length === 0 || parts[0] === 'health')) return send(res, 200, { ok: true });
-  if (parts[0] !== 'choirs' || parts[2] !== 'entries' || !CODE_RE.test(parts[1] || '')) {
+  if (parts[0] !== 'choirs' || parts[2] !== 'entries' || !validCode(parts[1])) {
     return send(res, 404, { error: 'Not found' });
   }
   const code = parts[1].toLowerCase();
@@ -115,7 +127,7 @@ const server = http.createServer(async (req, res) => {
     if (!entry) return send(res, 400, { error: 'Invalid entry' });
     if (!db[code]) {
       if (Object.keys(db).length >= MAX_CHOIRS) return send(res, 507, { error: 'Server full' });
-      db[code] = {};
+      db[code] = Object.create(null);
     }
     const key = `${entry.name.toLowerCase()}|${entry.pieceId}`;
     if (!db[code][key] && Object.keys(db[code]).length >= MAX_ENTRIES_PER_CHOIR) {

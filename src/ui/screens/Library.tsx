@@ -25,7 +25,9 @@ export function Library() {
         const singable = score.parts.filter((p) => p.notes.length > 0);
         if (!singable.length) throw new Error('No notes found in this file.');
         const p = await addImported(score);
-        toast(`Imported “${p.title}” with ${singable.length} parts`);
+        toast(p.persisted
+          ? `Imported “${p.title}” with ${singable.length} parts`
+          : `Imported “${p.title}”, but this browser won't keep it after a reload (private mode or storage blocked).`);
         if (files.length === 1) go({ name: 'piece', pieceId: p.id });
       } catch (e) {
         console.error(e);

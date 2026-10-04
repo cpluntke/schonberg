@@ -42,9 +42,7 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
   const [firstTime] = useState(() => {
     try {
       if (route.mode !== '2d' || route.level === 0) return false;
-      const seen = localStorage.getItem('sh:seenHowto') === '1';
-      localStorage.setItem('sh:seenHowto', '1');
-      return !seen;
+      return localStorage.getItem('sh:seenHowto') !== '1';
     } catch { return false; }
   });
   const rate = rateOverride ?? spec?.rate ?? 1;
@@ -127,11 +125,12 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
       if (entryOnsets.length >= 4) {
         const med = entryOnsets[Math.floor(entryOnsets.length / 2)];
         const iqr = entryOnsets[Math.floor(entryOnsets.length * 0.75)] - entryOnsets[Math.floor(entryOnsets.length * 0.25)];
-        if (med > 120 && iqr < 160) {
-          latencyAdjusted = Math.round(Math.min(500, sess.latencyMs + (med - 40)));
+        if (med / rate > 120 && iqr / rate < 160) {
+          // Onsets are in score time; at reduced tempo one score-ms lasts 1/rate real ms.
+          latencyAdjusted = Math.round(Math.min(500, sess.latencyMs + (med / rate - 40)));
           updateProfile({ latencyMs: latencyAdjusted });
-          // Re-score this run with the learned delay.
-          const shift = (latencyAdjusted - sess.latencyMs) / 1000;
+          // Re-score this run with the learned delay (converted back to score seconds).
+          const shift = ((latencyAdjusted - sess.latencyMs) / 1000) * rate;
           const idx = r.notes.map((n) => n.index);
           r = scoreAttempt(
             { score: piece.score, part, range: [Math.min(...idx), Math.max(...idx)] },
@@ -163,7 +162,18 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
     go({ name: 'results' }, true);
   }
 
+  const startingRef = useRef(false);
   async function start() {
+    if (startingRef.current) return; // double tap
+    startingRef.current = true;
+    try {
+      await startInner();
+    } finally {
+      startingRef.current = false;
+    }
+  }
+
+  async function startInner() {
     sessionRef.current?.dispose();
     fxRef.current = newFx();
     const s = makeSession();
@@ -240,6 +250,10 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [piece, part, section, route.mode, notation, showNames, rate, tolerance]);
+
+  useEffect(() => {
+    if (firstTime) try { localStorage.setItem('sh:seenHowto', '1'); } catch { /* ignore */ }
+  }, [firstTime]);
 
   // Cleanup on unmount / pause when hidden.
   useEffect(() => {

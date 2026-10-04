@@ -11,6 +11,11 @@ let trackerPromise: Promise<PitchTracker> | null = null;
 
 /** One shared microphone tracker for the whole app session (avoids re-prompting on iOS). */
 export async function getTracker(): Promise<PitchTracker> {
+  if (sharedTracker && !sharedTracker.alive) {
+    // The mic went away (headset unplugged, interruption): open it again.
+    sharedTracker = null;
+    trackerPromise = null;
+  }
   if (sharedTracker) return sharedTracker;
   if (!trackerPromise) {
     trackerPromise = PitchTracker.create(getAudioContext())
@@ -67,6 +72,8 @@ export class PracticeSession {
   /** Effective mic round-trip latency: calibrated, else a conservative estimate (set in start()). */
   latencyMs: number;
   private disposed = false;
+  private endTimer: number | null = null;
+  private resumeToken = 0;
   private onStateChange: (() => void) | null = null;
   /** Called when the audio system interrupts playback (phone call, Siri, other app). */
   onInterrupted: (() => void) | null = null;
@@ -94,6 +101,7 @@ export class PracticeSession {
   /** Must be called from a user gesture (tap) for iOS. */
   async start(): Promise<void> {
     await unlockAudio();
+    if (this.disposed) return;
     // Now that the context runs, outputLatency is meaningful.
     if (!(this.cfg.latencyMs > 0)) this.latencyMs = estimateLatencyMs();
     const ctx = getAudioContext();
@@ -119,15 +127,21 @@ export class PracticeSession {
               : 'No microphone found.';
         throw e;
       }
+      if (this.disposed) return; // the singer left while the permission prompt was open
       this.unsubPitch = this.tracker.onPitch((p) => this.onPitch(p));
     }
+    if (this.disposed) return;
     this.play(this.resumeFrom, true);
     this.requestWakeLock();
   }
 
   private play(from: number, countIn: boolean) {
     this.unsubEnd?.();
-    this.unsubEnd = this.player.onEnded(() => this.finish());
+    this.unsubEnd = this.player.onEnded(() => {
+      // The singer's last notes reach us one round-trip latency later: keep listening briefly.
+      if (this.cfg.listenOnly) return this.finish();
+      this.endTimer = window.setTimeout(() => this.finish(), Math.min(700, this.latencyMs + 120));
+    });
     this.player.play({
       from,
       to: this.cfg.to,
@@ -212,6 +226,7 @@ export class PracticeSession {
   }
 
   pause() {
+    this.resumeToken++;
     if (this.phase !== 'playing' && this.phase !== 'countin') return;
     this.resumeFrom = Math.max(this.cfg.from, Math.min(this.player.position, this.cfg.to));
     this.unsubEnd?.();
@@ -223,7 +238,9 @@ export class PracticeSession {
 
   async resume() {
     if (this.phase !== 'paused') return;
+    const token = ++this.resumeToken;
     await unlockAudio(); // iOS suspends the context when the app is backgrounded
+    if (token !== this.resumeToken || this.phase !== 'paused' || this.disposed) return;
     this.minTime = this.resumeFrom - 0.02;
     this.play(this.resumeFrom, true);
     this.requestWakeLock();
@@ -250,6 +267,8 @@ export class PracticeSession {
 
   finish() {
     if (this.phase === 'done') return;
+    if (this.endTimer != null) clearTimeout(this.endTimer);
+    this.endTimer = null;
     const pos = this.player.position;
     this.partial = this.phase === 'countin' || pos < this.cfg.to - 0.25;
     this.phase = 'done';
@@ -274,6 +293,8 @@ export class PracticeSession {
   /** Stop without producing a result (navigating away). */
   dispose() {
     this.disposed = true;
+    if (this.endTimer != null) clearTimeout(this.endTimer);
+    this.endTimer = null;
     if (this.onStateChange) getAudioContext().removeEventListener('statechange', this.onStateChange);
     this.onStateChange = null;
     this.stopSimulation();

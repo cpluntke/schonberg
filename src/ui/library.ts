@@ -133,7 +133,9 @@ async function loadAll() {
   }
   // First run: put the built-ins into the cycle so Home isn't empty.
   const cycle = loadCycle();
-  if (!cycle.pieceIds.length && !localStorage.getItem('sh:cycleSeeded')) {
+  let seeded = false;
+  try { seeded = !!localStorage.getItem('sh:cycleSeeded'); } catch { /* storage blocked */ }
+  if (!cycle.pieceIds.length && !seeded) {
     const preferred = ['warmup-chorale', 'debussy-dieu', 'ravel-nicolette', 'bruckner-locus-iste'].filter((id) => pieces.has(id));
     cycle.pieceIds = preferred.length ? preferred : [...pieces.values()].filter((p) => p.builtin).slice(0, 4).map((p) => p.id);
     cycle.name = cycle.name === 'This cycle' ? 'Demo cycle' : cycle.name;
@@ -144,7 +146,7 @@ async function loadAll() {
     cycle.rehearsalDate ??= iso(4);
     cycle.concertDate ??= iso(32);
     saveCycle(cycle);
-    localStorage.setItem('sh:cycleSeeded', '1');
+    try { localStorage.setItem('sh:cycleSeeded', '1'); } catch { /* storage blocked */ }
   }
   loaded = true;
   emit();
@@ -189,8 +191,8 @@ export function allPieces(): PieceInfo[] {
   });
 }
 
-export async function addImported(score: Score): Promise<PieceInfo> {
-  await saveImportedScore(score);
+export async function addImported(score: Score): Promise<PieceInfo & { persisted: boolean }> {
+  const persisted = await saveImportedScore(score);
   const p = makePiece(score);
   pieces.set(p.id, p);
   const cycle = loadCycle();
@@ -199,7 +201,7 @@ export async function addImported(score: Score): Promise<PieceInfo> {
     saveCycle(cycle);
   }
   emit();
-  return p;
+  return Object.assign(p, { persisted });
 }
 
 export async function removeImported(id: string) {

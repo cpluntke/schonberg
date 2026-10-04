@@ -236,6 +236,11 @@ export class PitchTracker {
     return new PitchTracker(ctx, stream, source, analyser, sink);
   }
 
+  /** False once stopped (also when the mic track ended: unplugged headset, interruption). */
+  get alive(): boolean {
+    return !this.stopped && this.stream.getAudioTracks().some((t) => t.readyState === 'live');
+  }
+
   /** Seconds of audio analysed per frame. */
   get windowSec(): number {
     return this.analyser.fftSize / this.ctx.sampleRate;

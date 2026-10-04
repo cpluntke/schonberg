@@ -19,13 +19,14 @@ const CODE_RE = /^[A-Za-z0-9_-]{3,40}$/;
 
 export function Ranks() {
   const [profile, update] = useProfile();
-  const v = useStoreVersion();
+  useStoreVersion();
   const cycle = loadCycle();
   const pieces = cycle.pieceIds.map((id) => getPiece(id)).filter(Boolean) as PieceInfo[];
   const [pieceId, setPieceId] = useState(pieces[0]?.id ?? '');
   const [by, setBy] = useState<RankBy>('readiness');
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [allEntries, setAllEntries] = useState<LeaderboardEntry[]>([]);
+  const [refresh, setRefresh] = useState(0);
   const [err, setErr] = useState<string | null>(null);
   const [paste, setPaste] = useState('');
   const [codeDraft, setCodeDraft] = useState(profile.choirCode ?? '');
@@ -46,7 +47,9 @@ export function Ranks() {
     if (!pieceId) return;
     (async () => {
       try {
-        if (me && profile.leaderboardOptIn) await backend.put(choir, me);
+        // Only post named entries, and only to a real (server) board — posting to the local
+        // store would bump the store version and re-run this effect in a loop.
+        if (me && profile.leaderboardOptIn && profile.name && backend.kind === 'http') await backend.put(choir, me);
         const list = await backend.list(choir, pieceId);
         const everything = await backend.list(choir);
         if (alive) { setEntries(list); setAllEntries(everything); setErr(null); }
@@ -56,7 +59,7 @@ export function Ranks() {
     })();
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pieceId, choir, profile.leaderboardOptIn, v]);
+  }, [pieceId, choir, profile.leaderboardOptIn, profile.name, refresh]);
 
   const others = entries.filter((e) => !(me && e.name === me.name && e.pieceId === me.pieceId));
   const all = me ? [...others, { ...me, name: me.name }] : others;
@@ -90,7 +93,7 @@ export function Ranks() {
     }
     const n = importShareCodes(choir, paste);
     toast(n ? `Added ${n} ranking${n > 1 ? 's' : ''}` : 'No ranking codes found in that text');
-    if (n) setPaste('');
+    if (n) { setPaste(''); setRefresh((x) => x + 1); }
   }
 
   function metric(e: LeaderboardEntry): string {
@@ -151,7 +154,7 @@ export function Ranks() {
               </div>
               <span className="mono" style={{ fontWeight: 600 }}>{metric(e)}</span>
               {!isMe && backend.kind === 'local' && (
-                <button className="icon-btn" aria-label={`Remove ${e.name}`} title="Remove" onClick={() => { removeLocalEntry(choir, e.name, e.pieceId); setEntries((xs) => xs.filter((x) => x !== e)); }}>
+                <button className="icon-btn" aria-label={`Remove ${e.name}`} title="Remove" onClick={() => { removeLocalEntry(choir, e.name, e.pieceId); setRefresh((x) => x + 1); }}>
                   <span aria-hidden="true" style={{ fontSize: 18, color: 'var(--muted)' }}>×</span>
                 </button>
               )}
