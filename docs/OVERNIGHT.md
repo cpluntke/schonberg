@@ -11,9 +11,10 @@ Good morning! Here is what happened between midnight and 7.
   Listen → Note-learning → In time → Independent → Concert-ready, with rehearsal-ready (L3) and
   concert-ready (L4) targets, review reminders and a daily plan paced to your rehearsal and concert
   dates.
-- **Tested by 11 sub-agent QA passes in 4 rounds** (functional, choir-singer UX, audio/perf, regression,
-  exploratory and a11y, code review, a week-long acceptance test, a real-audio pipeline test).
-  Every P0/P1 they found was fixed and re-verified; see "Testing" below.
+- **Tested by 13 sub-agent QA passes in 6 rounds** (functional, choir-singer UX, audio/perf, regression,
+  exploratory and a11y, code review, a week-long acceptance test, a real-audio pipeline test, two
+  final gates with about 11,000 synthetic singer runs). Every P0/P1 they found was fixed and re-verified. The final
+  gate (round 6) found **0 P0 and 0 P1**; see "Testing" below.
 - **Not online yet:** Render couldn't read the private repo. It's one click once you give Render
   access: see `docs/DEPLOY.md` (a `render.yaml` blueprint is included).
 
@@ -65,13 +66,31 @@ All QA reports are in `docs/qa/`. Priority scale: `docs/priorities.md`.
 | 1 | functional / singer UX / audio & perf | 0 | 10 | all P1s fixed |
 | 2 | verification / exploratory and a11y | 0 | 2 | fixed |
 | 3 | verification / code review / acceptance (go) | 0 | 4 | fixed |
-| 4 | final verification / real-audio pipeline | see `round4-*.md` | | |
+| 4 | final verification / real-audio pipeline | 0 | 0 | P2 fixes (short consonant notes, mic loss, storage guards) |
+| 5 | gate: real audio + 2,277 synthetic singers | 0 | 1 | "behind the beat" fired on normal singing: fixed (drag vs scoop told apart) |
+| 6 | final gate (≈9,000 runs, real audio, smoke) | **0** | **0** | 6 P2 remain (below) |
+
+Morning additions after the gate: a crash screen and error log, a **Diagnostics** page (mic test, storage check,
+copyable report), an update prompt instead of automatic reloads, persistent-storage request,
+gentler mic release, vibrato-proof drift detection, and an importer hardening pass on a large
+MusicXML corpus (`docs/qa/importer-hardening.md`).
+
+### Open P2s (accepted for the field test)
+
+- **Fastest passages:** a good singer may fall just short of level 2–4 in the fastest passages (Debussy *Yver* bars 1–23, *Dieu* bars 1–5,
+  Ravel *Nicolette* bars 20–45) in synthetic tests. Real recordings will tell. The knobs are in `docs/FIELD-TEST.md`.
+- **Uncalibrated delay of about 120–150 ms:** not learned automatically (to avoid learning consonants). The 10-second delay check
+  fixes it.
+- **Portamento:** a singer sliding into every note may be told "behind the beat".
+- **Staccato marks:** not yet used in scoring.
+- **Learned delay:** the latency learner may store a very steady ≥230 ms drag as headphone delay.
 
 Automated tests: 189 unit tests (`npm test`) and Playwright end-to-end tests (`npm run e2e`),
 including a fake-microphone test that feeds a WAV through the real pitch pipeline.
 
 ## Known limitations / next steps
 
+- **Field test:** follow `docs/FIELD-TEST.md` (what to check, what to tell singers, which knobs to turn).
 - **Not tested on real phones** (iOS Safari / Android). Testing was in desktop Chromium with fake
   microphones and CPU throttling. The first real-device session should check headphone latency
   calibration and Bluetooth behaviour.
