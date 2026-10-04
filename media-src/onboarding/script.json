@@ -38,20 +38,20 @@
  {
   "sp": "N",
   "scene": "C",
-  "say": "Now the practice screen. Your notes scroll toward the white line, and the blue line is your voice. Keep the blue line on the orange bars.",
-  "show": "Now the practice screen. Your notes scroll toward the white line, and the blue line is your voice. Keep the blue line on the orange bars."
+  "say": "Now the practice screen. At the first levels you sing from the sheet music. The blue line is your voice, drawn at the height you sing. Right on the note means in tune; just under it means flat.",
+  "show": "Now the practice screen. At the first levels you sing from the sheet music. The blue line is your voice, drawn at the height you sing. Right on the note means in tune; just under it means flat."
  },
  {
   "sp": "B",
   "scene": "C",
-  "say": "And the dashed boxes?",
-  "show": "And the dashed boxes?"
+  "say": "And if I don't read music?",
+  "show": "And if I don't read music?"
  },
  {
   "sp": "N",
   "scene": "C",
-  "say": "Those are the other voices, so you can see where you sit in the chord. The little bubble tells you how many cents sharp or flat you are.",
-  "show": "Those are the other voices, so you can see where you sit in the chord. The little bubble tells you how many cents sharp or flat you are."
+  "say": "Tap Highway. Your notes become bars scrolling toward a line, and you keep the blue line on them. In both views, the little bubble tells you how many cents sharp or flat you are.",
+  "show": "Tap “Highway”. Your notes become bars scrolling toward a line, and you keep the blue line on them. In both views, the little bubble tells you how many cents sharp or flat you are."
  },
  {
   "sp": "N",
