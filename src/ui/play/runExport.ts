@@ -74,6 +74,7 @@ export function runJson(r: RunExport): string {
     sampleRate: recording.sampleRate,
     scoreTimeAtSample0: recording.scoreTimeAtSample0,
     windowN: recording.windowN,
+    truncated: recording.truncated,
     app: { build: typeof __BUILD__ !== 'undefined' ? __BUILD__ : 'dev', recordedAt: new Date(r.at).toISOString() },
     device,
     result: {
@@ -100,21 +101,27 @@ export function runZip(r: RunExport): Uint8Array {
   });
 }
 
-/** Share (phone share sheet) or download the run. Returns how it went. */
+/** Share (phone share sheet: the WAV plus run.json as text, which Android accepts) or download a zip. */
 export async function shareRun(r: RunExport): Promise<'shared' | 'downloaded' | 'cancelled'> {
   const name = runFileName(r);
-  const blob = new Blob([runZip(r) as BlobPart], { type: 'application/zip' });
-  const file = typeof File !== 'undefined' ? new File([blob], name, { type: 'application/zip' }) : null;
   const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
-  if (file && nav.share && nav.canShare?.({ files: [file] })) {
-    try {
-      await nav.share({ files: [file], title: 'Schönberg Hero recording', text: `${r.meta.pieceTitle}, ${r.meta.partName}, L${r.meta.level}` });
-      return 'shared';
-    } catch (e) {
-      if ((e as DOMException)?.name === 'AbortError') return 'cancelled';
-      // Fall through to a download.
+  if (typeof File !== 'undefined' && nav.share && nav.canShare) {
+    const base = name.replace(/\.zip$/, '');
+    const files = [
+      new File([encodeWav(r.recording.pcm, r.recording.sampleRate) as BlobPart], `${base}.wav`, { type: 'audio/wav' }),
+      new File([runJson(r)], `${base}.json.txt`, { type: 'text/plain' }),
+    ];
+    if (nav.canShare({ files })) {
+      try {
+        await nav.share({ files, title: 'Schönberg Hero recording', text: `${r.meta.pieceTitle}, ${r.meta.partName}, L${r.meta.level}` });
+        return 'shared';
+      } catch (e) {
+        if ((e as DOMException)?.name === 'AbortError') return 'cancelled';
+        // Fall through to a download.
+      }
     }
   }
+  const blob = new Blob([runZip(r) as BlobPart], { type: 'application/zip' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

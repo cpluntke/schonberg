@@ -80,7 +80,9 @@ export function Results() {
         <div className="notice info" role="status" data-testid="aligned-note">
           Your voice reached the app {Math.abs(lr.alignedMs)} ms {lr.alignedMs > 0 ? 'later' : 'earlier'} than expected (headphone and phone audio delay),
           so we lined it up with the music before scoring.
-          {lr.latencyAdjusted != null ? ` From now on we'll allow ${lr.latencyAdjusted} ms for your device.` : ' If this keeps happening, redo the delay check in Voice setup.'}
+          {lr.latencyAdjusted != null ? ` From now on we'll allow ${lr.latencyAdjusted} ms for your device.`
+            : lr.suggestDelayCheck ? ' Your measured delay may be out of date (new headphones?): redo the delay check in Voice setup.'
+              : ' If the next run shows the same, we’ll adjust to your device. The delay check in Voice setup is faster and more exact.'}
         </div>
       )}
       {lr.notCounted && (
@@ -94,7 +96,9 @@ export function Results() {
             ? <><strong>Level {lr.newLevel} reached: {LEVELS[lr.newLevel - 1]?.name}!</strong> {lr.newLevel >= 4 ? 'This section is concert-ready.' : lr.newLevel >= 3 ? 'This section is rehearsal-ready.' : ''}</>
             : lr.passed
               ? <><strong>Passed.</strong> You keep level {lr.newLevel}.</>
-              : <><strong>Not yet:</strong> {Math.round(r.accuracy * 100)}% of {Math.round((spec?.pass ?? 0.8) * 100)}% needed. Use the tips below and try again.</>}
+              : lr.timingFail != null && r.accuracy >= (spec?.pass ?? 0.8)
+                ? <><strong>Not yet:</strong> the notes were right ({Math.round(r.accuracy * 100)}%), but you came in about {lr.timingFail} ms behind the beat. Breathe early and sing with the music, not after it.</>
+                : <><strong>Not yet:</strong> {Math.round(r.accuracy * 100)}% of {Math.round((spec?.pass ?? 0.8) * 100)}% needed. Use the tips below and try again.</>}
         </div>
       )}
 

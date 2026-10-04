@@ -22,6 +22,10 @@ export interface LastResult {
   latencyAdjusted?: number;
   /** The voice was lined up with the music by this many ms before scoring (device delay). */
   alignedMs?: number;
+  /** The measured delay looks off: suggest redoing the delay check. */
+  suggestDelayCheck?: boolean;
+  /** The notes were right but entries came this many ms late (median), which failed the run. */
+  timingFail?: number;
 }
 
 let last: LastResult | null = null;

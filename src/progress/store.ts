@@ -34,6 +34,8 @@ export interface Profile {
   latencyMs: number;
   /** Where latencyMs came from: the delay check / typed in ('measured') or learned from singing. */
   latencySource?: 'measured' | 'learned';
+  /** Delay suggested by the last run (ms), waiting for a second run to agree before it's learned. */
+  latencyHint?: number;
   /** Keep the last run's recording in memory so it can be shared (default on). */
   keepRecording?: boolean;
   rangeLow?: number;
@@ -223,6 +225,8 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
 
 export function loadProfile(): Profile {
   const p = readJSON<Partial<Profile>>(K.profile, {}, isObj);
+  // Delays saved before the source was recorded came from the delay check (or a typed value).
+  if (typeof p.latencyMs === 'number' && p.latencyMs > 0 && !p.latencySource) p.latencySource = 'measured';
   return { ...DEFAULT_PROFILE, ...p };
 }
 export function saveProfile(p: Profile): void { writeJSON(K.profile, p); }
@@ -266,6 +270,7 @@ export function recordAttempt(
   result: AttemptResult,
   durationSec?: number,
   now: number = Date.now(),
+  extra: { timingFail?: boolean } = {},
 ): RecordResult {
   const prog: PieceProgress = getProgress(pieceId, partId) ?? {
     pieceId, partId, sections: {}, totalAttempts: 0, bestScore: 0,
@@ -281,7 +286,7 @@ export function recordAttempt(
   if (lvl === 0) {
     sp.lastPracticed = now;
   } else {
-    passed = accuracy >= LEVELS[lvl - 1].pass;
+    passed = accuracy >= LEVELS[lvl - 1].pass && !extra.timingFail;
     sp.attempts = (sp.attempts ?? 0) + 1;
     sp.best[lvl] = Math.max(sp.best[lvl] ?? 0, accuracy);
     sp.bestScore = { ...(sp.bestScore ?? {}) };

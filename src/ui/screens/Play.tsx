@@ -7,7 +7,10 @@ import { LEVELS, LISTEN, effectiveTolerance, pieceReadiness } from '../../progre
 import { recordAttempt, getProgress, snapshotReadiness, personalBest } from '../../progress/store';
 import { keyAtTime } from '../../music/time';
 import { PracticeSession } from '../play/session';
-import { scoreAligned } from '../../game/align';
+import { medianOnsetMs, scoreAligned } from '../../game/align';
+
+/** Median entry this late (real ms) fails a level-2+ run even with the right notes. */
+const LATE_FAIL_MS = 200;
 import { setLastRun } from '../play/runExport';
 import { drawHighway2D, pitchWindow, type DrawState } from '../play/highway2d';
 import { drawArcade, lanesFor, newFx } from '../play/arcade3d';
@@ -100,7 +103,8 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
         latencyMs: profile.latencyMs || 0,
         range,
         // Tenors and basses (or anyone whose range reaches low) keep the long analysis window.
-        lowestMidi: profile.voice === 'T' || profile.voice === 'B' ? null : Math.min(part.low, profile.rangeLow ?? part.low),
+        // (The short window needs a known range: someone singing the part an octave down mustn't get it.)
+        lowestMidi: profile.voice === 'T' || profile.voice === 'B' || profile.rangeLow == null ? null : Math.min(part.low, profile.rangeLow),
         record: profile.keepRecording !== false && !listenOnly,
         simulate: simulateMode(),
       },
@@ -122,32 +126,44 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
       }
       return;
     }
-    // Line the voice up with the music before judging it: the device delay is rarely known
-    // exactly, and when it's off the previous note leaks into the next and reads as bad intonation.
-    // A measured delay is only nudged; otherwise the delay found here is learned for next time.
+    // Line the voice up with the music before judging intonation: the device delay is rarely
+    // known exactly, and when it's off the previous note leaks into the next and reads as bad
+    // intonation. Timing stays on the delay we apply, so late singing still shows as late.
     let latencyAdjusted: number | undefined;
     let alignedMs: number | undefined;
+    let suggestDelayCheck = false;
+    let timingFail: number | undefined;
     const sess = sessionRef.current;
+    const calibrated = profile.latencySource === 'measured' && profile.latencyMs > 0;
     if (sess) {
       const idx = r.notes.map((n) => n.index);
-      const calibrated = profile.latencySource === 'measured' && profile.latencyMs > 0;
       const al = scoreAligned(
         { score: piece.score, part, range: [Math.min(...idx), Math.max(...idx)] },
         sess.samples, sess.cfg.scoring,
         { rate: sess.cfg.rate, latencyMs: sess.latencyMs, calibrated },
       );
-      if (al.shiftMs !== 0) {
-        r = al.result;
-        alignedMs = al.shiftMs;
-        if (!calibrated && !simulateMode()) {
-          // Move most of the way (a single run can be off by a little).
-          latencyAdjusted = Math.round(Math.max(0, Math.min(500, sess.latencyMs + 0.8 * al.shiftMs)));
-          updateProfile({ latencyMs: latencyAdjusted, latencySource: 'learned' });
+      r = al.result;
+      if (al.shiftMs !== 0) alignedMs = al.shiftMs;
+      // Learn the delay on uncalibrated phones, but only from complete, clearly matching runs, and
+      // only once two runs agree (one run sung behind the guide, or a headset switch, must not
+      // teach a wrong delay).
+      if (!calibrated && !simulateMode() && !sess.partial && al.estimate.match >= 0.6) {
+        const suggested = sess.latencyMs + al.shiftMs;
+        const hint = profile.latencyHint;
+        if (hint != null && Math.abs(suggested - hint) <= 60) {
+          const learned = Math.round(Math.max(20, Math.min(450, (suggested + hint) / 2)));
+          if (Math.abs(learned - (profile.latencyMs || sess.latencyMs)) >= 25) latencyAdjusted = learned;
+          updateProfile({ latencyMs: learned, latencySource: 'learned', latencyHint: undefined });
+        } else {
+          updateProfile({ latencyHint: suggested });
         }
-      } else if (!calibrated && !profile.latencyMs && !simulateMode()) {
-        // Lined up already: remember the estimate that worked so it isn't re-guessed every run.
-        updateProfile({ latencyMs: sess.latencyMs, latencySource: 'learned' });
       }
+      if (calibrated && Math.abs(al.shiftMs) >= 60) suggestDelayCheck = true;
+      // From level 2 ("In time") on, coming in clearly late fails the run, once the delay is
+      // trustworthy (measured, or learned from runs that agreed).
+      const trusted = calibrated || profile.latencySource === 'learned';
+      const med = medianOnsetMs(r, sess.cfg.rate);
+      if (trusted && level >= 2 && med !== null && med > LATE_FAIL_MS) timingFail = Math.round(med);
     }
     setLastRun(sess?.recording ? {
       recording: sess.recording,
@@ -155,7 +171,7 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
       meta: {
         pieceId: piece.id, pieceTitle: piece.title, partId: part.id, partName: part.name,
         from: sess.cfg.from, to: sess.cfg.to, rate: sess.cfg.rate, level, scoring: sess.cfg.scoring,
-        latencyMs: sess.latencyMs, calibrated: profile.latencySource === 'measured' && profile.latencyMs > 0,
+        latencyMs: sess.latencyMs, calibrated,
         alignedMs: alignedMs ?? 0, samples: sess.samples, result: r,
       },
     } : null);
@@ -166,7 +182,7 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
     const recId = ladder || !realSection ? section.id : 'practice';
     const durationSec = (section.end - section.start) / rate;
     const prevBest = personalBest(piece.id, part.id, recId, level)?.score ?? null;
-    const rec = recordAttempt(piece.id, part.id, recId, level, r, durationSec);
+    const rec = recordAttempt(piece.id, part.id, recId, level, r, durationSec, Date.now(), { timingFail: timingFail != null });
     if (ladder) {
       const secs = singableSections(piece, part.id);
       snapshotReadiness(piece.id, part.id, pieceReadiness(secs, getProgress(piece.id, part.id)).pct);
@@ -176,6 +192,8 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
       from: section.start, to: section.end, result: r, ladder, prevBest,
       latencyAdjusted,
       alignedMs,
+      suggestDelayCheck,
+      timingFail,
       notCounted: realSection && !ladder ? (partial ? 'stopped early' : 'slower than the level’s tempo') : undefined,
       passed: rec.passed, prevLevel: rec.prevLevel, newLevel: rec.newLevel,
     });
@@ -194,6 +212,7 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
   async function start() {
     if (startingRef.current) return; // double tap
     startingRef.current = true;
+    setLastRun(null); // free the previous run's recording
     try {
       await startInner();
     } finally {

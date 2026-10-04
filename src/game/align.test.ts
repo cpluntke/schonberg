@@ -56,3 +56,13 @@ describe('scoreAligned', () => {
     expect(al.shiftMs).toBe(0);
   });
 });
+
+describe('scoreAligned keeps timing honest', () => {
+  it('a singer following 300 ms behind gets intonation credit but late onsets and a timing tip', () => {
+    const al = scoreAligned(ctx, singRealistic(part, { lag: 0.3, fn: 12, zeta: 0.7 }), opts, { rate: 1, latencyMs: 130, calibrated: false });
+    expect(al.shiftMs).toBeGreaterThan(250);
+    expect(al.result.pitch).toBeGreaterThan(0.9);
+    expect(al.result.rhythm).toBeLessThan(0.7);
+    expect(al.result.insights.some((i) => i.kind === 'behind-beat' || i.kind === 'late-entries')).toBe(true);
+  });
+});

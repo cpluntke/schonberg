@@ -53,3 +53,23 @@ for (const bpm of [60, 120]) {
     });
   });
 }
+
+describe('leniency has limits', () => {
+  it('short notes sung 60 cents flat are not "good"', () => {
+    const p = makePart('A', [[60, 0.5], [67, 0.5], [60, 0.5], [67, 0.5], [60, 0.5], [67, 0.5], [60, 0.5], [67, 0.5]], 110);
+    const c: ScoringContext = { score: makeScore([p], 110), part: p, range: [0, p.notes.length - 1] };
+    const r = scoreAttempt(c, sing(p, { offsetCents: -60, vibCents: 0 }), L4);
+    expect(r.accuracy).toBeLessThan(0.3);
+  });
+  it('notes held for only half their length are not "good"', () => {
+    const p = makePart('A', [[62, 1], [64, 1], [65, 1], [67, 1], [69, 1], [67, 1], [65, 1], [64, 1]], 60);
+    const c: ScoringContext = { score: makeScore([p], 60), part: p, range: [0, p.notes.length - 1] };
+    const samples = sing(p, { vibCents: 0, fn: 12, zeta: 0.7 }).map((s) => {
+      const n = p.notes.find((x) => s.time >= x.start && s.time < x.start + x.dur);
+      return n && s.time - n.start > n.dur / 2 ? { ...s, midi: null, clarity: 0, rms: 0 } : s;
+    });
+    const r = scoreAttempt(c, samples, L1);
+    expect(r.accuracy).toBeLessThan(0.7);
+    expect(r.counts.good + r.counts.perfect).toBeLessThan(4);
+  });
+});

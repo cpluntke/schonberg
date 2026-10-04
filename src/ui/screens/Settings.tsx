@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { setLastRun } from '../play/runExport';
 import { useProfile, useStoreVersion, toast, daysUntil } from '../hooks';
 import { nextRehearsal, WEEKDAYS } from '../../progress/rehearsal';
 import { getPiece } from '../library';
@@ -151,7 +152,7 @@ export function Settings() {
             style={{ width: 90, minHeight: 40, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--line)', padding: '0 8px' }} />
         </label>
         <label className="toggle-row"><span>Keep a recording of my last run<span className="tiny muted" style={{ display: 'block' }}>Only on this phone, so you can share it if the scoring seems off.</span></span>
-          <input type="checkbox" checked={profile.keepRecording !== false} onChange={(e) => update({ keepRecording: e.target.checked })} />
+          <input type="checkbox" checked={profile.keepRecording !== false} onChange={(e) => { update({ keepRecording: e.target.checked }); if (!e.target.checked) setLastRun(null); }} />
         </label>
         <div className="row">
           <button className="btn small grow" onClick={() => go({ name: 'setup' })}>Run voice setup again</button>

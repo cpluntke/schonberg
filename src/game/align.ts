@@ -9,7 +9,8 @@
 
 import type { Part } from '../music/types';
 import type { AttemptResult, PitchSample, ScoringOptions } from './types';
-import { scoreAttempt, type ScoringContext } from './scoring';
+import { rhythmValue, scoreAttempt, type ScoringContext } from './scoring';
+import { analyze } from './analysis';
 
 export interface LagEstimate {
   /** Score seconds to subtract from sample times (positive = the voice arrived late). */
@@ -103,14 +104,17 @@ export interface AlignedResult {
   result: AttemptResult;
   /** The estimate (score seconds). */
   estimate: LagEstimate;
-  /** Real-time milliseconds the voice was shifted by (0 when not shifted). */
+  /** Real-time milliseconds the voice was shifted by for the intonation judgement (0 = none). */
   shiftMs: number;
 }
 
 /**
- * Score a finished run after lining the voice up with the music. `latencyMs` is the delay already
- * applied; `calibrated` = it was measured with the delay check, so only small corrections are made
- * (the rest may be genuine lateness, which the singer should hear about).
+ * Score a finished run, judging intonation after lining the voice up with the music.
+ *
+ * Only intonation uses the lined-up voice. Onsets, rhythm and the timing tips stay on the delay
+ * the app already applies (`latencyMs`), so a singer who follows the guide 300 ms behind still
+ * hears that they're late. `calibrated` = that delay was measured with the delay check: then
+ * only small corrections are made.
  */
 export function scoreAligned(
   ctx: ScoringContext,
@@ -119,11 +123,23 @@ export function scoreAligned(
   run: { rate: number; latencyMs: number; calibrated: boolean },
 ): AlignedResult {
   const rate = run.rate > 0 ? run.rate : 1;
-  const lo = run.calibrated ? -0.08 : Math.max(-0.1, -run.latencyMs / 1000 - 0.03);
-  const hi = run.calibrated ? 0.08 : 0.35;
-  const estimate = estimateLag(ctx.part, ctx.range, samples, { minLag: lo * rate, maxLag: hi * rate, step: 0.01 * rate });
+  // Search a plausible range of device delays around the current setting (total ≥ ~20 ms).
+  const lo = run.calibrated ? -0.08 : Math.max(-0.25, -(run.latencyMs - 20) / 1000);
+  const hi = run.calibrated ? 0.08 : 0.3;
+  const plain = scoreAttempt(ctx, samples, opts);
+  const estimate = estimateLag(ctx.part, ctx.range, samples, { minLag: Math.min(0, lo) * rate, maxLag: hi * rate, step: 0.01 * rate });
   const shiftMs = estimate.confident ? Math.round((estimate.lag / rate) * 1000) : 0;
   // Small shifts aren't worth second-guessing the delay setting for.
-  if (Math.abs(shiftMs) < 25) return { result: scoreAttempt(ctx, samples, opts), estimate, shiftMs: 0 };
-  return { result: scoreAttempt(ctx, shiftSamples(samples, estimate.lag), opts), estimate, shiftMs };
+  if (Math.abs(shiftMs) < 25) return { result: plain, estimate, shiftMs: 0 };
+  const aligned = scoreAttempt(ctx, shiftSamples(samples, estimate.lag), opts);
+  const notes = aligned.notes.map((n, i) => ({ ...n, onsetMs: plain.notes[i]?.onsetMs ?? n.onsetMs }));
+  const rhythm = notes.length ? notes.reduce((x, n) => x + rhythmValue(n.onsetMs), 0) / notes.length : 0;
+  const result: AttemptResult = { ...aligned, notes, rhythm, insights: analyze(ctx, notes, samples) };
+  return { result, estimate, shiftMs };
+}
+
+/** Median onset (real ms) of the notes whose timing is meaningful, or null. */
+export function medianOnsetMs(result: AttemptResult, rate: number): number | null {
+  const xs = result.notes.filter((n) => n.onsetMs !== null && n.scoop === null).map((n) => n.onsetMs! / (rate > 0 ? rate : 1)).sort((a, b) => a - b);
+  return xs.length >= 3 ? xs[Math.floor(xs.length / 2)] : null;
 }

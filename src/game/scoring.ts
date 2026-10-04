@@ -36,8 +36,8 @@ export const DEFAULT_VIBRATO_WINDOW = 0.18;
 export const TRANSITION_MAX = 0.25;
 /** Likewise at the end of a note that leads into another: moving early / the next consonant. */
 export const RELEASE_MAX = 0.12;
-/** Share of the judged span that may be unvoiced (tracker dropouts, consonants) without penalty. */
-const DROPOUT_ALLOWANCE = 0.2;
+/** Gaps in the voiced readings shorter than this inside a note (tracker dropouts, an inner consonant) aren't penalised. */
+const DROPOUT_MAX = 0.1;
 
 export const GRADE_POINTS: Record<Grade, number> = { perfect: 100, good: 70, ok: 40, miss: 0 };
 export const GRADE_VALUE: Record<Grade, number> = { perfect: 1, good: 0.85, ok: 0.5, miss: 0 };
@@ -179,8 +179,6 @@ class NoteAcc {
   smD: number[] = [];
   smHead = 0;
   smSum = 0;
-  /** Any single unsmoothed body sample within tolerance (short-note leniency). */
-  rawHit = false;
   /** Body samples (time, deviation, covered seconds) for the final whole-note judgement. */
   bT: number[] = [];
   bD: number[] = [];
@@ -395,7 +393,6 @@ export class LiveScorer {
         smooth = a.smSum / (a.smT.length - a.smHead);
       }
       a.voicedTime += overlap;
-      if (inTol) a.rawHit = true;
       if (Math.abs(smooth) <= tol) a.hitTime += overlap;
       a.bT.push(t);
       a.bD.push(dev);
@@ -423,7 +420,13 @@ export class LiveScorer {
     const jT = a.bT.slice(k0, k1);
     const jD = a.bD.slice(k0, k1);
     const jW = a.bW.slice(k0, k1);
-    const voicedJudged = jW.reduce((x, y) => x + y, 0);
+    // Brief tracker dropouts (a breathy moment, an inner consonant) are excused; a note that
+    // simply isn't held to its end is not.
+    let excused = 0;
+    for (let k = 1; k < jT.length; k++) {
+      const gap = jT[k] - jW[k] / 2 - (jT[k - 1] + jW[k - 1] / 2);
+      if (gap > 0 && gap < DROPOUT_MAX) excused += gap;
+    }
     // Final judgement over the settled part of the note: a vibrato-cancelling average (or the
     // median for short notes), so neither vibrato nor the glide into the note reads as out of tune.
     let hitTime = 0;
@@ -433,11 +436,10 @@ export class LiveScorer {
         for (let k = 0; k < jT.length; k++) if (Math.abs(sm[k]) <= tolN) hitTime += jW[k];
       } else {
         // Median, not mean: a short pitch glitch shouldn't sink a short note.
-        if (Math.abs(median(jD)!) <= tolN) hitTime = voicedJudged;
+        if (Math.abs(median(jD)!) <= tolN) hitTime = jW.reduce((x, y) => x + y, 0) + excused;
       }
     }
-    // Brief tracker dropouts (consonants, a breathy moment) don't count against intonation.
-    const hitRatio = clamp(hitTime / Math.max(voicedJudged, (1 - DROPOUT_ALLOWANCE) * bodyDur), 0, 1);
+    const hitRatio = clamp(hitTime / Math.max(1e-3, bodyDur - excused), 0, 1);
     const voicedRatio = clamp(a.voicedTime / Math.max(1e-3, w.bodyEnd - w.bodyStart), 0, 1);
     const medDev = jD.length ? median(jD) : median(a.devs);
     const tol = tolN;
@@ -446,7 +448,8 @@ export class LiveScorer {
         : hitRatio >= 0.6 ? 'good'
           : hitRatio >= 0.35 ? 'ok'
             : 'miss';
-    if (bodyDur < SHORT_BODY && (a.hitTime > 0 || a.rawHit) && GRADE_RANK[grade] < GRADE_RANK.good) grade = 'good';
+    // Very short notes: one in-tune moment (within the judged part) is enough for "good".
+    if (w.bodyEnd - w.bodyStart < SHORT_BODY && jD.some((d) => Math.abs(d) <= tolN) && GRADE_RANK[grade] < GRADE_RANK.good) grade = 'good';
     // With octave tolerance on (the singer deliberately sings the part in their own octave),
     // folding is expected and not an error.
     const octave = !this.opts.octaveTolerant && a.devs.length > 0 && a.octaveSamples > a.devs.length / 2;

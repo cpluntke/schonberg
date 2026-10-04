@@ -173,3 +173,19 @@ describe('programme slots', () => {
     expect(c.focusPieceIds).toEqual(['a', 'imp-1']);
   });
 });
+
+describe('timing gate and delay migration', () => {
+  it('a run with the right notes but late entries does not pass', async () => {
+    const { recordAttempt, _resetAllForTests } = await import('./store');
+    _resetAllForTests();
+    const res = { accuracy: 0.95, pitch: 0.95, rhythm: 0.5, score: 100, maxCombo: 5, counts: { perfect: 5, good: 0, ok: 0, miss: 0 }, notes: [], perMeasure: {}, insights: [] };
+    expect(recordAttempt('p', 'A', 's1', 2, res, 10, Date.now(), { timingFail: true }).passed).toBe(false);
+    expect(recordAttempt('p', 'A', 's1', 2, res, 10).passed).toBe(true);
+  });
+  it('treats a delay saved before the source was recorded as measured', async () => {
+    const { loadProfile, _resetAllForTests } = await import('./store');
+    _resetAllForTests();
+    localStorage.setItem('sh:profile', JSON.stringify({ name: 'X', latencyMs: 180 }));
+    expect(loadProfile().latencySource).toBe('measured');
+  });
+});

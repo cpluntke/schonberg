@@ -252,6 +252,9 @@ export class PracticeSession {
     this.unsubEnd?.();
     this.unsubEnd = null;
     this.player.stop();
+    // A resumed run has a second time mapping: its recording couldn't be re-scored, so drop it.
+    this.recorder?.stop();
+    this.recorder = null;
     this.phase = 'paused';
     this.releaseWakeLock();
   }
