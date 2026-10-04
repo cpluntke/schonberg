@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { PATTERN, judgePattern, shouldStop, summarize } from './rangecheck';
 
 /** Readings of a sung-back pattern: 20 readings per note, with a little vibrato and an offset. */
-function sing(root: number, opts: { cents?: number; wobble?: number; skip?: number[]; db?: number } = {}) {
+function sing(root: number, opts: { cents?: number; wobble?: number; skip?: number[]; db?: number; drift?: number } = {}) {
   const out: { midi: number | null; rms: number }[] = [];
   PATTERN.forEach((x, k) => {
     for (let i = 0; i < 20; i++) {
       const skip = opts.skip?.includes(x);
-      out.push({ midi: skip ? null : root + x + ((opts.cents ?? 0) + (opts.wobble ?? 10) * Math.sin(i + k)) / 100, rms: 10 ** ((opts.db ?? -20) / 20) });
+      // drift: the pitch slides across each note (an unsteady voice), in cents per reading.
+      const d = (opts.drift ?? 0) * (i - 10);
+      out.push({ midi: skip ? null : root + x + ((opts.cents ?? 0) + d + (opts.wobble ?? 10) * Math.sin(i + k)) / 100, rms: 10 ** ((opts.db ?? -20) / 20) });
     }
   });
   return out;
@@ -22,7 +24,7 @@ describe('range check', () => {
   });
   it('flat or wobbly is shaky; a top note not reached is shaky, nothing sung is missed', () => {
     expect(judgePattern(60, sing(60, { cents: -70 })).verdict).toBe('shaky');
-    expect(judgePattern(60, sing(60, { wobble: 80 })).verdict).toBe('shaky');
+    expect(judgePattern(60, sing(60, { drift: 8 })).verdict).toBe('shaky');
     expect(judgePattern(72, sing(72, { skip: [4] })).verdict).toBe('shaky');
     expect(judgePattern(60, [{ midi: null, rms: 0.001 }]).verdict).toBe('missed');
   });
@@ -33,9 +35,27 @@ describe('range check', () => {
     expect(shouldStop([good, bad, bad])).toBe(true);
   });
   it('keeps the steady range, reports the reach', () => {
-    const rounds = [judgePattern(57, sing(57)), judgePattern(59, sing(59)), judgePattern(61, sing(61, { wobble: 80 })), judgePattern(55, sing(55))];
+    const rounds = [judgePattern(57, sing(57)), judgePattern(59, sing(59)), judgePattern(61, sing(61, { drift: 8 })), judgePattern(55, sing(55))];
     const s = summarize(rounds);
     expect(s.steady).toEqual({ lo: 55, hi: 63 });
     expect(s.reach).toEqual({ lo: 55, hi: 65 });
+  });
+});
+
+describe('range check and vibrato', () => {
+  it('a wide, even classical vibrato is steady; an irregular wobble is not', () => {
+    const vib = (root: number, cents: number, irregular = false) => {
+      const out: { midi: number | null; rms: number }[] = [];
+      PATTERN.forEach((x) => {
+        for (let i = 0; i < 22; i++) {
+          const t = i * 0.02;
+          const v = irregular ? cents * Math.sin(2 * Math.PI * 1.3 * t + x) : cents * Math.sin(2 * Math.PI * 5.5 * t);
+          out.push({ midi: root + x + v / 100, rms: 0.1 });
+        }
+      });
+      return out;
+    };
+    expect(judgePattern(60, vib(60, 65)).verdict).toBe('good');
+    expect(judgePattern(60, vib(60, 90, true)).verdict).not.toBe('good');
   });
 });

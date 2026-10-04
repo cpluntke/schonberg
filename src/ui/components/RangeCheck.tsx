@@ -28,28 +28,52 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
   const [round, setRound] = useState<RoundState>('idle');
   const [rounds, setRounds] = useState<{ phase: Phase; r: PatternResult }[]>([]);
   const [error, setError] = useState('');
+  /** A step's rounds are running (stays true between rounds, so the buttons don't jump). */
+  const [stepBusy, setStepBusy] = useState(false);
+  const [stopping, setStopping] = useState(false);
+  const runningRef = useRef(false);
+  const [silentFor, setSilentFor] = useState(0);
+  const lastVoiced = useRef(performance.now());
   const stopRef = useRef(false);
   const cancelRef = useRef(false);
-  const stable = useRef<{ midi: number; since: number; xs: number[] } | null>(null);
+  const stable = useRef<{ since: number; xs: number[]; out: number; lastVoiced: number } | null>(null);
   useEffect(() => {
     cancelRef.current = false; // (re)mounted, e.g. after React's development double-mount
     return () => { cancelRef.current = true; };
   }, []);
 
-  // Step 1: hold a comfortable note for 1.5 s.
+  // Step 1: hold a comfortable note for two seconds. Vibrato is fine: readings only have to stay
+  // within a semitone of the running median; a few stray readings or a short gap don't reset it.
   function onReading(p: RawPitch) {
     if (phase !== 'comfortable' || comfy !== null) return;
-    if (p.midi == null) { stable.current = null; setHold(0); return; }
     const now = performance.now();
-    if (!stable.current || Math.abs(stable.current.midi - p.midi) > 0.5) { stable.current = { midi: p.midi, since: now, xs: [p.midi] }; setHold(0); return; }
-    stable.current.xs.push(p.midi);
-    const f = Math.min(1, (now - stable.current.since) / 1500);
-    setHold(f);
-    if (f >= 1) {
-      const xs = [...stable.current.xs].sort((a, b) => a - b);
-      setComfy(Math.round(xs[xs.length >> 1]));
+    const st = stable.current;
+    if (p.midi == null) {
+      if (st && now - st.lastVoiced > 300) { stable.current = null; setHold(0); }
+      return;
     }
+    lastVoiced.current = now;
+    if (!st) { stable.current = { since: now, xs: [p.midi], out: 0, lastVoiced: now }; setHold(0); return; }
+    st.lastVoiced = now;
+    const sorted = [...st.xs].sort((a, b) => a - b);
+    const center = sorted[sorted.length >> 1];
+    if (Math.abs(p.midi - center) > 1) {
+      if (++st.out >= 5) { stable.current = { since: now, xs: [p.midi], out: 0, lastVoiced: now }; setHold(0); }
+      return;
+    }
+    st.out = 0;
+    st.xs.push(p.midi);
+    const f = Math.min(1, (now - st.since) / 2000);
+    setHold(f);
+    if (f >= 1) setComfy(Math.round(center));
   }
+
+  // "Can't hear you" hint on step 1.
+  useEffect(() => {
+    if (phase !== 'comfortable' || comfy !== null) return;
+    const id = setInterval(() => setSilentFor((performance.now() - lastVoiced.current) / 1000), 500);
+    return () => clearInterval(id);
+  }, [phase, comfy]);
 
   /** Play one pattern, listen to the answer, judge it. `dir` −1 = the pattern goes down from `top`. */
   async function playRound(top: number, dir: 1 | -1, ph: Phase): Promise<PatternResult | null> {
@@ -93,6 +117,20 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
   }
 
   async function runPhase(ph: Phase) {
+    if (comfy === null || runningRef.current) return;
+    runningRef.current = true;
+    setStepBusy(true);
+    setStopping(false);
+    try {
+      await runPhaseInner(ph);
+    } finally {
+      runningRef.current = false;
+      setStepBusy(false);
+      setStopping(false);
+    }
+  }
+
+  async function runPhaseInner(ph: Phase) {
     if (comfy === null) return;
     stopRef.current = false;
     // "Again" replaces this step's rounds.
@@ -119,14 +157,14 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
   const summary = summarize(rounds.map((x) => x.r));
   // A "range" of a note or two isn't worth keeping.
   const usable = !!summary.steady && summary.steady.hi - summary.steady.lo >= 3;
-  const busy = round !== 'idle';
-  const stepNo = { comfortable: 1, middle: 2, high: 3, low: 4, done: 4 }[phase];
+  const busy = stepBusy || round !== 'idle';
+  const stepNo = { comfortable: 1, middle: 2, high: 3, low: 4, done: 5 }[phase];
   const phaseRounds = rounds.filter((x) => x.phase === phase);
   const lastDone = phaseRounds.length > 0 && !busy;
 
   return (
     <div className="col" style={{ gap: 14 }} data-testid="range-check">
-      <div className="row tiny" style={{ gap: 6, flexWrap: 'wrap' }} aria-label={`Range check, part ${stepNo} of 4`}>
+      <div className="row tiny" style={{ gap: 6, flexWrap: 'wrap' }} aria-label={`Range check, part ${Math.min(4, stepNo)} of 4`}>
         {['Comfortable', 'Middle', 'Up', 'Down'].map((n, k) => (
           <span key={n} style={{ fontWeight: k + 1 === stepNo ? 800 : 500, color: k + 1 === stepNo ? 'var(--accent)' : k + 1 < stepNo ? 'var(--voice)' : 'var(--muted)' }}>
             {k + 1 < stepNo ? '✓ ' : ''}{n}{k < 3 ? ' ·' : ''}
@@ -136,10 +174,15 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
       {phase === 'comfortable' && (
         <>
           <h1 className="hero" style={{ margin: 0 }}>Sing one comfortable note</h1>
-          <span className="small">Any “ah” that feels easy, and hold it for two seconds.</span>
+          <span className="small">Any “ah” that feels easy, and hold it for two seconds. Vibrato is fine.</span>
           <Tuner notation="letter" onReading={onReading} />
           {comfy === null ? (
-            <div className="bar" aria-label="Holding"><span style={{ width: `${hold * 100}%` }} /></div>
+            <>
+              <div className="bar" aria-label="Holding the note"><span style={{ width: `${hold * 100}%` }} /></div>
+              {silentFor > 5 && hold === 0 && (
+                <span className="small muted" role="status">Can't hear you yet. Is the microphone on (tap the tuner above)? Then sing a little louder, close to the phone.</span>
+              )}
+            </>
           ) : (
             <div className="notice info" role="status">Got it: <strong>{letterName(comfy)}</strong>. Next, a short tune to sing back.</div>
           )}
@@ -162,7 +205,7 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
           </span>
           <div className="card" style={{ alignItems: 'center', textAlign: 'center', gap: 6 }} aria-live="polite">
             <span style={{ fontSize: 28, fontWeight: 800, color: round === 'sing' ? 'var(--accent)' : undefined }}>
-              {round === 'listen' ? 'Listen…' : round === 'sing' ? 'Your turn: sing it back' : round === 'judging' ? '…' : lastDone ? 'Round done' : 'Ready'}
+              {round === 'listen' ? 'Listen…' : round === 'sing' ? 'Your turn: sing it back' : busy ? (stopping ? 'Stopping…' : 'Next round…') : lastDone ? 'Done' : 'Ready'}
             </span>
             <span className="tiny muted">Headphones help: the app only listens while it's your turn.</span>
           </div>
@@ -187,8 +230,8 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
           )}
           <div className="row" style={{ marginTop: 'auto' }}>
             {(phase === 'high' || phase === 'low') && busy && (
-              <button className="btn grow" onClick={() => { stopRef.current = true; }} data-testid="range-stop">
-                {phase === 'high' ? "That's my top" : "That's my bottom"}
+              <button className="btn grow" disabled={stopping} onClick={() => { stopRef.current = true; setStopping(true); }} data-testid="range-stop">
+                {stopping ? 'Stopping after this round' : phase === 'high' ? "That's my top" : "That's my bottom"}
               </button>
             )}
             {!busy && (
@@ -214,6 +257,12 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
         <>
           <h1 className="hero" style={{ margin: 0 }}>Your range</h1>
           <VerdictStrip notes={summary.notes} />
+          <div className="row tiny muted wrap" style={{ gap: 12 }}>
+            <span className="row" style={{ gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: COLOR.good }} />in tune and steady</span>
+            <span className="row" style={{ gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: COLOR.shaky }} />less steady</span>
+            <span className="row" style={{ gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: COLOR.missed }} />not heard</span>
+            <span>a line under each C</span>
+          </div>
           <div className="col small" style={{ gap: 4 }}>
             <span><strong>In tune and steady:</strong> {usable ? `${letterName(summary.steady!.lo)} – ${letterName(summary.steady!.hi)}` : 'not enough to tell yet. Try again with headphones, singing each note back clearly.'}
               {summary.steady && summary.steady.hi - summary.steady.lo >= 7 ? ` (that sounds like ${{ S: 'a soprano', A: 'an alto', T: 'a tenor', B: 'a bass' }[suggestVoice(summary.steady.lo, summary.steady.hi)]})` : ''}</span>

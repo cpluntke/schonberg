@@ -134,7 +134,11 @@ export function Setup() {
       {step === 1 && (
         <RangeCheck
           onSkip={() => setStep(2)}
-          onDone={(r) => { if (r) setRange(r); setStep(2); }}
+          onDone={(r) => {
+            // Keep it right away, even if setup isn't finished.
+            if (r) { setRange(r); update({ rangeLow: r.lo, rangeHigh: r.hi }); }
+            setStep(2);
+          }}
         />
       )}
 

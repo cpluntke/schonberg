@@ -40,6 +40,7 @@ export function judgePattern(root: number, readings: Reading[], opts: { toleranc
   const minN = opts.minReadings ?? 4;
   const pitches = [...new Set(PATTERN)].map((x) => root + x);
   const bins = new Map<number, { c: number[]; db: number[] }>(pitches.map((p) => [p, { c: [], db: [] }]));
+  // Readings arrive in time order, so each bin holds runs of consecutive readings.
   for (const r of readings) {
     if (r.midi === null || !Number.isFinite(r.midi)) continue;
     // Octave slips of the tracker are folded; anything more than a semitone from every pattern
@@ -59,7 +60,14 @@ export function judgePattern(root: number, readings: Reading[], opts: { toleranc
     const b = bins.get(p)!;
     if (b.c.length < minN) return { midi: p, cents: null, spread: null, db: null, verdict: 'missed' as Verdict };
     const cents = median(b.c);
-    const spread = median(b.c.map((x) => Math.abs(x - cents)));
+    // Steadiness on ~one vibrato cycle averages (9 readings ≈ 180 ms), so a wide but even vibrato
+    // isn't "unsteady"; a wobbling or drifting pitch still is.
+    const groups: number[] = [];
+    for (let i = 0; i + 4 < b.c.length; i += 9) {
+      const g = b.c.slice(i, i + 9);
+      groups.push(g.reduce((x, y) => x + y, 0) / g.length);
+    }
+    const spread = groups.length >= 2 ? median(groups.map((x) => Math.abs(x - cents))) : median(b.c.map((x) => Math.abs(x - cents))) / 2;
     const verdict: Verdict = Math.abs(cents) <= tol && spread <= 30 ? 'good' : 'shaky';
     return { midi: p, cents: Math.round(cents), spread: Math.round(spread), db: Math.round(median(b.db)), verdict };
   });
