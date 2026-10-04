@@ -40,10 +40,14 @@ What you hear from the phone and what the microphone picks up arrive late by the
 
 - **Delay check** (Voice setup): sing "ta" with 6 clicks and the app measures the delay directly.
 - **Automatic line-up after every run:**
-  - The app tries delays across a range and keeps the one where your pitches agree best with the written notes. It uses pitch, not onsets, because consonants and breaths blur those.
-  - It re-scores the run with that delay and tells you on the results screen.
-  - On phones without a measured delay, it remembers the delay for the next run.
-  - A measured delay is only nudged (±80 ms), so genuinely late singing still shows up as late.
+  - The app tries a range of delays and keeps the one where your pitches agree best with the written notes. It uses pitch, not onsets, because consonants and breaths blur those.
+  - The search never goes beyond a plausible total device delay.
+  - **Only intonation** is judged on the lined-up voice. Onsets, rhythm and the timing tips stay on the delay the app applied, so singing late still shows as late.
+- **Learning the delay** (phones without a measured delay):
+  - The app suggests a delay after each complete run.
+  - It stores the delay once **two runs agree** (within 60 ms).
+  - While the guide plays your own part (levels 1–2), you might be following it by ear, so those runs can't teach a delay much above what the device itself suggests.
+- **Timing at level 2 and up:** when the delay was **measured** with the delay check, a run with the right notes still fails if your entries come more than 250 ms behind the beat (median). Without a measured delay, the app can't tell a late singer from a slow phone, so timing only gives tips.
 
 ## Recordings for tuning
 
