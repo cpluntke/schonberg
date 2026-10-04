@@ -26,7 +26,12 @@ export function decodeXmlBytes(bytes: Uint8Array): string {
 
 /** Extract the root MusicXML document from an .mxl (zip) archive. */
 export function extractMxl(data: Uint8Array): string {
-  const files = unzipSync(data);
+  let files: ReturnType<typeof unzipSync>;
+  try {
+    files = unzipSync(data);
+  } catch {
+    throw new Error('Invalid MusicXML archive: this .mxl file could not be unzipped (damaged or incomplete download?)');
+  }
   const names = Object.keys(files);
   let root: string | undefined;
   const container = names.find((n) => n.toLowerCase() === 'meta-inf/container.xml');

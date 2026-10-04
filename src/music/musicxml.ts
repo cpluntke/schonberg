@@ -7,6 +7,7 @@
 //   so clef-octave-change is NOT applied; only <transpose> (chromatic + octave-change) is.
 import type { Direction, KeySig, Measure, Part, Score, ScoreNote, VoiceType } from './types';
 import { beatToTime, buildTempoMap, DEFAULT_BPM } from './time';
+import { minMax, monophonize } from './mono';
 
 const EPS = 1e-6;
 
@@ -215,7 +216,10 @@ function parseRawPart(id: string, name: string, srcs: MeasureSrc[]): RawPart {
       switch (c.localName) {
         case 'attributes': {
           const d = kid(c, 'divisions');
-          if (d) divisions = num(d, 1) || 1;
+          if (d) {
+            const dv = num(d, 0);
+            if (dv > 0) divisions = dv; // 0 / negative / garbage divisions: keep the previous value
+          }
           const st = kid(c, 'staves');
           if (st) staves = Math.max(staves, num(st, 1));
           const tr = kid(c, 'transpose');
@@ -247,10 +251,10 @@ function parseRawPart(id: string, name: string, srcs: MeasureSrc[]): RawPart {
           break;
         }
         case 'backup':
-          advance(-num(kid(c, 'duration')) / divisions);
+          advance(-Math.max(0, num(kid(c, 'duration'))) / divisions);
           break;
         case 'forward':
-          advance(num(kid(c, 'duration')) / divisions);
+          advance(Math.max(0, num(kid(c, 'duration'))) / divisions);
           break;
         case 'direction': {
           const off = kid(c, 'offset') ? num(kid(c, 'offset')) / divisions : 0;
@@ -301,7 +305,8 @@ function parseRawPart(id: string, name: string, srcs: MeasureSrc[]): RawPart {
           const isCue = !!kid(c, 'cue');
           const isChord = !!kid(c, 'chord');
           const dur = num(kid(c, 'duration')) / divisions;
-          if (isGrace) break;
+          // grace notes, and notes without a usable <duration> (0, negative, missing), take no time
+          if (isGrace || !(dur > 0)) break;
           const onset = isChord ? lastOnset : cursor;
           if (!isChord) {
             lastOnset = cursor;
@@ -638,7 +643,7 @@ export function parseMusicXML(xml: string, opts?: { id?: string }): Score {
   if (!rawParts.length) throw new Error('MusicXML contains no parts');
 
   // ---- global measure grid
-  const nMeasures = Math.max(...rawParts.map((p) => p.measures.length));
+  const nMeasures = Math.max(0, minMax(rawParts.map((p) => p.measures.length))[1]);
   const measures: Measure[] = [];
   let ts: [number, number] = [4, 4];
   let beat = 0;
@@ -647,7 +652,7 @@ export function parseMusicXML(xml: string, opts?: { id?: string }): Score {
     const t = rms.find((m) => m.time)?.time;
     if (t) ts = t;
     const tsLen = (ts[0] * 4) / ts[1];
-    const len = Math.max(0, ...rms.map((m) => m.len));
+    const len = Math.max(0, minMax(rms.map((m) => m.len))[1]);
     const implicit = rms.some((m) => m.implicit);
     let dur: number;
     if (len <= EPS) dur = tsLen;
@@ -726,8 +731,8 @@ export function parseMusicXML(xml: string, opts?: { id?: string }): Score {
   let currentDirections: Direction[] = [];
   const finishPart = (id: string, name: string, voiceType: VoiceType, notes: ScoreNote[]): Part => {
     notes.sort((a, b) => a.start - b.start || b.midi - a.midi);
-    const midis = notes.map((n) => n.midi);
-    const p: Part = { id, name, voiceType, notes, low: midis.length ? Math.min(...midis) : 0, high: midis.length ? Math.max(...midis) : 0 };
+    const [lo, hi] = minMax(notes.map((n) => n.midi));
+    const p: Part = { id, name, voiceType, notes, low: notes.length ? lo : 0, high: notes.length ? hi : 0 };
     if (currentDirections.length) p.directions = currentDirections;
     return p;
   };
@@ -813,7 +818,9 @@ export function parseMusicXML(xml: string, opts?: { id?: string }): Score {
       const nm = names[i] ?? `${rp.name} ${ROMAN[i] ?? i + 1}`;
       const vt = guessVoiceType(nm, l.map((n) => n.midi));
       if (voiceTypeFromName(nm) === undefined) unnamed.add(id);
-      parts.push(finishPart(id, nm, vt === 'other' && hasLyrics ? voiceTypeFromRange(l.map((n) => n.midi)) : vt, l.map(mkNote)));
+      const voiceType = vt === 'other' && hasLyrics ? voiceTypeFromRange(l.map((n) => n.midi)) : vt;
+      // a singable lane must be one line: trim overlaps left by exporter quirks
+      parts.push(finishPart(id, nm, voiceType, voiceType === 'other' ? l.map(mkNote) : monophonize(l.map(mkNote))));
     });
   }
 
@@ -868,7 +875,8 @@ export function parseMusicXML(xml: string, opts?: { id?: string }): Score {
   composer = composer.replace(/\s+/g, ' ').trim();
 
   const noteCount = parts.reduce((s, p) => s + p.notes.length, 0);
-  const lastEnd = Math.max(0, ...parts.flatMap((p) => p.notes.map((n) => n.start + n.dur)));
+  let lastEnd = 0;
+  for (const p of parts) for (const n of p.notes) lastEnd = Math.max(lastEnd, n.start + n.dur);
   const duration = Math.max(lastEnd, beatToTime(tempos, totalBeats));
 
   return {

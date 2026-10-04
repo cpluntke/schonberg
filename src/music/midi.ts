@@ -6,6 +6,7 @@ import { parseMidi as parseSmf } from 'midi-file';
 import type { KeySig, Measure, Part, Score, ScoreNote } from './types';
 import { beatToTime, buildTempoMap } from './time';
 import { guessVoiceType, hashString, voiceTypeFromName } from './musicxml';
+import { minMax, monophonize } from './mono';
 
 interface RawMidiNote {
   tick: number;
@@ -24,8 +25,15 @@ function cleanLyric(t: string): { text: string; hyphen: boolean } | null {
 
 export function parseMidi(data: ArrayBuffer | Uint8Array, opts?: { id?: string; title?: string }): Score {
   const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
-  const tone = new Midi(bytes);
-  const smf = parseSmf(bytes);
+  if (bytes.length < 14 || String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) !== 'MThd') throw new Error('Invalid MIDI file (missing "MThd" header)');
+  let tone: Midi;
+  let smf: ReturnType<typeof parseSmf>;
+  try {
+    tone = new Midi(bytes);
+    smf = parseSmf(bytes);
+  } catch (e) {
+    throw new Error(`Invalid MIDI file: ${(e as Error)?.message ?? 'could not be read'}`);
+  }
   const ppq = tone.header.ppq || 480;
 
   // ---- tempo map
@@ -85,7 +93,10 @@ export function parseMidi(data: ArrayBuffer | Uint8Array, opts?: { id?: string; 
 
   // ---- measures
   const sigs = [...tone.header.timeSignatures].sort((a, b) => a.ticks - b.ticks);
-  const endBeat = Math.max(endTick / ppq, ...groups.flatMap((g) => g.notes.map((n) => (n.tick + n.durTicks) / ppq)), 0);
+  // the piece ends with its last note (a stray meta event far after it would add hundreds of empty bars)
+  let noteEndTick = 0;
+  for (const g of groups) for (const n of g.notes) noteEndTick = Math.max(noteEndTick, n.tick + n.durTicks);
+  const endBeat = (groups.length ? noteEndTick : endTick) / ppq;
   const measures: Measure[] = [];
   let beat = 0;
   let si = 0;
@@ -109,7 +120,13 @@ export function parseMidi(data: ArrayBuffer | Uint8Array, opts?: { id?: string; 
       timeSig: [ts[0], ts[1]],
     });
     beat += len;
-    if (measures.length > 10000) break;
+    if (measures.length >= 10000 && beat < endBeat - 1e-6) {
+      // pathological length: stretch the last bar to the end rather than leaving notes outside the grid
+      const last = measures[measures.length - 1];
+      last.durBeats = endBeat - last.startBeat;
+      last.dur = beatToTime(tempos, endBeat) - last.start;
+      break;
+    }
   }
   const measureOf = (b: number) => {
     let lo = 0;
@@ -165,25 +182,30 @@ export function parseMidi(data: ArrayBuffer | Uint8Array, opts?: { id?: string; 
       }
       return sn;
     });
-    const midis = notes.map((n) => n.midi);
+    let midis = notes.map((n) => n.midi);
     const name = g.name || `Track ${gi + 1}`;
     let vt = guessVoiceType(name, midis);
     // GM programs 0..7 pianos, 16..23 organs → accompaniment unless named as a voice
     const nameType = voiceTypeFromName(name);
     if (!nameType && ((g.program >= 0 && g.program <= 23 && g.program !== 0) || polyphonic(notes))) vt = 'other';
+    // a sung line must be monophonic: trim legato overlaps / drop stray chord notes
+    const finalNotes = vt === 'other' ? notes : monophonize(notes);
+    midis = finalNotes.map((n) => n.midi);
+    const [lo, hi] = minMax(midis);
     return {
       id: `t${g.track}c${g.channel}`,
       name,
       voiceType: vt,
-      notes,
-      low: midis.length ? Math.min(...midis) : 0,
-      high: midis.length ? Math.max(...midis) : 0,
+      notes: finalNotes,
+      low: midis.length ? lo : 0,
+      high: midis.length ? hi : 0,
     };
   });
 
   const title = opts?.title || tone.header.name || 'Untitled';
   const noteCount = parts.reduce((s, p) => s + p.notes.length, 0);
-  const duration = Math.max(beatToTime(tempos, endBeat), ...parts.flatMap((p) => p.notes.map((n) => n.start + n.dur)), 0);
+  let duration = Math.max(0, beatToTime(tempos, endBeat));
+  for (const p of parts) for (const n of p.notes) duration = Math.max(duration, n.start + n.dur);
   return {
     id: opts?.id ?? 'midi-' + hashString(`${title}|${noteCount}|${endTick}`),
     title,
