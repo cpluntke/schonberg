@@ -6,7 +6,8 @@
 // on exactly the samples the app judged and asks, note by note, which rule dropped it.
 import type { Part, Score } from '../../src/music/types';
 import type { Grade } from '../../src/game/types';
-import { LiveScorer, judgedSpan, median, type ScoringContext } from '../../src/game/scoring';
+import * as curScoring from '../../src/game/scoring';
+import { median, type ScoringContext } from '../../src/game/scoring';
 import { makePart, makeScore } from '../../src/game/testutil';
 import { CLARITY_GATE, RMS_GATE } from '../../src/audio/pitch';
 import { levelSetup, oracleSamples } from './harness';
@@ -68,6 +69,22 @@ export interface RenderedRun {
 
 export const CAL_MS = 150;
 
+export function renderTake(passage: FastPassage, singer: SingerProfile, level: number, seed: number, channel?: ChannelProfile): RenderedTake {
+  const L = levelSetup(level);
+  return renderSinger({
+    score: passage.score, part: passage.part, range: passage.range, from: passage.from, to: passage.to, rate: L.rate,
+    trueLatencyMs: CAL_MS, assumedLatencyMs: CAL_MS, guide: L.guide, profile: singer, channel: channel ?? CHANNELS.phoneHeadphones,
+    performanceSeed: hashSeed('fast-perf', seed, passage.id, level), microSeed: hashSeed('fast-micro', seed, passage.id, level),
+  });
+}
+
+/** Score a rendered take with a pipeline (calibrated delay = true delay). */
+export function scoreTake(passage: FastPassage, take: RenderedTake, level: number, seed: number, spec: PipelineSpec = AFTER): RenderedRun {
+  const ctx: ScoringContext = { score: passage.score, part: passage.part, range: passage.range };
+  const outcome = runSession(spec, { take, part: passage.part, ctx, from: passage.from, to: passage.to, level, microSeed: seed }, measured(CAL_MS));
+  return { passage, level, take, outcome };
+}
+
 export function renderRun(passage: FastPassage, singer: SingerProfile, level: number, seed: number, o: { channel?: ChannelProfile; spec?: PipelineSpec } = {}): RenderedRun {
   const L = levelSetup(level);
   const take = renderSinger({
@@ -86,6 +103,7 @@ export type Reason =
   | 'no readings: consonant / silence'
   | 'no readings: voice before/after the body (timing)'
   | 'arrival never reached'
+  | 'only transition readings in the note'
   | 'all excluded as release'
   | 'judged readings cover too little'
   | 'tracker smear / smoother lag'
@@ -113,7 +131,10 @@ const tolOf = (level: number) => levelSetup(level).toleranceCents;
  * Per-note diagnosis of a run. Replays the app's final scorer (afterScorerView + the alignment shift)
  * and inspects the per-note accumulators, so it explains exactly the grades the app shows.
  */
-export function diagnose(run: RenderedRun): { notes: NoteDiag[]; mismatches: number } {
+/** The scorer module a diagnosis replays (src/game/scoring.ts, or a git variant of it). */
+export type ScoringModule = Pick<typeof curScoring, 'LiveScorer' | 'judgedSpan'> & { shortNoteDev?: typeof curScoring.shortNoteDev };
+
+export function diagnose(run: RenderedRun, mod: ScoringModule = curScoring): { notes: NoteDiag[]; mismatches: number } {
   const { passage, level, take, outcome } = run;
   const rate = take.rate;
   const tol = tolOf(level);
@@ -121,10 +142,10 @@ export function diagnose(run: RenderedRun): { notes: NoteDiag[]; mismatches: num
   const ctx: ScoringContext = { score: passage.score, part: passage.part, range: passage.range };
   const lag = (outcome.alignedMs / 1000) * rate;
   const view = afterScorerView(passage.part, outcome.samples).map((s) => ({ ...s, time: s.time - lag }));
-  const ls = new LiveScorer(ctx, opts);
+  const ls = new mod.LiveScorer(ctx, opts);
   for (const s of [...view].sort((a, b) => a.time - b.time)) ls.push(s);
   const res = ls.finish();
-  const oracle = new LiveScorer(ctx, opts);
+  const oracle = new mod.LiveScorer(ctx, opts);
   for (const s of oracleSamples(take, { latencyMs: take.trueLatencyMs, from: passage.from })) oracle.push(s);
   const ores = oracle.finish();
   // Raw readings mapped to (shifted) score time, with their truth.
@@ -136,7 +157,7 @@ export function diagnose(run: RenderedRun): { notes: NoteDiag[]; mismatches: num
   }));
   const truthAtScore = (t: number) => truthAt(take.truthMidi, (t + lag - take.scoreTimeAtSample0) / rate + lat);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const accs = (ls as any).accs as { w: any; bT: number[]; bD: number[]; bW: number[]; final: { grade: Grade; hitRatio: number } }[];
+  const accs = (ls as any).accs as { w: any; bT: number[]; bD: number[]; bW: number[]; nT?: number[]; nD?: number[]; final: { grade: Grade; hitRatio: number } }[];
   let mismatches = 0;
   const notes: NoteDiag[] = accs.map((a, k) => {
     const w = a.w;
@@ -144,22 +165,36 @@ export function diagnose(run: RenderedRun): { notes: NoteDiag[]; mismatches: num
     if (final.grade !== outcome.result.notes[k].grade) mismatches++;
     const tolN = tol + w.tolExtra;
     const n = a.bT.length;
-    const span = judgedSpan(a, tolN, false);
-    const jD = a.bD.slice(span.k0, span.k1);
-    const jT = a.bT.slice(span.k0, span.k1);
+    const span = mod.judgedSpan(a, tolN, false);
+    let jD = a.bD.slice(span.k0, span.k1);
+    let jT = a.bT.slice(span.k0, span.k1);
+    // Very short notes in the new scorer: judged on the note's own readings.
+    const shortPath = !!(w.short && mod.shortNoteDev && a.nT);
+    let shortNone = false;
+    let inNoteCount = 0;
+    if (shortPath) {
+      const nT = a.nT!;
+      const nD = a.nD!;
+      const inNote = nT.map((t, k) => k).filter((k) => nT[k] >= w.start && nT[k] < w.start + w.note.dur);
+      inNoteCount = inNote.length;
+      if (mod.shortNoteDev!(a as never, tolN, false) === null) shortNone = inNote.length > 0;
+      jT = nT;
+      jD = nD;
+    }
     let reason: Reason = 'hit';
     if (final.grade === 'ok' || final.grade === 'miss') {
-      if (n === 0) {
+      if (shortNone) reason = 'only transition readings in the note';
+      else if (shortPath ? inNoteCount === 0 : n === 0) {
         const inBody = raw.filter((r) => r.time >= w.bodyStart && r.time < w.bodyEnd);
         const unclear = inBody.filter((r) => r.raw == null && r.rms >= RMS_GATE && r.clarity < CLARITY_GATE && Number.isFinite(r.truth)).length;
         const truthVoiced = inBody.filter((r) => Number.isFinite(r.truth)).length;
         reason = unclear > 0 && unclear >= inBody.length / 2 ? 'no readings: tracker gated (unclear)'
           : truthVoiced < inBody.length / 2 ? 'no readings: consonant / silence'
             : 'no readings: voice before/after the body (timing)';
-      } else if (span.k0 >= n) reason = 'arrival never reached';
-      else if (span.k1 <= span.k0) reason = 'all excluded as release';
+      } else if (!shortPath && span.k0 >= n) reason = 'arrival never reached';
+      else if (!shortPath && span.k1 <= span.k0) reason = 'all excluded as release';
       else {
-        const md = median(jD)!;
+        const md = shortPath ? mod.shortNoteDev!(a as never, tolN, false)! : median(jD)!;
         if (Math.abs(md) <= tolN) reason = 'judged readings cover too little';
         else {
           const tr = jT.map((t) => 100 * (truthAtScore(t) - w.target)).filter(Number.isFinite);
@@ -173,7 +208,7 @@ export function diagnose(run: RenderedRun): { notes: NoteDiag[]; mismatches: num
     }
     return {
       index: w.index, realDur: w.note.dur / rate, grade: final.grade, liveGrade: outcome.plain.notes[k].grade, oracleGrade: ores.notes[k].grade,
-      hitRatio: final.hitRatio, reason, bodyReadings: n, judgedReadings: Math.max(0, span.k1 - span.k0),
+      hitRatio: final.hitRatio, reason, bodyReadings: n, judgedReadings: shortPath ? jT.length : Math.max(0, span.k1 - span.k0),
     };
   });
   return { notes, mismatches };

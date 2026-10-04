@@ -2,62 +2,68 @@
  {
   "sp": "N",
   "scene": "A",
-  "say": "Welcome to Schönberg Hero. In about a minute and a half, you'll know how to learn your part for the next concert.",
-  "show": "Welcome to Schönberg Hero. In about a minute and a half, you'll know how to learn your part for the next concert."
- },
- {
-  "sp": "B",
-  "scene": "B",
-  "say": "Hang on. Is this karaoke for choir nerds?",
-  "show": "Hang on. Is this karaoke for choir nerds?"
+  "say": "Welcome to Schönberg Hero. In under two minutes, you'll know how to learn your part for the next concert.",
+  "show": "Welcome to Schönberg Hero. In under two minutes, you'll know how to learn your part for the next concert."
  },
  {
   "sp": "N",
   "scene": "B",
-  "say": "Pretty much. Your notes scroll toward the white line, and the blue line is your voice. Keep the blue line on the orange bars.",
-  "show": "Pretty much. Your notes scroll toward the white line, and the blue line is your voice. Keep the blue line on the orange bars."
+  "say": "Start with the voice setup. First, type the code your choir gave you. It brings in your programme and your scores. No code? Just practise on your own.",
+  "show": "Start with the voice setup. First, type the code your choir gave you. It brings in your programme and your scores. No code? Just practise on your own."
  },
  {
   "sp": "B",
   "scene": "B",
-  "say": "And the dashed boxes?",
-  "show": "And the dashed boxes?"
+  "say": "Then what?",
+  "show": "Then what?"
  },
  {
   "sp": "N",
   "scene": "B",
-  "say": "Those are the other voices, so you can see where you sit in the chord. The little bubble tells you how many cents sharp or flat you are.",
-  "show": "Those are the other voices, so you can see where you sit in the chord. The little bubble tells you how many cents sharp or flat you are."
- },
- {
-  "sp": "N",
-  "scene": "C",
-  "say": "Before your first run, do the two minute voice setup. Put on wired headphones, so the microphone only hears you.",
-  "show": "Before your first run, do the 2-minute voice setup. Put on wired headphones, so the microphone only hears you."
+  "say": "Sing back a little do re mi pattern, one step higher each round, then lower. That's how the app finds where your voice is comfortable. Don't push the top notes.",
+  "show": "Sing back a little do-re-mi pattern, one step higher each round, then lower. That's how the app finds where your voice is comfortable. Don't push the top notes."
  },
  {
   "sp": "B",
-  "scene": "C",
+  "scene": "B",
   "say": "What about my Bluetooth earbuds?",
   "show": "What about my Bluetooth earbuds?"
  },
  {
   "sp": "N",
+  "scene": "B",
+  "say": "Wired headphones are best. The setup measures any delay: you just sing ta on each click.",
+  "show": "Wired headphones are best. The setup measures any delay: you just sing “ta” on each click."
+ },
+ {
+  "sp": "N",
   "scene": "C",
-  "say": "They add a delay. The setup measures it: you just sing ta on each of the clicks.",
-  "show": "They add a delay. The setup measures it: you just sing “ta” on each of the clicks."
+  "say": "Now the practice screen. Your notes scroll toward the white line, and the blue line is your voice. Keep the blue line on the orange bars.",
+  "show": "Now the practice screen. Your notes scroll toward the white line, and the blue line is your voice. Keep the blue line on the orange bars."
+ },
+ {
+  "sp": "B",
+  "scene": "C",
+  "say": "And the dashed boxes?",
+  "show": "And the dashed boxes?"
+ },
+ {
+  "sp": "N",
+  "scene": "C",
+  "say": "Those are the other voices, so you can see where you sit in the chord. The little bubble tells you how many cents sharp or flat you are.",
+  "show": "Those are the other voices, so you can see where you sit in the chord. The little bubble tells you how many cents sharp or flat you are."
  },
  {
   "sp": "N",
   "scene": "D",
-  "say": "Every piece is cut into short sections, and each section climbs four levels.",
-  "show": "Every piece is cut into short sections, and each section climbs four levels."
+  "say": "Every piece is cut into short sections, and each section climbs five levels.",
+  "show": "Every piece is cut into short sections, and each section climbs five levels."
  },
  {
   "sp": "N",
   "scene": "D",
-  "say": "Level one is slow, with your part playing. Level two is full tempo. Level three, you sing alone against the other voices. Level four is concert ready: no note names, only the chord to start.",
-  "show": "Level 1: slow, with your part playing. Level 2: full tempo. Level 3: alone against the other voices. Level 4: concert-ready, no note names, only the chord to start."
+  "say": "Level one is slow, with your part playing. Level two, full tempo. Level three, you sing alone against the other voices. Level four, no note names, only the chord to start. Level five is off book: from memory, on two different days.",
+  "show": "Level 1: slow, with your part playing. Level 2: full tempo. Level 3: alone against the other voices. Level 4: no note names, only the chord to start. Level 5: off book, from memory, on two different days."
  },
  {
   "sp": "B",
@@ -90,22 +96,22 @@
   "show": "Home shows today's plan, paced to your rehearsal and concert dates. Ten minutes a day is plenty."
  },
  {
-  "sp": "B",
-  "scene": "F",
-  "say": "And the three D mode?",
-  "show": "And the 3D mode?"
+  "sp": "N",
+  "scene": "G",
+  "say": "So, here's what to do right now. One: put on headphones and tap Start voice setup. Two: open the first piece on Home, and sing level one of its first section.",
+  "show": "So, here's what to do right now. 1: put on headphones and tap “Start voice setup”. 2: open the first piece on Home and sing level 1 of its first section."
  },
  {
-  "sp": "N",
-  "scene": "F",
-  "say": "Arcade mode unlocks once a section reaches level two. It's your reward, not your homework.",
-  "show": "Arcade mode unlocks once a section reaches level 2. It's your reward, not your homework."
+  "sp": "B",
+  "scene": "G",
+  "say": "That's it?",
+  "show": "That's it?"
  },
  {
   "sp": "N",
   "scene": "G",
-  "say": "Ready? Put on your headphones and start the voice setup.",
-  "show": "Ready? Put on your headphones and start the voice setup."
+  "say": "That's it for today. About five minutes. Tomorrow, Home shows your next step.",
+  "show": "That's it for today. About five minutes. Tomorrow, Home shows your next step."
  },
  {
   "sp": "B",
