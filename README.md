@@ -9,6 +9,13 @@ so it takes intonation seriously: cents-level feedback, a chord-aware just-inton
 target, movable/fixed solfège and Chinese numbered notation (jianpu), and an atonal
 **Zwölfton** expert mode.
 
+<p>
+  <img src="docs/screenshots/home.png" width="200" alt="Home: cycle readiness and today's plan">
+  <img src="docs/screenshots/practice-2d.png" width="200" alt="Practice mode: note highway with live pitch trace">
+  <img src="docs/screenshots/arcade-3d.png" width="200" alt="Arcade mode: 3D lanes">
+  <img src="docs/screenshots/results.png" width="200" alt="Results with coach notes">
+</p>
+
 ## Features
 
 - **Repertoire:** import your choir's **MusicXML** (`.musicxml`, `.xml`, `.mxl`) or **MIDI**.
