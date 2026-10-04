@@ -430,12 +430,12 @@ export interface LayoutOpts {
 
 /** Natural horizontal space after an event (in staff spaces), before lyric/accidental constraints. */
 export function naturalSpace(durBeats: number): number {
-  return 1.9 + 1.55 * Math.log2(1 + 2 * durBeats);
+  return 1.45 + 1.3 * Math.log2(1 + 2 * durBeats);
 }
 
-const CLEF_W = 3.3;
+const CLEF_W = 3.5;
 const TIME_W = 2.5;
-const keyW = (fifths: number) => (fifths ? Math.abs(fifths) * 0.95 + 0.7 : 0.3);
+const keyW = (fifths: number) => (fifths ? Math.abs(fifths) * 0.85 + 0.7 : 0.3);
 const ACC_W = 1.25;
 
 function measureWidths(sm: StaffMeasure, sp: number, textW: (s: string) => number, inside: boolean) {
@@ -457,7 +457,7 @@ function measureWidths(sm: StaffMeasure, sp: number, textW: (s: string) => numbe
       if (nx.accidental != null) g = Math.max(g, (1.5 + ACC_W + 0.4) * sp);
       if (lw[j] || lw[j + 1]) {
         const hyph = e.syllabic === 'begin' || e.syllabic === 'middle';
-        g = Math.max(g, lw[j] / 2 + lw[j + 1] / 2 + (hyph ? 1.5 : 0.7) * sp);
+        g = Math.max(g, lw[j] / 2 + lw[j + 1] / 2 + (hyph ? 1.4 : 0.6) * sp);
       }
     } else {
       g = Math.max(g, lw[j] / 2 + 0.5 * sp + (e.syllabic === 'begin' || e.syllabic === 'middle' ? 0.6 * sp : 0));
@@ -573,16 +573,22 @@ export function measureSpan(score: Pick<Score, 'measures'>, from: number, to: nu
  * Staff step of a sung pitch at a moment: the key signature's letters, with the alteration of the
  * note being sung (if any). Far-off octaves are folded towards the target (a tenor singing the
  * soprano line an octave down still draws on the staff).
+ *
+ * Near the target, small deviations are magnified (about ×2 at the note, fading out by ~1.5
+ * semitones; still monotonic, exact on the note and further away): on a phone a staff step is only ~4 px, so
+ * 30 cents would otherwise move the line by a single pixel.
  */
 export function sungStep(midi: number, key: Pick<KeySig, 'fifths'>, target?: { midi: number; step: number; alt: number } | null): number {
   const alts = keyAlts(key.fifths);
   let m = midi;
-  if (target) {
-    alts[mod(target.step, 7)] = target.alt;
-    if (Math.abs(m - target.midi) > 7) m -= 12 * Math.round((m - target.midi) / 12);
-  }
-  return midiToStep(m, alts);
+  if (!target) return midiToStep(m, alts);
+  alts[mod(target.step, 7)] = target.alt;
+  if (Math.abs(m - target.midi) > 7) m -= 12 * Math.round((m - target.midi) / 12);
+  const cents = (m - target.midi) * 100;
+  return midiToStep(m, alts) + MAGNIFY * (cents / 200) * Math.exp(-((cents / 70) ** 2));
 }
+/** Extra gain near the target (must stay < 1.49 to keep the mapping monotonic over augmented seconds). */
+const MAGNIFY = 1.4;
 
 // ---------------------------------------------------------------------------------------------
 // Glyphs (drawn in staff-space units; y grows downwards)
@@ -633,23 +639,25 @@ function drawTreble(c: Ctx, x: number, gLineY: number, sp: number, color: string
 
 function drawBass(c: Ctx, x: number, fLineY: number, sp: number, color: string) {
   c.save();
-  c.translate(x + 0.75 * sp, fLineY);
+  c.translate(x + 0.45 * sp, fLineY);
   c.scale(sp, sp);
   c.fillStyle = color;
   c.strokeStyle = color;
   c.beginPath();
-  c.arc(0, 0.05, 0.36, 0, Math.PI * 2);
+  c.arc(0.05, 0.05, 0.38, 0, Math.PI * 2);
   c.fill();
-  c.lineWidth = 0.26;
+  c.lineWidth = 0.24;
   c.lineCap = 'round';
   c.beginPath();
-  c.moveTo(-0.2, -0.1);
-  c.bezierCurveTo(-0.1, -0.95, 1.2, -1.15, 1.45, -0.25);
-  c.bezierCurveTo(1.7, 0.75, 0.75, 1.95, -0.45, 2.75);
+  c.moveTo(-0.25, 0.0);
+  c.bezierCurveTo(-0.2, -0.9, 1.1, -1.2, 1.5, -0.35);
+  c.bezierCurveTo(1.85, 0.6, 1.0, 1.9, -0.35, 2.8);
   c.stroke();
   c.beginPath();
-  c.arc(2.05, -0.5, 0.17, 0, Math.PI * 2);
-  c.arc(2.05, 0.5, 0.17, 0, Math.PI * 2);
+  c.arc(2.2, -0.5, 0.18, 0, Math.PI * 2);
+  c.fill();
+  c.beginPath();
+  c.arc(2.2, 0.5, 0.18, 0, Math.PI * 2);
   c.fill();
   c.restore();
 }
@@ -661,7 +669,7 @@ function drawAccidental(c: Ctx, x: number, y: number, sp: number, alt: number, c
   c.fillStyle = color;
   c.lineCap = 'butt';
   const thin = Math.max(1, 0.11 * sp);
-  const thick = Math.max(1.6, 0.36 * sp);
+  const thick = Math.max(1.5, 0.28 * sp);
   if (alt === 1) {
     c.lineWidth = thin;
     for (const dx of [-0.22, 0.22]) {
@@ -817,13 +825,13 @@ function drawKeySig(c: Ctx, x: number, midY: number, sp: number, fifths: number,
     for (let i = from; i < Math.abs(cancel); i++) {
       const off = (cancel > 0 ? KEY_SHARPS : KEY_FLATS)[i] + shift;
       drawAccidental(c, cx + 0.45 * sp, midY - (off * sp) / 2, sp, 0, color);
-      cx += 0.95 * sp;
+      cx += 0.85 * sp;
     }
   }
   for (let i = 0; i < Math.abs(fifths); i++) {
     const off = (fifths > 0 ? KEY_SHARPS : KEY_FLATS)[i] + shift;
     drawAccidental(c, cx + 0.5 * sp, midY - (off * sp) / 2, sp, fifths > 0 ? 1 : -1, color);
-    cx += 0.95 * sp;
+    cx += 0.85 * sp;
   }
 }
 
@@ -899,7 +907,7 @@ function getLayout(c: Ctx, W: number, H: number, s: DrawState): Cached {
   const lyricOff = Math.max(3.2, ((mid - 4) - lo) / 2 + 2.6); // bottom line → lyric baseline
   const below = lyricOff + 1.3;
   const perSys = above + 4 + below;
-  const sp = Math.max(6, Math.min(11, (H - 8) / (2 * perSys), W / 30));
+  const sp = Math.max(6.5, Math.min(11, (H - 8) / (2 * perSys), W / 44));
   c.font = lyricFontFor(sp);
   const textW = (t: string) => c.measureText(t).width;
   const layout = layoutStaff(s.score, s.part, m0, m1, { width: W, sp, textW, maxBars: W < 520 ? 3 : 4 });
@@ -952,7 +960,8 @@ export function drawStaff2D(c: Ctx, W: number, H: number, s: DrawState) {
   const vis = (i: number): 'show' | 'letters' | 'none' => ((isPast(i) && inRange(i)) || !s.hide ? 'show' : s.hide(i));
 
   const geos: SysGeo[] = [];
-  for (let j = k - 1; j <= k + slots; j++) {
+  // The previous system only while it slides out of view.
+  for (let j = k - (shift > 0.5 ? 1 : 0); j <= k + slots; j++) {
     if (j < 0 || j >= systems.length) continue;
     const top = pad + (j - k) * band + shift + L.above * sp;
     if (top - L.above * sp > H || top + (4 + L.below) * sp < 0) continue;
@@ -1026,7 +1035,7 @@ function drawSystem(c: Ctx, g: SysGeo, layout: StaffLayout, L: Cached, s: DrawSt
     } else c.fillRect(bx, top, lw + 0.5, 4 * sp + lw);
     c.fillStyle = INK.barNo;
     const nx = mi === 0 ? sys.clefX : m.x0 - 0.2 * sp;
-    c.fillText(m.sm.number, nx, top - 1.3 * sp);
+    if (m.sm.number !== '0') c.fillText(m.sm.number, nx, top - 1.3 * sp);
     if (m.changeX != null) {
       let cx = m.changeX;
       if (m.sm.keyChange) {
@@ -1124,6 +1133,7 @@ function drawSystem(c: Ctx, g: SysGeo, layout: StaffLayout, L: Cached, s: DrawSt
       const pastRest = beatToTime(s.score.tempos, e.start + e.dur) <= s.pos;
       if (hiddenBar.has(m.sm.index) && !pastRest) continue;
       c.fillStyle = INK.rest;
+      c.strokeStyle = INK.rest;
       drawRest(c, x, mid, sp, e.base, e.dots);
       continue;
     }
@@ -1153,14 +1163,6 @@ function drawSystem(c: Ctx, g: SysGeo, layout: StaffLayout, L: Cached, s: DrawSt
       drawNotehead(c, x, y, sp, e.base);
       drawNotehead(c, x, y, sp, e.base);
       c.restore();
-      const fill = s.live?.noteFill(i) ?? 0;
-      if (fill > 0) {
-        c.strokeStyle = COLORS.voice;
-        c.lineWidth = Math.max(2, 0.22 * sp);
-        c.beginPath();
-        c.arc(x, y, 1.05 * sp, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, fill));
-        c.stroke();
-      }
     } else drawNotehead(c, x, y, sp, e.base);
     // Accidental.
     if (e.accidental != null) drawAccidental(c, x - headRx - 0.75 * sp, y, sp, e.accidental, col);
@@ -1442,14 +1444,16 @@ function drawBubble(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: number, beat
   const shown = cnt ? sum / cnt : last.midi;
   let cents = (shown - target) * 100;
   if (Math.abs(cents) > 600) cents = ((cents % 1200) + 1800) % 1200 - 600;
-  const txt = `${cents >= 0 ? '+' : '−'}${Math.round(Math.abs(cents))}¢`;
+  const rc = Math.round(Math.abs(cents));
+  const txt = `${rc === 0 ? '±' : cents > 0 ? '+' : '−'}${rc}¢`;
   c.font = '600 12px "JetBrains Mono", monospace';
   c.textBaseline = 'middle';
   const tw = c.measureText(txt).width;
   const bw = tw + 14;
-  let bx = px + Math.max(10, 1.2 * sp);
-  if (bx + bw > g.sys.x1 + 6) bx = px - Math.max(10, 1.2 * sp) - bw;
-  const by = Math.max(yMin + 11, Math.min(yMax - 11, py - 1.4 * sp - 8));
+  // Above the staff, next to the top of the playhead: it never hides the notes you're about to sing.
+  let bx = px + 0.9 * sp;
+  if (bx + bw > g.sys.x1 + 6) bx = px - 0.9 * sp - bw;
+  const by = g.top - Math.max(11, (L.above - 0.9) * sp * 0.5 + 6);
   const ok = Math.abs(cents) <= s.tolerance;
   c.fillStyle = '#0B0D1A';
   roundRect(c, bx, by - 11, bw, 22, 7);

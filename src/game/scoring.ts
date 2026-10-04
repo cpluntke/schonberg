@@ -570,17 +570,14 @@ export function shortNoteDev(a: { w: NoteWindow; nT: number[]; nD: number[] }, t
   const w = a.w;
   const end = w.start + w.note.dur;
   const fold = (d: number) => (octaveTolerant ? d - 1200 * Math.round(d / 1200) : d);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const X = ((globalThis as any).__FAST ?? {}) as { side?: boolean; capS?: number; capE?: number };
   // Out of tolerance, and nearer the neighbour's pitch than this note's.
   const nearer = (d: number, other: number | null) => {
     if (other === null || other === w.note.midi) return false;
     const x = fold(d);
-    if (X.side) return Math.abs(x) > tol && Math.sign(x) === Math.sign(other - w.target);
     return Math.abs(x) > tol && Math.abs(fold(d - 100 * (other - w.target))) < Math.abs(x);
   };
-  const capStart = w.start + Math.min(TRANSITION_MAX, (X.capS ?? 0.35) * w.note.dur);
-  const capEnd = end - Math.min(RELEASE_MAX, (X.capE ?? 0.2) * w.note.dur);
+  const capStart = w.start + Math.min(TRANSITION_MAX, 0.35 * w.note.dur);
+  const capEnd = end - Math.min(RELEASE_MAX, 0.2 * w.note.dur);
   let k0 = 0;
   let k1 = a.nT.length;
   while (k0 < k1 && a.nT[k0] <= capStart && nearer(a.nD[k0], w.legatoFrom)) k0++;
