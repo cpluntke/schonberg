@@ -15,7 +15,8 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "types": [
-      "vite/client"
+      "vite/client",
+      "vite-plugin-pwa/react"
     ],
     "noEmit": true
   },

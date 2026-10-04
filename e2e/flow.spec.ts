@@ -36,9 +36,17 @@ test('a flat simulated singer does not pass level 4', async ({ page }) => {
 test('all main screens render without errors', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
-  for (const h of ['#/', '#/library', '#/ranks', '#/settings', '#/expert', '#/setup', '#/tuner']) {
+  for (const h of ['#/', '#/library', '#/ranks', '#/settings', '#/expert', '#/setup', '#/tuner', '#/diagnostics']) {
     await page.goto('/' + h);
     await page.waitForTimeout(800);
   }
   expect(errors).toEqual([]);
+});
+
+test('diagnostics mic test reads the fake microphone', async ({ page }) => {
+  await page.goto('/#/diagnostics');
+  await page.getByTestId('diag-mic').click();
+  await expect(page.getByText(/readings\/s/)).toBeVisible({ timeout: 15_000 });
+  const report = await page.getByLabel('Diagnostics report').inputValue();
+  expect(JSON.parse(report).mic.readingsPerSec).toBeGreaterThan(20);
 });

@@ -228,7 +228,11 @@ function parseRawPart(id: string, name: string, srcs: MeasureSrc[]): RawPart {
             const f = kid(k, 'fifths');
             if (!f) continue;
             const mode = txt(kid(k, 'mode')).toLowerCase() === 'minor' ? 'minor' : 'major';
-            rm.keys.push({ beat: cursor, fifths: num(f), mode });
+            // theoretical keys (e.g. -11 = 11 flats) → enharmonic equivalent within -7..7
+            let fifths = Math.round(num(f));
+            while (fifths > 7) fifths -= 12;
+            while (fifths < -7) fifths += 12;
+            rm.keys.push({ beat: cursor, fifths, mode });
           }
           const t = kid(c, 'time');
           if (t) {

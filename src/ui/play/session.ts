@@ -246,6 +246,18 @@ export class PracticeSession {
     const token = ++this.resumeToken;
     await unlockAudio(); // iOS suspends the context when the app is backgrounded
     if (token !== this.resumeToken || this.phase !== 'paused' || this.disposed) return;
+    // The mic may have been released or lost while paused (backgrounded, headset change): reopen it.
+    if (this.tracker && !this.tracker.alive && !this.cfg.simulate) {
+      this.unsubPitch?.();
+      try {
+        this.tracker = await getTracker();
+      } catch {
+        this.micError = 'The microphone could not be reopened.';
+        return;
+      }
+      if (token !== this.resumeToken || this.phase !== 'paused' || this.disposed) return;
+      this.unsubPitch = this.tracker.onPitch((p) => this.onPitch(p));
+    }
     this.minTime = this.resumeFrom - 0.02;
     this.play(this.resumeFrom, true);
     this.requestWakeLock();

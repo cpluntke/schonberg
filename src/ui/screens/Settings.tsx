@@ -121,6 +121,7 @@ export function Settings() {
           <button className="btn small grow" onClick={() => go({ name: 'setup' })}>Run voice setup again</button>
           <button className="btn small grow" onClick={() => go({ name: 'tuner' })}>Tuner</button>
         </div>
+        <button className="btn small" onClick={() => go({ name: 'diagnostics' })}>Diagnostics &amp; problem report</button>
       </section>
 
       <section className="col" style={{ gap: 8 }}>

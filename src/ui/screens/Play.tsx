@@ -185,6 +185,14 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
       notCounted: realSection && !ladder ? (partial ? 'stopped early' : 'slower than the level’s tempo') : undefined,
       passed: rec.passed, prevLevel: rec.prevLevel, newLevel: rec.newLevel,
     });
+    // After the first real practice run, ask the browser to keep our data (Safari may otherwise
+    // evict site storage after weeks of non-use).
+    try {
+      if (!localStorage.getItem('sh:persistAsked')) {
+        localStorage.setItem('sh:persistAsked', '1');
+        navigator.storage?.persist?.().catch(() => {});
+      }
+    } catch { /* ignore */ }
     go({ name: 'results' }, true);
   }
 

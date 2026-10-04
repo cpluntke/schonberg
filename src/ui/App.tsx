@@ -15,6 +15,9 @@ import { Ranks } from './screens/Ranks';
 import { Expert } from './screens/Expert';
 import { TunerScreen } from './screens/TunerScreen';
 import './generated';
+import { Diagnostics } from './screens/Diagnostics';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { UpdatePrompt } from './components/UpdatePrompt';
 
 const TABS: { name: Route['name']; label: string; icon: React.ReactNode }[] = [
   { name: 'home', label: 'Home', icon: <IconHome /> },
@@ -27,12 +30,24 @@ export function App() {
   const route = useRoute();
   const lib = useLibrary();
   const toast = useToast();
-  // Release the microphone shortly after leaving the screens that use it (privacy + battery).
+  // Release the microphone after a while away from the screens that use it (privacy + battery).
+  // Not too eagerly: iOS may ask for permission again every time the mic is reopened, and singers
+  // hop between Results, the piece and the next run.
   useEffect(() => {
-    if (route.name === 'play' || route.name === 'setup' || route.name === 'tuner') return;
-    const t = window.setTimeout(() => releaseTracker(), 15000);
+    const micScreens = ['play', 'setup', 'tuner', 'diagnostics', 'results', 'piece'];
+    if (micScreens.includes(route.name)) return;
+    const t = window.setTimeout(() => releaseTracker(), 3 * 60_000);
     return () => clearTimeout(t);
   }, [route.name]);
+  useEffect(() => {
+    let hiddenAt = 0;
+    const onVis = () => {
+      if (document.hidden) hiddenAt = Date.now();
+      else if (hiddenAt && Date.now() - hiddenAt > 60_000) releaseTracker();
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, []);
   // Accessibility: on every screen change, move focus to the screen's heading and update the title.
   useEffect(() => {
     const t = window.setTimeout(() => {
@@ -62,12 +77,14 @@ export function App() {
       case 'ranks': body = <Ranks />; break;
       case 'expert': body = <Expert />; break;
       case 'tuner': body = <TunerScreen />; break;
+      case 'diagnostics': body = <Diagnostics />; break;
     }
   }
 
   return (
     <div className="app">
-      {body}
+      <ErrorBoundary resetKey={JSON.stringify(route)}>{body}</ErrorBoundary>
+      <UpdatePrompt hidden={route.name === 'play'} />
       {showNav && (
         <nav className="nav" aria-label="Main">
           <div className="nav-inner">
