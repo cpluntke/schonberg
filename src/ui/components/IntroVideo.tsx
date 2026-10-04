@@ -17,8 +17,8 @@ function markSeen() {
   try { localStorage.setItem('sh:introSeen', '1'); } catch { /* ignore */ }
 }
 
-/** A button that opens the 100-second onboarding video in a full-screen player. */
-export function IntroVideoButton({ label = 'Watch the 1½-minute intro', className = 'btn block', compact = false }: { label?: string; className?: string; compact?: boolean }) {
+/** A button that opens the 2-minute onboarding video in a full-screen player. */
+export function IntroVideoButton({ label = 'Watch the 2-minute intro', className = 'btn block', compact = false }: { label?: string; className?: string; compact?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <>

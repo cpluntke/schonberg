@@ -19,9 +19,11 @@ const at=(i,f,t)=>ease((lp(i,t)-f)/0.12); // reveal at fraction f of line i
 function wrapText(s,maxW){const out=[];let cur='';for(const w of s.split(' ')){const tt=cur?cur+' '+w:w;if(ctx.measureText(tt).width>maxW&&cur){out.push(cur);cur=w}else cur=tt}if(cur)out.push(cur);return out}
 
 /* images */
-const IMG={};['practice-2d','setup-tuner','setup-delay','piece','results','home','arcade-3d'].forEach(n=>{const im=new Image();im.src='img/'+n+'.png';IMG[n]=im});
+const IMG={};['practice-2d','setup-choir','setup-range','setup-delay','piece','results-coach','home'].forEach(n=>{const im=new Image();im.src='img/'+n+'.png';IMG[n]=im});
 const logo=new Image();logo.src='img/icon.svg';
 const imgReady=Promise.all([...Object.values(IMG),logo].map(im=>new Promise(r=>{if(im.complete)r();else{im.onload=r;im.onerror=r}})));
+// visible from line a until line b ends (next line starts), with short fades
+const win=(t,a,b)=>{const t0=L(a).start-0.35,t1=b+1<TL.lines.length?L(b+1).start-0.45:1e9;return ease((t-t0)/0.4)*(1-ease((t-t1)/0.4))};
 
 /* phone mockup: css-px coordinates of the 390×844 screenshot map into the frame */
 const PH={h:480};PH.s=PH.h/844;PH.w=390*PH.s;
@@ -41,7 +43,10 @@ function callout(px,py,lx,ly,label,sub,color,A){ // dot on phone + line + label
   ctx.lineWidth=3;ctx.beginPath();ctx.arc(px,py,13+4*Math.sin(A*6),0,7);ctx.globalAlpha=A*0.4;ctx.stroke();ctx.globalAlpha=A;
   text(label,lx,ly,DISP6(28),color);if(sub)text(sub,lx,ly+30,SERIF(21),C.muted);ctx.globalAlpha=1}
 
-/* --- scenes --- */
+/* --- scenes ---
+   Line indices (script.json): 0 A title · 1–5 B voice setup (1 choir code, 3 range, 4–5 delay) ·
+   6–8 C practice screen · 9–12 D level ladder · 13–14 E coach notes · 15 F home · 16–19 G try it now */
+const C2={green:'#6EE7A8'};
 function sceneA(t,A){const a=A*ease(since(0,t)/0.8);ctx.globalAlpha=a;
   // little highway motif
   const y0=410;ctx.lineWidth=5;ctx.lineCap='round';
@@ -52,62 +57,110 @@ function sceneA(t,A){const a=A*ease(since(0,t)/0.8);ctx.globalAlpha=a;
   text('Schönberg Hero',W/2,290,DISP(84),C.ink,'center');
   text('Learn your choir part, one phrase at a time',W/2,530,SERIF(28),C.muted,'center');ctx.globalAlpha=1}
 
-function sceneB(t,A){const x=170,y=110;phone('practice-2d',x,y,A);
+function chip(x,y,label,color,A,fill){ctx.globalAlpha=A;ctx.font=DISP6(24);const w=ctx.measureText(label).width+36;
+  ctx.fillStyle=fill?color:C.panel;rr(x,y,w,48,24);ctx.fill();ctx.strokeStyle=color;ctx.lineWidth=2;rr(x,y,w,48,24);ctx.stroke();
+  text(label,x+18,y+32,DISP6(24),fill?C.paper:C.ink);ctx.globalAlpha=1;return w}
+
+/* B: voice setup. One phone slot that changes picture: choir code → range check → delay. */
+function sceneB(t,A){const x=150,y=110;
+  const w1=win(t,1,2),w2=win(t,3,3),w3=win(t,4,5);
+  // first phone shows without fade-in at the scene start (the scene fade covers it)
+  phone('setup-choir',x,y,A*(t<L(1).start?1:w1));phone('setup-range',x,y,A*w2);phone('setup-delay',x,y,A*w3);
+  // 1: choir code
+  if(w1>0.01){const a=A*w1;
+    callout(...P(90,331,x,y),560,180,'Your choir code',null,C.orange,a*at(1,0.16,t));
+    const f=a*at(1,0.42,t);if(f>0.01){ctx.globalAlpha=f;text('brings in',560,262,SERIF(23),C.muted);ctx.globalAlpha=1;
+      let cx=672;cx+=chip(cx,232,'Programme',C.cyan,f)+14;chip(cx,232,'Scores',C.cyan,f);}
+    callout(...P(195,765,x,y),560,440,'No code?','practise on your own',C.purple,a*at(1,0.78,t));}
+  // 3: range check, a do-re-mi pattern one step higher each round
+  if(w2>0.01){const a=A*w2,bx=540,by=150,bw=640,bh=340;ctx.globalAlpha=a;
+    ctx.fillStyle=C.panel;rr(bx,by,bw,bh,18);ctx.fill();
+    const steps=['Comfortable','Middle','Up','Down'],sp=lp(3,t),cur=sp<0.08?0:sp<0.2?1:sp<0.62?2:3;let sx=bx+24;
+    steps.forEach((n,k)=>{const col=k===cur?C.orange:k<cur?C.cyan:C.faint;const lab=(k<cur?'✓ ':'')+n+(k<3?' ·':'');text(lab,sx,by+40,MONO(17),col);ctx.font=MONO(17);sx+=ctx.measureText(lab).width+10});
+    for(let y2=by+70;y2<=by+bh-30;y2+=24){ctx.fillStyle=C.rule;ctx.fillRect(bx+20,y2,bw-40,1)}
+    const PAT=[0,2,4,2,0],nw=21,rw=5*nw+12,yOf=st=>by+bh-58-st*14;
+    const rounds=[0,2,4,6,8],t0=L(3).start+0.6,per=0.95;
+    rounds.forEach((r,k)=>{const rs=t0+k*per;if(t<rs)return;const top=k===4;
+      PAT.forEach((d,j)=>{const nt=rs+j*0.12;if(t<nt)return;const nx=bx+30+k*rw+j*nw,ny=yOf(r+d);
+        ctx.globalAlpha=a*ease((t-nt)/0.15)*(top?0.45:1);ctx.fillStyle=top?C.faint:C.orange;rr(nx,ny-6,nw-3,12,5);ctx.fill();
+        if(k===0){ctx.globalAlpha=a*ease((t-nt)/0.15);text(['do','re','mi','re','do'][j],nx+nw/2-1,yOf(4)-18,MONO(14),C.ink,'center')}});
+      ctx.globalAlpha=a*ease((t-rs-0.6)/0.3);text(top?'✗':'✓',bx+30+k*rw+2*nw+9,yOf(r)+32,DISP6(22),top?C.faint:C.cyan,'center')});
+    ctx.globalAlpha=1;
+    const h=a*at(3,0.32,t);if(h>0.01){ctx.globalAlpha=h;text('one step higher each round ↗',bx+24,by+bh+44,DISP6(26),C.ink);ctx.globalAlpha=1}
+    const p=a*at(3,0.78,t);if(p>0.01){ctx.globalAlpha=p;const px=bx+30+4*rw+2*nw+9;ctx.strokeStyle=C.orange;ctx.lineWidth=3;ctx.beginPath();ctx.arc(px,yOf(12)-34,22,0,7);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(px-15,yOf(12)-19);ctx.lineTo(px+15,yOf(12)-49);ctx.stroke();
+      text("Don't push the top notes",bx+24,by+bh+84,DISP6(26),C.orange);ctx.globalAlpha=1}}
+  // 4–5: headphones, then clicks + "ta"
+  if(w3>0.01){const a1=A*w3*at(4,0.2,t);ctx.globalAlpha=a1;
+    const hx=880,hy=220;ctx.strokeStyle=C.cyan;ctx.lineWidth=10;ctx.lineCap='round';
+    ctx.beginPath();ctx.arc(hx,hy,70,Math.PI,0);ctx.stroke();ctx.fillStyle=C.cyan;rr(hx-90,hy-10,36,70,12);ctx.fill();rr(hx+54,hy-10,36,70,12);ctx.fill();
+    text('Wired headphones',hx,hy+110,DISP6(30),C.ink,'center');text('so the mic only hears you',hx,hy+142,SERIF(22),C.muted,'center');
+    ctx.globalAlpha=1;
+    const a2=A*w3*at(5,0.42,t);if(a2>0.01){ctx.globalAlpha=a2;
+      for(let k=0;k<6;k++){const cx=735+k*58,cy=450;const ph=((t-L(5).start-0.42*L(5).dur)*1.6-k*0.3);const on=ph>0&&ph%1.8<0.35;
+        ctx.fillStyle=on?C.orange:C.rule;ctx.beginPath();ctx.arc(cx,cy,on?16:12,0,7);ctx.fill();
+        if(on)text('ta',cx,cy-28,DISP6(22),C.orange,'center')}
+      text('6 clicks → delay measured',880,512,MONO(20),C.muted,'center');ctx.globalAlpha=1}}}
+
+/* C: the practice screen */
+function sceneC(t,A){const x=170,y=110;phone('practice-2d',x,y,A);
   const lx=560;
-  callout(...P(143,200,x,y),lx,170,'The white line = now','sing when a bar reaches it',C.ink,A*at(2,0.1,t));
-  callout(...P(118,410,x,y),lx,265,'Blue line = your voice','keep it on the orange bars',C.cyan,A*at(2,0.45,t));
-  callout(...P(195,470,x,y),lx,360,'Orange bars = your notes',null,C.orange,A*at(2,0.75,t));
-  callout(...P(80,650,x,y),lx,445,'Dashed = the other voices','see where you sit in the chord',C.purple,A*at(4,0.05,t));
-  callout(...P(178,383,x,y),lx,540,'Bubble = cents sharp (+) / flat (−)',null,C.cyan,A*at(4,0.55,t));}
+  callout(...P(143,150,x,y),lx,165,'The white line = now','sing when a bar reaches it',C.ink,A*at(6,0.1,t));
+  callout(...P(122,421,x,y),lx,330,'Blue = your voice','keep it on the orange bars',C.cyan,A*at(6,0.45,t));
+  callout(...P(285,550,x,y),lx,410,'Orange bars = your notes',null,C.orange,A*at(6,0.75,t));
+  callout(...P(210,640,x,y),lx,490,'Dashed = the other voices','see where you sit in the chord',C.purple,A*at(8,0.05,t));
+  callout(...P(174,389,x,y),lx,255,'Bubble = cents sharp (+) / flat (−)',null,C.cyan,A*at(8,0.55,t));}
 
-function sceneC(t,A){const x1=150,x2=430,y=110;
-  phone('setup-tuner',x1,y,A);phone('setup-delay',x2,y,A*at(6,0,t));
-  const a1=A*at(5,0.45,t);ctx.globalAlpha=a1;
-  // headphones icon
-  const hx=880,hy=230;ctx.strokeStyle=C.cyan;ctx.lineWidth=10;ctx.lineCap='round';
-  ctx.beginPath();ctx.arc(hx,hy,70,Math.PI,0);ctx.stroke();ctx.fillStyle=C.cyan;rr(hx-90,hy-10,36,70,12);ctx.fill();rr(hx+54,hy-10,36,70,12);ctx.fill();
-  text('Wired headphones',hx,hy+110,DISP6(30),C.ink,'center');text('so the mic only hears you',hx,hy+142,SERIF(22),C.muted,'center');
-  ctx.globalAlpha=1;
-  // clicks + "ta"
-  const a2=A*at(7,0.35,t);if(a2>0.01){ctx.globalAlpha=a2;
-    for(let k=0;k<6;k++){const cx=730+k*58,cy=470;const ph=((t-L(7).start)*1.5-k*0.25);const on=ph>0&&ph%1.5<0.35;
-      ctx.fillStyle=on?C.orange:C.rule;ctx.beginPath();ctx.arc(cx,cy,on?16:12,0,7);ctx.fill();
-      if(on)text('ta',cx,cy-28,DISP6(22),C.orange,'center')}
-    text('6 clicks → delay measured',880,540,MONO(20),C.muted,'center');ctx.globalAlpha=1}}
-
-const LV=[['1','Note-learning','70% tempo · your part plays'],['2','In time','full tempo · your part plays'],['3','Independent','others only'],['4','Concert-ready','no names · chord only']];
+/* D: the level ladder, five levels */
+const LV=[['1','Note-learning','70% tempo · your part plays'],['2','In time','full tempo · your part plays'],['3','Independent','others only'],['4','Concert-ready','no note names · chord only'],['5','Off book','from memory · on two days']];
+const LVCOL=[C.cyan,C.cyan,C.orange,C.purple,C2.green];
+const LVH=72,LVG=13,LVY=130;
 function sceneD(t,A){const x=150,y=110;phone('piece',x,y,A,{scrollCss:0});
-  const bx=520;LV.forEach((l,k)=>{const f=[0.0,0.22,0.42,0.66][k];const a=A*(sceneOf(lineIdx(t))==='D'&&lineIdx(t)>9?1:at(9,f,t));
-    if(a<0.01)return;ctx.globalAlpha=a;const yy=150+k*96;
-    const col=k<2?C.cyan:k===2?C.orange:C.purple;ctx.fillStyle=C.panel;rr(bx,yy,500,80,16);ctx.fill();ctx.strokeStyle=col;ctx.lineWidth=2;rr(bx,yy,500,80,16);ctx.stroke();
-    ctx.fillStyle=col;rr(bx+16,yy+14,52,52,12);ctx.fill();text(l[0],bx+42,yy+52,DISP(32),C.paper,'center');
-    text(l[1],bx+88,yy+38,DISP6(28),C.ink);text(l[2],bx+88,yy+66,MONO(17),C.muted);ctx.globalAlpha=1});
+  const bx=520;LV.forEach((l,k)=>{const f=[0.0,0.17,0.27,0.51,0.75][k];const a=A*(lineIdx(t)>10?1:at(10,f,t));
+    if(a<0.01)return;ctx.globalAlpha=a;const yy=LVY+k*(LVH+LVG);
+    const col=LVCOL[k];ctx.fillStyle=C.panel;rr(bx,yy,500,LVH,16);ctx.fill();ctx.strokeStyle=col;ctx.lineWidth=2;rr(bx,yy,500,LVH,16);ctx.stroke();
+    ctx.fillStyle=col;rr(bx+14,yy+12,48,48,12);ctx.fill();text(l[0],bx+38,yy+48,DISP(30),C.paper,'center');
+    text(l[1],bx+80,yy+33,DISP6(27),C.ink);text(l[2],bx+80,yy+59,MONO(16),C.muted);ctx.globalAlpha=1});
   // targets
-  const ar=A*at(11,0.15,t);if(ar>0.01){ctx.globalAlpha=ar;text('← rehearsal-ready',bx+520,150+2*96+48,MONO(20),C.orange,'left');ctx.globalAlpha=1}
-  const ac=A*at(11,0.55,t);if(ac>0.01){ctx.globalAlpha=ac;text('← concert-ready',bx+520,150+3*96+48,MONO(20),C.purple,'left');ctx.globalAlpha=1}}
+  const ar=A*at(12,0.15,t);if(ar>0.01){ctx.globalAlpha=ar;text('← rehearsal-ready',bx+516,LVY+2*(LVH+LVG)+44,MONO(20),C.orange,'left');ctx.globalAlpha=1}
+  const ac=A*at(12,0.55,t);if(ac>0.01){ctx.globalAlpha=ac;text('← concert-ready',bx+516,LVY+3*(LVH+LVG)+44,MONO(20),C.purple,'left');ctx.globalAlpha=1}}
 
+/* E: coach notes */
 const NOTES=[['↓','Long notes sink','keep the support to the end'],['◷','Late after rests','breathe in tempo'],['♪','Wrong notes in bar 12','learn the pitches slowly']];
-function sceneE(t,A){const x=150,y=110;phone('results',x,y,A,{scrollCss:330});
-  const bx=520;NOTES.forEach((n,k)=>{const a=A*at(13,[0.18,0.32,0.46][k],t);if(a<0.01)return;ctx.globalAlpha=a;const yy=150+k*100;
+function sceneE(t,A){const x=150,y=110;phone('results-coach',x,y,A,{scrollCss:330});
+  const bx=520;NOTES.forEach((n,k)=>{const a=A*at(14,[0.17,0.34,0.48][k],t);if(a<0.01)return;ctx.globalAlpha=a;const yy=150+k*100;
     ctx.fillStyle=C.panel;rr(bx,yy,600,84,16);ctx.fill();text(n[0],bx+30,yy+54,DISP(34),C.orange,'center');
     text(n[1],bx+64,yy+38,DISP6(27),C.ink);text(n[2],bx+64,yy+66,SERIF(21),C.muted);ctx.globalAlpha=1});
-  const a=A*at(13,0.7,t);if(a>0.01){ctx.globalAlpha=a;const yy=470;ctx.fillStyle=C.orange;rr(bx,yy,600,64,14);ctx.fill();
-    text('⟲  Loop bars 10–12 slowly',bx+300,yy+42,DISP6(27),C.paper,'center');ctx.globalAlpha=1}}
+  const a=A*at(14,0.67,t);if(a>0.01){ctx.globalAlpha=a;const yy=470;ctx.fillStyle=C.orange;rr(bx,yy,600,64,14);ctx.fill();
+    text('⟲  Loop bars 9–12 slowly',bx+300,yy+42,DISP6(27),C.paper,'center');ctx.globalAlpha=1}}
 
+/* F: Home, every day */
 function sceneF(t,A){const x=150,y=110;phone('home',x,y,A);
-  const a1=A*at(14,0.25,t);if(a1>0.01){ctx.globalAlpha=a1;text("Today's plan",520,190,DISP(40),C.ink);
-    text('paced to your rehearsal and concert',520,228,SERIF(24),C.muted);
-    text('≈ 10 minutes a day',520,290,DISP6(34),C.orange);ctx.globalAlpha=1}
-  const a2=A*at(16,0.0,t);if(a2>0.01){phone('arcade-3d',1000,y,a2);ctx.globalAlpha=a2;
-    text('Arcade →',520,400,DISP(40),C.purple,'left');text('unlocks at level 2',520,436,MONO(19),C.muted,'left');ctx.globalAlpha=1}}
+  const a1=A*at(15,0.02,t);if(a1>0.01){ctx.globalAlpha=a1;text("Today's plan",560,200,DISP(44),C.ink);
+    text('paced to your rehearsal and concert dates',560,240,SERIF(24),C.muted);ctx.globalAlpha=1}
+  callout(...P(60,236,x,y),560,330,'Days to rehearsal & concert',null,C.cyan,A*at(15,0.3,t));
+  const a2=A*at(15,0.7,t);if(a2>0.01){ctx.globalAlpha=a2;text('≈ 10 minutes a day',560,440,DISP(40),C.orange);ctx.globalAlpha=1}}
 
-function sceneG(t,A){const a=A*ease(since(17,t)/0.6);ctx.globalAlpha=a;if(logo.complete)ctx.drawImage(logo,W/2-44,150,88,88);
-  text('Put on headphones',W/2,320,DISP(56),C.ink,'center');
-  ctx.fillStyle=C.orange;rr(W/2-190,370,380,74,18);ctx.fill();text('Start voice setup',W/2,418,DISP6(32),C.paper,'center');
-  const b=A*at(18,0,t);ctx.globalAlpha=b;text("Let's sing.",W/2,520,DISP(44),C.cyan,'center');ctx.globalAlpha=1}
+/* G: try it now, a two-item checklist */
+function num(cx,cy,n,col){ctx.fillStyle=col;ctx.beginPath();ctx.arc(cx,cy,28,0,7);ctx.fill();text(n,cx,cy+11,DISP(32),C.paper,'center')}
+function sceneG(t,A){const x0=210;
+  const a1=A*at(16,0.22,t);if(a1>0.01){ctx.globalAlpha=a1;const yy=180;num(x0,yy,'1',C.orange);
+    text('Put on headphones',x0+52,yy+12,DISP6(36),C.ink);ctx.font=DISP6(36);const w=ctx.measureText('Put on headphones').width;
+    text('→',x0+70+w,yy+12,DISP6(36),C.muted);
+    const bx=x0+122+w;ctx.fillStyle=C.orange;rr(bx,yy-34,330,68,16);ctx.fill();text('Start voice setup',bx+165,yy+11,DISP6(30),C.paper,'center');ctx.globalAlpha=1}
+  const a2=A*at(16,0.57,t);if(a2>0.01){ctx.globalAlpha=a2;const yy=310;num(x0,yy,'2',C.cyan);
+    let cx=x0+52;const step=(s,last)=>{cx+=chip(cx,yy-24,s,last?C.cyan:C.rule,a2,false)+12;if(!last){text('→',cx+4,yy+10,DISP6(28),C.muted);cx+=40}ctx.globalAlpha=a2};
+    step('Home');step('first piece');
+    // level button look (as on the piece screen)
+    ctx.fillStyle=C.panel;rr(cx,yy-30,250,60,12);ctx.fill();ctx.strokeStyle=C.cyan;ctx.lineWidth=2;rr(cx,yy-30,250,60,12);ctx.stroke();
+    ctx.fillStyle=C.cyan;rr(cx+10,yy-20,40,40,10);ctx.fill();text('1',cx+30,yy+10,DISP(26),C.paper,'center');
+    text('Level 1',cx+62,yy-2,DISP6(24),C.ink);text('first section',cx+62,yy+22,MONO(15),C.muted);ctx.globalAlpha=1}
+  const a3=A*at(18,0.05,t);if(a3>0.01){ctx.globalAlpha=a3;text('≈ 5 minutes today',W/2,430,DISP6(34),C.orange,'center');
+    text('tomorrow, Home shows your next step',W/2,470,SERIF(25),C.muted,'center');ctx.globalAlpha=1}
+  const a4=A*at(19,0.0,t);if(a4>0.01){ctx.globalAlpha=a4;text("Let's sing.",W/2,550,DISP(52),C.cyan,'center');ctx.globalAlpha=1}}
 
 const SCENES={A:sceneA,B:sceneB,C:sceneC,D:sceneD,E:sceneE,F:sceneF,G:sceneG};
-const HEAD={B:'The practice screen',C:'Voice setup',D:'The level ladder',E:'Coach notes',F:'Every day'};
+const HEAD={B:'Voice setup',C:'The practice screen',D:'The level ladder',E:'Coach notes',F:'Every day',G:'Try it now'};
 
 function speakers(t){const i=lineIdx(t),l=L(i),talking=t>=l.start&&t<=l.start+l.dur;
   [['N','NORA','coach',C.nora,880],['B','BEN','singer',C.ben,1070]].forEach(s=>{const on=talking&&l.sp===s[0],x=s[4],y=34;
