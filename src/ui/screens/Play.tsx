@@ -148,9 +148,10 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
         const med = entryOnsets[Math.floor(entryOnsets.length / 2)];
         const iqr = entryOnsets[Math.floor(entryOnsets.length * 0.75)] - entryOnsets[Math.floor(entryOnsets.length * 0.25)];
         // Conservative: only clearly late and consistent (a singer who is genuinely late varies more).
-        if (med / rate > 150 && iqr / rate < 120) {
+        if (med / rate > 110 && iqr / rate < 120) {
           // Onsets are in score time; at reduced tempo one score-ms lasts 1/rate real ms.
-          latencyAdjusted = Math.round(Math.min(400, sess.latencyMs + (med / rate - 40)));
+          // ~50 ms of each onset is detection lag (attack + analysis window), not delay.
+          latencyAdjusted = Math.round(Math.min(400, sess.latencyMs + (med / rate - 50)));
           updateProfile({ latencyMs: latencyAdjusted });
           // Re-score this run with the learned delay (converted back to score seconds).
           const shift = ((latencyAdjusted - sess.latencyMs) / 1000) * rate;

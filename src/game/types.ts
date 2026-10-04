@@ -60,6 +60,7 @@ export type InsightKind =
   | 'flat-overall'
   | 'sharp-overall'
   | 'late-entries'
+  | 'behind-beat'
   | 'early-entries'
   | 'scooping'
   | 'leaps'

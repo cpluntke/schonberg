@@ -112,8 +112,8 @@ export function analyze(ctx: ScoringContext, notes: NoteResult[], samples?: Pitc
         ? `Overall you sat about ${c} cents under the pitch, most clearly in ${barsText(score, m)}. Keep the sound bright and the breath moving; think each note slightly higher than you feel it.`
         : `Overall you sat about ${c} cents above the pitch, most clearly in ${barsText(score, m)}. Release tension in the throat and let the notes settle rather than pushing them up.`,
       measures: m,
-      severity: Math.abs(overall) > 20 ? 2 : 1,
-      weight: Math.abs(overall),
+      severity: Math.abs(overall) > 25 ? 3 : Math.abs(overall) > 20 ? 2 : 1,
+      weight: Math.abs(overall) * 2,
     });
   }
 
@@ -180,6 +180,25 @@ export function analyze(ctx: ScoringContext, notes: NoteResult[], samples?: Pitc
         });
       }
     }
+  }
+
+  // 3b. Consistently behind the beat on every note (not just entries): usually an uncalibrated
+  // headphone delay, or dragging. Onsets include ~50 ms of natural detection lag.
+  // Scooped notes start "late" because the pitch arrives late, not the voice: leave them out.
+  const onsets = notes.filter((n) => n.onsetMs !== null && n.scoop === null).map((n) => n.onsetMs!);
+  const medOnset = median(onsets);
+  if (onsets.length >= 6 && medOnset !== null && medOnset > 120) {
+    const lateNotes = notes.filter((n) => n.onsetMs !== null && n.scoop === null && n.onsetMs > 120);
+    const bad = new Map<number, number>();
+    for (const n of lateNotes) addTo(bad, noteOf(n).measure, n.onsetMs!);
+    out.push({
+      kind: 'behind-beat',
+      title: 'Behind the beat',
+      detail: `Your notes started about ${Math.round(medOnset - 40)} ms after the beat, quite evenly. If you wear Bluetooth headphones that's probably their delay: run the delay check in Voice setup. Otherwise, listen to the other voices and place each syllable's consonant before the beat.`,
+      measures: window(bad),
+      severity: 3,
+      weight: medOnset,
+    });
   }
 
   // 4. Scooping into notes from below.
@@ -293,6 +312,13 @@ export function analyze(ctx: ScoringContext, notes: NoteResult[], samples?: Pitc
       severity: 3,
       weight: 1000,
     });
+  }
+
+  // If we barely heard the singer, the other diagnoses are noise.
+  if (out.some((c) => c.kind === 'quiet')) out.splice(0, out.length, ...out.filter((c) => c.kind === 'quiet'));
+  // Behind the beat explains "scoops" and pitch misses at note starts: drop those then.
+  if (out.some((c) => c.kind === 'behind-beat')) {
+    for (let i = out.length - 1; i >= 0; i--) if (out[i].kind === 'scooping' || out[i].kind === 'wrong-notes' || out[i].kind === 'late-entries') out.splice(i, 1);
   }
 
   // Sort: severity desc, then weight desc. Keep at most 3; reserve a slot for praise.

@@ -350,7 +350,9 @@ export class LiveScorer {
           a.runMiss = 0;
         }
       }
-      if (dev !== null && t < w.start + SCOOP_WINDOW) a.scoopDevs.push(dev);
+      // Still on the previous note's pitch = coming in late, not scooping.
+      const holdingPrev = midi !== null && w.legatoFrom !== null && w.legatoFrom !== w.note.midi && Math.abs(midi - w.legatoFrom) < 0.5;
+      if (dev !== null && t < w.start + SCOOP_WINDOW && !holdingPrev) a.scoopDevs.push(dev);
     }
     // Body coverage. In-tune is judged on the vibrato-smoothed deviation (mean over the last
     // ~one vibrato cycle of this note's body), so a centred vibrato is not punished.

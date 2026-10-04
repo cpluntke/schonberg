@@ -74,7 +74,8 @@ describe('scoreAttempt', () => {
     for (const n of r.notes) expect(Math.abs(n.onsetMs! - 300)).toBeLessThanOrEqual(25);
     // clamp(1 - (|300-40|-60)/400) = 0.5
     expect(r.rhythm).toBeCloseTo(0.5, 1);
-    expect(r.insights.map((i) => i.kind)).toContain('late-entries');
+    // Every note 300 ms late reads as "behind the beat" (which subsumes late entries).
+    expect(r.insights.map((i) => i.kind).some((k) => k === 'late-entries' || k === 'behind-beat')).toBe(true);
   });
 
   it('silence → all misses, zero rhythm, combo 0', () => {
@@ -88,7 +89,9 @@ describe('scoreAttempt', () => {
 
   it('scoop from below detected', () => {
     const r = scoreAttempt(ctx, sampleSinging(melody, (n, t) => (t < 0.15 ? n.midi - 1 : n.midi)), opts);
-    expect(r.notes.every((n) => n.scoop === 'below')).toBe(true);
+    // Note 3 (F♯→G) is approached by a semitone: "a semitone below" is the previous note,
+    // which reads as holding on late rather than scooping.
+    expect(r.notes.filter((n) => n.index !== 3).every((n) => n.scoop === 'below')).toBe(true);
     expect(r.insights.map((i) => i.kind)).toContain('scooping');
   });
 
