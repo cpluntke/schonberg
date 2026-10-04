@@ -39,6 +39,13 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
   }, [piece, route]);
 
   const [rateOverride, setRateOverride] = useState<number | null>(null);
+  const [firstTime] = useState(() => {
+    try {
+      const seen = localStorage.getItem('sh:seenHowto') === '1';
+      localStorage.setItem('sh:seenHowto', '1');
+      return !seen && route.mode === '2d';
+    } catch { return false; }
+  });
   const rate = rateOverride ?? spec?.rate ?? 1;
   const [phase, setPhase] = useState<'ready' | 'running' | 'paused' | 'micError'>('ready');
   const [micMsg, setMicMsg] = useState('');
@@ -320,6 +327,14 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
                   <span className="small">Tempo {Math.round(rate * 100)}%{rate < (spec?.rate ?? 1) - 1e-6 ? ' (slower than the level: practice only, won’t count)' : ''}</span>
                   <input type="range" min={40} max={100} step={5} value={Math.round(rate * 100)} onChange={(e) => setRateOverride(Number(e.target.value) / 100)} />
                 </label>
+              )}
+              {!listenOnly && firstTime && (
+                <div className="col small" style={{ gap: 4, background: 'var(--bg-2)', borderRadius: 10, padding: '10px 12px' }} data-testid="howto">
+                  <strong>How to read the screen</strong>
+                  <span><span style={{ color: 'var(--accent)' }}>■</span> Orange bars are your notes. They move left to the white line: sing when they reach it.</span>
+                  <span><span style={{ color: 'var(--voice)' }}>━</span> The blue line is your voice. Keep it on the bar; it turns blue when you hit it.</span>
+                  <span>Dashed outlines are the other voices. The bubble shows how many cents sharp (+) or flat (−) you are.</span>
+                </div>
               )}
               {!listenOnly && <span className="tiny muted">Wear headphones so the mic only hears you.{!profile.latencyMs ? ' Tip: run voice setup once to measure your headphone delay.' : ''}</span>}
               <button className="btn primary block" onClick={start} data-testid="start">
