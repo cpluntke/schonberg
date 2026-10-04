@@ -230,7 +230,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
                 return (
                   <div key={s.id} className="row" style={{ gap: 8 }}>
                     <span className="grow small ellipsis">{s.label}</span>
-                    <span className="tiny muted" aria-label={passed >= 0 ? `${STAGE_NAMES[passed]} done` : 'not started'}>
+                    <span className="tiny muted" title={passed >= 0 ? `${STAGE_NAMES[passed]} done` : 'not started'}>
                       {[0, 1, 2].map((k) => (k <= passed ? '●' : '○')).join(' ')}
                     </span>
                     <button className="btn small" onClick={() => go({ name: 'play', pieceId: piece.id, partId: part.id, sectionId: s.id, level: 0, mode: '2d', words: true })}>

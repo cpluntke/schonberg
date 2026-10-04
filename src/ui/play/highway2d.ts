@@ -337,7 +337,7 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
         if (last.time < notes[i].start + notes[i].dur) heard = i;
       }
     }
-    if (heard >= 0 && !(s.hide && s.hide(heard) === 'none' && notes[heard].start + notes[heard].dur > s.pos)) {
+    if (heard >= 0 && !(s.hide && s.hide(heard) !== 'show' && notes[heard].start + notes[heard].dur > s.pos)) {
       const target = notes[heard].midi;
       // Average over ~one vibrato cycle so the readout doesn't flicker.
       let sum = 0;

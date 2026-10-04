@@ -47,10 +47,12 @@ export function recordBars(
   partId: string,
   result: AttemptResult,
   level: number,
-  opts: { peeked?: Iterable<number>; now?: number } = {},
+  opts: { peeked?: Iterable<number>; hidden?: Iterable<number>; now?: number } = {},
 ): BarMap {
   const now = opts.now ?? Date.now();
   const peeked = new Set(opts.peeked ?? []);
+  // Off book only counts for bars that were actually hidden (not shown in fade mode, not peeked at).
+  const hidden = opts.hidden ? new Set(opts.hidden) : null;
   const bars = { ...getBars(pieceId, partId) };
   const issuesAt = new Map<number, InsightKind[]>();
   for (const i of result.insights) {
@@ -65,7 +67,7 @@ export function recordBars(
     if (old?.mem != null) s.mem = old.mem;
     if (old?.off != null) s.off = old.off;
     if (level >= 4 && !peeked.has(m)) s.mem = blend(old?.mem, v);
-    if (level >= 5 && !peeked.has(m)) s.off = blend(old?.off, v);
+    if (level >= 5 && !peeked.has(m) && (!hidden || hidden.has(m))) s.off = blend(old?.off, v);
     const iss = issuesAt.get(m);
     if (iss && v < SOLID) s.issues = [...new Set(iss)];
     bars[m] = s;

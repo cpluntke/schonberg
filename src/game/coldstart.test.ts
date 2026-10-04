@@ -10,6 +10,7 @@ describe('cold start', () => {
     for (let k = 0; k < 50; k++) {
       const c = pickColdStart(score, part, {}, { rand: () => k / 50 })!;
       expect(c.bar).not.toBe(2); // the bar of rests
+      expect(c.bar).toBeGreaterThanOrEqual(1); // at least a full bar of lead-in
       expect(c.from).toBe(score.measures[c.bar].start);
       expect(c.to).toBeGreaterThan(c.from);
     }
@@ -17,13 +18,15 @@ describe('cold start', () => {
     expect(leadInFrom(score, 1)).toBe(0);
   });
   it('prefers bars you do not know yet and avoids the last one', () => {
-    const bars = { 0: { ema: 1, mem: 1, off: 1, n: 3, at: 0 }, 1: { ema: 1, mem: 1, off: 1, n: 3, at: 0 }, 3: { ema: 0.2, n: 1, at: 0 } };
+    const bars = { 4: { ema: 1, mem: 1, off: 1, n: 3, at: 0 }, 3: { ema: 0.2, n: 1, at: 0 } };
     const counts: Record<number, number> = {};
     for (let k = 0; k < 400; k++) {
       const c = pickColdStart(score, part, bars, { rand: () => (k + 0.5) / 400, avoid: 5 })!;
       counts[c.bar] = (counts[c.bar] ?? 0) + 1;
     }
     expect(counts[5]).toBeUndefined();
-    expect(counts[3]).toBeGreaterThan(counts[0]);
+    expect(counts[3]).toBeGreaterThan(counts[4]);
+    // The first bar has no lead-in at all.
+    expect(counts[0]).toBeUndefined();
   });
 });

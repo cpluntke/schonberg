@@ -39,11 +39,19 @@ export function syllableOnsets(samples: PitchSample[]): number[] {
   if (s.length < 5) return [];
   const env = s.map((x) => db(x.rms));
   const sorted = [...env].sort((a, b) => a - b);
-  const floor = sorted[Math.floor(sorted.length * 0.15)];
-  const loud = Math.max(floor + 12, -50);
+  const globalFloor = sorted[Math.floor(sorted.length * 0.15)];
+  // The floor around each moment (quietest point in the last second): music bleeding into the mic
+  // raises it, and a syllable must stand clearly above what's around it.
+  const localFloor = env.map((_, k) => {
+    let m = Infinity;
+    for (let j = k; j >= 0 && s[k].time - s[j].time <= 1; j--) m = Math.min(m, env[j]);
+    return m;
+  });
+  const loudAt = (k: number) => Math.max(globalFloor + 8, localFloor[k] + 9, -50);
   const out: number[] = [];
   let last = -Infinity;
   for (let k = 1; k < s.length; k++) {
+    const loud = loudAt(k);
     if (env[k] < loud) continue;
     let lo = Infinity;
     let at = k;
@@ -55,7 +63,7 @@ export function syllableOnsets(samples: PitchSample[]): number[] {
     const t = s[Math.min(at, k)].time;
     if (t - last < 0.09) continue;
     // Only take the first frame of each rise.
-    if (env[k - 1] >= loud && env[k - 1] - lo >= 6) continue;
+    if (env[k - 1] >= loudAt(k - 1) && env[k - 1] - lo >= 6) continue;
     out.push(t);
     last = t;
   }
@@ -75,6 +83,8 @@ export interface WordsResult {
   medianMs: number | null;
   /** Syllables with no onset near them. */
   missed: number;
+  /** Syllables heard that aren't in the text (beyond the matched ones). */
+  extra?: number;
 }
 
 const GRADE_VALUE: Record<WordGrade, number> = { perfect: 1, good: 0.85, ok: 0.5, miss: 0 };
@@ -132,8 +142,16 @@ export function scoreWords(syl: Syllable[], onsets: number[], opts: { rate: numb
   });
   const perMeasure: Record<number, number> = {};
   for (const [m, e] of per) perMeasure[m] = e.s / e.n;
-  const accuracy = syl.length ? syllables.reduce((a, x) => a + GRADE_VALUE[x.grade], 0) / syl.length : 0;
-  return { syllables, accuracy, perMeasure, medianMs: medianMs === null ? null : Math.round(medianMs), missed: syllables.filter((x) => x.ms === null).length };
+  // Extra syllables count against you: chattering steadily through the section mustn't pass.
+  // (A few spare onsets, e.g. a consonant cluster heard twice, are tolerated.)
+  const first = syl.length ? syl[0].start + bestD - win : 0;
+  const last = syl.length ? syl[syl.length - 1].start + bestD + win : 0;
+  const inWindow = onsets.filter((t) => t >= first && t <= last).length;
+  const extra = Math.max(0, inWindow - used.size);
+  const penalty = Math.max(0, extra - 0.2 * syl.length);
+  const sum = syllables.reduce((a, x) => a + GRADE_VALUE[x.grade], 0);
+  const accuracy = syl.length ? sum / (syl.length + penalty) : 0;
+  return { syllables, accuracy, perMeasure, medianMs: medianMs === null ? null : Math.round(medianMs), missed: syllables.filter((x) => x.ms === null).length, extra };
 }
 
 /** How much of the text is shown: 0 = read along, 1 = first letters, 2 = from memory. */

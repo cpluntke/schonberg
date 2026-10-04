@@ -26,7 +26,10 @@ export function pickColdStart(score: Score, part: Part, bars: BarMap, opts: { av
   const rand = opts.rand ?? Math.random;
   const ms = score.measures;
   const withNotes = new Set(part.notes.map((n) => n.measure));
-  const candidates = ms.map((m) => m.index).filter((i) => withNotes.has(i) && i !== opts.avoid);
+  const all = ms.map((m) => m.index).filter((i) => withNotes.has(i) && i !== opts.avoid);
+  // Prefer bars with a full lead-in (not the very start, not right after a short pickup).
+  const full = all.filter((i) => i > 0 && ms[i].start - leadInFrom(score, i) >= ms[i].dur * 0.99);
+  const candidates = full.length ? full : all;
   if (!candidates.length) return null;
   const weight = (i: number) => {
     const s = bars[i];

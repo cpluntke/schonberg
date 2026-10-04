@@ -89,7 +89,7 @@ export function PieceMap({ score, part, sections, bars, onLoop }: {
               const empty = barNotes(part, score, m).length === 0;
               return (
                 <button key={m} onClick={() => onLoop(m)} data-mastery={k}
-                  aria-label={`Bar ${label(m)}: ${empty ? 'rest' : LABEL[k]}${g.length ? ` (${[...new Set(g.map((x) => x[1]))].join(', ')})` : ''}`}
+                  aria-label={`Bar ${label(m)}: ${empty ? 'rest' : LABEL[k]}${g.length ? ` (${[...new Set(g.map((x) => x[1]))].join(', ')})` : ''}. Loop this bar`}
                   style={{
                     position: 'relative', minHeight: 44, padding: '3px 2px 2px', border: 'none', borderRadius: 6,
                     background: empty ? 'transparent' : MASTERY_COLOR[k] + (k === 'none' ? '' : '33'),

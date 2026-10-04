@@ -102,7 +102,9 @@ export function Results() {
       )}
       {lr.ladder && (
         <div className={lr.passed ? 'notice info' : 'notice'} role="status" data-testid="pass-banner">
-          {leveledUp
+          {lr.passed && lr.level === 5 && lr.newLevel < 5
+            ? <><strong>Sung from memory!</strong> That's day {lr.offBookDays ?? 1} of {OFF_BOOK_DAYS}: do it again on another day and the section counts as memorised.{leveledUp ? ` (And it's concert-ready now.)` : ''}</>
+            : leveledUp
             ? <><strong>Level {lr.newLevel} reached: {LEVELS[lr.newLevel - 1]?.name}!</strong> {lr.newLevel >= 5 ? 'This section is memorised.' : lr.newLevel >= 4 ? 'This section is concert-ready.' : lr.newLevel >= 3 ? 'This section is rehearsal-ready.' : ''}</>
             : lr.passed && lr.level === 5 && lr.newLevel < 5
               ? <><strong>Sung from memory!</strong> That's day {lr.offBookDays ?? 1} of {OFF_BOOK_DAYS}: do it again on another day and the section counts as memorised.</>

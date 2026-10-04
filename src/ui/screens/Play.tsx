@@ -100,8 +100,9 @@ function SingPlay({ route }: { route: PlayRoute }) {
   const offBook = level === 5;
   const sectionMeasures = useMemo(() => {
     if (!piece || !section) return [] as number[];
-    return piece.score.measures.filter((m) => m.start >= section.start - 1e-6 && m.start < section.end - 1e-6).map((m) => m.index);
-  }, [piece, section]);
+    const withNotes = new Set(part?.notes.map((n) => n.measure) ?? []);
+    return piece.score.measures.filter((m) => m.start >= section.start - 1e-6 && m.start < section.end - 1e-6 && withNotes.has(m.index)).map((m) => m.index);
+  }, [piece, section, part]);
   const known = useMemo(() => {
     if (!offBook || !piece || !part || /~|^(row|leaps)-/.test(piece.id)) return new Set<number>();
     const bars = getBars(piece.id, part.id);
@@ -154,7 +155,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
         guide: listenOnly || !!spec?.guide,
         listenOnly,
         cue: route.sectionId === 'entries' || route.sectionId === 'cold' ? 'none' : spec?.cue ?? 'note',
-        leadFrom: route.sectionId === 'cold' ? leadInFrom(piece.score, piece.score.measures.findIndex((m) => Math.abs(m.start - section.start) < 1e-3)) : undefined,
+        leadFrom: route.sectionId === 'cold' ? coldLeadFrom(piece.score, section.start) : undefined,
         scoring: { toleranceCents: tolerance, tuning: profile.tuning, octaveTolerant },
         latencyMs: profile.latencyMs || 0,
         range,
@@ -191,6 +192,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
     let suggestDelayCheck = false;
     let timingFail: number | undefined;
     let timingUnsure: number | undefined;
+    let alignLag = 0;
     const sess = sessionRef.current;
     const calibrated = profile.latencySource === 'measured' && profile.latencyMs > 0;
     if (sess) {
@@ -205,6 +207,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
       );
       r = al.result;
       if (al.shiftMs !== 0) alignedMs = al.shiftMs;
+      alignLag = al.shiftMs !== 0 ? al.estimate.lag : 0;
       // Learn the delay on uncalibrated phones, but only from complete, clearly matching runs, and
       // only once two runs agree (one run sung behind the guide, or a headset switch, must not
       // teach a wrong delay). While the guide plays the singer's own part they may be following it
@@ -240,11 +243,13 @@ function SingPlay({ route }: { route: PlayRoute }) {
     if (sess && sess.exposed.size) {
       const idx = new Set(r.notes.map((n) => n.index));
       const ex = exposedNotes(piece.score, part.id, sess.exposed, beatGrid(piece.score, sess.cfg.from, sess.cfg.to)).filter((i) => idx.has(i));
-      const ins = soloTimingInsight({ score: piece.score, part, range: [Math.min(...idx), Math.max(...idx)] }, ex, sess.samples);
+      // Judge solo tempo on the lined-up voice: a slow phone isn't dragging.
+      const ins = soloTimingInsight({ score: piece.score, part, range: [Math.min(...idx), Math.max(...idx)] }, ex,
+        alignLag ? sess.samples.map((x) => ({ ...x, time: x.time - alignLag })) : sess.samples);
       if (ins) r = { ...r, insights: [ins, ...r.insights.filter((i) => i.kind !== 'great')] };
     }
     // Per-bar history for the piece map and off-book fading (real pieces only, not generated drills).
-    if (!/~|^(row|leaps)-/.test(piece.id)) recordBars(piece.id, part.id, r, level, { peeked: sess?.peeked });
+    if (!/~|^(row|leaps)-/.test(piece.id)) recordBars(piece.id, part.id, r, level, { peeked: sess?.peeked, hidden: hiddenRef.current });
     setLastRun(sess?.recording ? {
       recording: sess.recording,
       at: Date.now(),
@@ -365,6 +370,8 @@ function SingPlay({ route }: { route: PlayRoute }) {
         lo, hi, from: section.start, to: section.end,
         beatSec: s ? s.beatSec(Math.max(0, pos)) : 60 / tempoAt(piece.score.tempos, Math.max(0, pos)),
         hide: offBook ? (i: number) => {
+          // Cold start: nothing of your part before the entry either (it would give the pitch away).
+          if (cold && range && i < range[0]) return 'none';
           const m = part.notes[i]?.measure ?? -1;
           if (!hiddenRef.current.has(m)) return 'show';
           const pk = peekRef.current;
@@ -400,7 +407,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [piece, part, section, route.mode, notation, showNames, rate, tolerance, offBook]);
+  }, [piece, part, section, route.mode, notation, showNames, rate, tolerance, offBook, cold]);
 
   useEffect(() => {
     if (firstTime) try { localStorage.setItem('sh:seenHowto', '1'); } catch { /* ignore */ }
@@ -493,7 +500,10 @@ function SingPlay({ route }: { route: PlayRoute }) {
                 </span>
               )}
               {cold && (
-                <span className="small">You'll hear two bars of the other voices, then come in at bar {piece.score.measures.find((m) => Math.abs(m.start - section.start) < 1e-3)?.number} from memory: no starting note, nothing of your part shown.</span>
+                <span className="small">
+                  {coldLeadFrom(piece.score, section.start) != null ? "You'll hear two bars of the other voices, then come in" : 'After a count-in, come in'}{' '}
+                  at bar {piece.score.measures.find((m) => section.start >= m.start - 1e-3 && section.start < m.start + m.dur - 1e-3)?.number} from memory: no starting note, nothing of your part shown.
+                </span>
               )}
               {offBook && !cold && (
                 <div className="col" style={{ gap: 6 }} data-testid="offbook-mode">
@@ -598,7 +608,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
           {offBook && running && hiddenRef.current.size > 0 && (
             <button className="btn small" data-testid="peek"
               onPointerDown={(e) => { e.preventDefault(); peekStart(); }} onPointerUp={peekEnd} onPointerLeave={peekEnd} onPointerCancel={peekEnd}
-              onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); peekStart(); } }} onKeyUp={peekEnd}
+              onKeyDown={(e) => { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) { e.preventDefault(); peekStart(); } }} onKeyUp={peekEnd}
               onContextMenu={(e) => e.preventDefault()} style={{ touchAction: 'none', userSelect: 'none' }}>
               Peek{peeks ? ` (${peeks})` : ''}
             </button>
@@ -624,6 +634,14 @@ export function simulateMode(): 'perfect' | 'flat' | 'sloppy' | null {
     v = new URLSearchParams(location.search).get('simulate') ?? localStorage.getItem('sh:simulate');
   } catch { /* ignore */ }
   return v === 'perfect' || v === 'flat' || v === 'sloppy' ? v : null;
+}
+
+/** Cold start lead-in: two bars of the others before the bar containing `from` (none at the very start). */
+function coldLeadFrom(score: { measures: { start: number; dur: number }[] }, from: number): number | undefined {
+  const bar = score.measures.findIndex((m) => from >= m.start - 1e-3 && from < m.start + m.dur - 1e-3);
+  const lead = leadInFrom(score as never, Math.max(0, bar));
+  // Less than a bar of lead-in (the start of the piece, or just a pickup): use a normal count-in.
+  return bar > 0 && from - lead >= score.measures[bar].dur * 0.99 ? lead : undefined;
 }
 
 function sessionStartTarget(s: PracticeSession, sectionStart: number): number {

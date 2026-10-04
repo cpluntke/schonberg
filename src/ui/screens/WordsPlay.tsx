@@ -64,7 +64,7 @@ export function WordsPlay({ route }: { route: PlayRoute }) {
       simulate: simulateMode(),
     }, () => onDone());
     // Everyone plays, your part too: the tune carries the rhythm of the words.
-    for (const p of piece.score.parts) s.partGains[p.id] = p.id === part.id ? 0.8 : p.voiceType === 'other' ? 0.55 : 0.6;
+    for (const p of piece.score.parts) s.partGains[p.id] = p.id === part.id ? 0.6 : p.voiceType === 'other' ? 0.45 : 0.5;
     return s;
   }
 
@@ -141,8 +141,10 @@ export function WordsPlay({ route }: { route: PlayRoute }) {
       const r = s?.cfg.rate ?? rate;
       if (s && ts - lastOn > 200) {
         lastOn = ts;
-        onsets = syllableOnsets(s.samples);
-        graded = scoreWords(syl.filter((x) => x.start < pos - 0.3), onsets, { rate: r, relative: !(profile.latencySource === 'measured' && profile.latencyMs > 0) });
+        // Live feedback on the last ~8 s only (the full judgement happens at the end).
+        const recent = s.samples.filter((x) => x.time > pos - 9);
+        onsets = syllableOnsets(recent);
+        graded = scoreWords(syl.filter((x) => x.start < pos - 0.3 && x.start > pos - 8), onsets, { rate: r, relative: !(profile.latencySource === 'measured' && profile.latencyMs > 0) });
         let li = -1;
         if (part) for (let i = 0; i < part.notes.length; i++) { if (part.notes[i].start <= pos + 0.05) li = i; else break; }
         setLyricIdx(li);
@@ -201,7 +203,8 @@ export function WordsPlay({ route }: { route: PlayRoute }) {
               ) : (
                 <>
                   <span className="small muted">
-                    Speak or whisper the words in time with the music: pitch doesn't matter here. Crisp consonants help the app hear each syllable.
+                    Speak or whisper the words in time with the music (speak, don't sing: pitch doesn't matter here). Crisp consonants help the app hear each syllable.
+                    Wear headphones: through the speaker the music drowns your voice.
                   </span>
                   <div className="chips" role="group" aria-label="How much text to show">
                     {STAGE_NAMES.map((n, k) => (

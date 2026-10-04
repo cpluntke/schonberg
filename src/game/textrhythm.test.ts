@@ -50,3 +50,20 @@ describe('words in rhythm', () => {
     expect(scoreWords(syl, syllableOnsets(speak([])), { rate: 1 }).accuracy).toBe(0);
   });
 });
+
+describe('words in rhythm can not be gamed', () => {
+  const syl = syllablesOf(part, [0, part.notes.length - 1]);
+  it('steady chatter through the section does not pass', () => {
+    // "ta ta ta…" every 200 ms: short bursts with clear gaps.
+    const chatter: PitchSample[] = [];
+    for (let t = 0; t < 6; t += 0.02) chatter.push({ time: t, midi: null, clarity: 0, rms: (t % 0.2) < 0.1 ? 0.1 : 0.002 });
+    const r = scoreWords(syl, syllableOnsets(chatter), { rate: 1, relative: true });
+    expect(r.accuracy).toBeLessThan(0.6);
+    expect(r.extra).toBeGreaterThan(5);
+  });
+  it('correct speech over quieter music bleed still counts', () => {
+    const clean = speak(syl.map((s) => s.start));
+    const bled = clean.map((x, k) => ({ ...x, rms: Math.sqrt(x.rms ** 2 + (0.02 * (1 + 0.3 * Math.sin(k / 3))) ** 2) }));
+    expect(scoreWords(syl, syllableOnsets(bled), { rate: 1 }).accuracy).toBeGreaterThan(0.8);
+  });
+});

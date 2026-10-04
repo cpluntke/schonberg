@@ -185,14 +185,16 @@ export class PracticeSession {
   /** The practice beat for a playback starting at `from`. */
   private clickFor(from: number): boolean | ((t: number) => boolean) {
     const mode = this.cfg.beat ?? 'alone';
-    if (mode === 'always' && !this.cfg.listenOnly) return true;
-    if (mode !== 'alone' || this.cfg.listenOnly) return false;
+    if (this.cfg.listenOnly) return false;
+    // Where you're on your own is worked out whatever the setting (the coach uses it for tempo).
     const audible = new Set(Object.entries(this.partGains).filter(([, g]) => g > 0).map(([id]) => id));
     const beats = beatGrid(this.cfg.score, from, this.cfg.to);
     const m = this.cfg.score.measures.find((x) => from >= x.start - 1e-6 && from < x.start + x.dur - 1e-6);
     // A stretch of at least a bar on your own.
     this.exposed = exposedBeats(this.cfg.score, audible, beats, Math.max(2, beatsInMeasure(m?.timeSig ?? [4, 4])));
     const ex = this.exposed;
+    if (mode === 'always') return true;
+    if (mode === 'off') return false;
     return ex.size ? (t: number) => ex.has(t) : false;
   }
 

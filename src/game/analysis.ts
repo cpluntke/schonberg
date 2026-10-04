@@ -434,13 +434,15 @@ export function soloTimingInsight(ctx: ScoringContext, exposed: number[], sample
   const rush = med < -0.09;
   const drag = med > 0.13;
   if (!rush && !drag) return null;
-  const ms = devs.map((x) => x.m);
+  // Name the bars where it showed, not the whole stretch.
+  const off = devs.filter((x) => (rush ? x.d < -0.09 : x.d > 0.13));
+  const ms = (off.length ? off : devs).map((x) => x.m);
   const range: [number, number] = [Math.min(...ms), Math.max(...ms)];
   const amt = Math.round(Math.abs(med) * 1000);
   return {
     kind: 'tempo-drift',
     title: rush ? 'You rushed where you sing alone' : 'You dragged where you sing alone',
-    detail: `With nobody else playing (${barsText(ctx.score, range)}) your notes came about ${amt} ms ${rush ? 'early' : 'late'}. Keep the pulse going in your head through the solo, or switch on the practice beat in Settings ("Beat when you sing alone").`,
+    detail: `With nobody else playing (${barsText(ctx.score, range)}) your notes came about ${amt} ms ${rush ? 'early' : 'late'}. Keep the pulse going in your head through the solo, or set Settings → Practice beat to "When I sing alone".`,
     measures: range,
     severity: amt > 200 ? 3 : 2,
   };
