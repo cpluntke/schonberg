@@ -95,7 +95,7 @@ export function Home() {
       <section className="card">
         <div className="row between">
           <div className="eyebrow">{cycle.name || 'This cycle'}</div>
-          <button className="btn ghost small" onClick={() => go({ name: 'settings' })} style={{ height: 32 }}>Edit dates</button>
+          <button className="btn ghost small" onClick={() => go({ name: 'settings' })}>Edit dates</button>
         </div>
         <div className="row" style={{ gap: 16 }}>
           <Countdown label="Rehearsal" days={toRehearsal} date={cycle.rehearsalDate} />

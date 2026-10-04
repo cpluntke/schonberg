@@ -136,7 +136,8 @@ export class PracticeSession {
       countInBeats: countIn ? this.countInBeats(from) : 0,
       click: false,
       cuePartId: this.cfg.part.id,
-      cue: from === this.cfg.from ? this.cfg.cue : 'note',
+      // After a resume, give the note as a reminder — except at concert level, which only gets the chord.
+      cue: from === this.cfg.from || this.cfg.cue !== 'note' ? this.cfg.cue : 'note',
     });
     this.phase = 'countin';
   }

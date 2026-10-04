@@ -34,7 +34,8 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
       return { id: route.sectionId, label, start: from, end: to };
     }
     const s = piece.sections.find((x) => x.id === route.sectionId);
-    return s ? { id: s.id, label: s.label, start: route.from ?? s.start, end: route.to ?? s.end } : null;
+    // Ladder sections always run whole (bar-range loops use the 'drill' section).
+    return s ? { id: s.id, label: s.label, start: s.start, end: s.end } : null;
   }, [piece, route]);
 
   const [rateOverride, setRateOverride] = useState<number | null>(null);

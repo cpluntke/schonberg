@@ -389,7 +389,7 @@ describe('built-in pieces', () => {
     expect(s.keys[0]).toMatchObject({ fifths: 2, mode: 'major' });
     expect(s.parts[0].notes[1]).toMatchObject({ midi: 74, lyric: 'Mond', start: 60 / 72 });
     const secs = computeSections(s);
-    expect(secs.map((x) => x.label)).toEqual(['Bars 0–6', 'Bars 7–12']);
+    expect(secs.map((x) => x.label)).toEqual(['Upbeat–bar 6', 'Bars 7–12']);
     expect(secs[0].id).toBe('s0-m0-6');
   });
 });

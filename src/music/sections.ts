@@ -125,6 +125,8 @@ export function computeSections(score: Score, opts?: { targetBars?: number }): S
   const barLabel = (a: number, b: number) => {
     const na = ms[a].number;
     const nb = ms[b].number;
+    // A pickup bar is usually numbered 0: read it as "upbeat".
+    if (a === 0 && na === '0') return a === b ? 'Upbeat' : `Upbeat–bar ${nb}`;
     return a === b ? `Bar ${na}` : `Bars ${na}–${nb}`;
   };
   for (const s of segs) {

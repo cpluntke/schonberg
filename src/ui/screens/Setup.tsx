@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
-import { useProfile } from '../hooks';
+import { useProfile, useStoreVersion } from '../hooks';
+import { loadCycle, saveCycle } from '../../progress/store';
 import { go, back } from '../router';
 import { Tuner, letterName } from '../components/Tuner';
 import { getTracker } from '../play/session';
@@ -35,6 +36,7 @@ function suggestVoice(lo: number, hi: number): VoiceType {
 
 export function Setup() {
   const [profile, update] = useProfile();
+  useStoreVersion();
   const [step, setStep] = useState(0);
   const [name, setName] = useState(profile.name);
   const [range, setRange] = useState<{ lo: number; hi: number } | null>(
@@ -107,6 +109,15 @@ export function Setup() {
               ))}
             </div>
           </div>
+          <div className="row">
+            <label className="field grow"><span>Next rehearsal (optional)</span>
+              <input type="date" value={loadCycle().rehearsalDate ?? ''} onChange={(e) => saveCycle({ ...loadCycle(), rehearsalDate: e.target.value || undefined })} />
+            </label>
+            <label className="field grow"><span>Concert (optional)</span>
+              <input type="date" value={loadCycle().concertDate ?? ''} onChange={(e) => saveCycle({ ...loadCycle(), concertDate: e.target.value || undefined })} />
+            </label>
+          </div>
+          <span className="tiny muted">With dates, Home tells you how many sections to learn per day.</span>
           <button className="btn primary block" style={{ marginTop: 'auto' }} onClick={() => setStep(1)}>Continue</button>
         </>
       )}
