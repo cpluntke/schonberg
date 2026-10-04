@@ -15,7 +15,7 @@ export interface PieceInfo {
   sections: Section[];
 }
 
-interface ManifestEntry { id: string; file: string; title: string; composer: string; level?: string; description?: string; credit?: string }
+interface ManifestEntry { id: string; file: string; title: string; composer: string; level?: string; description?: string; credit?: string; partNames?: string[] }
 
 const pieces = new Map<string, PieceInfo>();
 const virtual = new Map<string, PieceInfo>();
@@ -38,34 +38,51 @@ export function makePiece(score: Score, extra: Partial<PieceInfo> = {}): PieceIn
   };
 }
 
-async function loadAll() {
+async function loadManifest(base: string, file: string): Promise<ManifestEntry[]> {
   try {
-    const base = import.meta.env.BASE_URL || './';
-    const res = await fetch(`${base}pieces/manifest.json`);
-    if (res.ok) {
-      const manifest: ManifestEntry[] = await res.json();
-      await Promise.all(
-        manifest.map(async (m) => {
-          try {
-            const r = await fetch(`${base}pieces/${m.file}`);
-            if (!r.ok) throw new Error(`HTTP ${r.status}`);
-            const score = await importScoreFile(m.file, await r.arrayBuffer());
-            score.id = m.id;
-            score.source = 'builtin';
-            if (!score.title || score.title === 'Untitled') score.title = m.title;
-            pieces.set(m.id, makePiece(score, {
-              id: m.id, title: m.title, composer: m.composer, level: m.level, description: m.description, builtin: true,
-            }));
-          } catch (e) {
-            console.error('Failed to load built-in piece', m.id, e);
-          }
-        }),
-      );
-    }
-  } catch (e) {
-    console.error(e);
-    loadError = 'Could not load the built-in pieces.';
+    const res = await fetch(`${base}pieces/${file}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
   }
+}
+
+async function loadAll() {
+  const base = import.meta.env.BASE_URL || './';
+  const manifest = [
+    ...(await loadManifest(base, 'repertoire.json')),
+    ...(await loadManifest(base, 'manifest.json')),
+  ];
+  if (!manifest.length) loadError = 'Could not load the built-in pieces.';
+  await Promise.all(
+    manifest.map(async (m) => {
+      try {
+        const r = await fetch(`${base}pieces/${m.file}`);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const score = await importScoreFile(m.file, await r.arrayBuffer());
+        score.id = m.id;
+        score.source = 'builtin';
+        score.title = m.title;
+        if (m.composer) score.composer = m.composer;
+        if (m.partNames) {
+          const vocal = score.parts.filter((x) => x.notes.length);
+          m.partNames.forEach((name, i) => {
+            if (!vocal[i]) return;
+            vocal[i].name = name;
+            const v = name[0].toUpperCase();
+            if ('SATB'.includes(v)) vocal[i].voiceType = v as 'S' | 'A' | 'T' | 'B';
+          });
+        }
+        pieces.set(m.id, makePiece(score, {
+          id: m.id, title: m.title, composer: m.composer, level: m.level, description: m.description, builtin: true,
+        }));
+      } catch (e) {
+        console.error('Failed to load built-in piece', m.id, e);
+      }
+    }),
+  );
   try {
     const imported = await loadImportedScores();
     for (const s of imported) pieces.set(s.id, makePiece(s));
@@ -75,7 +92,9 @@ async function loadAll() {
   // First run: put the built-ins into the cycle so Home isn't empty.
   const cycle = loadCycle();
   if (!cycle.pieceIds.length && !localStorage.getItem('sh:cycleSeeded')) {
-    cycle.pieceIds = [...pieces.values()].filter((p) => p.builtin).map((p) => p.id);
+    const preferred = ['bach-bwv512', 'debussy-dieu', 'ravel-nicolette', 'bruckner-locus-iste'].filter((id) => pieces.has(id));
+    cycle.pieceIds = preferred.length ? preferred : [...pieces.values()].filter((p) => p.builtin).slice(0, 4).map((p) => p.id);
+    cycle.name = cycle.name === 'This cycle' ? 'Demo cycle' : cycle.name;
     saveCycle(cycle);
     localStorage.setItem('sh:cycleSeeded', '1');
   }

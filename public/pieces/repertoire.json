@@ -1,0 +1,14 @@
+[
+  { "id": "bach-bwv512", "file": "pd/bach-bwv512.mxl", "title": "Gib dich zufrieden, BWV 512", "composer": "J. S. Bach", "level": "easy",
+    "description": "Four-part chorale: the ideal first piece to learn the app.", "partNames": ["Soprano", "Alto", "Tenor", "Bass"], "credit": "PDMX / MuseScore (Public Domain Mark)" },
+  { "id": "bruckner-locus-iste", "file": "pd/bruckner-locus-iste.mxl", "title": "Locus iste, WAB 23", "composer": "Anton Bruckner", "level": "easy",
+    "description": "Gradual for SATB. Clean lines, chromatic surprises.", "credit": "PDMX / MuseScore (CC0)" },
+  { "id": "debussy-dieu", "file": "pd/debussy-dieu.mxl", "title": "Dieu! qu'il la fait bon regarder!", "composer": "Claude Debussy", "level": "medium",
+    "description": "Trois chansons de Charles d'Orléans, no. 1. Modal harmony, sustained lines.", "credit": "PDMX / MuseScore (Public Domain Mark)" },
+  { "id": "brahms-schaffe", "file": "pd/brahms-schaffe.mxl", "title": "Schaffe in mir, Gott, Op. 29/2", "composer": "Johannes Brahms", "level": "medium",
+    "description": "Five-part motet (SATBB).", "credit": "PDMX / MuseScore (Public Domain Mark)" },
+  { "id": "ravel-nicolette", "file": "pd/ravel-nicolette.mxl", "title": "Nicolette", "composer": "Maurice Ravel", "level": "hard",
+    "description": "Trois chansons, no. 1. Quick-changing tempo and characterful entries.", "credit": "PDMX / MuseScore, James Gibb editions (Public Domain Mark)" },
+  { "id": "debussy-yver", "file": "pd/debussy-yver.mxl", "title": "Yver, vous n'estes qu'un villain", "composer": "Claude Debussy", "level": "hard",
+    "description": "Trois chansons de Charles d'Orléans, no. 3. Fast, rhythmic, chromatic.", "credit": "PDMX / MuseScore (Public Domain Mark)" }
+]
