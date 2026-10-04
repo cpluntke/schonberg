@@ -1,0 +1,127 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+@font-face{font-family:"IBM Plex Mono";src:url(fonts/PlexMono.ttf);font-weight:500}
+@font-face{font-family:"Bricolage Grotesque";src:url(fonts/Bricolage.ttf);font-weight:100 900}
+@font-face{font-family:"Source Serif 4";src:url(fonts/SourceSerif.ttf);font-weight:200 900}
+html,body{margin:0;background:#0B0D1A}canvas{display:block}
+</style></head><body><canvas id="c" width="1280" height="720"></canvas><script>
+const TL=__TIMELINE__;
+const C={paper:'#0B0D1A',panel:'#151933',ink:'#EEF0FF',muted:'#A8B0D6',faint:'#6B739C',rule:'#262B4D',
+  orange:'#FF7A45',cyan:'#4CC9F0',purple:'#B3A6FF',nora:'#FF7A45',ben:'#4CC9F0',deep:'#1D4F63'};
+const cv=document.getElementById('c'),ctx=cv.getContext('2d'),W=1280,H=720;
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x)),ease=x=>{x=clamp(x,0,1);return x*x*(3-2*x)},lerp=(a,b,u)=>a+(b-a)*u;
+const MONO=s=>`500 ${s}px "IBM Plex Mono"`,DISP=s=>`800 ${s}px "Bricolage Grotesque"`,DISP6=s=>`600 ${s}px "Bricolage Grotesque"`,SERIF=s=>`400 ${s}px "Source Serif 4"`;
+function rr(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
+function text(s,x,y,font,color,align){ctx.font=font;ctx.fillStyle=color;ctx.textAlign=align||'left';ctx.fillText(s,x,y);ctx.textAlign='left'}
+function lineIdx(t){let i=0;TL.lines.forEach((l,j)=>{if(t>=l.start-0.25)i=j});return i}
+const L=i=>TL.lines[i], lp=(i,t)=>(t-L(i).start)/L(i).dur, since=(i,t)=>t-L(i).start;
+const sceneOf=i=>L(i).scene, firstOf=sc=>TL.lines.findIndex(l=>l.scene===sc);
+const at=(i,f,t)=>ease((lp(i,t)-f)/0.12); // reveal at fraction f of line i
+function wrapText(s,maxW){const out=[];let cur='';for(const w of s.split(' ')){const tt=cur?cur+' '+w:w;if(ctx.measureText(tt).width>maxW&&cur){out.push(cur);cur=w}else cur=tt}if(cur)out.push(cur);return out}
+
+/* images */
+const IMG={};['practice-2d','setup-tuner','setup-delay','piece','results','home','arcade-3d'].forEach(n=>{const im=new Image();im.src='img/'+n+'.png';IMG[n]=im});
+const logo=new Image();logo.src='img/icon.svg';
+const imgReady=Promise.all([...Object.values(IMG),logo].map(im=>new Promise(r=>{if(im.complete)r();else{im.onload=r;im.onerror=r}})));
+
+/* phone mockup: css-px coordinates of the 390×844 screenshot map into the frame */
+const PH={h:480};PH.s=PH.h/844;PH.w=390*PH.s;
+function phone(name,x,y,A,opts={}){
+  const s=PH.s,w=PH.w,h=PH.h,src=IMG[name];if(!src)return;
+  ctx.globalAlpha=A;ctx.fillStyle='#000';rr(x-9,y-9,w+18,h+18,30);ctx.fill();
+  ctx.strokeStyle='#30365C';ctx.lineWidth=2;rr(x-9,y-9,w+18,h+18,30);ctx.stroke();
+  ctx.save();rr(x,y,w,h,22);ctx.clip();
+  const sy=(opts.scrollCss||0)*2; // screenshots are @2x
+  ctx.drawImage(src,0,sy,780,1688,x,y,w,h);ctx.restore();ctx.globalAlpha=1;}
+const P=(px,py,ox,oy)=>[ox+px*PH.s,oy+py*PH.s];
+
+function callout(px,py,lx,ly,label,sub,color,A){ // dot on phone + line + label
+  if(A<=0.01)return;ctx.globalAlpha=A;ctx.strokeStyle=color;ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(lx-14,ly-8);ctx.stroke();
+  ctx.fillStyle=color;ctx.beginPath();ctx.arc(px,py,7,0,7);ctx.fill();
+  ctx.lineWidth=3;ctx.beginPath();ctx.arc(px,py,13+4*Math.sin(A*6),0,7);ctx.globalAlpha=A*0.4;ctx.stroke();ctx.globalAlpha=A;
+  text(label,lx,ly,DISP6(28),color);if(sub)text(sub,lx,ly+30,SERIF(21),C.muted);ctx.globalAlpha=1}
+
+/* --- scenes --- */
+function sceneA(t,A){const a=A*ease(since(0,t)/0.8);ctx.globalAlpha=a;
+  // little highway motif
+  const y0=410;ctx.lineWidth=5;ctx.lineCap='round';
+  for(let k=0;k<5;k++){const x=330+k*130+ (-(t*60)%130);ctx.fillStyle=C.orange;rr(x,y0-((k*37)%60),100,26,13);ctx.fill();}
+  ctx.strokeStyle=C.cyan;ctx.beginPath();for(let x=200;x<=640;x+=6){const yy=y0+13-40*Math.sin(x/90+t*1.2)*0.5-((x-200)/440)*20;x===200?ctx.moveTo(x,yy):ctx.lineTo(x,yy)}ctx.stroke();
+  ctx.fillStyle=C.ink;ctx.fillRect(640,330,3,150);
+  ctx.globalAlpha=a;if(logo.complete)ctx.drawImage(logo,W/2-48,120,96,96);
+  text('Schönberg Hero',W/2,290,DISP(84),C.ink,'center');
+  text('Learn your choir part, one phrase at a time',W/2,530,SERIF(28),C.muted,'center');ctx.globalAlpha=1}
+
+function sceneB(t,A){const x=170,y=110;phone('practice-2d',x,y,A);
+  const lx=560;
+  callout(...P(143,200,x,y),lx,170,'The white line = now','sing when a bar reaches it',C.ink,A*at(2,0.1,t));
+  callout(...P(118,410,x,y),lx,265,'Blue line = your voice','keep it on the orange bars',C.cyan,A*at(2,0.45,t));
+  callout(...P(195,470,x,y),lx,360,'Orange bars = your notes',null,C.orange,A*at(2,0.75,t));
+  callout(...P(80,650,x,y),lx,445,'Dashed = the other voices','see where you sit in the chord',C.purple,A*at(4,0.05,t));
+  callout(...P(178,383,x,y),lx,540,'Bubble = cents sharp (+) / flat (−)',null,C.cyan,A*at(4,0.55,t));}
+
+function sceneC(t,A){const x1=150,x2=430,y=110;
+  phone('setup-tuner',x1,y,A);phone('setup-delay',x2,y,A*at(6,0,t));
+  const a1=A*at(5,0.45,t);ctx.globalAlpha=a1;
+  // headphones icon
+  const hx=880,hy=230;ctx.strokeStyle=C.cyan;ctx.lineWidth=10;ctx.lineCap='round';
+  ctx.beginPath();ctx.arc(hx,hy,70,Math.PI,0);ctx.stroke();ctx.fillStyle=C.cyan;rr(hx-90,hy-10,36,70,12);ctx.fill();rr(hx+54,hy-10,36,70,12);ctx.fill();
+  text('Wired headphones',hx,hy+110,DISP6(30),C.ink,'center');text('so the mic only hears you',hx,hy+142,SERIF(22),C.muted,'center');
+  ctx.globalAlpha=1;
+  // clicks + "ta"
+  const a2=A*at(7,0.35,t);if(a2>0.01){ctx.globalAlpha=a2;
+    for(let k=0;k<6;k++){const cx=730+k*58,cy=470;const ph=((t-L(7).start)*1.5-k*0.25);const on=ph>0&&ph%1.5<0.35;
+      ctx.fillStyle=on?C.orange:C.rule;ctx.beginPath();ctx.arc(cx,cy,on?16:12,0,7);ctx.fill();
+      if(on)text('ta',cx,cy-28,DISP6(22),C.orange,'center')}
+    text('6 clicks → delay measured',880,540,MONO(20),C.muted,'center');ctx.globalAlpha=1}}
+
+const LV=[['1','Note-learning','70% tempo · your part plays'],['2','In time','full tempo · your part plays'],['3','Independent','others only'],['4','Concert-ready','no names · chord only']];
+function sceneD(t,A){const x=150,y=110;phone('piece',x,y,A,{scrollCss:0});
+  const bx=520;LV.forEach((l,k)=>{const f=[0.0,0.22,0.42,0.66][k];const a=A*(sceneOf(lineIdx(t))==='D'&&lineIdx(t)>9?1:at(9,f,t));
+    if(a<0.01)return;ctx.globalAlpha=a;const yy=150+k*96;
+    const col=k<2?C.cyan:k===2?C.orange:C.purple;ctx.fillStyle=C.panel;rr(bx,yy,500,80,16);ctx.fill();ctx.strokeStyle=col;ctx.lineWidth=2;rr(bx,yy,500,80,16);ctx.stroke();
+    ctx.fillStyle=col;rr(bx+16,yy+14,52,52,12);ctx.fill();text(l[0],bx+42,yy+52,DISP(32),C.paper,'center');
+    text(l[1],bx+88,yy+38,DISP6(28),C.ink);text(l[2],bx+88,yy+66,MONO(17),C.muted);ctx.globalAlpha=1});
+  // targets
+  const ar=A*at(11,0.15,t);if(ar>0.01){ctx.globalAlpha=ar;text('← rehearsal-ready',bx+520,150+2*96+48,MONO(20),C.orange,'left');ctx.globalAlpha=1}
+  const ac=A*at(11,0.55,t);if(ac>0.01){ctx.globalAlpha=ac;text('← concert-ready',bx+520,150+3*96+48,MONO(20),C.purple,'left');ctx.globalAlpha=1}}
+
+const NOTES=[['↓','Long notes sink','keep the support to the end'],['◷','Late after rests','breathe in tempo'],['♪','Wrong notes in bar 12','learn the pitches slowly']];
+function sceneE(t,A){const x=150,y=110;phone('results',x,y,A,{scrollCss:330});
+  const bx=520;NOTES.forEach((n,k)=>{const a=A*at(13,[0.18,0.32,0.46][k],t);if(a<0.01)return;ctx.globalAlpha=a;const yy=150+k*100;
+    ctx.fillStyle=C.panel;rr(bx,yy,600,84,16);ctx.fill();text(n[0],bx+30,yy+54,DISP(34),C.orange,'center');
+    text(n[1],bx+64,yy+38,DISP6(27),C.ink);text(n[2],bx+64,yy+66,SERIF(21),C.muted);ctx.globalAlpha=1});
+  const a=A*at(13,0.7,t);if(a>0.01){ctx.globalAlpha=a;const yy=470;ctx.fillStyle=C.orange;rr(bx,yy,600,64,14);ctx.fill();
+    text('⟲  Loop bars 10–12 slowly',bx+300,yy+42,DISP6(27),C.paper,'center');ctx.globalAlpha=1}}
+
+function sceneF(t,A){const x=150,y=110;phone('home',x,y,A);
+  const a1=A*at(14,0.25,t);if(a1>0.01){ctx.globalAlpha=a1;text("Today's plan",520,190,DISP(40),C.ink);
+    text('paced to your rehearsal and concert',520,228,SERIF(24),C.muted);
+    text('≈ 10 minutes a day',520,290,DISP6(34),C.orange);ctx.globalAlpha=1}
+  const a2=A*at(16,0.0,t);if(a2>0.01){phone('arcade-3d',1000,y,a2);ctx.globalAlpha=a2;
+    text('Arcade →',520,400,DISP(40),C.purple,'left');text('unlocks at level 2',520,436,MONO(19),C.muted,'left');ctx.globalAlpha=1}}
+
+function sceneG(t,A){const a=A*ease(since(17,t)/0.6);ctx.globalAlpha=a;if(logo.complete)ctx.drawImage(logo,W/2-44,150,88,88);
+  text('Put on headphones',W/2,320,DISP(56),C.ink,'center');
+  ctx.fillStyle=C.orange;rr(W/2-190,370,380,74,18);ctx.fill();text('Start voice setup',W/2,418,DISP6(32),C.paper,'center');
+  const b=A*at(18,0,t);ctx.globalAlpha=b;text("Let's sing.",W/2,520,DISP(44),C.cyan,'center');ctx.globalAlpha=1}
+
+const SCENES={A:sceneA,B:sceneB,C:sceneC,D:sceneD,E:sceneE,F:sceneF,G:sceneG};
+const HEAD={B:'The practice screen',C:'Voice setup',D:'The level ladder',E:'Coach notes',F:'Every day'};
+
+function speakers(t){const i=lineIdx(t),l=L(i),talking=t>=l.start&&t<=l.start+l.dur;
+  [['N','NORA','coach',C.nora,880],['B','BEN','singer',C.ben,1070]].forEach(s=>{const on=talking&&l.sp===s[0],x=s[4],y=34;
+    ctx.globalAlpha=on?1:.45;ctx.fillStyle=on?s[3]:C.panel;rr(x,y,180,40,20);ctx.fill();ctx.strokeStyle=s[3];ctx.lineWidth=1.5;rr(x,y,180,40,20);ctx.stroke();
+    text(s[1],x+18,y+26,MONO(15),on?C.paper:s[3]);text(s[2],x+78,y+26,MONO(13),on?C.paper:C.muted);
+    if(on){ctx.fillStyle=C.paper;for(let b=0;b<4;b++){const h=6+10*Math.abs(Math.sin(t*9+b*1.7));ctx.fillRect(x+148+b*6,y+20-h/2,3,h)}}});ctx.globalAlpha=1}
+function subtitles(t){const s=TL.subs.find(x=>t>=x[0]-0.05&&t<x[1]+0.2);if(!s)return;ctx.font=SERIF(25);
+  const ls=wrapText(s[3],980),bh=ls.length*34+22,y0=H-bh-14;ctx.globalAlpha=.92;ctx.fillStyle='#05060D';rr(90,y0,1100,bh,10);ctx.fill();ctx.globalAlpha=1;
+  text(s[2]==='N'?'NORA':'BEN',112,y0+33,MONO(14),s[2]==='N'?C.nora:C.ben);ctx.font=SERIF(25);ctx.fillStyle=C.ink;ls.forEach((x,j)=>ctx.fillText(x,190,y0+34+j*34))}
+window.renderAt=function(t){ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.fillStyle=C.paper;ctx.fillRect(0,0,W,H);
+  const i=lineIdx(t),sc=sceneOf(i),first=firstOf(sc),fin=ease((t-(L(first).start-0.45))/0.45);
+  if(fin<1&&first>0)SCENES[sceneOf(first-1)](Math.min(t,L(first).start-0.46),1-fin);
+  SCENES[sc](t,fin);
+  if(HEAD[sc]){text('SCHÖNBERG HERO',44,52,MONO(13),C.orange);text(HEAD[sc],44,86,DISP(30),C.ink)}
+  speakers(t);subtitles(t)};
+window.ready=Promise.all([...[MONO(15),DISP(34),DISP6(28),SERIF(25)].map(f=>document.fonts.load(f)),imgReady]);
+</script></body></html>

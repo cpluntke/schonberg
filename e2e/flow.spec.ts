@@ -50,3 +50,14 @@ test('diagnostics mic test reads the fake microphone', async ({ page }) => {
   const report = await page.getByLabel('Diagnostics report').inputValue();
   expect(JSON.parse(report).mic.readingsPerSec).toBeGreaterThan(20);
 });
+
+test('onboarding video opens from Home and loads', async ({ page }) => {
+  await page.goto('/#/');
+  await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
+  await page.getByTestId('intro-open').first().click();
+  const v = page.getByTestId('intro-video');
+  await expect(v).toBeVisible();
+  await expect.poll(async () => v.evaluate((el: HTMLVideoElement) => el.duration || 0), { timeout: 15_000 }).toBeGreaterThan(90);
+  await page.getByRole('button', { name: 'Close' }).click();
+  await expect(v).toHaveCount(0);
+});

@@ -6,6 +6,7 @@ import { loadCycle, getProgress, streakDays, dueForReview, attemptLog } from '..
 import { pieceReadiness, nextStep, levelSpec } from '../../progress/ladder';
 import { rowOfTheDay } from '../../game/twelvetone';
 import { IconFlame, IconPlay, IconMic } from '../icons';
+import { IntroVideoButton } from '../components/IntroVideo';
 
 function pcSym(p: number) { return p === 10 ? 't' : p === 11 ? 'e' : String(p); }
 
@@ -94,6 +95,7 @@ export function Home() {
               <span className="small muted">Mic check, your range, headphone delay and your preferred note names.</span>
             </div>
           </div>
+          <IntroVideoButton className="btn block" />
           <button className="btn voice block" onClick={() => go({ name: 'setup' })}>Start setup</button>
         </div>
       )}

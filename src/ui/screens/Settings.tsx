@@ -5,6 +5,7 @@ import { loadCycle, saveCycle, exportBackup, importBackup } from '../../progress
 import { effectiveTolerance } from '../../progress/ladder';
 import { NOTATIONS } from './Setup';
 import { noteLabel } from '../../game/notation';
+import { IntroVideoButton } from '../components/IntroVideo';
 
 export function Settings() {
   const [profile, update] = useProfile();
@@ -121,6 +122,7 @@ export function Settings() {
           <button className="btn small grow" onClick={() => go({ name: 'setup' })}>Run voice setup again</button>
           <button className="btn small grow" onClick={() => go({ name: 'tuner' })}>Tuner</button>
         </div>
+        <IntroVideoButton label="Watch the intro video again" className="btn small" compact />
         <button className="btn small" onClick={() => go({ name: 'diagnostics' })}>Diagnostics &amp; problem report</button>
       </section>
 

@@ -1,0 +1,21 @@
+[
+ {"sp":"N","scene":"A","say":"Welcome to Schoenberg Hero. In about a minute and a half, you'll know how to learn your part for the next concert.","show":"Welcome to Schönberg Hero. In about a minute and a half, you'll know how to learn your part for the next concert."},
+ {"sp":"B","scene":"B","say":"Hang on. Is this karaoke for choir nerds?","show":"Hang on. Is this karaoke for choir nerds?"},
+ {"sp":"N","scene":"B","say":"Pretty much. Your notes scroll toward the white line, and the blue line is your voice. Keep the blue line on the orange bars.","show":"Pretty much. Your notes scroll toward the white line, and the blue line is your voice. Keep the blue line on the orange bars."},
+ {"sp":"B","scene":"B","say":"And the dashed boxes?","show":"And the dashed boxes?"},
+ {"sp":"N","scene":"B","say":"Those are the other voices, so you can see where you sit in the chord. The little bubble tells you how many cents sharp or flat you are.","show":"Those are the other voices, so you can see where you sit in the chord. The little bubble tells you how many cents sharp or flat you are."},
+ {"sp":"N","scene":"C","say":"Before your first run, do the two minute voice setup. Put on wired headphones, so the microphone only hears you.","show":"Before your first run, do the 2-minute voice setup. Put on wired headphones, so the microphone only hears you."},
+ {"sp":"B","scene":"C","say":"What about my Bluetooth earbuds?","show":"What about my Bluetooth earbuds?"},
+ {"sp":"N","scene":"C","say":"They add a delay. The setup measures it: you just sing ta on each of the clicks.","show":"They add a delay. The setup measures it: you just sing “ta” on each of the clicks."},
+ {"sp":"N","scene":"D","say":"Every piece is cut into short sections, and each section climbs four levels.","show":"Every piece is cut into short sections, and each section climbs four levels."},
+ {"sp":"N","scene":"D","say":"Level one is slow, with your part playing. Level two is full tempo. Level three, you sing alone against the other voices. Level four is concert ready: no note names, only the chord to start.","show":"Level 1: slow, with your part playing. Level 2: full tempo. Level 3: alone against the other voices. Level 4: concert-ready, no note names, only the chord to start."},
+ {"sp":"B","scene":"D","say":"So level three means I'm ready for rehearsal?","show":"So level 3 means I'm ready for rehearsal?"},
+ {"sp":"N","scene":"D","say":"Exactly. Every section at three means rehearsal ready. Every section at four means concert ready.","show":"Exactly. Every section at 3 = rehearsal-ready. Every section at 4 = concert-ready."},
+ {"sp":"B","scene":"E","say":"And when I mess up?","show":"And when I mess up?"},
+ {"sp":"N","scene":"E","say":"The coach tells you why. Sinking on long notes, late after rests, wrong notes in bar twelve. Tap the note, and it loops just those bars, slowly.","show":"The coach tells you why: sinking on long notes, late after rests, wrong notes in bar 12. Tap the note, and it loops just those bars, slowly."},
+ {"sp":"N","scene":"F","say":"Home shows today's plan, paced to your rehearsal and concert dates. Ten minutes a day is plenty.","show":"Home shows today's plan, paced to your rehearsal and concert dates. Ten minutes a day is plenty."},
+ {"sp":"B","scene":"F","say":"And the three D mode?","show":"And the 3D mode?"},
+ {"sp":"N","scene":"F","say":"Arcade mode unlocks once a section reaches level two. It's your reward, not your homework.","show":"Arcade mode unlocks once a section reaches level 2. It's your reward, not your homework."},
+ {"sp":"N","scene":"G","say":"Ready? Put on your headphones and start the voice setup.","show":"Ready? Put on your headphones and start the voice setup."},
+ {"sp":"B","scene":"G","say":"Let's sing.","show":"Let's sing."}
+]

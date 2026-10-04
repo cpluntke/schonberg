@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { useProfile, useStoreVersion } from '../hooks';
 import { loadCycle, saveCycle } from '../../progress/store';
 import { allPieces } from '../library';
+import { IntroVideoButton, introSeen } from '../components/IntroVideo';
 import { go, back } from '../router';
 import { Tuner, letterName } from '../components/Tuner';
 import { getTracker } from '../play/session';
@@ -101,6 +102,7 @@ export function Setup() {
       {step === 0 && (
         <>
           <h1 className="hero">Who's singing?</h1>
+          {!introSeen() && <IntroVideoButton label="New here? Watch the 1½-minute intro" className="btn block" />}
           <label className="field">
             <span>Your name (shown on the choir leaderboard)</span>
             <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="First name" autoComplete="given-name" maxLength={40} />
