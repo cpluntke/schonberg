@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { releaseTracker } from './play/session';
 import { useRoute, go, type Route } from './router';
 import { useLibrary } from './library';
 import { useToast } from './hooks';
@@ -26,6 +27,12 @@ export function App() {
   const route = useRoute();
   const lib = useLibrary();
   const toast = useToast();
+  // Release the microphone shortly after leaving the screens that use it (privacy + battery).
+  useEffect(() => {
+    if (route.name === 'play' || route.name === 'setup' || route.name === 'tuner') return;
+    const t = window.setTimeout(() => releaseTracker(), 15000);
+    return () => clearTimeout(t);
+  }, [route.name]);
   const showNav = ['home', 'library', 'ranks', 'settings', 'piece', 'expert'].includes(route.name);
 
   let body: React.ReactNode;

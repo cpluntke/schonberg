@@ -35,7 +35,7 @@ describe('ladder', () => {
     expect(strictnessFactor('forgiving')).toBe(1.3);
     expect(effectiveTolerance(1, 'forgiving')).toBe(65);
     expect(effectiveTolerance(2, 'standard')).toBe(35);
-    expect(effectiveTolerance(4, 'strict')).toBe(18);
+    expect(effectiveTolerance(4, 'strict')).toBe(20);
   });
   it('readiness', () => {
     expect(pieceReadiness(secs, undefined)).toEqual({ pct: 0, minLevel: 0, rehearsalReady: false, concertReady: false });

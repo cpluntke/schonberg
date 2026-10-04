@@ -63,7 +63,7 @@ export function levelSpec(level: number): LevelSpec {
 }
 
 export function strictnessFactor(s: Strictness): number {
-  return s === 'forgiving' ? 1.3 : s === 'strict' ? 0.7 : 1;
+  return s === 'forgiving' ? 1.3 : s === 'strict' ? 0.8 : 1;
 }
 
 /** Tolerance in cents for a level after the profile strictness factor. */

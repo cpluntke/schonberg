@@ -138,7 +138,7 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
       const canvas = canvasRef.current;
       const wrap = wrapRef.current;
       if (!canvas || !wrap || !piece || !part || !section) return;
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const dpr = Math.min(route.mode === '3d' ? 1.5 : 2, window.devicePixelRatio || 1);
       const W = wrap.clientWidth;
       const H = wrap.clientHeight;
       if (canvas.width !== Math.round(W * dpr) || canvas.height !== Math.round(H * dpr)) {
@@ -165,9 +165,9 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
       if (ts - lastHud > 90) {
         lastHud = ts;
         let count = 0;
-        if (s && pos < section.start && (s.phase === 'countin')) {
-          const bpm = piece.score.tempos.length ? tempoAt(piece.score.tempos, section.start) : 90;
-          count = Math.ceil((section.start - pos) / (60 / bpm));
+        if (s && s.phase === 'countin') {
+          const target = sessionStartTarget(s, section.start);
+          if (pos < target) count = Math.ceil((target - pos) / s.beatSec(target) - 1e-6);
         }
         let lyricIdx = -1;
         for (let i = 0; i < part.notes.length; i++) {
@@ -337,6 +337,10 @@ export function simulateMode(): 'perfect' | 'flat' | 'sloppy' | null {
     v = new URLSearchParams(location.search).get('simulate') ?? localStorage.getItem('sh:simulate');
   } catch { /* ignore */ }
   return v === 'perfect' || v === 'flat' || v === 'sloppy' ? v : null;
+}
+
+function sessionStartTarget(s: PracticeSession, sectionStart: number): number {
+  return Math.max(sectionStart, s.resumePoint);
 }
 
 function tempoAt(tempos: { time: number; bpm: number }[], t: number): number {

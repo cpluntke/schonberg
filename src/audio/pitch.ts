@@ -34,7 +34,7 @@ export class MicError extends Error {
 
 export const MIN_HZ = 60;
 export const MAX_HZ = 1400;
-export const RMS_GATE = 0.01;
+export const RMS_GATE = 0.005;
 export const CLARITY_GATE = 0.85;
 
 export function hzToMidi(hz: number): number {

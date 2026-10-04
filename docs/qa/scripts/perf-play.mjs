@@ -62,9 +62,9 @@ for (const mode of ['play', 'arcade']) {
 }
 // restarts with the (fake) real mic, 10 cycles
 await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
-const bachPart = await page.evaluate(async () => { const m = await import('/src/ui/library.ts'); await m.ensureLoaded(); return m.getPiece('bach-bwv512').score.parts[0].id; });
+const bachPart = await page.evaluate(async () => { const m = await import('/src/ui/library.ts'); await m.ensureLoaded(); return m.getPiece('brahms-schaffe').score.parts[0].id; });
 console.log(JSON.stringify(out.runs));
-await page.goto(BASE + `#/play/bach-bwv512/${encodeURIComponent(bachPart)}/all?level=2`); await page.reload(); await sleep(1500);
+await page.goto(BASE + `#/play/brahms-schaffe/${encodeURIComponent(bachPart)}/all?level=2`); await page.reload(); await sleep(1500);
 const heap = async () => { await cdp.send('HeapProfiler.collectGarbage'); const h = await cdp.send('Runtime.getHeapUsage'); const d = await cdp.send('Memory.getDOMCounters'); const s = await page.evaluate(() => ({ ...window.__stats, liveTracks: (window.__streams || []).flatMap((x) => x.getTracks()).filter((t) => t.readyState === 'live').length })); return { heapMB: +(h.usedSize / 1e6).toFixed(2), nodes: d.nodes, listeners: d.jsEventListeners, ...s }; };
 out.restart = [await heap()];
 await page.getByTestId('start').click(); await sleep(4000);

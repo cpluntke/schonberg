@@ -57,16 +57,16 @@ describe('scoreAttempt', () => {
     for (const n of r.notes) expect(n.grade).toBe('ok');
   });
 
-  it('octave error: miss when strict, ok + flagged when octave tolerant', () => {
+  it('octave error: miss when strict; full credit and no flag when octave tolerant', () => {
     const samples = sampleSinging(melody, (n) => n.midi - 12);
     const strict = scoreAttempt(ctx, samples, opts);
     expect(strict.counts.miss).toBe(8);
     expect(strict.notes.every((n) => n.octave)).toBe(true);
     expect(strict.insights.map((i) => i.kind)).toContain('octave');
     const tolerant = scoreAttempt(ctx, samples, { ...opts, octaveTolerant: true });
-    expect(tolerant.counts.ok).toBe(8);
+    expect(tolerant.counts.perfect).toBe(8);
     expect(tolerant.notes[0].cents).toBeCloseTo(0);
-    expect(tolerant.notes.every((n) => n.octave)).toBe(true);
+    expect(tolerant.notes.some((n) => n.octave)).toBe(false);
   });
 
   it('late onsets lower rhythm and are measured', () => {
@@ -201,9 +201,13 @@ describe('just intonation', () => {
     const pure = scoreAttempt(c, sampleSinging(sop, (n) => n.midi - 0.137), justOpts);
     expect(pure.notes[0].targetOffset).toBeCloseTo(-13.7);
     expect(pure.notes[0].grade).toBe('perfect');
+    // Tempered (what the backing plays) is accepted too: the target sits halfway, window widened.
     const tempered = scoreAttempt(c, sampleSinging(sop, (n) => n.midi), justOpts);
-    expect(tempered.notes[0].cents).toBeCloseTo(13.7);
-    expect(tempered.notes[0].grade).toBe('miss');
+    expect(tempered.notes[0].cents).toBeCloseTo(6.85);
+    expect(tempered.notes[0].grade).not.toBe('miss');
+    // …but a third sung 25 cents sharp of tempered is still out.
+    const sharp = scoreAttempt(c, sampleSinging(sop, (n) => n.midi + 0.25), justOpts);
+    expect(sharp.notes[0].grade).toBe('miss');
   });
 });
 

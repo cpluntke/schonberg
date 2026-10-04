@@ -126,10 +126,14 @@ export function drawArcade(c: CanvasRenderingContext2D, W: number, H: number, s:
     const col = past ? gradeColor(g) : isNow && fill > 0.4 ? COLORS.voice : COLORS.target;
     c.fillStyle = col;
     c.globalAlpha = past ? (g === 'miss' ? 0.35 : 0.6) : 1;
-    c.shadowColor = col;
-    c.shadowBlur = isNow ? 24 : 10;
     c.fill();
-    c.shadowBlur = 0;
+    if (isNow) {
+      // cheap glow: wide translucent stroke instead of shadowBlur (expensive on phones)
+      c.globalAlpha = 0.35;
+      c.strokeStyle = col;
+      c.lineWidth = 10;
+      c.stroke();
+    }
     c.globalAlpha = 1;
     if (nn.lyric && !past) {
       const sz = Math.max(9, Math.round(14 * scale(z0)));
@@ -227,10 +231,7 @@ export function drawArcade(c: CanvasRenderingContext2D, W: number, H: number, s:
     c.textBaseline = 'middle';
     const tw = c.measureText(p.text).width;
     c.fillStyle = p.color;
-    c.shadowColor = p.color;
-    c.shadowBlur = 20;
     c.fillText(p.text, cx - tw / 2, H * 0.3 - t * 20);
-    c.shadowBlur = 0;
   }
   c.globalAlpha = 1;
 }

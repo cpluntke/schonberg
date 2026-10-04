@@ -1,9 +1,9 @@
 // Glue between audio (player + pitch tracker), live scoring and the renderers.
 import type { Part, Score } from '../../music/types';
 import type { AttemptResult, PitchSample, ScoringOptions } from '../../game/types';
-import { getAudioContext, unlockAudio } from '../../audio/context';
+import { getAudioContext, unlockAudio, outputLatencySec } from '../../audio/context';
 import { PitchTracker, type RawPitch } from '../../audio/pitch';
-import { ScorePlayer } from '../../audio/player';
+import { ScorePlayer, beatsInMeasure, beatSecAt } from '../../audio/player';
 import { LiveScorer, type ScoringContext } from '../../game/scoring';
 
 let sharedTracker: PitchTracker | null = null;
@@ -62,6 +62,11 @@ export class PracticeSession {
   private unsubEnd: (() => void) | null = null;
   private resumeFrom: number;
   private simTimer: number | null = null;
+  /** Samples earlier than this are ignored (count-in before the start, or before a resume point). */
+  private minTime: number;
+  /** Effective mic round-trip latency: calibrated, else a conservative estimate. */
+  readonly latencyMs: number;
+  private wakeLock: { release(): Promise<void> } | null = null;
   private onDone: (r: AttemptResult | null) => void;
   latest: PitchSample | null = null;
 
@@ -69,6 +74,8 @@ export class PracticeSession {
     this.cfg = cfg;
     this.onDone = onDone;
     this.resumeFrom = cfg.from;
+    this.minTime = cfg.from - 0.6;
+    this.latencyMs = cfg.latencyMs > 0 ? cfg.latencyMs : estimateLatencyMs();
     this.player = new ScorePlayer(getAudioContext(), cfg.score);
     for (const p of cfg.score.parts) {
       if (p.id === cfg.part.id) this.partGains[p.id] = cfg.listenOnly || cfg.guide ? 0.9 : 0;
@@ -99,6 +106,7 @@ export class PracticeSession {
       this.unsubPitch = this.tracker.onPitch((p) => this.onPitch(p));
     }
     this.play(this.resumeFrom, true);
+    this.requestWakeLock();
   }
 
   private play(from: number, countIn: boolean) {
@@ -117,21 +125,24 @@ export class PracticeSession {
     this.phase = 'countin';
   }
 
-  private countInBeats(from: number): number {
+  /** Count-in: one bar of felt beats (2/2 → 2, 6/8 → 2, 3/4 → 3), at least 2 and at most 4. */
+  countInBeats(from: number): number {
     const m = this.cfg.score.measures.find((x) => from >= x.start - 1e-6 && from < x.start + x.dur - 1e-6);
-    const num = m?.timeSig[0] ?? 4;
-    const den = m?.timeSig[1] ?? 4;
-    // Compound meters (6/8, 9/8, 12/8) count in dotted beats; otherwise one bar, at least 2 beats.
-    const beats = den === 8 && num % 3 === 0 ? num / 3 : num;
-    return Math.max(2, Math.min(4, beats)) * (den === 8 && num % 3 === 0 ? 1.5 : 4 / den);
+    const felt = beatsInMeasure(m?.timeSig ?? [4, 4]);
+    return Math.max(2, Math.min(4, felt));
+  }
+
+  /** Length of one count-in beat in score seconds. */
+  beatSec(at: number): number {
+    return beatSecAt(this.cfg.score, at);
   }
 
   private onPitch(p: RawPitch) {
     if (this.phase !== 'playing' && this.phase !== 'countin') return;
-    const t = this.player.scoreTimeAt(p.ctxTime - this.cfg.latencyMs / 1000);
+    const t = this.player.scoreTimeAt(p.ctxTime - this.latencyMs / 1000);
     const s: PitchSample = { time: t, midi: p.midi, clarity: p.clarity, rms: p.rms };
     this.latest = s;
-    if (t < this.cfg.from - 0.6) return;
+    if (t < this.minTime) return;
     this.samples.push(s);
     this.live?.push(s);
   }
@@ -155,7 +166,7 @@ export class PracticeSession {
       }
       const s: PitchSample = { time: t, midi, clarity: midi == null ? 0.3 : 0.97, rms: midi == null ? 0.002 : 0.1 };
       this.latest = s;
-      if (t < this.cfg.from - 0.6) return;
+      if (t < this.minTime) return;
       this.samples.push(s);
       this.live?.push(s);
     }, 20);
@@ -164,6 +175,11 @@ export class PracticeSession {
   private stopSimulation() {
     if (this.simTimer != null) clearInterval(this.simTimer);
     this.simTimer = null;
+  }
+
+  /** Score time where the current/next playback starts (section start or resume point). */
+  get resumePoint(): number {
+    return this.resumeFrom;
   }
 
   /** Called every animation frame by the screen. */
@@ -185,11 +201,27 @@ export class PracticeSession {
     this.unsubEnd = null;
     this.player.stop();
     this.phase = 'paused';
+    this.releaseWakeLock();
   }
 
-  resume() {
+  async resume() {
     if (this.phase !== 'paused') return;
+    await unlockAudio(); // iOS suspends the context when the app is backgrounded
+    this.minTime = this.resumeFrom - 0.02;
     this.play(this.resumeFrom, true);
+    this.requestWakeLock();
+  }
+
+  private async requestWakeLock() {
+    try {
+      const wl = (navigator as Navigator & { wakeLock?: { request(t: 'screen'): Promise<{ release(): Promise<void> }> } }).wakeLock;
+      if (wl && !this.wakeLock) this.wakeLock = await wl.request('screen');
+    } catch { /* not allowed / unsupported */ }
+  }
+
+  private releaseWakeLock() {
+    this.wakeLock?.release().catch(() => {});
+    this.wakeLock = null;
   }
 
   finish() {
@@ -197,6 +229,7 @@ export class PracticeSession {
     this.phase = 'done';
     this.unsubEnd?.();
     this.stopSimulation();
+    this.releaseWakeLock();
     this.player.stop();
     const result = this.live ? this.live.finish(this.samples) : null;
     this.onDone(result);
@@ -205,6 +238,7 @@ export class PracticeSession {
   /** Stop without producing a result (navigating away). */
   dispose() {
     this.stopSimulation();
+    this.releaseWakeLock();
     this.unsubPitch?.();
     this.unsubPitch = null;
     this.unsubEnd?.();
@@ -214,4 +248,12 @@ export class PracticeSession {
       this.player.stop();
     }
   }
+}
+
+/** Uncalibrated devices: output latency + input/processing (~40 ms), at least 80 ms on phones. */
+export function estimateLatencyMs(): number {
+  let out = 0;
+  try { out = outputLatencySec() * 1000; } catch { /* no context yet */ }
+  const mobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  return Math.round(Math.max(mobile ? 80 : 50, out + 40));
 }

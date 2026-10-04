@@ -80,7 +80,12 @@ export function latencyFromOnsets(beats: number[], onsets: (number | null)[]): {
     if (o != null) d.push((o - T) * 1000);
   });
   if (d.length < 3) return { latencyMs: d.length ? clampMs(median(d)) : 0, ok: false };
-  return { latencyMs: clampMs(median(d)), ok: true };
+  // Consistency check: the "ta"s must line up with the clicks. Keep the onsets within 60 ms of
+  // the median and require at least 3 of them; otherwise we probably heard something unrelated.
+  const med = median(d);
+  const close = d.filter((x) => Math.abs(x - med) <= 60);
+  if (close.length < Math.max(3, Math.ceil(d.length * 0.6))) return { latencyMs: clampMs(med), ok: false };
+  return { latencyMs: clampMs(median(close)), ok: true };
 }
 
 function clampMs(x: number): number {

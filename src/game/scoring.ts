@@ -139,6 +139,8 @@ interface NoteWindow {
   bodyEnd: number;
   /** Pitch of the previous note when it runs legato into this one (null after a rest). */
   legatoFrom: number | null;
+  /** Extra tolerance (cents) — just-intonation mode accepts both the pure and the tempered pitch. */
+  tolExtra: number;
 }
 
 class NoteAcc {
@@ -157,6 +159,10 @@ class NoteAcc {
   smSum = 0;
   /** Any single unsmoothed body sample within tolerance (short-note leniency). */
   rawHit = false;
+  /** Body samples (time, deviation, covered seconds) for the final whole-note judgement. */
+  bT: number[] = [];
+  bD: number[] = [];
+  bW: number[] = [];
   final: NoteResult | null = null;
   constructor(readonly w: NoteWindow) {}
 }
@@ -177,7 +183,10 @@ function noteWindows(ctx: ScoringContext, opts: ScoringOptions): NoteWindow[] {
       : 0;
     const prev = i > 0 ? notes[i - 1] : null;
     const legatoFrom = prev && prev.start + prev.dur >= note.start - 0.25 ? prev.midi : null;
-    out.push({ index: i, note, target: note.midi + targetOffset / 100, targetOffset, start: note.start, bodyStart, bodyEnd, legatoFrom });
+    // Just intonation: aim halfway between pure and tempered and widen the window by the same
+    // amount, so singing either what the (tempered) backing plays or the pure interval is fine.
+    const half = targetOffset / 2;
+    out.push({ index: i, note, target: note.midi + half / 100, targetOffset, start: note.start, bodyStart, bodyEnd, legatoFrom, tolExtra: Math.abs(half) });
   }
   return out;
 }
@@ -306,7 +315,8 @@ export class LiveScorer {
         if (k !== 0) dev -= 1200 * k;
       }
     }
-    const inTol = dev !== null && Math.abs(dev) <= this.tol;
+    const tol = this.tol + w.tolExtra;
+    const inTol = dev !== null && Math.abs(dev) <= tol;
     // Onset & scoop use samples from the note start (grace included).
     if (t >= w.start && t < w.bodyEnd) {
       // Timing is judged independently of intonation: the note "starts" with the first voiced
@@ -335,13 +345,16 @@ export class LiveScorer {
       }
       a.voicedTime += overlap;
       if (inTol) a.rawHit = true;
-      if (Math.abs(smooth) <= this.tol) a.hitTime += overlap;
+      if (Math.abs(smooth) <= tol) a.hitTime += overlap;
+      a.bT.push(t);
+      a.bD.push(dev);
+      a.bW.push(overlap);
       if (t >= w.bodyStart && t < w.bodyEnd) {
         a.devs.push(dev);
         // Octave error: the sample is in tune only after folding by whole octaves.
         if (rawDev !== null && Math.abs(rawDev) > 600) {
           const f = rawDev - 1200 * Math.round(rawDev / 1200);
-          if (Math.abs(f) <= Math.max(this.tol, 50)) a.octaveSamples++;
+          if (Math.abs(f) <= Math.max(tol, 50)) a.octaveSamples++;
         }
       }
     }
@@ -351,18 +364,42 @@ export class LiveScorer {
     if (a.final) return;
     const w = a.w;
     const bodyDur = w.bodyEnd - w.bodyStart;
-    const hitRatio = clamp(a.hitTime / bodyDur, 0, 1);
+    const tolN = this.tol + w.tolExtra;
+    // Final judgement over the whole note: a centred average over ~one vibrato cycle (or the
+    // whole body for short notes), so vibrato on quick notes isn't mistaken for bad intonation.
+    let hitTime = a.hitTime;
+    if (a.bT.length) {
+      hitTime = 0;
+      const win = this.vibWin > 0 ? this.vibWin : 0;
+      if (win === 0) {
+        for (let k = 0; k < a.bT.length; k++) if (Math.abs(a.bD[k]) <= tolN) hitTime += a.bW[k];
+      } else if (bodyDur < 1.5 * win) {
+        const m = a.bD.reduce((x, y) => x + y, 0) / a.bD.length;
+        if (Math.abs(m) <= tolN) hitTime = a.bW.reduce((x, y) => x + y, 0);
+      } else {
+        let lo = 0;
+        let hi = 0;
+        let sum = 0;
+        for (let k = 0; k < a.bT.length; k++) {
+          while (hi < a.bT.length && a.bT[hi] <= a.bT[k] + win / 2) sum += a.bD[hi++];
+          while (a.bT[lo] < a.bT[k] - win / 2) sum -= a.bD[lo++];
+          if (Math.abs(sum / (hi - lo)) <= tolN) hitTime += a.bW[k];
+        }
+      }
+    }
+    const hitRatio = clamp(hitTime / bodyDur, 0, 1);
     const voicedRatio = clamp(a.voicedTime / bodyDur, 0, 1);
     const cents = median(a.devs);
-    const tol = this.tol;
+    const tol = tolN;
     let grade: Grade =
       hitRatio >= 0.8 && cents !== null && Math.abs(cents) <= tol / 2 ? 'perfect'
         : hitRatio >= 0.6 ? 'good'
           : hitRatio >= 0.35 ? 'ok'
             : 'miss';
     if (bodyDur < SHORT_BODY && (a.hitTime > 0 || a.rawHit) && GRADE_RANK[grade] < GRADE_RANK.good) grade = 'good';
-    const octave = a.devs.length > 0 && a.octaveSamples > a.devs.length / 2;
-    if (octave && this.opts.octaveTolerant && GRADE_RANK[grade] > GRADE_RANK.ok) grade = 'ok';
+    // With octave tolerance on (the singer deliberately sings the part in their own octave),
+    // folding is expected and not an error.
+    const octave = !this.opts.octaveTolerant && a.devs.length > 0 && a.octaveSamples > a.devs.length / 2;
 
     let drift: number | null = null;
     if (a.devs.length >= 6) {
