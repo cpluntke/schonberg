@@ -9,7 +9,7 @@ test('a perfect simulated singer passes level 1 and levels up', async ({ page })
 
   // Open the first piece in the cycle.
   await page.locator('.list-row').first().click();
-  await expect(page.getByText('Sections')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Sections' })).toBeVisible();
 
   // Level 1 of the first section.
   await page.getByRole('button', { name: /level 1/ }).first().click();

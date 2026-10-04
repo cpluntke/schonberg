@@ -40,7 +40,14 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
   const [phase, setPhase] = useState<'ready' | 'running' | 'paused' | 'micError'>('ready');
   const [micMsg, setMicMsg] = useState('');
   const [hud, setHud] = useState({ score: 0, combo: 0, count: 0, lyricIdx: -1 });
-  const [gains, setGains] = useState<Record<string, number>>({});
+  const [gains, setGains] = useState<Record<string, number>>(() => {
+    const g: Record<string, number> = {};
+    for (const p of piece?.score.parts ?? []) {
+      if (p.id === route.partId) g[p.id] = level === 0 || (level <= 2) ? 0.9 : 0;
+      else g[p.id] = p.voiceType === 'other' ? 0.55 : 0.7;
+    }
+    return g;
+  });
   const sessionRef = useRef<PracticeSession | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -73,7 +80,8 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
       },
       (r) => onDone(r),
     );
-    setGains({ ...s.partGains });
+    // Keep the singer's mixer choices across restarts.
+    for (const [id, g] of Object.entries(gains)) s.partGains[id] = g;
     return s;
   }
 
@@ -86,7 +94,7 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
     }
     const ladder = section.id !== 'all' && section.id !== 'drill' && (rateOverride == null || rateOverride >= (spec?.rate ?? 1) - 1e-6);
     const durationSec = (section.end - section.start) / rate;
-    const rec = recordAttempt(piece.id, part.id, ladder ? section.id : section.id, level, r, durationSec);
+    const rec = recordAttempt(piece.id, part.id, section.id, level, r, durationSec);
     if (ladder) {
       const secs = singableSections(piece, part.id);
       snapshotReadiness(piece.id, part.id, pieceReadiness(secs, getProgress(piece.id, part.id)).pct);

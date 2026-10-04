@@ -7,6 +7,8 @@ import { LEVELS, pieceReadiness, nextStep, sectionStatus } from '../../progress/
 import { IconBack, IconEar, IconCube, IconPlay } from '../icons';
 import { voiceName } from './Home';
 
+const SHORT: Record<number, string> = { 1: 'Learn', 2: 'In time', 3: 'Alone', 4: 'Concert' };
+
 export function PieceScreen({ pieceId }: { pieceId: string }) {
   const [profile] = useProfile();
   useStoreVersion();
@@ -102,25 +104,32 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
           const status = sectionStatus(sp);
           const isDue = due.includes(s.id);
           return (
-            <div key={s.id} className="ladder-row">
-              <div className="col grow" style={{ gap: 4 }}>
-                <span style={{ fontWeight: 600 }}>{s.label}</span>
-                <span className="tiny muted">
-                  {isDue ? 'Due for review' : status === 'new' ? 'Not started' : `Level ${lvl}${sp?.best?.[lvl] != null ? ` · best ${Math.round(sp.best[lvl] * 100)}%` : ''}`}
-                </span>
+            <div key={s.id} className="ladder-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
+              <div className="row">
+                <div className="col grow" style={{ gap: 2 }}>
+                  <span style={{ fontWeight: 700 }}>{s.label}</span>
+                  <span className="tiny muted">
+                    {isDue ? 'Due for review' : status === 'new' ? 'Not started' : `Level ${lvl}${sp?.best?.[lvl] != null ? ` · best ${Math.round(sp.best[lvl] * 100)}%` : ''}`}
+                  </span>
+                </div>
+                <button className="icon-btn" aria-label={`Listen to ${s.label}`} title="Listen" onClick={() => play(s.id, 0)}><IconEar size={20} /></button>
+                <button className="icon-btn" aria-label={`Arcade mode for ${s.label}${lvl < 2 ? ' (unlocks at level 2)' : ''}`}
+                  disabled={lvl < 2} onClick={() => play(s.id, Math.max(2, Math.min(4, lvl)), '3d')}
+                  title={lvl < 2 ? 'Arcade unlocks at level 2' : 'Arcade mode'}>
+                  <IconCube size={20} color={lvl >= 2 ? '#B3A6FF' : undefined} />
+                </button>
               </div>
-              <button className="icon-btn" aria-label={`Listen to ${s.label}`} onClick={() => play(s.id, 0)}><IconEar size={20} /></button>
-              {[1, 2, 3, 4].map((l) => {
-                const cls = l <= lvl ? 'lvl-btn done' : l === lvl + 1 ? 'lvl-btn next' : 'lvl-btn';
-                return (
-                  <button key={l} className={cls} aria-label={`${s.label}, level ${l}${l <= lvl ? ' (passed)' : ''}`} onClick={() => play(s.id, l)}>{l}</button>
-                );
-              })}
-              <button className="icon-btn" aria-label={`Arcade mode for ${s.label}${lvl < 2 ? ' (unlocks at level 2)' : ''}`}
-                disabled={lvl < 2} onClick={() => play(s.id, Math.max(2, Math.min(4, lvl)), '3d')}
-                title={lvl < 2 ? 'Arcade unlocks at level 2' : 'Arcade mode'}>
-                <IconCube size={20} color={lvl >= 2 ? '#B3A6FF' : undefined} />
-              </button>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 6 }}>
+                {LEVELS.map((L) => {
+                  const l = L.level;
+                  const cls = l <= lvl ? 'lvl-btn done' : l === lvl + 1 ? 'lvl-btn next' : 'lvl-btn';
+                  return (
+                    <button key={l} className={cls} aria-label={`${s.label}, level ${l} ${L.name}${l <= lvl ? ' (passed)' : ''}`} onClick={() => play(s.id, l)}>
+                      {l} <span style={{ fontWeight: 600, fontSize: 11 }}>{SHORT[l]}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           );
         })}
