@@ -53,6 +53,7 @@ export function Home() {
   const row = rowOfTheDay(new Date());
   const toRehearsal = daysUntil(cycle.rehearsalDate);
   const toConcert = daysUntil(cycle.concertDate);
+  const target = cycleTarget(statuses, toRehearsal, toConcert);
   const avg = statuses.length ? statuses.reduce((a, s) => a + s.pct, 0) / statuses.length : 0;
 
   return (
@@ -102,6 +103,7 @@ export function Home() {
             <span className="tiny muted">cycle readiness</span>
           </div>
         </div>
+        {target && <div className="small" style={{ color: 'var(--accent-text)' }}>{target}</div>}
         {focus && focus.next ? (
           <NextUp status={focus} />
         ) : statuses.length ? (
@@ -177,6 +179,26 @@ function Countdown({ label, days, date }: { label: string; days: number | null; 
       <span className="tiny muted">{label}{date ? ` · ${formatDate(date)}` : ''}</span>
     </div>
   );
+}
+
+function cycleTarget(statuses: PieceStatus[], toRehearsal: number | null, toConcert: number | null): string | null {
+  const goals = [
+    { label: 'Rehearsal', level: 3, days: toRehearsal, name: 'level 3 (Independent)' },
+    { label: 'Concert', level: 4, days: toConcert, name: 'level 4 (Concert-ready)' },
+  ];
+  for (const g of goals) {
+    if (g.days == null || g.days < 0) continue;
+    let missing = 0;
+    for (const st of statuses) {
+      const prog = getProgress(st.piece.id, st.partId);
+      for (const sec of singableSections(st.piece, st.partId)) if ((prog?.sections[sec.id]?.level ?? 0) < g.level) missing++;
+    }
+    if (!missing) continue;
+    const when = g.days === 0 ? 'today' : g.days === 1 ? 'tomorrow' : `in ${g.days} days`;
+    const perDay = g.days > 1 ? Math.ceil(missing / g.days) : missing;
+    return `${g.label} ${when}: ${missing} section${missing > 1 ? 's' : ''} still below ${g.name}${g.days > 1 ? `, about ${perDay} a day` : ''}.`;
+  }
+  return null;
 }
 
 export function voiceName(v: string): string {

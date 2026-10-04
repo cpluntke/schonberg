@@ -95,6 +95,12 @@ async function loadAll() {
     const preferred = ['bach-bwv512', 'debussy-dieu', 'ravel-nicolette', 'bruckner-locus-iste'].filter((id) => pieces.has(id));
     cycle.pieceIds = preferred.length ? preferred : [...pieces.values()].filter((p) => p.builtin).slice(0, 4).map((p) => p.id);
     cycle.name = cycle.name === 'This cycle' ? 'Demo cycle' : cycle.name;
+    const iso = (days: number) => {
+      const d = new Date(Date.now() + days * 86400000);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    cycle.rehearsalDate ??= iso(4);
+    cycle.concertDate ??= iso(32);
     saveCycle(cycle);
     localStorage.setItem('sh:cycleSeeded', '1');
   }
