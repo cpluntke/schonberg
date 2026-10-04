@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pitch test</title>
+    <style>
+      body { font: 14px/1.4 system-ui, sans-serif; margin: 16px; background: #0b0d1a; color: #e8e8f0; }
+      button { font-size: 18px; padding: 10px 18px; margin-right: 8px; }
+      #now { font-size: 40px; margin: 12px 0; font-variant-numeric: tabular-nums; }
+      pre { max-height: 50vh; overflow: auto; font-size: 11px; background: #15182b; padding: 8px; }
+    </style>
+  </head>
+  <body>
+    <h1>Pitch tracker test</h1>
+    <button id="start">Start mic</button>
+    <button id="stop">Stop</button>
+    <button id="tone">Play A3</button>
+    <div id="status">idle</div>
+    <div id="now">–</div>
+    <pre id="out"></pre>
+    <script type="module" src="/src/dev/pitch-test.ts"></script>
+  </body>
+</html>

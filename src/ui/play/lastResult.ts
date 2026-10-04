@@ -1,0 +1,33 @@
+import type { AttemptResult } from '../../game/types';
+
+export interface LastResult {
+  pieceId: string;
+  partId: string;
+  sectionId: string;
+  level: number;
+  mode: '2d' | '3d';
+  from: number;
+  to: number;
+  result: AttemptResult;
+  passed: boolean;
+  prevLevel: number;
+  newLevel: number;
+  /** True when the attempt counted toward the section ladder. */
+  ladder: boolean;
+}
+
+let last: LastResult | null = null;
+
+export function setLastResult(r: LastResult) {
+  last = r;
+  try { sessionStorage.setItem('sh:lastResult', JSON.stringify(r)); } catch { /* quota */ }
+}
+
+export function getLastResult(): LastResult | null {
+  if (last) return last;
+  try {
+    const s = sessionStorage.getItem('sh:lastResult');
+    if (s) last = JSON.parse(s);
+  } catch { /* ignore */ }
+  return last;
+}

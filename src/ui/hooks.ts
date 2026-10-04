@@ -1,0 +1,55 @@
+import { useEffect, useState, useCallback } from 'react';
+import { loadProfile, saveProfile, subscribe, type Profile } from '../progress/store';
+
+export function useStoreVersion(): number {
+  const [v, setV] = useState(0);
+  useEffect(() => subscribe(() => setV((x) => x + 1)), []);
+  return v;
+}
+
+export function useProfile(): [Profile, (patch: Partial<Profile>) => void] {
+  useStoreVersion();
+  const profile = loadProfile();
+  const update = useCallback((patch: Partial<Profile>) => {
+    saveProfile({ ...loadProfile(), ...patch });
+  }, []);
+  return [profile, update];
+}
+
+let toastTimer: number | undefined;
+const toastListeners = new Set<(m: string | null) => void>();
+export function toast(msg: string) {
+  toastListeners.forEach((l) => l(msg));
+  clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => toastListeners.forEach((l) => l(null)), 2600);
+}
+export function useToast(): string | null {
+  const [m, setM] = useState<string | null>(null);
+  useEffect(() => {
+    toastListeners.add(setM);
+    return () => { toastListeners.delete(setM); };
+  }, []);
+  return m;
+}
+
+export function formatDate(d: string | undefined): string {
+  if (!d) return '';
+  const dt = new Date(d + 'T12:00:00');
+  if (isNaN(dt.getTime())) return d;
+  return dt.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+export function daysUntil(d: string | undefined, now = new Date()): number | null {
+  if (!d) return null;
+  const dt = new Date(d + 'T12:00:00');
+  if (isNaN(dt.getTime())) return null;
+  const a = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const b = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getTime();
+  return Math.round((b - a) / 86400000);
+}
+
+export function initials(s: string): string {
+  const w = s.replace(/[^\p{L}\s]/gu, ' ').split(/\s+/).filter(Boolean);
+  if (!w.length) return '♪';
+  return (w[0][0] + (w.length > 1 ? w[w.length - 1][0] : '')).toUpperCase();
+}

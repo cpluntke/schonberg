@@ -24,6 +24,11 @@ export interface ScoringOptions {
   octaveTolerant: boolean;
   /** Seconds at the beginning of each note ignored for pitch (attack / consonants). Default 0.08. */
   onsetGrace?: number;
+  /**
+   * Seconds of moving average applied to the pitch before the in-tune test, so a vibrato centred
+   * on the note counts as in tune. Default 0.18 (one cycle at ~5.5 Hz); 0 disables.
+   */
+  vibratoWindow?: number;
 }
 
 export interface NoteResult {
@@ -45,6 +50,8 @@ export interface NoteResult {
   /** Target adjustment in cents applied by just-intonation mode (0 in equal temperament). */
   targetOffset: number;
   points: number;
+  /** True when most of the note was sung in tune but in the wrong octave. */
+  octave?: boolean;
 }
 
 export type InsightKind =
