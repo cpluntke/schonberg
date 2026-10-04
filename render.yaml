@@ -1,0 +1,29 @@
+# Render Blueprint: Dashboard → New → Blueprint → pick this repo.
+# Creates the app (static site) and the optional leaderboard server.
+services:
+  - type: web
+    name: schonberg-leaderboard
+    runtime: node
+    plan: free
+    buildCommand: "true"
+    startCommand: node server/index.mjs
+    healthCheckPath: /health
+  - type: web
+    name: schonberg-hero
+    runtime: static
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_LEADERBOARD_URL
+        fromService:
+          type: web
+          name: schonberg-leaderboard
+          envVarKey: RENDER_EXTERNAL_URL
+    headers:
+      - path: /*
+        name: Permissions-Policy
+        value: microphone=(self)
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
