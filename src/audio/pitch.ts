@@ -1,8 +1,10 @@
 // Microphone pitch tracking (McLeod pitch method via `pitchy`).
 //
 // Pipeline: getUserMedia (raw: no AEC/NS/AGC) → MediaStreamSource → AnalyserNode(2048)
-// → every ~20 ms (setInterval, keeps running when rAF is throttled) detectPitch()
-// → gate (rms / clarity / 60–1400 Hz) → PitchSmoother (median-of-3 + octave-jump guard).
+// → every ~20 ms (setInterval, keeps running when rAF is throttled) detectPitch() on the latest
+// 1024 or 2048 samples (≈21 / 43 ms at 48 kHz; the shorter window for voices that don't go below
+// ~C3, so note changes smear less) → gate (rms / clarity / 60–1400 Hz) → PitchSmoother
+// (median-of-3 + octave-jump guard).
 
 import { PitchDetector } from 'pitchy';
 
@@ -159,6 +161,14 @@ function isOctaveJump(d: number): boolean {
 
 const FFT_SIZE = 2048;
 const INTERVAL_MS = 20;
+/** Periods of the lowest expected pitch the analysis window must hold for McLeod to be reliable. */
+const MIN_PERIODS = 2.2;
+
+/** Analysis window (samples) for a singer whose lowest note is `lowestMidi`. */
+export function windowFor(lowestMidi: number, sampleRate: number): 1024 | 2048 {
+  const f = midiToHz(lowestMidi - 2); // a little slack below the written range
+  return (MIN_PERIODS * sampleRate) / f <= 1024 ? 1024 : 2048;
+}
 
 export async function listInputDevices(): Promise<MediaDeviceInfo[]> {
   if (!navigator.mediaDevices?.enumerateDevices) return [];
@@ -208,6 +218,7 @@ export class PitchTracker {
   private buf: Float32Array<ArrayBuffer>;
   private smoother = new PitchSmoother();
   private stopped = false;
+  private winN = FFT_SIZE;
 
   private constructor(
     private ctx: AudioContext,
@@ -236,6 +247,16 @@ export class PitchTracker {
     return new PitchTracker(ctx, stream, source, analyser, sink);
   }
 
+  /** The microphone node (for recording a run). */
+  get sourceNode(): AudioNode {
+    return this.source;
+  }
+
+  /** Samples analysed per frame. */
+  get windowN(): number {
+    return this.winN;
+  }
+
   /** False once stopped (also when the mic track ended: unplugged headset, interruption). */
   get alive(): boolean {
     return !this.stopped && this.stream.getAudioTracks().some((t) => t.readyState === 'live');
@@ -243,7 +264,16 @@ export class PitchTracker {
 
   /** Seconds of audio analysed per frame. */
   get windowSec(): number {
-    return this.analyser.fftSize / this.ctx.sampleRate;
+    return this.winN / this.ctx.sampleRate;
+  }
+
+  /** Use the shortest reliable analysis window for a singer whose lowest note is `lowestMidi`. */
+  configureFor(lowestMidi: number | null): void {
+    const n = lowestMidi == null || !Number.isFinite(lowestMidi) ? FFT_SIZE : windowFor(lowestMidi, this.ctx.sampleRate);
+    if (n !== this.winN) {
+      this.winN = n;
+      this.smoother.reset();
+    }
   }
 
   onPitch(cb: (p: RawPitch) => void): () => void {
@@ -258,7 +288,8 @@ export class PitchTracker {
   private tick(): void {
     if (this.stopped || this.ctx.state !== 'running') return;
     this.analyser.getFloatTimeDomainData(this.buf);
-    const r = detectPitch(this.buf, this.ctx.sampleRate);
+    const frame = this.winN < this.buf.length ? this.buf.subarray(this.buf.length - this.winN) : this.buf;
+    const r = detectPitch(frame, this.ctx.sampleRate);
     const gated = gatePitch(r);
     const midi = this.smoother.push(gated);
     const p: RawPitch = {

@@ -36,6 +36,7 @@ export function Tuner({ notation, onReading, autoStart = false }: {
     try {
       await unlockAudio();
       const t = await getTracker();
+      t.configureFor(null); // full window: any voice, down to the bass range
       if (!mountedRef.current) return;
       unsubRef.current?.();
       let last = 0;

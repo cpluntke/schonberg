@@ -32,6 +32,10 @@ export interface Profile {
   tuning: TuningMode;
   /** Output→input round trip in ms; 0 = unknown / not measured. */
   latencyMs: number;
+  /** Where latencyMs came from: the delay check / typed in ('measured') or learned from singing. */
+  latencySource?: 'measured' | 'learned';
+  /** Keep the last run's recording in memory so it can be shared (default on). */
+  keepRecording?: boolean;
   rangeLow?: number;
   rangeHigh?: number;
   onboarded: boolean;

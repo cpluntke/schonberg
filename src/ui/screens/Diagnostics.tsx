@@ -70,6 +70,7 @@ export function Diagnostics() {
     try {
       await unlockAudio();
       const t = await getTracker();
+      t.configureFor(null); // full window: any voice, down to the bass range
       const track = t.stream.getAudioTracks()[0];
       const readings: { midi: number | null; rms: number }[] = [];
       const start = performance.now();

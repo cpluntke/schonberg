@@ -129,3 +129,13 @@ describe('PitchSmoother', () => {
     expect(s.push(50)).toBe(50); // history cleared, no smear
   });
 });
+
+describe('windowFor', () => {
+  it('uses the short window for upper voices and the long one for basses', async () => {
+    const { windowFor } = await import('./pitch');
+    expect(windowFor(53, 48000)).toBe(1024); // alto F3
+    expect(windowFor(48, 48000)).toBe(1024); // tenor C3
+    expect(windowFor(40, 48000)).toBe(2048); // bass E2
+    expect(windowFor(48, 44100)).toBe(1024);
+  });
+});

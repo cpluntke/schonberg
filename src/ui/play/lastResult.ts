@@ -20,6 +20,8 @@ export interface LastResult {
   notCounted?: string;
   /** Headphone/mic delay learned from this run (ms), if any. */
   latencyAdjusted?: number;
+  /** The voice was lined up with the music by this many ms before scoring (device delay). */
+  alignedMs?: number;
 }
 
 let last: LastResult | null = null;

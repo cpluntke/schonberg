@@ -5,6 +5,7 @@ import { getAudioContext, unlockAudio, outputLatencySec } from '../../audio/cont
 import { PitchTracker, type RawPitch } from '../../audio/pitch';
 import { ScorePlayer, beatsInMeasure, beatSecAt } from '../../audio/player';
 import { LiveScorer, scoreAttempt, type ScoringContext } from '../../game/scoring';
+import { RunRecorder, type Recording } from '../../audio/recorder';
 
 let sharedTracker: PitchTracker | null = null;
 let trackerPromise: Promise<PitchTracker> | null = null;
@@ -48,6 +49,10 @@ export interface SessionConfig {
   scoring: ScoringOptions;
   latencyMs: number;
   range: [number, number] | null;
+  /** Lowest note the singer is expected to sing (selects the pitch tracker's window). */
+  lowestMidi?: number | null;
+  /** Keep a recording of the run (memory only) so it can be shared as a reference recording. */
+  record?: boolean;
   /** Testing / demo: synthesise the singer instead of using the mic. */
   simulate?: 'perfect' | 'flat' | 'sloppy' | null;
 }
@@ -80,6 +85,10 @@ export class PracticeSession {
   private wakeLock: { release(): Promise<void> } | null = null;
   private onDone: (r: AttemptResult | null) => void;
   latest: PitchSample | null = null;
+  private recorder: RunRecorder | null = null;
+  private plays = 0;
+  /** The run's recording (only for uninterrupted runs), with the score time of its first sample. */
+  recording: (Recording & { scoreTimeAtSample0: number; windowN: number }) | null = null;
 
   constructor(cfg: SessionConfig, onDone: (r: AttemptResult | null) => void) {
     this.cfg = cfg;
@@ -128,7 +137,12 @@ export class PracticeSession {
         throw e;
       }
       if (this.disposed) return; // the singer left while the permission prompt was open
+      this.tracker.configureFor(this.cfg.lowestMidi ?? null);
       this.unsubPitch = this.tracker.onPitch((p) => this.onPitch(p));
+      if (this.cfg.record && !this.recorder) {
+        this.recorder = await RunRecorder.start(ctx, this.tracker.sourceNode);
+        if (this.disposed) { this.recorder?.stop(); this.recorder = null; return; }
+      }
     }
     if (this.disposed) return;
     this.play(this.resumeFrom, true);
@@ -136,6 +150,7 @@ export class PracticeSession {
   }
 
   private play(from: number, countIn: boolean) {
+    this.plays++;
     this.unsubEnd?.();
     this.unsubEnd = this.player.onEnded(() => {
       // The singer's last notes reach us one round-trip latency later: keep listening briefly.
@@ -256,6 +271,7 @@ export class PracticeSession {
         return;
       }
       if (token !== this.resumeToken || this.phase !== 'paused' || this.disposed) return;
+      this.tracker.configureFor(this.cfg.lowestMidi ?? null);
       this.unsubPitch = this.tracker.onPitch((p) => this.onPitch(p));
     }
     this.minTime = this.resumeFrom - 0.02;
@@ -293,6 +309,12 @@ export class PracticeSession {
     this.stopSimulation();
     this.releaseWakeLock();
     this.player.stop();
+    const rec = this.recorder?.stop() ?? null;
+    this.recorder = null;
+    // A paused-and-resumed run has two time mappings; only keep uninterrupted recordings.
+    if (rec && this.plays === 1 && this.tracker) {
+      this.recording = { ...rec, scoreTimeAtSample0: this.player.scoreTimeAt(rec.startCtxTime), windowN: this.tracker.windowN };
+    }
     let result = this.live ? this.live.finish(this.samples) : null;
     if (this.partial && this.cfg.range) {
       // Score only the notes that had started when the singer stopped.
@@ -317,6 +339,8 @@ export class PracticeSession {
     this.onStateChange = null;
     this.stopSimulation();
     this.releaseWakeLock();
+    this.recorder?.stop();
+    this.recorder = null;
     this.unsubPitch?.();
     this.unsubPitch = null;
     this.unsubEnd?.();
@@ -328,10 +352,16 @@ export class PracticeSession {
   }
 }
 
-/** Uncalibrated devices: output latency + input/processing (~40 ms), at least 80 ms on phones. */
+/**
+ * Uncalibrated devices: output latency + input/processing. Android browsers add the most (often
+ * 120–250 ms round trip), iPhones less. Only a starting point: every run lines the voice up with
+ * the music and learns the real delay (see game/align.ts).
+ */
 export function estimateLatencyMs(): number {
   let out = 0;
   try { out = outputLatencySec() * 1000; } catch { /* no context yet */ }
-  const mobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+  if (/Android/i.test(ua)) return Math.round(Math.max(130, out + 70));
+  const mobile = /iPhone|iPad|iPod|Mobile/i.test(ua);
   return Math.round(Math.max(mobile ? 80 : 50, out + 40));
 }

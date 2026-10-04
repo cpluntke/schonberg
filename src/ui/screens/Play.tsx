@@ -7,7 +7,8 @@ import { LEVELS, LISTEN, effectiveTolerance, pieceReadiness } from '../../progre
 import { recordAttempt, getProgress, snapshotReadiness, personalBest } from '../../progress/store';
 import { keyAtTime } from '../../music/time';
 import { PracticeSession } from '../play/session';
-import { scoreAttempt } from '../../game/scoring';
+import { scoreAligned } from '../../game/align';
+import { setLastRun } from '../play/runExport';
 import { drawHighway2D, pitchWindow, type DrawState } from '../play/highway2d';
 import { drawArcade, lanesFor, newFx } from '../play/arcade3d';
 import { setLastResult } from '../play/lastResult';
@@ -98,6 +99,9 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
         scoring: { toleranceCents: tolerance, tuning: profile.tuning, octaveTolerant },
         latencyMs: profile.latencyMs || 0,
         range,
+        // Tenors and basses (or anyone whose range reaches low) keep the long analysis window.
+        lowestMidi: profile.voice === 'T' || profile.voice === 'B' ? null : Math.min(part.low, profile.rangeLow ?? part.low),
+        record: profile.keepRecording !== false && !listenOnly,
         simulate: simulateMode(),
       },
       (r) => onDone(r),
@@ -118,54 +122,43 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
       }
       return;
     }
-    // Uncalibrated singers who are consistently late on entries after rests: that's almost always
-    // headphone/output delay, not the singer. Learn it once so the next run is scored fairly.
+    // Line the voice up with the music before judging it: the device delay is rarely known
+    // exactly, and when it's off the previous note leaks into the next and reads as bad intonation.
+    // A measured delay is only nudged; otherwise the delay found here is learned for next time.
     let latencyAdjusted: number | undefined;
+    let alignedMs: number | undefined;
     const sess = sessionRef.current;
-    if (sess && !profile.latencyMs && !simulateMode()) {
-      const entryOnsets = r.notes
-        .filter((n) => {
-          const i = n.index;
-          const prev = i > 0 ? part.notes[i - 1] : null;
-          return n.onsetMs != null && (!prev || part.notes[i].start - (prev.start + prev.dur) >= 0.4);
-        })
-        .map((n) => n.onsetMs!)
-        .sort((a, b) => a - b) as number[];
-      // Few entries in this section? Every onset shifts with the delay, so use all of them.
-      // (Skip repeated pitches sung legato: their "onset" is just the held voice, at ~0 ms.)
-      const allOnsets = r.notes
-        .filter((n) => {
-          if (n.onsetMs == null) return false;
-          const prev = n.index > 0 ? part.notes[n.index - 1] : null;
-          const cur = part.notes[n.index];
-          return !(prev && prev.midi === cur.midi && cur.start - (prev.start + prev.dur) < 0.25);
-        })
-        .map((n) => n.onsetMs!)
-        .sort((a, b) => a - b);
-      const useAll = entryOnsets.length < 2 && allOnsets.length >= 6;
-      if (useAll) entryOnsets.splice(0, entryOnsets.length, ...allOnsets);
-      if (entryOnsets.length >= 2) {
-        const med = entryOnsets[Math.floor(entryOnsets.length / 2)];
-        const iqr = entryOnsets[Math.floor(entryOnsets.length * 0.75)] - entryOnsets[Math.floor(entryOnsets.length * 0.25)];
-        // Conservative: only clearly late and consistent (a singer who is genuinely late varies more).
-        // On-time singing measures up to ~130 ms (detection lag + consonant), so only learn
-        // from clearly larger, consistent offsets.
-        if (med / rate > 170 && iqr / rate < 120) {
-          // Onsets are in score time; at reduced tempo one score-ms lasts 1/rate real ms.
-          // ~50 ms of each onset is detection lag (attack + analysis window), not delay.
-          latencyAdjusted = Math.round(Math.min(400, sess.latencyMs + (med / rate - 50)));
-          updateProfile({ latencyMs: latencyAdjusted });
-          // Re-score this run with the learned delay (converted back to score seconds).
-          const shift = ((latencyAdjusted - sess.latencyMs) / 1000) * rate;
-          const idx = r.notes.map((n) => n.index);
-          r = scoreAttempt(
-            { score: piece.score, part, range: [Math.min(...idx), Math.max(...idx)] },
-            sess.samples.map((x) => ({ ...x, time: x.time - shift })),
-            sess.cfg.scoring,
-          );
+    if (sess) {
+      const idx = r.notes.map((n) => n.index);
+      const calibrated = profile.latencySource === 'measured' && profile.latencyMs > 0;
+      const al = scoreAligned(
+        { score: piece.score, part, range: [Math.min(...idx), Math.max(...idx)] },
+        sess.samples, sess.cfg.scoring,
+        { rate: sess.cfg.rate, latencyMs: sess.latencyMs, calibrated },
+      );
+      if (al.shiftMs !== 0) {
+        r = al.result;
+        alignedMs = al.shiftMs;
+        if (!calibrated && !simulateMode()) {
+          // Move most of the way (a single run can be off by a little).
+          latencyAdjusted = Math.round(Math.max(0, Math.min(500, sess.latencyMs + 0.8 * al.shiftMs)));
+          updateProfile({ latencyMs: latencyAdjusted, latencySource: 'learned' });
         }
+      } else if (!calibrated && !profile.latencyMs && !simulateMode()) {
+        // Lined up already: remember the estimate that worked so it isn't re-guessed every run.
+        updateProfile({ latencyMs: sess.latencyMs, latencySource: 'learned' });
       }
     }
+    setLastRun(sess?.recording ? {
+      recording: sess.recording,
+      at: Date.now(),
+      meta: {
+        pieceId: piece.id, pieceTitle: piece.title, partId: part.id, partName: part.name,
+        from: sess.cfg.from, to: sess.cfg.to, rate: sess.cfg.rate, level, scoring: sess.cfg.scoring,
+        latencyMs: sess.latencyMs, calibrated: profile.latencySource === 'measured' && profile.latencyMs > 0,
+        alignedMs: alignedMs ?? 0, samples: sess.samples, result: r,
+      },
+    } : null);
     const realSection = section.id !== 'all' && section.id !== 'drill' && section.id !== 'entries';
     const partial = !!sessionRef.current?.partial;
     const ladder = realSection && !partial && (rateOverride == null || rateOverride >= (spec?.rate ?? 1) - 1e-6);
@@ -182,6 +175,7 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
       pieceId: piece.id, partId: part.id, sectionId: section.id, level, mode: route.mode,
       from: section.start, to: section.end, result: r, ladder, prevBest,
       latencyAdjusted,
+      alignedMs,
       notCounted: realSection && !ladder ? (partial ? 'stopped early' : 'slower than the level’s tempo') : undefined,
       passed: rec.passed, prevLevel: rec.prevLevel, newLevel: rec.newLevel,
     });

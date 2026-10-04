@@ -1,4 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { getLastRun, shareRun } from '../play/runExport';
+import { toast } from '../hooks';
 import { getLastResult } from '../play/lastResult';
 import { getPiece, singableSections } from '../library';
 import { go } from '../router';
@@ -74,10 +76,11 @@ export function Results() {
         <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800 }}>{piece.title}</h1>
       </div>
 
-      {lr.latencyAdjusted != null && (
-        <div className="notice info" role="status">
-          You came in consistently late after rests, which is usually headphone delay, not you. We've set your delay to {lr.latencyAdjusted} ms and re-scored this run with it.
-          For best accuracy run the delay check in Voice setup.
+      {lr.alignedMs != null && Math.abs(lr.alignedMs) >= 25 && (
+        <div className="notice info" role="status" data-testid="aligned-note">
+          Your voice reached the app {Math.abs(lr.alignedMs)} ms {lr.alignedMs > 0 ? 'later' : 'earlier'} than expected (headphone and phone audio delay),
+          so we lined it up with the music before scoring.
+          {lr.latencyAdjusted != null ? ` From now on we'll allow ${lr.latencyAdjusted} ms for your device.` : ' If this keeps happening, redo the delay check in Voice setup.'}
         </div>
       )}
       {lr.notCounted && (
@@ -189,7 +192,39 @@ export function Results() {
           <button className="btn block" onClick={() => go({ name: 'piece', pieceId: piece.id })}>All sections</button>
         </div>
         <button className="btn ghost block" onClick={() => go({ name: 'ranks' })}>Leaderboard</button>
+        <ShareRecording pieceId={lr.pieceId} partId={lr.partId} />
       </div>
     </main>
+  );
+}
+
+/** Share the run's recording (with the data to re-score it) to help tune the scoring. */
+function ShareRecording({ pieceId, partId }: { pieceId: string; partId: string }) {
+  const run = getLastRun();
+  const [busy, setBusy] = useState(false);
+  if (!run || run.meta.pieceId !== pieceId || run.meta.partId !== partId) return null;
+  const secs = Math.round(run.recording.pcm.length / run.recording.sampleRate);
+  return (
+    <div className="col" style={{ gap: 4, marginTop: 6 }}>
+      <button className="btn ghost block small" disabled={busy} data-testid="share-recording"
+        onClick={async () => {
+          setBusy(true);
+          try {
+            const how = await shareRun(run);
+            if (how === 'downloaded') toast('Recording saved to your downloads');
+          } catch (e) {
+            console.error(e);
+            toast('The recording could not be shared');
+          } finally {
+            setBusy(false);
+          }
+        }}>
+        Share this run’s recording ({secs} s)
+      </button>
+      <span className="tiny muted" style={{ textAlign: 'center' }}>
+        Scored oddly? Send the recording to whoever looks after the app: it contains your voice and the app’s readings, so the scoring can be checked and tuned.
+        It stays on this phone unless you share it.
+      </span>
+    </div>
   );
 }

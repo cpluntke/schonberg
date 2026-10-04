@@ -27,6 +27,17 @@ const SCOOP_WINDOW = 0.15;
 const SHORT_BODY = 0.15;
 /** Default vibrato smoothing window (≈ one vibrato cycle at 5.5 Hz). */
 export const DEFAULT_VIBRATO_WINDOW = 0.18;
+/**
+ * A voice needs a moment to settle on a new pitch: it glides, overshoots and rings for ~0.1–0.3 s,
+ * and the device delay is never exact. Intonation is judged from when the voice arrives within
+ * tolerance, up to this many seconds (and 35% of the note) after the written start. Coming in
+ * late is a timing matter (onset), not an intonation one.
+ */
+export const TRANSITION_MAX = 0.25;
+/** Likewise at the end of a note that leads into another: moving early / the next consonant. */
+export const RELEASE_MAX = 0.12;
+/** Share of the judged span that may be unvoiced (tracker dropouts, consonants) without penalty. */
+const DROPOUT_ALLOWANCE = 0.2;
 
 export const GRADE_POINTS: Record<Grade, number> = { perfect: 100, good: 70, ok: 40, miss: 0 };
 export const GRADE_VALUE: Record<Grade, number> = { perfect: 1, good: 0.85, ok: 0.5, miss: 0 };
@@ -141,6 +152,8 @@ interface NoteWindow {
   bodyEnd: number;
   /** Pitch of the previous note when it runs legato into this one (null after a rest). */
   legatoFrom: number | null;
+  /** Pitch of the next note when this one leads straight into it (null before a rest). */
+  legatoTo: number | null;
   /** Extra tolerance (cents) — just-intonation mode accepts both the pure and the tempered pitch. */
   tolExtra: number;
 }
@@ -194,10 +207,12 @@ function noteWindows(ctx: ScoringContext, opts: ScoringOptions): NoteWindow[] {
     const prev = i > 0 ? notes[i - 1] : null;
     // The previous pitch still matters across short rests: a late singer may still be on it.
     const legatoFrom = prev && prev.start + prev.dur >= note.start - 1.0 ? prev.midi : null;
+    const next = i + 1 < notes.length ? notes[i + 1] : null;
+    const legatoTo = next && next.start <= note.start + note.dur + 0.25 ? next.midi : null;
     // Just intonation: aim halfway between pure and tempered and widen the window by the same
     // amount, so singing either what the (tempered) backing plays or the pure interval is fine.
     const half = targetOffset / 2;
-    out.push({ index: i, note, target: note.midi + half / 100, targetOffset, start: note.start, bodyStart, bodyEnd, legatoFrom, tolExtra: Math.abs(half) });
+    out.push({ index: i, note, target: note.midi + half / 100, targetOffset, start: note.start, bodyStart, bodyEnd, legatoFrom, legatoTo, tolExtra: Math.abs(half) });
   }
   return out;
 }
@@ -401,34 +416,30 @@ export class LiveScorer {
     const w = a.w;
     // A qualifying run that was cut short only by the end of a short note still marks its start.
     if (a.onsetMs === null && a.runStart !== null) a.onsetMs = Math.max(0, (a.runStart - w.start) * 1000);
-    const bodyDur = w.bodyEnd - w.bodyStart;
     const tolN = this.tol + w.tolExtra;
-    // Final judgement over the whole note: a centred average over ~one vibrato cycle (or the
-    // whole body for short notes), so vibrato on quick notes isn't mistaken for bad intonation.
-    let hitTime = a.hitTime;
-    if (a.bT.length) {
-      hitTime = 0;
-      const win = this.vibWin > 0 ? this.vibWin : 0;
-      if (win === 0) {
-        for (let k = 0; k < a.bT.length; k++) if (Math.abs(a.bD[k]) <= tolN) hitTime += a.bW[k];
-      } else if (bodyDur < 1.5 * win) {
-        // Median, not mean: a short pitch glitch shouldn't sink a short note.
-        const m = median(a.bD)!;
-        if (Math.abs(m) <= tolN) hitTime = a.bW.reduce((x, y) => x + y, 0);
+    const judged = judgedSpan(a, tolN, this.opts.octaveTolerant);
+    const { k0, k1, from, to } = judged;
+    const bodyDur = Math.max(1e-3, to - from);
+    const jT = a.bT.slice(k0, k1);
+    const jD = a.bD.slice(k0, k1);
+    const jW = a.bW.slice(k0, k1);
+    const voicedJudged = jW.reduce((x, y) => x + y, 0);
+    // Final judgement over the settled part of the note: a vibrato-cancelling average (or the
+    // median for short notes), so neither vibrato nor the glide into the note reads as out of tune.
+    let hitTime = 0;
+    if (jT.length) {
+      const sm = vibratoSmoothed(jT, jD, this.vibWin);
+      if (sm) {
+        for (let k = 0; k < jT.length; k++) if (Math.abs(sm[k]) <= tolN) hitTime += jW[k];
       } else {
-        let lo = 0;
-        let hi = 0;
-        let sum = 0;
-        for (let k = 0; k < a.bT.length; k++) {
-          while (hi < a.bT.length && a.bT[hi] <= a.bT[k] + win / 2) sum += a.bD[hi++];
-          while (a.bT[lo] < a.bT[k] - win / 2) sum -= a.bD[lo++];
-          if (Math.abs(sum / (hi - lo)) <= tolN) hitTime += a.bW[k];
-        }
+        // Median, not mean: a short pitch glitch shouldn't sink a short note.
+        if (Math.abs(median(jD)!) <= tolN) hitTime = voicedJudged;
       }
     }
-    const hitRatio = clamp(hitTime / bodyDur, 0, 1);
-    const voicedRatio = clamp(a.voicedTime / bodyDur, 0, 1);
-    const medDev = median(a.devs);
+    // Brief tracker dropouts (consonants, a breathy moment) don't count against intonation.
+    const hitRatio = clamp(hitTime / Math.max(voicedJudged, (1 - DROPOUT_ALLOWANCE) * bodyDur), 0, 1);
+    const voicedRatio = clamp(a.voicedTime / Math.max(1e-3, w.bodyEnd - w.bodyStart), 0, 1);
+    const medDev = jD.length ? median(jD) : median(a.devs);
     const tol = tolN;
     let grade: Grade =
       hitRatio >= 0.8 && medDev !== null && Math.abs(medDev) <= tol / 2 ? 'perfect'
@@ -440,20 +451,11 @@ export class LiveScorer {
     // folding is expected and not an error.
     const octave = !this.opts.octaveTolerant && a.devs.length > 0 && a.octaveSamples > a.devs.length / 2;
 
-    // Drift: compare the first and last third of the note on the vibrato-smoothed pitch
-    // (a centred ~one-cycle average), so a normal vibrato doesn't read as sagging or creeping.
+    // Drift: compare the first and last third of the settled note on the vibrato-smoothed pitch,
+    // so a normal vibrato (or the glide in) doesn't read as sagging or creeping.
     let drift: number | null = null;
-    if (a.bD.length >= 6) {
-      const win = this.vibWin > 0 ? this.vibWin : 0.18;
-      const sm: number[] = [];
-      let lo = 0;
-      let hi = 0;
-      let sum = 0;
-      for (let k = 0; k < a.bT.length; k++) {
-        while (hi < a.bT.length && a.bT[hi] <= a.bT[k] + win / 2) sum += a.bD[hi++];
-        while (a.bT[lo] < a.bT[k] - win / 2) sum -= a.bD[lo++];
-        sm.push(sum / (hi - lo));
-      }
+    if (jD.length >= 6) {
+      const sm = vibratoSmoothed(jT, jD, this.vibWin > 0 ? this.vibWin : DEFAULT_VIBRATO_WINDOW) ?? jD;
       const third = Math.floor(sm.length / 3);
       drift = median(sm.slice(-third))! - median(sm.slice(0, third))!;
     }
@@ -480,6 +482,80 @@ export class LiveScorer {
       targetOffset: w.targetOffset, points, ...(octave ? { octave: true } : {}),
     };
   }
+}
+
+/**
+ * The part of a note that is judged for intonation: from when the voice arrives within tolerance
+ * (at most TRANSITION_MAX / 35% of the note after its start) to when it leaves for the next note
+ * (at most RELEASE_MAX / 20% before its end). Indices into the note's body samples, and times.
+ */
+export function judgedSpan(a: { w: NoteWindow; bT: number[]; bD: number[]; bW: number[] }, tol: number, octaveTolerant: boolean): { k0: number; k1: number; from: number; to: number } {
+  const w = a.w;
+  const n = a.bT.length;
+  const capStart = Math.max(w.bodyStart, Math.min(w.bodyEnd, w.start + Math.min(TRANSITION_MAX, 0.35 * w.note.dur)));
+  let k0 = 0;
+  while (k0 < n && a.bT[k0] <= capStart && Math.abs(a.bD[k0]) > tol) k0++;
+  // Silence or gliding before the arrival is excused, up to the cap.
+  const from = k0 < n ? clamp(a.bT[k0] - a.bW[k0] / 2, w.bodyStart, capStart) : capStart;
+  let k1 = n;
+  let to = w.bodyEnd;
+  if (w.legatoTo !== null) {
+    const capEnd = Math.max(from, w.start + w.note.dur - Math.min(RELEASE_MAX, 0.2 * w.note.dur));
+    if (capEnd < w.bodyEnd) {
+      // Trailing samples heading for the next pitch (closer to it than to this one) are excused.
+      const nextDev = 100 * (w.legatoTo - w.target);
+      const towardNext = (d: number) => {
+        let x = d;
+        let y = d - nextDev;
+        if (octaveTolerant) { x -= 1200 * Math.round(x / 1200); y -= 1200 * Math.round(y / 1200); }
+        return Math.abs(y) < Math.abs(x) && Math.abs(x) > tol;
+      };
+      while (k1 > k0 && a.bT[k1 - 1] >= capEnd && towardNext(a.bD[k1 - 1])) k1--;
+      // Excuse an early release / the next syllable's consonant up to the cap as well.
+      const lastT = k1 > k0 ? a.bT[k1 - 1] + a.bW[k1 - 1] / 2 : from;
+      to = clamp(lastT, capEnd, w.bodyEnd);
+    }
+  }
+  return { k0, k1, from, to: Math.max(to, from + 1e-3) };
+}
+
+/** Centred moving average whose window is shifted (not truncated) to stay inside the samples. */
+function boxSmooth(T: number[], D: number[], win: number): number[] {
+  const n = T.length;
+  const out = new Array<number>(n);
+  const first = T[0];
+  const last = T[n - 1];
+  const fits = last - first >= win;
+  let i0 = 0;
+  let i1 = 0;
+  let sum = 0;
+  for (let k = 0; k < n; k++) {
+    let lo = T[k] - win / 2;
+    let hi = T[k] + win / 2;
+    if (fits) {
+      if (lo < first) { hi += first - lo; lo = first; }
+      if (hi > last) { lo -= hi - last; hi = last; }
+    }
+    while (i1 < n && T[i1] <= hi + 1e-9) sum += D[i1++];
+    while (i0 < i1 && T[i0] < lo - 1e-9) sum -= D[i0++];
+    out[k] = i1 > i0 ? sum / (i1 - i0) : D[k];
+  }
+  return out;
+}
+
+/**
+ * Vibrato-cancelling smoothing of a note's deviations. Two cascaded moving averages
+ * (≈ one cycle at 5.5 Hz and at 4.5 Hz) cancel vibratos from about 4 to 8 Hz to within a few
+ * percent of their width; a single window is used for medium notes. Returns null when the note
+ * is too short for either (the caller then uses the median).
+ */
+export function vibratoSmoothed(T: number[], D: number[], win: number): number[] | null {
+  if (!T.length) return null;
+  if (win <= 0) return D.slice();
+  const span = T[T.length - 1] - T[0];
+  if (span >= 2.4 * win) return boxSmooth(T, boxSmooth(T, D, win), win * 1.22);
+  if (span >= 1.5 * win) return boxSmooth(T, D, win);
+  return null;
 }
 
 function summarize(ctx: ScoringContext, notes: NoteResult[], maxCombo: number, score: number, samples: PitchSample[]): AttemptResult {

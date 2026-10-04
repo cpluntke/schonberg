@@ -61,3 +61,30 @@ test('onboarding video opens from Home and loads', async ({ page }) => {
   await page.getByRole('button', { name: 'Close' }).click();
   await expect(v).toHaveCount(0);
 });
+
+test('a real-microphone run can be shared as a recording (WAV + run.json)', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await page.goto('/#/');
+  await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
+  await page.getByTestId('piece-row').first().click();
+  await page.getByRole('button', { name: /level 1/ }).first().click();
+  await page.getByTestId('start').click();
+  await expect(page.getByTestId('pass-banner')).toBeVisible({ timeout: 90_000 });
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.getByTestId('share-recording').click()]);
+  expect(dl.suggestedFilename()).toMatch(/^schonberg-.*\.zip$/);
+  const path = await dl.path();
+  const { unzipSync, strFromU8 } = await import('fflate');
+  const fs = await import('node:fs');
+  const files = unzipSync(new Uint8Array(fs.readFileSync(path!)));
+  const meta = JSON.parse(strFromU8(files['run.json']));
+  expect(meta.version).toBe(1);
+  expect(meta.samples.length).toBeGreaterThan(50);
+  expect(typeof meta.scoreTimeAtSample0).toBe('number');
+  const wav = files['run.wav'];
+  expect(String.fromCharCode(...wav.slice(0, 4))).toBe('RIFF');
+  // Seconds of audio ≈ the run (count-in + section at 70%).
+  const secs = (wav.length - 44) / 2 / meta.sampleRate;
+  expect(secs).toBeGreaterThan(3);
+  expect(errors).toEqual([]);
+});
