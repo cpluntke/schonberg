@@ -5,7 +5,7 @@ import { entryNotes } from '../../game/drills';
 import { useProfile, useStoreVersion } from '../hooks';
 import { go, back } from '../router';
 import { getProgress, dueForReview } from '../../progress/store';
-import { LEVELS, pieceReadiness, nextStep, sectionStatus } from '../../progress/ladder';
+import { LEVELS, OFF_BOOK_DAYS, pieceReadiness, nextStep, sectionStatus } from '../../progress/ladder';
 import { IconBack, IconEar, IconCube, IconPlay } from '../icons';
 import { voiceName } from './Home';
 import { PieceMap } from '../components/PieceMap';
@@ -171,6 +171,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
                   {snippet(part!, s.start, s.end) && <span className="small ellipsis" style={{ color: 'var(--accent-text)', fontStyle: 'italic' }}>“{snippet(part!, s.start, s.end)}…”</span>}
                   <span className="tiny muted">
                     {isDue ? 'Due for review' : status === 'new' ? 'Not started' : `Level ${lvl}${sp?.best?.[lvl] != null ? ` · best ${Math.round(sp.best[lvl] * 100)}%` : ''}`}
+                    {lvl === 4 && sp?.offBookDays?.length ? ` · from memory: day ${sp.offBookDays.length} of ${OFF_BOOK_DAYS}` : ''}
                   </span>
                 </div>
                 <button className="icon-btn" aria-label={`Listen to ${s.label}`} title="Listen" onClick={() => play(s.id, 0)}><IconEar size={20} /></button>
@@ -202,7 +203,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
           <strong>Entry drill</strong>
           <span className="small muted">
             Hear two beats of the other voices, then come in on your own, with no starting note.
-            {` ${entryCount(part)} entries from this piece.`}
+            {` ${entryCount(part)} ${entryCount(part) === 1 ? 'entry' : 'entries'} from this piece.`}
           </span>
           <div className="row wrap">
             <button className="btn small" onClick={() => {

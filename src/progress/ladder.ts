@@ -153,11 +153,15 @@ export function nextStep(sections: Section[], prog: PieceProgress | undefined, n
       reason: `Review ${due.s.label}: last passed ${days} days ago. Keep it at ${levelSpec(l).name}.`,
     };
   }
-  // 2. Earliest section with the lowest level.
+  // 2. Earliest section with the lowest level. (Off book needs a second day: a section already
+  // sung from memory today waits until tomorrow.)
+  const d = new Date(now);
+  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   let best: Section | null = null;
   let bestLevel = 5;
   for (const s of [...sections].sort((a, b) => a.index - b.index)) {
     const l = levelOf(prog, s.id);
+    if (l === 4 && prog?.sections[s.id]?.offBookDays?.includes(today)) continue;
     if (l < bestLevel) { best = s; bestLevel = l; }
   }
   if (!best || bestLevel >= MAX_LEVEL) return null;

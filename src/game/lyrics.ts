@@ -455,7 +455,8 @@ export function makeQuiz(allLines: LyricLine[], opts: QuizOptions = {}): QuizQue
       const nx = lines[li + 1];
       if (!nx || li < 0) return null;
       const bad = followers.get(l.norm) ?? new Set([nx.norm]);
-      const pool = distinctLines.filter((x) => !bad.has(x.norm) && x.norm !== nx.norm);
+      // Not the prompt line itself either.
+      const pool = distinctLines.filter((x) => !bad.has(x.norm) && x.norm !== nx.norm && x.norm !== l.norm);
       if (pool.length < 2) return null;
       // Prefer lines of a similar length.
       const near = shuffle(pool, rand).sort((a, b) => Math.abs(a.words.length - nx.words.length) - Math.abs(b.words.length - nx.words.length)).slice(0, 6);

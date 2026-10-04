@@ -95,7 +95,7 @@ export function Results() {
       {lr.notCounted && (
         <div className="notice info" role="status" data-testid="pass-banner">
           <strong>Practice run:</strong> {lr.notCounted}{lr.timingUnsure != null ? '.'
-            : lr.level === 5 && !/stopped early/.test(lr.notCounted) ? <>, so it doesn't count toward memorising the section yet. When the map shows it's ready, choose “Test: all hidden” and sing it without peeking.</>
+            : lr.level === 5 && !/stopped early/.test(lr.notCounted) ? <>, so it doesn't count toward memorising the section yet. When you feel ready, choose “Test: all hidden” and sing it without peeking.</>
               : <>, so it doesn't count toward the level. Sing the whole section at the level's tempo to level up.</>}
           {lr.timingUnsure != null && <> <button className="linklike" onClick={() => go({ name: 'setup' })}>Open Voice setup</button></>}
         </div>
@@ -264,10 +264,10 @@ function WordsResults({ lr, words }: { lr: NonNullable<ReturnType<typeof getLast
   const inTime = res.syllables.filter((x) => x.grade === 'perfect' || x.grade === 'good').length;
   const mnum = (i: number) => piece.score.measures[i]?.number ?? String(i + 1);
   const measureIdx = Object.keys(res.perMeasure).map(Number).sort((a, b) => a - b);
-  const nextStage = words.stage < 2 && res.accuracy >= WORDS_PASS ? ((words.stage + 1) as WordsStage) : null;
+  const nextStage = words.counted && words.stage < 2 && res.accuracy >= WORDS_PASS ? ((words.stage + 1) as WordsStage) : null;
   // The words screen opens at the next step that isn't passed yet.
   const again = () => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, level: 0, mode: '2d', words: true });
-  const color = { perfect: 'var(--voice)', good: 'var(--voice)', ok: '#7FB8CC', miss: '#FF7A45' } as const;
+  const color = { perfect: 'var(--voice)', good: 'var(--voice)', ok: '#E8B86A', miss: '#FF7A45' } as const;
   return (
     <main className="screen">
       <div className="col" style={{ gap: 2, paddingTop: 8 }}>
@@ -276,24 +276,26 @@ function WordsResults({ lr, words }: { lr: NonNullable<ReturnType<typeof getLast
       </div>
       <div className={res.accuracy >= WORDS_PASS ? 'notice info' : 'notice'} role="status" data-testid="words-banner">
         {!words.counted
-          ? <><strong>Practice run</strong> (slower tempo or stopped early): sing it at 100% to move on.</>
+          ? <><strong>Practice run</strong> (slower tempo or stopped early): do it at 100% tempo to move on.</>
           : words.newStage
             ? <><strong>{STAGE_NAMES[words.stage]}: done!</strong> {words.stage === 2 ? 'You know the words of this section by heart.' : `Next: ${STAGE_NAMES[words.stage + 1]}.`}</>
             : res.accuracy >= WORDS_PASS
               ? <><strong>Well done.</strong> {pct}% of the syllables in time.</>
-              : <><strong>Not yet:</strong> {pct}% of {Math.round(WORDS_PASS * 100)}%. Say the words in rhythm, with crisp consonants.</>}
+              : (res.extra ?? 0) > 2
+                ? <><strong>Not yet:</strong> {pct}% of {Math.round(WORDS_PASS * 100)}%. The app heard {res.extra} more syllables than the text has: say just the words, in their rhythm.</>
+                : <><strong>Not yet:</strong> {pct}% of {Math.round(WORDS_PASS * 100)}%. Say the words in rhythm, with crisp consonants.</>}
       </div>
       <div className="stats3">
         <div className="stat"><span className="k">In time</span><span className="v">{pct}%</span></div>
         <div className="stat"><span className="k">Syllables</span><span className="v">{inTime}/{res.syllables.length}</span></div>
-        <div className="stat"><span className="k">Missed</span><span className="v">{res.missed}</span></div>
+        <div className="stat"><span className="k">Missed · extra</span><span className="v">{res.missed} · {res.extra ?? 0}</span></div>
       </div>
       {words.calibrated && res.medianMs !== null && Math.abs(res.medianMs) > 120 && (
         <span className="small muted">On average you were about {Math.abs(res.medianMs)} ms {res.medianMs > 0 ? 'late' : 'early'}.</span>
       )}
       {part && (
         <div className="card" data-testid="words-text">
-          <span className="tiny muted">Blue: in time · orange: missing or off the beat</span>
+          <span className="tiny muted">Blue: in time · amber: a little off · orange: missing or off the beat</span>
           <p style={{ margin: 0, fontSize: 18, lineHeight: 1.5 }}>
             {res.syllables.map((x, k) => {
               const n = part.notes[x.index];

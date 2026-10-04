@@ -94,11 +94,18 @@ export function beatGrid(score: Score, from: number, to: number): { time: number
     for (const m of score.measures) {
       if (m.start >= to || m.start + m.dur <= from) continue;
       const n = beatsInMeasure(m.timeSig);
-      const bd = m.dur / n;
-      for (let k = 0; k < n; k++) {
-        const t = m.start + k * bd;
-        if (t >= from - 1e-6 && t < to - 1e-6) out.push({ time: t, downbeat: k === 0 });
+      const nominal = (m.timeSig[0] * 4) / m.timeSig[1];
+      const short = m.durBeats > 0 && m.durBeats < nominal - 1e-6;
+      // A pickup (incomplete) bar keeps the bar's beat length and counts from its end, so a
+      // one-beat upbeat gets one click, not a whole bar squeezed into it.
+      const bd = short ? (m.dur / m.durBeats) * (nominal / n) : m.dur / n;
+      const times: { t: number; down: boolean }[] = [];
+      if (short) {
+        for (let j = 1; m.start + m.dur - j * bd >= m.start - 1e-6; j++) times.unshift({ t: m.start + m.dur - j * bd, down: false });
+      } else {
+        for (let k = 0; k < n; k++) times.push({ t: m.start + k * bd, down: k === 0 });
       }
+      for (const { t, down } of times) if (t >= from - 1e-6 && t < to - 1e-6) out.push({ time: t, downbeat: down });
     }
     return out;
   }

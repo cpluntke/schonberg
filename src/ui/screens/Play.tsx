@@ -498,8 +498,8 @@ function SingPlay({ route }: { route: PlayRoute }) {
             <div className="card">
               <span className="eyebrow">{listenOnly ? 'Level 0 · Listen' : `Level ${level} · ${levelInfo?.name}`}</span>
               <strong style={{ fontSize: 18 }}>{section.label}</strong>
-              <span className="small muted">{listenOnly ? LISTEN.description : levelInfo?.description}</span>
-              {!listenOnly && levelInfo && (
+              {!cold && <span className="small muted">{listenOnly ? LISTEN.description : levelInfo?.description}</span>}
+              {!listenOnly && levelInfo && !cold && (
                 <span className="tiny mono muted">
                   {Math.round(rate * 100)}% tempo · ±{tolerance}¢ · pass at {Math.round(levelInfo.pass * 100)}% · start: {levelInfo.cue === 'chord' ? 'chord only' : 'your note'}
                 </span>

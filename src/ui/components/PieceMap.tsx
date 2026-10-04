@@ -111,7 +111,7 @@ export function PieceMap({ score, part, sections, bars, onLoop }: {
         {(['solid', 'ok', 'weak', 'none'] as Mastery[]).map((k) => (
           <span key={k} className="row" style={{ gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: MASTERY_COLOR[k] }} />{LABEL[k]}</span>
         ))}
-        <span>♭♯ intonation · ⏱ timing · ↕ leaps · ✕ wrong notes</span>
+        <span>♭♯ intonation · ⏱ timing · ↗ scooping · ↕ leaps · ✕ wrong notes · 8 octave</span>
       </div>
     </div>
   );

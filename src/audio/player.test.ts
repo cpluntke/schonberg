@@ -69,3 +69,18 @@ describe('cues', () => {
     expect(firstNoteIn(s.parts[1], 4.5, 6)).toBeNull();
   });
 });
+
+describe('beatGrid with a pickup bar', () => {
+  it('a one-beat upbeat gets one beat, counted from its end', async () => {
+    const { beatGrid } = await import('./player');
+    const score = {
+      measures: [
+        { index: 0, number: '0', startBeat: 0, durBeats: 1, start: 0, dur: 1, timeSig: [4, 4] as [number, number] },
+        { index: 1, number: '1', startBeat: 1, durBeats: 4, start: 1, dur: 4, timeSig: [4, 4] as [number, number] },
+      ],
+      tempos: [{ beat: 0, time: 0, bpm: 60 }],
+    } as never;
+    expect(beatGrid(score, 0, 5).map((b) => b.time)).toEqual([0, 1, 2, 3, 4]);
+    expect(beatGrid(score, 0, 5)[1].downbeat).toBe(true);
+  });
+});
