@@ -1,9 +1,11 @@
 // Fast notes: why does a good singer's short note score as "ok"/"miss"?
 //
 // Renders a good singer on fast passages (built-in pieces' fast bars, synthetic runs of eighths and
-// sixteenths with/without consonants), runs the real offline tracker and the current app's end of
-// run (runSession AFTER, calibrated delay so latency is not the confound), then re-runs the scorer
-// on exactly the samples the app judged and asks, note by note, which rule dropped it.
+// sixteenths with/without consonants), runs the real offline tracker and the app's end of run
+// (runSession, calibrated delay so latency is not the confound), then re-runs the scorer on exactly
+// the samples the app judged and asks, note by note, which rule dropped it (`diagnose`).
+// `fastExperiment` compares the pre-fix app (git FAST_BASE_REF: scoring.ts, align.ts, pitch.ts) with
+// the working tree on the same renders, for good and adversarial singers (cmp-fast.test.ts).
 import type { Part, Score } from '../../src/music/types';
 import type { Grade } from '../../src/game/types';
 import * as curScoring from '../../src/game/scoring';
@@ -11,7 +13,9 @@ import { median, type ScoringContext } from '../../src/game/scoring';
 import { makePart, makeScore } from '../../src/game/testutil';
 import { CLARITY_GATE, RMS_GATE } from '../../src/audio/pitch';
 import { levelSetup, oracleSamples } from './harness';
-import { AFTER, afterScorerView, measured, runSession, type PipelineSpec, type SessionOutcome } from './pipeline';
+import { AFTER, UNCALIBRATED, afterScorerView, measured, runSession, type PipelineSpec, type Profile, type SessionOutcome } from './pipeline';
+import { SINGERS } from './singer';
+import { gitVariant } from './variants';
 import { hashSeed } from './prng';
 import { barSpan, findPart, loadPiece, noteRangeFor } from './scores';
 import { CHANNELS, renderSinger, truthAt, type ChannelProfile, type RenderedTake, type SingerProfile } from './singer';
@@ -69,32 +73,24 @@ export interface RenderedRun {
 
 export const CAL_MS = 150;
 
-export function renderTake(passage: FastPassage, singer: SingerProfile, level: number, seed: number, channel?: ChannelProfile): RenderedTake {
+export function renderTake(passage: FastPassage, singer: SingerProfile, level: number, seed: number, channel?: ChannelProfile, trueLatencyMs = CAL_MS): RenderedTake {
   const L = levelSetup(level);
   return renderSinger({
     score: passage.score, part: passage.part, range: passage.range, from: passage.from, to: passage.to, rate: L.rate,
-    trueLatencyMs: CAL_MS, assumedLatencyMs: CAL_MS, guide: L.guide, profile: singer, channel: channel ?? CHANNELS.phoneHeadphones,
+    trueLatencyMs, assumedLatencyMs: 450, guide: L.guide, profile: singer, channel: channel ?? CHANNELS.phoneHeadphones,
     performanceSeed: hashSeed('fast-perf', seed, passage.id, level), microSeed: hashSeed('fast-micro', seed, passage.id, level),
   });
 }
 
-/** Score a rendered take with a pipeline (calibrated delay = true delay). */
-export function scoreTake(passage: FastPassage, take: RenderedTake, level: number, seed: number, spec: PipelineSpec = AFTER): RenderedRun {
+/** Score a rendered take with a pipeline (default: the delay was measured and is exact). */
+export function scoreTake(passage: FastPassage, take: RenderedTake, level: number, seed: number, spec: PipelineSpec = AFTER, profile: Profile = measured(take.trueLatencyMs)): RenderedRun {
   const ctx: ScoringContext = { score: passage.score, part: passage.part, range: passage.range };
-  const outcome = runSession(spec, { take, part: passage.part, ctx, from: passage.from, to: passage.to, level, microSeed: seed }, measured(CAL_MS));
+  const outcome = runSession(spec, { take, part: passage.part, ctx, from: passage.from, to: passage.to, level, microSeed: seed }, profile);
   return { passage, level, take, outcome };
 }
 
 export function renderRun(passage: FastPassage, singer: SingerProfile, level: number, seed: number, o: { channel?: ChannelProfile; spec?: PipelineSpec } = {}): RenderedRun {
-  const L = levelSetup(level);
-  const take = renderSinger({
-    score: passage.score, part: passage.part, range: passage.range, from: passage.from, to: passage.to, rate: L.rate,
-    trueLatencyMs: CAL_MS, assumedLatencyMs: CAL_MS, guide: L.guide, profile: singer, channel: o.channel ?? CHANNELS.phoneHeadphones,
-    performanceSeed: hashSeed('fast-perf', seed, passage.id, level), microSeed: hashSeed('fast-micro', seed, passage.id, level),
-  });
-  const ctx: ScoringContext = { score: passage.score, part: passage.part, range: passage.range };
-  const outcome = runSession(o.spec ?? AFTER, { take, part: passage.part, ctx, from: passage.from, to: passage.to, level, microSeed: seed }, measured(CAL_MS));
-  return { passage, level, take, outcome };
+  return scoreTake(passage, renderTake(passage, singer, level, seed, o.channel), level, seed, o.spec);
 }
 
 export type Reason =
@@ -127,13 +123,14 @@ export interface NoteDiag {
 
 const tolOf = (level: number) => levelSetup(level).toleranceCents;
 
-/**
- * Per-note diagnosis of a run. Replays the app's final scorer (afterScorerView + the alignment shift)
- * and inspects the per-note accumulators, so it explains exactly the grades the app shows.
- */
 /** The scorer module a diagnosis replays (src/game/scoring.ts, or a git variant of it). */
 export type ScoringModule = Pick<typeof curScoring, 'LiveScorer' | 'judgedSpan'> & { shortNoteDev?: typeof curScoring.shortNoteDev };
 
+/**
+ * Per-note diagnosis of a run. Replays the app's final scorer (afterScorerView + the alignment shift)
+ * and inspects the per-note accumulators, so it explains exactly the grades the app shows
+ * (`mismatches` counts notes where the replay disagrees with the run).
+ */
 export function diagnose(run: RenderedRun, mod: ScoringModule = curScoring): { notes: NoteDiag[]; mismatches: number } {
   const { passage, level, take, outcome } = run;
   const rate = take.rate;
@@ -222,6 +219,7 @@ export const DUR_BUCKETS: [string, number, number][] = [
 ];
 export const bucketOf = (d: number) => DUR_BUCKETS.find(([, lo, hi]) => d >= lo && d < hi)![0];
 
+/** The good singer's passages: the built-in pieces' fast bars and synthetic runs. */
 export const PASSAGES = async (): Promise<FastPassage[]> => [
   await piecePassage('debussy-yver', 'A', '1', '23'),
   await piecePassage('debussy-dieu', 'A', '1', '5'),
@@ -229,3 +227,101 @@ export const PASSAGES = async (): Promise<FastPassage[]> => [
   ...[80, 104, 120, 144].flatMap((bpm) => [0.5, 0.25].flatMap((b) => (['ta', 'a', null] as const).map((ly) => synthPassage(bpm, b, ly)))),
 ];
 
+// ---------------------------------------------------------------------------------------------
+// The before/after experiment (cmp-fast.test.ts → report section "Fast notes")
+
+declare const process: { env: Record<string, string | undefined> };
+/** The app before the fast-note fixes (scoring.ts short-note judgement, pitch.ts smoother). */
+export const FAST_BASE_REF = process.env.FAST_BASE_REF ?? '54ea7b9';
+/** A note this short (real seconds) is a "fast note". */
+export const FAST_SEC = 0.15;
+
+export interface FastRun { acc: number; plainAcc: number; passed: boolean; alignedMs: number; fast: Record<Grade, number>; liveFastMiss: number }
+export interface FastGoodRow { passage: string; level: number; seed: number; before: FastRun | null; after: FastRun }
+export interface FastAdvRow { singer: string; passage: string; level: number; before: FastRun | null; after: FastRun }
+export interface FastReport {
+  baseRef: string | null;
+  good: FastGoodRow[];
+  /** Why fast (and 0.15–0.25 s) ok/miss notes of the good singer were dropped: bucket → reason → count, plus `notes` = all notes in the bucket. */
+  reasons: { before: Record<string, Record<string, number>> | null; after: Record<string, Record<string, number>> };
+  adversarial: FastAdvRow[];
+  /** Uncalibrated phone (true 200 ms, estimate 130): misses of notes < 0.25 s on the live display vs the result. */
+  live: { passage: string; level: number; fastN: number; liveMiss: number; finalMiss: number }[];
+  mismatches: number;
+}
+
+const isMiss = (g: Grade) => g === 'miss' || g === 'ok';
+
+function fastRun(run: RenderedRun, fastSec = FAST_SEC): FastRun {
+  const { outcome, passage, take } = run;
+  const fast: Record<Grade, number> = { perfect: 0, good: 0, ok: 0, miss: 0 };
+  let liveFastMiss = 0;
+  outcome.result.notes.forEach((n, k) => {
+    if (passage.part.notes[n.index].dur / take.rate >= fastSec) return;
+    fast[n.grade]++;
+    if (isMiss(outcome.plain.notes[k].grade)) liveFastMiss++;
+  });
+  return { acc: outcome.result.accuracy, plainAcc: outcome.plain.accuracy, passed: outcome.passed, alignedMs: outcome.alignedMs, fast, liveFastMiss };
+}
+
+function addReasons(into: Record<string, Record<string, number>>, notes: NoteDiag[]): void {
+  for (const n of notes) {
+    if (n.realDur >= 0.25) continue;
+    const b = (into[bucketOf(n.realDur)] ??= { notes: 0 });
+    b.notes++;
+    if (n.reason !== 'hit') b[n.reason] = (b[n.reason] ?? 0) + 1;
+  }
+}
+
+export async function fastExperiment(o: { seeds?: number[] } = {}): Promise<FastReport> {
+  const seeds = o.seeds ?? [1, 2];
+  let base: Awaited<ReturnType<typeof gitVariant>> | null = null;
+  try {
+    base = await gitVariant(FAST_BASE_REF);
+  } catch {
+    base = null; // no git history (e.g. an exported copy): after only
+  }
+  const before: PipelineSpec | null = base ? { ...AFTER, impl: base.impl, pitch: base.pitch, pitchKey: base.key } : null;
+  const all = await PASSAGES();
+  const goodPassages = all.filter((p) => !p.id.startsWith('synth') || p.id.includes('16ths') || p.id.startsWith('synth 144bpm 8ths'));
+  const report: FastReport = { baseRef: base ? FAST_BASE_REF : null, good: [], reasons: { before: base ? {} : null, after: {} }, adversarial: [], live: [], mismatches: 0 };
+  for (const p of goodPassages) {
+    for (const level of [1, 2, 4]) {
+      for (const seed of seeds) {
+        const take = renderTake(p, SINGERS.goodChoir, level, seed);
+        const ra = scoreTake(p, take, level, seed, AFTER);
+        const da = diagnose(ra);
+        report.mismatches += da.mismatches;
+        addReasons(report.reasons.after, da.notes);
+        let rb: RenderedRun | null = null;
+        if (before && base) {
+          rb = scoreTake(p, take, level, seed, before);
+          addReasons(report.reasons.before!, diagnose(rb, base.scoring).notes);
+        }
+        report.good.push({ passage: p.id, level, seed, before: rb && fastRun(rb), after: fastRun(ra) });
+      }
+    }
+  }
+  // Adversarial singers on the pieces and the fastest runs.
+  const advPassages = all.filter((p) => !p.id.startsWith('synth') || ['synth 104bpm 16ths ta', 'synth 144bpm 16ths ta', 'synth 144bpm 16ths a', 'synth 144bpm 8ths ta'].includes(p.id));
+  for (const singer of [SINGERS.wrongNotes, SINGERS.flat40, SINGERS.oneBehind]) {
+    for (const p of advPassages) {
+      for (const level of [1, 2, 4]) {
+        const take = renderTake(p, singer, level, seeds[0]);
+        const ra = scoreTake(p, take, level, seeds[0], AFTER);
+        const rb = before ? scoreTake(p, take, level, seeds[0], before) : null;
+        report.adversarial.push({ singer: singer.name, passage: p.id, level, before: rb && fastRun(rb), after: fastRun(ra) });
+      }
+    }
+  }
+  // Live display vs result on an uncalibrated phone (the end-of-run alignment can't help the live view).
+  for (const p of all.filter((x) => !x.id.startsWith('synth') || x.id === 'synth 144bpm 16ths a' || x.id === 'synth 104bpm 16ths ta')) {
+    for (const level of [2, 4]) {
+      const take = renderTake(p, SINGERS.goodChoir, level, seeds[0], undefined, 200);
+      const r = fastRun(scoreTake(p, take, level, seeds[0], AFTER, UNCALIBRATED), 0.25);
+      const fastN = r.fast.perfect + r.fast.good + r.fast.ok + r.fast.miss;
+      report.live.push({ passage: p.id, level, fastN, liveMiss: r.liveFastMiss, finalMiss: r.fast.ok + r.fast.miss });
+    }
+  }
+  return report;
+}

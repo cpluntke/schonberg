@@ -228,8 +228,10 @@ function noteWindows(ctx: ScoringContext, opts: ScoringOptions): NoteWindow[] {
     // amount, so singing either what the (tempered) backing plays or the pure interval is fine.
     const half = targetOffset / 2;
     const short = bodyEnd - bodyStart < SHORT_BODY;
-    const judgeFrom = note.start - (short && prev && prev.midi !== note.midi ? SHORT_SLACK : 0);
-    const judgeTo = note.start + note.dur + (short && next?.midi !== note.midi ? SHORT_SLACK : 0);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const __S = ((globalThis as any).__SLK ?? { pre: SHORT_SLACK, post: SHORT_SLACK }) as { pre: number; post: number };
+    const judgeFrom = note.start - (short && prev && prev.midi !== note.midi ? __S.pre : 0);
+    const judgeTo = note.start + note.dur + (short && next?.midi !== note.midi ? __S.post : 0);
     out.push({
       index: i, note, target: note.midi + half / 100, targetOffset, start: note.start, bodyStart, bodyEnd, legatoFrom, legatoTo, tolExtra: Math.abs(half),
       short, judgeFrom, judgeTo, doneAt: short ? Math.max(bodyEnd, judgeTo) : bodyEnd,
@@ -480,8 +482,11 @@ export class LiveScorer {
         : hitRatio >= 0.6 ? 'good'
           : hitRatio >= 0.35 ? 'ok'
             : 'miss';
-    // Very short notes: one in-tune moment (within the judged part) is enough for "good".
-    if (w.bodyEnd - w.bodyStart < SHORT_BODY && jD.some((d) => Math.abs(d) <= tolN) && GRADE_RANK[grade] < GRADE_RANK.good) grade = 'good';
+    // Very short notes: one in-tune moment (within the judged part) is enough for "good" — as long
+    // as the note as a whole was on this note and not on a neighbouring semitone (a voice sitting on
+    // the previous pitch, or on a wrong note, passes through the target on its way to the next).
+    const onNote = shortDev === null || Math.abs(shortDev) < 50;
+    if (w.short && onNote && jD.some((d) => Math.abs(d) <= tolN) && GRADE_RANK[grade] < GRADE_RANK.good) grade = 'good';
     // With octave tolerance on (the singer deliberately sings the part in their own octave),
     // folding is expected and not an error.
     const octave = !this.opts.octaveTolerant && a.devs.length > 0 && a.octaveSamples > a.devs.length / 2;

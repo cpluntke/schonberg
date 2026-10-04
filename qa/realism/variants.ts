@@ -34,7 +34,7 @@ export async function transitionMaxVariant(sec: number): Promise<AfterImpl> {
  * The scorer (scoring.ts + align.ts) and pitch tracker (pitch.ts) as committed at git `ref`, for a
  * before/after comparison of uncommitted changes on the same renders. Regenerated on every call.
  */
-export async function gitVariant(ref = 'HEAD'): Promise<{ impl: AfterImpl; pitch: PitchImpl; key: string }> {
+export async function gitVariant(ref = 'HEAD'): Promise<{ impl: AfterImpl; pitch: PitchImpl; key: string; scoring: typeof import('../../src/game/scoring') }> {
   mkdirSync(DIR, { recursive: true });
   const tag = `git-${ref.replace(/[^A-Za-z0-9]/g, '_')}`;
   const show = (f: string) => execSync(`git show ${ref}:${f}`, { cwd: REPO_ROOT, encoding: 'utf8', maxBuffer: 1 << 24 });
@@ -55,5 +55,6 @@ export async function gitVariant(ref = 'HEAD'): Promise<{ impl: AfterImpl; pitch
     impl: { scoreAttempt: s.scoreAttempt, scoreAligned: a.scoreAligned, medianOnsetMs: a.medianOnsetMs },
     pitch: { detectPitch: p.detectPitch, gatePitch: (r) => p.gatePitch(r), newSmoother: () => new p.PitchSmoother() },
     key: tag,
+    scoring: s,
   };
 }

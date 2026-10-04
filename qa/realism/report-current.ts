@@ -53,7 +53,8 @@ export function writeCurrentReport(): boolean {
   const bleed = read('bleed');
   const abl = read('ablation');
   const roundtrip = read('roundtrip');
-  writeFileSync(resolve(ROOT, 'qa/realism/out/report-current.json'), JSON.stringify({ meta, grid, seqL2, rep, sanity, violations, tm, fid, bleed, abl, roundtrip }, null, 1));
+  const fast = read('fast');
+  writeFileSync(resolve(ROOT, 'qa/realism/out/report-current.json'), JSON.stringify({ meta, grid, seqL2, rep, sanity, violations, tm, fid, bleed, abl, roundtrip, fast }, null, 1));
 
   const L: string[] = [];
   L.push('# Realism: before / after the scoring fixes');
@@ -110,6 +111,14 @@ export function writeCurrentReport(): boolean {
   }
   if (roundtrip) L.push(`- **Real-recording path** (16-bit WAV + current-app sidecar → \`scoreRecordingApp\`): accuracy ${pct(roundtrip.direct)} direct vs ${pct(roundtrip.viaWav)} via the file (shift ${roundtrip.alignedDirect} / ${roundtrip.alignedWav} ms).`);
   if (violations) L.push(`- **Sanity guard (current app):** ${violations.length ? `**${violations.length} violation(s)**: ${violations.join('; ')}` : 'all must-fail runs fail'}.`);
+  if (fast) {
+    const lost = (lvl: number, k: 'before' | 'after') => {
+      const rs = fast.good.filter((r: Any) => r.level === lvl && r[k]);
+      const n = rs.reduce((x: number, r: Any) => x + fastTotal(r[k]), 0);
+      return rs.length ? pct1(rs.reduce((x: number, r: Any) => x + fastLost(r[k]), 0) / Math.max(1, n)) : '–';
+    };
+    L.push(`- **Fast notes (< 0.15 s), good singer, measured delay — share scored ok/miss, before (\`${fast.baseRef ?? '–'}\`) → after:** ${[1, 2, 4].map((l) => `L${l} ${lost(l, 'before')} → ${lost(l, 'after')}`).join(', ')}. See section 7.`);
+  }
   L.push('');
 
   const obsPath = resolve(ROOT, 'qa/realism/observations-current.md');
@@ -241,6 +250,59 @@ export function writeCurrentReport(): boolean {
     ));
     L.push('');
   }
+  if (fast) fastSection(L, fast);
   writeFileSync(resolve(ROOT, 'docs/qa/realism-current.md'), L.join('\n'));
   return true;
+}
+
+const fastTotal = (r: Any) => r.fast.perfect + r.fast.good + r.fast.ok + r.fast.miss;
+const fastLost = (r: Any) => r.fast.ok + r.fast.miss;
+const pct1 = (x: number | null | undefined) => (x == null || !Number.isFinite(x) ? '–' : `${(x * 100).toFixed(1)}%`);
+
+/** Section 7: fast notes (cmp-fast.test.ts / fastnotes.ts). */
+function fastSection(L: string[], f: Any): void {
+  const base = f.baseRef ? `\`${f.baseRef}\`` : '–';
+  L.push('## 7. Fast notes (good singer, measured delay), before → after');
+  L.push('');
+  L.push(`Before = the app at ${base} (\`scoring.ts\`, \`align.ts\`, \`pitch.ts\` from git), after = the working tree, both through the current pipeline on the same renders (true delay 150 ms, measured). "Fast" = shorter than 0.15 s as sung. Cells: accuracy, and the share of fast notes scored ok/miss. Synthetic runs are scales, thirds and neighbour figures, 2 bars per phrase; \`ta\` = a consonant on every note, \`a\` = none (melisma-like), \`nolyr\` = the singer model's default (a consonant on about half).`);
+  L.push('');
+  const groups = [...new Set(f.good.map((r: Any) => r.passage))] as string[];
+  const cell = (rs: Any[], k: 'before' | 'after') => {
+    const xs = rs.map((r: Any) => r[k]).filter(Boolean);
+    if (!xs.length) return '–';
+    const n = xs.reduce((a: number, r: Any) => a + fastTotal(r), 0);
+    return `${pct(mean(xs.map((r: Any) => r.acc)))}${n ? ` · ${pct1(xs.reduce((a: number, r: Any) => a + fastLost(r), 0) / n)}` : ''}${xs.some((r: Any) => !r.passed) ? ` (${xs.filter((r: Any) => !r.passed).length}✗)` : ''}`;
+  };
+  L.push(table(['passage', ...[1, 2, 4].flatMap((l) => [`L${l} before`, `L${l} after`])],
+    groups.map((g) => [g, ...[1, 2, 4].flatMap((l) => { const rs = f.good.filter((r: Any) => r.passage === g && r.level === l); return [cell(rs, 'before'), cell(rs, 'after')]; })])));
+  L.push('');
+  L.push('**Why short notes were lost** (good singer, all levels; the diagnosis replays the scorer on the exact samples it judged and names the rule that dropped each ok/miss note; counts per 1000 notes of that length):');
+  L.push('');
+  const buckets = Object.keys(f.reasons.after);
+  const reasons = [...new Set(buckets.flatMap((b) => [...Object.keys(f.reasons.after[b] ?? {}), ...Object.keys(f.reasons.before?.[b] ?? {})]).filter((r) => r !== 'notes'))];
+  const per1000 = (k: 'before' | 'after', b: string, r: string) => {
+    const e = f.reasons[k]?.[b];
+    return e ? f1(((e[r] ?? 0) / Math.max(1, e.notes)) * 1000) : '–';
+  };
+  L.push(table(['reason', ...buckets.flatMap((b) => [`${b} before`, `${b} after`])],
+    [...reasons.map((r) => [r, ...buckets.flatMap((b) => [per1000('before', b, r), per1000('after', b, r)])]),
+      ['**all lost**', ...buckets.flatMap((b) => (['before', 'after'] as const).map((k) => { const e = f.reasons[k]?.[b]; return e ? f1((Object.entries(e).filter(([r]) => r !== 'notes').reduce((a, [, v]) => a + (v as number), 0) / Math.max(1, e.notes)) * 1000) : '–'; }))],
+      ['notes', ...buckets.flatMap((b) => [f.reasons.before?.[b]?.notes ?? '–', f.reasons.after[b]?.notes ?? '–'])]]));
+  L.push('');
+  L.push('**Adversarial singers** (accuracy, ✗ = fails the level; `plain` = without the end-of-run line-up, i.e. what the live view shows; `al+N` = the voice was shifted N ms):');
+  L.push('');
+  const adv = (r: Any) => (r ? `${pct(r.acc)}${r.passed ? '' : ' ✗'} (plain ${pct(r.plainAcc)}${r.alignedMs ? `, al${r.alignedMs > 0 ? '+' : ''}${r.alignedMs}` : ''})` : '–');
+  L.push(table(['singer', 'passage', 'L', 'before', 'after'], f.adversarial.map((r: Any) => [r.singer, r.passage, r.level, adv(r.before), adv(r.after)])));
+  L.push('');
+  const cal = f.good.filter((r: Any) => r.level >= 2);
+  if (cal.length) {
+    const n = cal.reduce((a: number, r: Any) => a + fastTotal(r.after), 0);
+    L.push(`**Live display vs result, measured delay** (good singer, L2+L4, after): fast notes shown ok/miss while singing ${pct1(cal.reduce((a: number, r: Any) => a + r.after.liveFastMiss, 0) / Math.max(1, n))} vs ${pct1(cal.reduce((a: number, r: Any) => a + fastLost(r.after), 0) / Math.max(1, n))} in the result.`);
+    L.push('');
+  }
+  if (f.live?.length) {
+    L.push('**Live display vs result, uncalibrated phone** (true delay 200 ms, estimate 130 ms; notes shorter than 0.25 s shown ok/miss while singing vs in the result after the line-up): ' +
+      f.live.map((r: Any) => `${r.passage} L${r.level}: ${r.liveMiss}/${r.fastN} live vs ${r.finalMiss}/${r.fastN} result`).join('; ') + '.');
+    L.push('');
+  }
 }
