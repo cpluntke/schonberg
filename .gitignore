@@ -6,3 +6,5 @@ playwright-report
 *.log
 .DS_Store
 content/raw/*.zip
+docs/qa/shots*/
+docs/qa/scripts/*.wav
