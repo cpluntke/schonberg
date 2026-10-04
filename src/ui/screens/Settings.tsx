@@ -26,6 +26,7 @@ export function Settings() {
   }
 
   function restore(text: string) {
+    if (!confirm('Replace your current progress and settings with this backup?')) return;
     try {
       importBackup(text);
       toast('Backup restored');

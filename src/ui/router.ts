@@ -15,7 +15,9 @@ export type Route =
 export function parseHash(hash: string): Route {
   const h = hash.replace(/^#\/?/, '');
   const [path, query = ''] = h.split('?');
-  const seg = path.split('/').filter(Boolean).map(decodeURIComponent);
+  const seg = path.split('/').filter(Boolean).map((x) => {
+    try { return decodeURIComponent(x); } catch { return x; }
+  });
   const q = new URLSearchParams(query);
   switch (seg[0]) {
     case 'library': return { name: 'library' };

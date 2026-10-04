@@ -93,10 +93,14 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
       if (listenOnly) recordAttempt(piece.id, part.id, section.id, 0, emptyResult(), section.end - section.start);
       return;
     }
-    const ladder = section.id !== 'all' && section.id !== 'drill' && section.id !== 'entries' && (rateOverride == null || rateOverride >= (spec?.rate ?? 1) - 1e-6);
+    const realSection = section.id !== 'all' && section.id !== 'drill' && section.id !== 'entries';
+    const partial = !!sessionRef.current?.partial;
+    const ladder = realSection && !partial && (rateOverride == null || rateOverride >= (spec?.rate ?? 1) - 1e-6);
+    // Practice runs (slower tempo, stopped early) are logged but never change section levels.
+    const recId = ladder || !realSection ? section.id : 'practice';
     const durationSec = (section.end - section.start) / rate;
-    const prevBest = personalBest(piece.id, part.id, section.id, level)?.score ?? null;
-    const rec = recordAttempt(piece.id, part.id, section.id, level, r, durationSec);
+    const prevBest = personalBest(piece.id, part.id, recId, level)?.score ?? null;
+    const rec = recordAttempt(piece.id, part.id, recId, level, r, durationSec);
     if (ladder) {
       const secs = singableSections(piece, part.id);
       snapshotReadiness(piece.id, part.id, pieceReadiness(secs, getProgress(piece.id, part.id)).pct);
@@ -211,6 +215,15 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
   const levelInfo = spec ?? null;
   const running = phase === 'running';
 
+  /** Leave to the piece (or the screen that launched a generated drill), never to a stale Results. */
+  function leave() {
+    const fromResults = sessionStorage.getItem('sh:fromResults') === '1';
+    sessionStorage.removeItem('sh:fromResults');
+    if (fromResults || piece!.builtin && /~entries~|^row-|^leaps-/.test(piece!.id)) {
+      go(/^row-|^leaps-/.test(piece!.id) ? { name: 'expert' } : { name: 'piece', pieceId: piece!.id.split('~')[0] }, true);
+    } else back({ name: 'piece', pieceId: piece!.id });
+  }
+
   function togglePart(id: string) {
     const s = sessionRef.current;
     const cur = (s?.partGains ?? gains)[id] ?? 0;
@@ -223,7 +236,7 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
   return (
     <main className="play">
       <div className="play-hud">
-        <button className="icon-btn" aria-label="Back" onClick={() => { sessionRef.current?.dispose(); back({ name: 'piece', pieceId: piece.id }); }}><IconBack /></button>
+        <button className="icon-btn" aria-label="Back" onClick={() => { sessionRef.current?.dispose(); leave(); }}><IconBack /></button>
         <div className="grow col" style={{ gap: 0 }}>
           <span className="ellipsis" style={{ fontWeight: 800, fontSize: 16 }}>{piece.title}</span>
           <span className="tiny muted ellipsis">
@@ -276,7 +289,7 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
               <button className="btn primary block" onClick={() => { sessionRef.current?.resume(); setPhase('running'); }}><IconPlay size={18} /> Resume</button>
               <button className="btn block" onClick={() => { sessionRef.current?.dispose(); sessionRef.current = null; start(); }}><IconRestart size={18} /> Restart section</button>
               {!listenOnly && <button className="btn block" onClick={() => sessionRef.current?.finish()}>Finish &amp; see results</button>}
-              <button className="btn ghost block" onClick={() => { sessionRef.current?.dispose(); back({ name: 'piece', pieceId: piece.id }); }}>Quit</button>
+              <button className="btn ghost block" onClick={() => { sessionRef.current?.dispose(); leave(); }}>Quit</button>
             </div>
           </div>
         )}

@@ -130,7 +130,7 @@ export function Home() {
             </div>
             <div className="col" style={{ alignItems: 'flex-end', gap: 4 }}>
               <span className="mono small">{Math.round(s.pct * 100)}%</span>
-              <span className="tiny muted">{s.concertReady ? 'concert-ready' : s.rehearsalReady ? 'rehearsal-ready' : levelName(s.minLevel)}</span>
+              <span className="tiny muted">{s.concertReady ? 'concert-ready' : s.rehearsalReady ? 'rehearsal-ready' : s.pct > 0 && s.minLevel === 0 ? 'in progress' : levelName(s.minLevel)}</span>
             </div>
           </button>
         ))}

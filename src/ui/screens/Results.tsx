@@ -7,6 +7,12 @@ import { getProgress } from '../../progress/store';
 import { IconDown, IconUp, IconClock, IconLoop, IconStar, IconPlay, IconCube } from '../icons';
 import type { Insight } from '../../game/types';
 
+/** Start a run from Results; replace the history entry so "back" from the run doesn't land on stale results. */
+function goPlay(r: Parameters<typeof go>[0]) {
+  sessionStorage.setItem('sh:fromResults', '1');
+  go(r, true);
+}
+
 function gradeLetter(acc: number): string {
   if (acc >= 0.95) return 'S';
   if (acc >= 0.85) return 'A';
@@ -56,7 +62,7 @@ export function Results() {
     const from = ms[Math.max(0, m0)]?.start ?? lr.from;
     const last = ms[Math.min(ms.length - 1, m1)];
     const to = last ? last.start + last.dur : lr.to;
-    go({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: 'drill', level, mode: '2d', from, to });
+    goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: 'drill', level, mode: '2d', from, to });
   };
 
   return (
@@ -105,7 +111,7 @@ export function Results() {
             {measureIdx.map((m) => {
               const v = r.perMeasure[m];
               const bg = v >= 0.85 ? '#4CC9F0' : v >= 0.6 ? '#1D4F63' : '#FF7A45';
-              return <button key={m} aria-label={`Bar ${mnum(m)}: ${Math.round(v * 100)}%`} title={`Bar ${mnum(m)} · ${Math.round(v * 100)}%`} style={{ background: bg }} onClick={() => playLoop(m - 1, m + 1)} />;
+              return <button key={m} aria-label={`Bar ${mnum(m)}: ${Math.round(v * 100)}%`} title={`Bar ${mnum(m)} · ${Math.round(v * 100)}%`} style={{ background: bg, color: '#0B0D1A', fontSize: 11, fontWeight: 700, fontFamily: 'var(--mono)' }} onClick={() => playLoop(m - 1, m + 1)}>{mnum(m)}</button>;
             })}
           </div>
           <div className="row tiny muted" style={{ gap: 14 }}>
@@ -141,25 +147,25 @@ export function Results() {
 
       <div className="col" style={{ gap: 8, marginTop: 'auto' }}>
         {!lr.passed && lr.ladder ? (
-          <button className="btn primary block" onClick={() => go({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, level: lr.level, mode: lr.mode })}>
+          <button className="btn primary block" onClick={() => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, level: lr.level, mode: lr.mode })}>
             <IconPlay size={18} /> Try again
           </button>
         ) : next ? (
-          <button className="btn primary block" onClick={() => go({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: next.sectionId, level: next.level, mode: '2d' })}>
+          <button className="btn primary block" onClick={() => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: next.sectionId, level: next.level, mode: '2d' })}>
             <IconPlay size={18} /> Next: {sections.find((s) => s.id === next.sectionId)?.label}, level {next.level}
           </button>
         ) : (
-          <button className="btn primary block" onClick={() => go({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: 'all', level: 4, mode: '3d' })}>
+          <button className="btn primary block" onClick={() => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: 'all', level: 4, mode: '3d' })}>
             <IconCube size={18} color="#0B0D1A" /> Concert-ready! Arcade run of the whole piece
           </button>
         )}
         <div className="row">
           {!lr.passed && lr.ladder && lr.level > 1 ? (
-            <button className="btn block" onClick={() => go({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, level: lr.level - 1, mode: '2d' })}>
+            <button className="btn block" onClick={() => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, level: lr.level - 1, mode: '2d' })}>
               Easier: level {lr.level - 1}
             </button>
           ) : !(!lr.passed && lr.ladder) ? (
-            <button className="btn block" onClick={() => go({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, level: lr.level, mode: lr.mode, ...(lr.sectionId === 'drill' ? { from: lr.from, to: lr.to } : {}) })}>Again</button>
+            <button className="btn block" onClick={() => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, level: lr.level, mode: lr.mode, ...(lr.sectionId === 'drill' ? { from: lr.from, to: lr.to } : {}) })}>Again</button>
           ) : null}
           <button className="btn block" onClick={() => go({ name: 'piece', pieceId: piece.id })}>All sections</button>
         </div>

@@ -89,10 +89,12 @@ export function sanitizeEntry(v: unknown): LeaderboardEntry | null {
   const pieceId = clampStr(o.pieceId, 120);
   const voice = VOICES.includes(o.voice as VoiceType) ? (o.voice as VoiceType) : 'other';
   const readiness = num(o.readiness, 0, 1);
-  const weeklyScore = num(o.weeklyScore, 0, 1e9);
-  const streak = num(o.streak, 0, 10000);
+  // Plausibility limits (a share code can be hand-crafted): a week of practice can't exceed a few
+  // hundred thousand points, streaks are capped at ~3 years, and timestamps can't be in the future.
+  const weeklyScore = num(o.weeklyScore, 0, 500_000);
+  const streak = num(o.streak, 0, 1000);
   const improved = num(o.improved, -1, 1);
-  const updatedAt = num(o.updatedAt, 0, 1e14);
+  const updatedAt = num(o.updatedAt, 0, Date.now() + 86_400_000);
   if (!name || !pieceId || readiness == null || weeklyScore == null || streak == null || improved == null || updatedAt == null) {
     return null;
   }

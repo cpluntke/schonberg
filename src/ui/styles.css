@@ -206,8 +206,8 @@ input[type='range'] { accent-color: var(--accent); width: 100%; }
 }
 .overlay .card { max-width: 420px; width: 100%; }
 
-.heat { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 3px; }
-.heat button { height: 30px; border: none; padding: 0; border-radius: 3px; }
+.heat { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 4px; }
+.heat button { height: 44px; border: none; padding: 0; border-radius: 3px; }
 
 .grade-tile {
   width: 96px; height: 96px; border-radius: 24px; background: var(--accent); color: var(--accent-ink);
@@ -245,4 +245,15 @@ input[type='range'] { accent-color: var(--accent); width: 100%; }
 
 @media (min-width: 700px) {
   .screen { padding-left: 24px; padding-right: 24px; }
+}
+
+/* Short screens (phones in landscape): keep the play controls on screen. */
+@media (max-height: 520px) {
+  .play-canvas-wrap { min-height: 120px; }
+  .play-controls { flex-direction: row; align-items: center; padding-top: 4px; padding-bottom: calc(6px + var(--safe-bottom)); }
+  .play-controls .mixer { flex: 1 1 auto; }
+  .play-controls > .row { flex: none; }
+  .lyrics { font-size: 16px; padding-top: 4px; min-height: 26px; }
+  .big-play { width: 48px; height: 48px; }
+  .play-hud { padding-top: 2px; padding-bottom: 0; }
 }

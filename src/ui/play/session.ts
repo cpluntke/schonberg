@@ -4,7 +4,7 @@ import type { AttemptResult, PitchSample, ScoringOptions } from '../../game/type
 import { getAudioContext, unlockAudio, outputLatencySec } from '../../audio/context';
 import { PitchTracker, type RawPitch } from '../../audio/pitch';
 import { ScorePlayer, beatsInMeasure, beatSecAt } from '../../audio/player';
-import { LiveScorer, type ScoringContext } from '../../game/scoring';
+import { LiveScorer, scoreAttempt, type ScoringContext } from '../../game/scoring';
 
 let sharedTracker: PitchTracker | null = null;
 let trackerPromise: Promise<PitchTracker> | null = null;
@@ -224,14 +224,26 @@ export class PracticeSession {
     this.wakeLock = null;
   }
 
+  /** True when the last finish() came before the end of the section. */
+  partial = false;
+
   finish() {
     if (this.phase === 'done') return;
+    const pos = this.player.position;
+    this.partial = this.phase === 'countin' || pos < this.cfg.to - 0.25;
     this.phase = 'done';
     this.unsubEnd?.();
     this.stopSimulation();
     this.releaseWakeLock();
     this.player.stop();
-    const result = this.live ? this.live.finish(this.samples) : null;
+    let result = this.live ? this.live.finish(this.samples) : null;
+    if (this.partial && this.cfg.range) {
+      // Score only the notes that had started when the singer stopped.
+      const [a, b] = this.cfg.range;
+      let last = a - 1;
+      for (let i = a; i <= b; i++) if (this.cfg.part.notes[i].start < pos) last = i;
+      result = last < a ? null : scoreAttempt({ score: this.cfg.score, part: this.cfg.part, range: [a, last] }, this.samples, this.cfg.scoring);
+    }
     this.onDone(result);
   }
 

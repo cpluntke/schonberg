@@ -29,7 +29,12 @@ export function Library() {
         if (files.length === 1) go({ name: 'piece', pieceId: p.id });
       } catch (e) {
         console.error(e);
-        setError(`${f.name}: ${(e as Error).message || 'could not read this file'}`);
+        const msg = (e as Error).message || '';
+        const friendly = f.size === 0 ? 'the file is empty.'
+          : /no notes/i.test(msg) ? 'no notes were found in it.'
+            : /unsupported|extension/i.test(msg) ? 'this file type isn’t supported. Use MusicXML (.musicxml, .xml, .mxl) or MIDI (.mid).'
+              : 'it doesn’t look like a valid MusicXML or MIDI file. Try exporting it again from your notation program.';
+        setError(`${f.name}: ${friendly}`);
       }
     }
     setBusy(false);

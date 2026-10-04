@@ -647,7 +647,8 @@ export function parseMusicXML(xml: string, opts?: { id?: string }): Score {
     const implicit = rms.some((m) => m.implicit);
     let dur: number;
     if (len <= EPS) dur = tsLen;
-    else if (implicit || i === nMeasures - 1) dur = len;
+    // A short first bar is a pickup (anacrusis) even when the file doesn't mark it implicit.
+    else if (implicit || i === nMeasures - 1 || (i === 0 && nMeasures > 1 && len < tsLen - EPS)) dur = len;
     else dur = len < tsLen - EPS ? tsLen : len;
     const first = rms[0];
     const m: Measure = {

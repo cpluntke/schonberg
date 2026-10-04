@@ -49,7 +49,36 @@ async function loadManifest(base: string, file: string): Promise<ManifestEntry[]
   }
 }
 
+/** Ids of built-in pieces that were renamed; progress and cycle entries are moved over. */
+const RENAMED: Record<string, string> = { 'bach-bwv512': 'bach-bwv315' };
+
+function migrateIds() {
+  try {
+    for (const [from, to] of Object.entries(RENAMED)) {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k) continue;
+        const prefixes = [`sh:progress:${from}:`, `sh:part:${from}`];
+        for (const pre of prefixes) {
+          if (k.startsWith(pre)) {
+            const nk = k.replace(from, to);
+            if (localStorage.getItem(nk) == null) localStorage.setItem(nk, localStorage.getItem(k)!);
+            localStorage.removeItem(k);
+            i--;
+          }
+        }
+      }
+      const c = loadCycle();
+      if (c.pieceIds.includes(from)) {
+        c.pieceIds = c.pieceIds.map((x) => (x === from ? to : x));
+        saveCycle(c);
+      }
+    }
+  } catch { /* storage unavailable */ }
+}
+
 async function loadAll() {
+  migrateIds();
   const base = import.meta.env.BASE_URL || './';
   const manifest = [
     ...(await loadManifest(base, 'repertoire.json')),
@@ -122,6 +151,7 @@ export function registerResolver(r: Resolver) {
 }
 
 export function getPiece(id: string): PieceInfo | undefined {
+  if (RENAMED[id]) id = RENAMED[id];
   const p = pieces.get(id) ?? virtual.get(id);
   if (p) return p;
   for (const r of resolvers) {
