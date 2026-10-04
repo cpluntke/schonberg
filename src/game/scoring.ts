@@ -24,14 +24,7 @@ const HALF_COVER_MAX = 0.025;
 /** Assumed half-period for the first/last sample (no neighbour known). */
 const EDGE_HALF_COVER = 0.01;
 const SCOOP_WINDOW = 0.15;
-/** A note whose body is shorter than this is "very short" (fast passages): judged as a whole, see below. */
 const SHORT_BODY = 0.15;
-/**
- * Very short notes are also judged on all their own readings, from the written start to the written
- * end, widened by this much on a side where the neighbour is another pitch (the singer is a little
- * early or late; readings are attributed by pitch there).
- */
-const SHORT_SLACK = 0.03;
 /** Default vibrato smoothing window (≈ one vibrato cycle at 5.5 Hz). */
 export const DEFAULT_VIBRATO_WINDOW = 0.18;
 /**
@@ -164,12 +157,6 @@ interface NoteWindow {
   legatoTo: number | null;
   /** Extra tolerance (cents) — just-intonation mode accepts both the pure and the tempered pitch. */
   tolExtra: number;
-  /** Very short note (body < SHORT_BODY): also judged on all its readings in [judgeFrom, judgeTo). */
-  short: boolean;
-  judgeFrom: number;
-  judgeTo: number;
-  /** The note can be finalized once samples are past this time. */
-  doneAt: number;
 }
 
 class NoteAcc {
@@ -197,9 +184,6 @@ class NoteAcc {
   bT: number[] = [];
   bD: number[] = [];
   bW: number[] = [];
-  /** Very short notes: every voiced reading in [judgeFrom, judgeTo) (time, deviation). */
-  nT: number[] = [];
-  nD: number[] = [];
   final: NoteResult | null = null;
   constructor(readonly w: NoteWindow) {}
 }
@@ -227,15 +211,7 @@ function noteWindows(ctx: ScoringContext, opts: ScoringOptions): NoteWindow[] {
     // Just intonation: aim halfway between pure and tempered and widen the window by the same
     // amount, so singing either what the (tempered) backing plays or the pure interval is fine.
     const half = targetOffset / 2;
-    const short = bodyEnd - bodyStart < SHORT_BODY;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const __S = ((globalThis as any).__SLK ?? { pre: SHORT_SLACK, post: SHORT_SLACK }) as { pre: number; post: number };
-    const judgeFrom = note.start - (short && prev && prev.midi !== note.midi ? __S.pre : 0);
-    const judgeTo = note.start + note.dur + (short && next?.midi !== note.midi ? __S.post : 0);
-    out.push({
-      index: i, note, target: note.midi + half / 100, targetOffset, start: note.start, bodyStart, bodyEnd, legatoFrom, legatoTo, tolExtra: Math.abs(half),
-      short, judgeFrom, judgeTo, doneAt: short ? Math.max(bodyEnd, judgeTo) : bodyEnd,
-    });
+    out.push({ index: i, note, target: note.midi + half / 100, targetOffset, start: note.start, bodyStart, bodyEnd, legatoFrom, legatoTo, tolExtra: Math.abs(half) });
   }
   return out;
 }
@@ -338,14 +314,14 @@ export class LiveScorer {
 
   private apply(c: Covered): void {
     const t = c.s.time;
-    // Finalize notes whose body (very short notes: whole judged span) is completely before this sample's coverage.
-    while (this.cur < this.accs.length && this.accs[this.cur].w.doneAt <= c.from) {
+    // Finalize notes whose body is completely before this sample's coverage.
+    while (this.cur < this.accs.length && this.accs[this.cur].w.bodyEnd <= c.from) {
       this.finalize(this.accs[this.cur]);
       this.cur++;
     }
     for (let j = this.cur; j < this.accs.length; j++) {
       const a = this.accs[j];
-      if (Math.min(a.w.start, a.w.judgeFrom) > c.to) break;
+      if (a.w.start > c.to) break;
       if (a.final) continue;
       this.addToNote(a, c, t);
     }
@@ -365,10 +341,7 @@ export class LiveScorer {
       }
     }
     const tol = this.tol + w.tolExtra;
-    if (w.short && dev !== null && t >= w.judgeFrom && t < w.judgeTo) {
-      a.nT.push(t);
-      a.nD.push(dev);
-    }
+    const inTol = dev !== null && Math.abs(dev) <= tol;
     // Onset & scoop use samples from the note start (grace included).
     if (t >= w.start && t < w.bodyEnd) {
       // Timing is judged independently of intonation: the note "starts" with the first voiced
@@ -467,26 +440,17 @@ export class LiveScorer {
         if (Math.abs(median(jD)!) <= tolN) hitTime = jW.reduce((x, y) => x + y, 0) + excused;
       }
     }
-    let hitRatio = clamp(hitTime / Math.max(1e-3, bodyDur - excused), 0, 1);
+    const hitRatio = clamp(hitTime / Math.max(1e-3, bodyDur - excused), 0, 1);
     const voicedRatio = clamp(a.voicedTime / Math.max(1e-3, w.bodyEnd - w.bodyStart), 0, 1);
-    let medDev = jD.length ? median(jD) : median(a.devs);
-    // Very short notes: what was sung is the median of the note's own readings (see shortNoteDev).
-    const shortDev = w.short ? shortNoteDev(a, tolN, this.opts.octaveTolerant) : null;
-    if (shortDev !== null) {
-      medDev = shortDev;
-      if (Math.abs(shortDev) <= tolN) hitRatio = 1;
-    }
+    const medDev = jD.length ? median(jD) : median(a.devs);
     const tol = tolN;
     let grade: Grade =
       hitRatio >= 0.8 && medDev !== null && Math.abs(medDev) <= tol / 2 ? 'perfect'
         : hitRatio >= 0.6 ? 'good'
           : hitRatio >= 0.35 ? 'ok'
             : 'miss';
-    // Very short notes: one in-tune moment (within the judged part) is enough for "good" — as long
-    // as the note as a whole was on this note and not on a neighbouring semitone (a voice sitting on
-    // the previous pitch, or on a wrong note, passes through the target on its way to the next).
-    const onNote = shortDev === null || Math.abs(shortDev) < 50;
-    if (w.short && onNote && jD.some((d) => Math.abs(d) <= tolN) && GRADE_RANK[grade] < GRADE_RANK.good) grade = 'good';
+    // Very short notes: one in-tune moment (within the judged part) is enough for "good".
+    if (w.bodyEnd - w.bodyStart < SHORT_BODY && jD.some((d) => Math.abs(d) <= tolN) && GRADE_RANK[grade] < GRADE_RANK.good) grade = 'good';
     // With octave tolerance on (the singer deliberately sings the part in their own octave),
     // folding is expected and not an error.
     const octave = !this.opts.octaveTolerant && a.devs.length > 0 && a.octaveSamples > a.devs.length / 2;
@@ -559,37 +523,6 @@ export function judgedSpan(a: { w: NoteWindow; bT: number[]; bD: number[]; bW: n
     }
   }
   return { k0, k1, from, to: Math.max(to, from + 1e-3) };
-}
-
-/**
- * Very short notes (fast passages). In ~0.1 s the voice rarely settles: it glides in, overshoots, and
- * the next syllable's consonant cuts it off, so only one or two readings fall in the body (after
- * the grace and tail), often mid-transition. What was sung for the note is better told by the median
- * of all of its own readings from the written start to the written end (widened by SHORT_SLACK where
- * a neighbour has another pitch): leading readings still nearer the previous pitch and trailing ones
- * already nearer the next pitch are the transitions and are excused, up to the same caps as in
- * judgedSpan (so a singer who stays on the previous pitch through the note is not excused).
- * Returns the median deviation (cents), or null without readings inside the written note.
- */
-export function shortNoteDev(a: { w: NoteWindow; nT: number[]; nD: number[] }, tol: number, octaveTolerant: boolean): number | null {
-  const w = a.w;
-  const end = w.start + w.note.dur;
-  const fold = (d: number) => (octaveTolerant ? d - 1200 * Math.round(d / 1200) : d);
-  // Out of tolerance, and nearer the neighbour's pitch than this note's.
-  const nearer = (d: number, other: number | null) => {
-    if (other === null || other === w.note.midi) return false;
-    const x = fold(d);
-    return Math.abs(x) > tol && Math.abs(fold(d - 100 * (other - w.target))) < Math.abs(x);
-  };
-  const capStart = w.start + Math.min(TRANSITION_MAX, 0.35 * w.note.dur);
-  const capEnd = end - Math.min(RELEASE_MAX, 0.2 * w.note.dur);
-  let k0 = 0;
-  let k1 = a.nT.length;
-  while (k0 < k1 && a.nT[k0] <= capStart && nearer(a.nD[k0], w.legatoFrom)) k0++;
-  while (k1 > k0 && a.nT[k1 - 1] >= capEnd && nearer(a.nD[k1 - 1], w.legatoTo)) k1--;
-  let inside = false;
-  for (let k = k0; k < k1; k++) if (a.nT[k] >= w.start && a.nT[k] < end) inside = true;
-  return inside ? median(a.nD.slice(k0, k1)) : null;
 }
 
 /** Centred moving average whose window is shifted (not truncated) to stay inside the samples. */
