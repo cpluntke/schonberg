@@ -25,6 +25,7 @@ export function Ranks() {
   const [pieceId, setPieceId] = useState(pieces[0]?.id ?? '');
   const [by, setBy] = useState<RankBy>('readiness');
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const [allEntries, setAllEntries] = useState<LeaderboardEntry[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [paste, setPaste] = useState('');
   const [codeDraft, setCodeDraft] = useState(profile.choirCode ?? '');
@@ -32,6 +33,10 @@ export function Ranks() {
   const choir = profile.choirCode || 'local';
   const piece = getPiece(pieceId);
 
+  const computeMyEntryCached = (pc: PieceInfo) => {
+    const pid = chosenPartId(pc, profile.voice);
+    return computeMyEntry(pc.id, pid, singableSections(pc, pid));
+  };
   const me: LeaderboardEntry | null = piece
     ? computeMyEntry(piece.id, chosenPartId(piece, profile.voice), singableSections(piece, chosenPartId(piece, profile.voice)))
     : null;
@@ -43,7 +48,8 @@ export function Ranks() {
       try {
         if (me && profile.leaderboardOptIn) await backend.put(choir, me);
         const list = await backend.list(choir, pieceId);
-        if (alive) { setEntries(list); setErr(null); }
+        const everything = await backend.list(choir);
+        if (alive) { setEntries(list); setAllEntries(everything); setErr(null); }
       } catch (e) {
         if (alive) setErr((e as Error).message);
       }
@@ -153,6 +159,40 @@ export function Ranks() {
           );
         })}
       </div>
+
+      {pieces.length > 0 && (
+        <div className="card">
+          <div className="row between"><h2 style={{ fontSize: 15 }}>Choir overview</h2><span className="tiny muted">avg. readiness per section of the choir</span></div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 13 }}>
+              <thead>
+                <tr>
+                  <th scope="col" style={{ textAlign: 'left', padding: '4px 6px' }}>Piece</th>
+                  {(['S', 'A', 'T', 'B'] as const).map((vt) => <th key={vt} scope="col" style={{ padding: '4px 6px' }}>{vt}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {pieces.map((pc) => {
+                  const mine = getPiece(pc.id) ? computeMyEntryCached(pc) : null;
+                  const es = [...allEntries.filter((e) => e.pieceId === pc.id && !(mine && e.name === mine.name)), ...(mine ? [mine] : [])];
+                  return (
+                    <tr key={pc.id} style={{ borderTop: '1px solid var(--surface-2)' }}>
+                      <th scope="row" style={{ textAlign: 'left', padding: '6px', fontWeight: 600, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pc.title}</th>
+                      {(['S', 'A', 'T', 'B'] as const).map((vt) => {
+                        const v = es.filter((e) => e.voice === vt);
+                        const avg = v.length ? v.reduce((a, e) => a + e.readiness, 0) / v.length : null;
+                        const bg = avg == null ? 'transparent' : avg >= 0.75 ? '#1D4F63' : avg >= 0.4 ? '#2A2F55' : '#4A2418';
+                        return <td key={vt} className="mono" style={{ textAlign: 'center', padding: '6px', background: bg }}>{avg == null ? '–' : `${Math.round(avg * 100)}%`}</td>;
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <span className="tiny muted">Built from your own progress plus the rankings you've collected. Rehearsal-ready ≈ 75%.</span>
+        </div>
+      )}
 
       <div className="card">
         <strong>Compare with your choir</strong>
