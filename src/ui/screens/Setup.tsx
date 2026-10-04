@@ -1,16 +1,15 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { useProfile, useStoreVersion } from '../hooks';
 import { loadCycle, saveCycle } from '../../progress/store';
 import { allPieces } from '../library';
 import { IntroVideoButton, introSeen } from '../components/IntroVideo';
 import { go, back } from '../router';
-import { Tuner, letterName } from '../components/Tuner';
+import { RangeCheck } from '../components/RangeCheck';
 import { getTracker } from '../play/session';
 import { getAudioContext, unlockAudio } from '../../audio/context';
 import { measureLatency } from '../../audio/latency';
 import type { VoiceType } from '../../music/types';
 import type { NotationMode } from '../../game/notation';
-import type { RawPitch } from '../../audio/pitch';
 import { IconBack, IconCheck } from '../icons';
 
 const VOICES: { v: VoiceType; name: string; range: string }[] = [
@@ -33,14 +32,6 @@ function renamed<T extends { name: string }>(c: T): T {
   return c.name === 'Demo cycle' ? { ...c, name: 'This cycle' } : c;
 }
 
-function suggestVoice(lo: number, hi: number): VoiceType {
-  const mid = (lo + hi) / 2;
-  if (mid >= 67) return 'S';
-  if (mid >= 61) return 'A';
-  if (mid >= 54) return 'T';
-  return 'B';
-}
-
 export function Setup() {
   const [profile, update] = useProfile();
   useStoreVersion();
@@ -49,23 +40,8 @@ export function Setup() {
   const [range, setRange] = useState<{ lo: number; hi: number } | null>(
     profile.rangeLow && profile.rangeHigh ? { lo: profile.rangeLow, hi: profile.rangeHigh } : null,
   );
-  const stable = useRef<{ midi: number; since: number } | null>(null);
   const [lat, setLat] = useState<{ state: 'idle' | 'running' | 'done' | 'fail'; beat: number; ms: number }>({ state: 'idle', beat: 0, ms: profile.latencyMs });
   const steps = 4;
-
-  function onReading(p: RawPitch) {
-    if (p.midi == null) { stable.current = null; return; }
-    const r = Math.round(p.midi);
-    const now = performance.now();
-    if (!stable.current || Math.abs(stable.current.midi - p.midi) > 0.6) { stable.current = { midi: p.midi, since: now }; return; }
-    if (now - stable.current.since > 350) {
-      setRange((cur) => {
-        if (!cur) return { lo: r, hi: r };
-        if (r < cur.lo || r > cur.hi) return { lo: Math.min(cur.lo, r), hi: Math.max(cur.hi, r) };
-        return cur;
-      });
-    }
-  }
 
   async function runLatency() {
     setLat({ state: 'running', beat: 0, ms: 0 });
@@ -156,25 +132,10 @@ export function Setup() {
       )}
 
       {step === 1 && (
-        <>
-          <h1 className="hero">Sing a comfortable “ah”</h1>
-          <Tuner notation="letter" onReading={onReading} />
-          <div className="col">
-            <div className="row between small">
-              <strong>Your range so far</strong>
-              <span className="mono muted">{range ? `${letterName(range.lo)} – ${letterName(range.hi)}` : '–'}</span>
-            </div>
-            <RangeStrip range={range} />
-            <span className="small muted">
-              Slide slowly from your lowest to your highest comfortable note.
-              {range && range.hi - range.lo >= 7 ? ` That sounds like a ${VOICES.find((v) => v.v === suggestVoice(range.lo, range.hi))?.name.toLowerCase()} range.` : ''}
-            </span>
-          </div>
-          <div className="row" style={{ marginTop: 'auto' }}>
-            {range && <button className="btn" onClick={() => setRange(null)}>Reset range</button>}
-            <button className="btn primary grow" onClick={() => setStep(2)}>Continue</button>
-          </div>
-        </>
+        <RangeCheck
+          onSkip={() => setStep(2)}
+          onDone={(r) => { if (r) setRange(r); setStep(2); }}
+        />
       )}
 
       {step === 2 && (
@@ -224,16 +185,4 @@ export function Setup() {
       )}
     </main>
   );
-}
-
-function RangeStrip({ range }: { range: { lo: number; hi: number } | null }) {
-  const LO = 36; // C2
-  const HI = 84; // C6
-  const keys = [];
-  for (let m = LO; m <= HI; m++) {
-    if ([1, 3, 6, 8, 10].includes(m % 12)) continue;
-    const inR = range && m >= range.lo && m <= range.hi;
-    keys.push(<span key={m} style={{ flex: '1 1 0', borderRadius: 3, background: inR ? 'var(--voice-deep)' : 'var(--surface-2)', borderBottom: m % 12 === 0 ? '2px solid var(--muted)' : undefined }} />);
-  }
-  return <div style={{ display: 'flex', gap: 2, height: 36 }} aria-hidden="true">{keys}</div>;
 }
