@@ -17,7 +17,8 @@ export type Route =
   | { name: 'choir' }
   | { name: 'choiradmin' }
   | { name: 'section' }
-  | { name: 'superadmin' };
+  | { name: 'superadmin' }
+  | { name: 'invite'; token?: string };
 
 export function parseHash(hash: string): Route {
   const h = hash.replace(/^#\/?/, '');
@@ -59,6 +60,7 @@ export function parseHash(hash: string): Route {
     case 'choiradmin': return { name: 'choiradmin' };
     case 'section': return { name: 'section' };
     case 'superadmin': return { name: 'superadmin' };
+    case 'invite': return seg[1] ? { name: 'invite', token: seg[1] } : { name: 'invite' };
   }
   return { name: 'home' };
 }
@@ -76,6 +78,7 @@ export function href(r: Route): string {
     }
     case 'lyrics':
     case 'memorymap': return `#/${r.name}/${e(r.pieceId)}/${e(r.partId)}`;
+    case 'invite': return r.token ? `#/invite/${e(r.token)}` : '#/invite';
     default: return r.name === 'home' ? '#/' : `#/${r.name}`;
   }
 }

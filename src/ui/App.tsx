@@ -19,6 +19,7 @@ import { Diagnostics } from './screens/Diagnostics';
 import { LyricsQuiz } from './screens/LyricsQuiz';
 import { MemoryMap } from './screens/MemoryMap';
 import { ChoirScreen, ChoirAdmin, SectionLead, SuperAdmin } from './screens/Choir';
+import { InviteScreen } from './screens/Invite';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { UpdatePrompt } from './components/UpdatePrompt';
 
@@ -87,6 +88,7 @@ export function App() {
       case 'choiradmin': body = <ChoirAdmin />; break;
       case 'section': body = <SectionLead />; break;
       case 'superadmin': body = <SuperAdmin />; break;
+      case 'invite': body = <InviteScreen key={route.token ?? 'invite'} token={route.token} />; break;
     }
   }
 

@@ -1,8 +1,8 @@
-// Your choir on the server: its programme (cycle) and its own scores, plus the admin, section-lead
-// and super-admin calls. Members only need the choir code; the programme and scores are synced to
-// the phone (and work offline afterwards).
+// Your choir on the server: its programme (cycle) and its own scores, plus the calls for admins and
+// section leads (personal accounts, created through invite links) and the super admin. Members only
+// need the choir code; the programme and scores are synced to the phone (and work offline afterwards).
 
-import { loadCycle, loadProfile, readJSON, saveCycle, saveProfile, writeJSON, type Cycle } from './store';
+import { loadCycle, loadProfile, rawGet, rawRemove, rawSet, readJSON, saveCycle, saveProfile, writeJSON, type Cycle } from './store';
 import type { BarMap } from './bars';
 
 export interface ChoirPiece { id: string; title: string; composer: string; filename: string; uploadedAt: number; size: number }
@@ -14,7 +14,10 @@ export interface ChoirInfo {
   updatedAt: number;
   /** When an admin last published the programme (score uploads don't change it). */
   cycleUpdatedAt?: number;
+  /** Voice parts that have a section lead. */
   leads: string[];
+  /** The first version's shared admin / section-lead passwords can still become personal accounts. */
+  legacyLogin?: boolean;
 }
 
 export class ChoirApiError extends Error {
@@ -24,7 +27,8 @@ export class ChoirApiError extends Error {
 /** API base (same origin when served from the app's own server). */
 export function apiBase(): string | null {
   try {
-    const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
+    // Written as `import.meta.env` so Vite (and Vitest's stubEnv) can see it.
+    const env = import.meta.env as Record<string, string | undefined> | undefined;
     // Only builds served next to the choir server set this (the plain leaderboard server has no choirs).
     const v = env?.VITE_CHOIR_URL;
     return v && v.trim() ? v.trim().replace(/\/$/, '') : null;
@@ -52,23 +56,33 @@ export function memberToken(): string {
   }
 }
 
-async function call<T>(path: string, init: RequestInit & { admin?: string; superAdmin?: string; lead?: string; member?: boolean } = {}): Promise<T> {
+/** How a request proves who sends it: a logged-in account's session, or the super-admin password. */
+export type Auth = { bearer: string } | { superAdmin: string };
+
+async function call<T>(path: string, init: RequestInit & { auth?: Auth; member?: boolean } = {}): Promise<T> {
   const base = apiBase();
   if (!base) throw new ChoirApiError(0, 'Choirs need the online version of the app.');
-  const headers: Record<string, string> = { ...(init.headers as Record<string, string> | undefined) };
-  if (init.admin) headers['X-Choir-Admin'] = init.admin;
-  if (init.superAdmin) headers['X-Super-Admin'] = init.superAdmin;
-  if (init.lead) headers['X-Section-Lead'] = init.lead;
-  if (init.member) headers['X-Member-Token'] = memberToken();
+  const { auth, member, ...rest } = init;
+  const headers: Record<string, string> = { ...(rest.headers as Record<string, string> | undefined) };
+  if (auth && 'bearer' in auth) headers.Authorization = `Bearer ${auth.bearer}`;
+  if (auth && 'superAdmin' in auth) headers['X-Super-Admin'] = auth.superAdmin;
+  if (member) headers['X-Member-Token'] = memberToken();
   let res: Response;
   try {
-    res = await fetch(base + path, { ...init, headers });
+    res = await fetch(base + path, { ...rest, headers });
   } catch {
     throw new ChoirApiError(0, 'No connection to the server.');
   }
   let body: unknown = null;
   try { body = await res.json(); } catch { /* not json */ }
-  if (!res.ok) throw new ChoirApiError(res.status, (body as { error?: string } | null)?.error ?? `Server error (${res.status})`);
+  if (!res.ok) {
+    // The server ended this session (expired, logged out elsewhere, account removed): forget it here too.
+    if (res.status === 401 && auth && 'bearer' in auth && loadSession()?.token === auth.bearer) {
+      logoutNotice = LOGGED_OUT_ELSEWHERE;
+      saveSession(null);
+    }
+    throw new ChoirApiError(res.status, (body as { error?: string } | null)?.error ?? `Server error (${res.status})`);
+  }
   return body as T;
 }
 
@@ -101,6 +115,8 @@ export function leaveChoir(): void {
   saveProfile({ ...p, choirCode: undefined, shareProgress: false });
   writeJSON(CACHE, null);
   try { localStorage.removeItem('sh:choirApplied'); } catch { /* ignore */ }
+  // An admin's or section lead's login belongs to that choir.
+  if (p.choirCode && loadSession()?.code === p.choirCode) void logout();
   // The programme stays as the singer's own (no longer tied to the choir).
   const c = loadCycle();
   if (c.preset?.startsWith('choir:')) saveCycle({ ...c, preset: undefined });
@@ -162,18 +178,15 @@ export async function syncChoir(importFile: (name: string, data: ArrayBuffer, me
 
 // ------------------------------------------------------------------ choir admins
 
-export const checkAdmin = (code: string, admin: string) => call<{ ok: true }>(`/choirs/${enc(code)}/admin`, { method: 'POST', admin });
-export const saveChoirCycle = (code: string, admin: string, cycle: unknown) => call<ChoirInfo>(`/choirs/${enc(code)}/cycle`, { method: 'PUT', admin, ...json(cycle) });
-export async function uploadChoirPiece(code: string, admin: string, file: File, title: string, composer: string): Promise<{ piece: ChoirPiece }> {
+export const saveChoirCycle = (code: string, auth: Auth, cycle: unknown) => call<ChoirInfo>(`/choirs/${enc(code)}/cycle`, { method: 'PUT', auth, ...json(cycle) });
+export async function uploadChoirPiece(code: string, auth: Auth, file: File, title: string, composer: string): Promise<{ piece: ChoirPiece }> {
   const fd = new FormData();
   fd.append('file', file);
   fd.append('title', title);
   fd.append('composer', composer);
-  return call(`/choirs/${enc(code)}/pieces`, { method: 'POST', admin, body: fd });
+  return call(`/choirs/${enc(code)}/pieces`, { method: 'POST', auth, body: fd });
 }
-export const deleteChoirPiece = (code: string, admin: string, id: string) => call(`/choirs/${enc(code)}/pieces/${enc(id)}`, { method: 'DELETE', admin });
-export const setSectionLead = (code: string, admin: string, voice: string, password: string | null) =>
-  call<{ leads: string[] }>(`/choirs/${enc(code)}/leads/${voice}`, password == null ? { method: 'DELETE', admin } : { method: 'PUT', admin, ...json({ password }) });
+export const deleteChoirPiece = (code: string, auth: Auth, id: string) => call(`/choirs/${enc(code)}/pieces/${enc(id)}`, { method: 'DELETE', auth });
 
 // ------------------------------------------------------------------ section leads
 
@@ -182,9 +195,7 @@ export interface SectionView {
   members: { name: string; updatedAt: number; pieces: Record<string, { readiness: number; level: number }> }[];
   pieces: Record<string, { singers: number; bars: Record<string, { n: number; mean: number; weak: number }> }>;
 }
-export const checkLead = (code: string, voice: string, lead: string) => call<{ ok: true }>(`/choirs/${enc(code)}/lead/${voice}`, { method: 'POST', lead });
-export const fetchSection = (code: string, voice: string, auth: { lead?: string; admin?: string }) =>
-  call<SectionView>(`/choirs/${enc(code)}/section/${voice}`, { ...auth });
+export const fetchSection = (code: string, voice: string, auth: Auth) => call<SectionView>(`/choirs/${enc(code)}/section/${voice}`, { auth });
 
 /** Share my per-bar progress with my section lead (opt-in). */
 export function shareProgress(code: string, name: string, voice: string, pieces: Record<string, { readiness: number; level: number; bars: BarMap }>) {
@@ -198,19 +209,200 @@ export function shareProgress(code: string, name: string, voice: string, pieces:
 }
 export const withdrawProgress = (code: string, name: string) => call(`/choirs/${enc(code)}/progress/${enc(name)}`, { method: 'DELETE', member: true });
 
+// ------------------------------------------------------------------ accounts (admins and section leads)
+
+export type Role = 'admin' | 'lead';
+export interface Account {
+  id: string; name: string; role: Role; voices: string[]; createdAt: number; lastLoginAt?: number | null;
+  /** How the account was made. */
+  invitedBy?: 'invite' | 'super admin' | 'old password';
+}
+export interface Session { token: string; code: string; choirName: string; account: Account; expiresAt: number }
+export interface InviteInfo {
+  id: string; role: Role; voices: string[]; note: string; createdAt: number; expiresAt: number; by: string;
+  /** A new-password link for an existing account. */
+  reset?: boolean; accountName?: string | null;
+}
+export interface People {
+  accounts: Account[];
+  invites: InviteInfo[];
+  legacy: { active: boolean; admin: boolean; leads: string[]; until: number | null };
+  you: string | null;
+}
+
+// Kept outside the `sh:` keys, so a login never ends up in a backup file someone shares.
+const SESSION_KEY = 'schonberg:session';
+const INVITES_KEY = 'schonberg:inviteLinks';
+const sessionListeners = new Set<() => void>();
+export const LOGGED_OUT_ELSEWHERE = 'You were logged out (password changed or account removed). Log in again.';
+let logoutNotice: string | null = null;
+/** Why this phone's login ended without the person logging out here (shown until they log in again). */
+export const loggedOutNotice = () => logoutNotice;
+export function onSessionChange(cb: () => void): () => void {
+  sessionListeners.add(cb);
+  return () => { sessionListeners.delete(cb); };
+}
+
+const isSession = (v: unknown): v is Session => {
+  const s = v as Session | null;
+  return !!s && typeof s.token === 'string' && typeof s.code === 'string' && typeof s.expiresAt === 'number'
+    && !!s.account && typeof s.account.name === 'string' && (s.account.role === 'admin' || s.account.role === 'lead') && Array.isArray(s.account.voices);
+};
+
+/** This phone's login (an admin's or section lead's session token, never the password). */
+export function loadSession(): Session | null {
+  try {
+    const raw = rawGet(SESSION_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    return isSession(s) && s.expiresAt > Date.now() ? s : null;
+  } catch {
+    return null;
+  }
+}
+export function saveSession(s: Session | null): void {
+  if (s) rawSet(SESSION_KEY, JSON.stringify(s));
+  else rawRemove(SESSION_KEY);
+  sessionListeners.forEach((cb) => { try { cb(); } catch { /* ignore */ } });
+}
+/** The session when it belongs to this choir. */
+export function sessionFor(code: string | undefined | null): Session | null {
+  const s = loadSession();
+  return s && code && s.code === code.toLowerCase() ? s : null;
+}
+export const sessionAuth = (s: Session): Auth => ({ bearer: s.token });
+
+/** Use a new login; a different one this phone had (maybe another choir) is ended on the server too. */
+function adoptSession(s: Session): void {
+  const old = loadSession();
+  logoutNotice = null;
+  saveSession(s);
+  if (old && old.token !== s.token) void call('/session', { method: 'DELETE', auth: { bearer: old.token } }).catch(() => {});
+}
+
+export async function login(code: string, name: string, password: string): Promise<Session> {
+  const s = await call<Session>(`/choirs/${enc(code.toLowerCase())}/login`, { method: 'POST', ...json({ name, password }) });
+  adoptSession(s);
+  return s;
+}
+/** Log out on this phone (the server forgets the session too). */
+export async function logout(): Promise<void> {
+  const s = loadSession();
+  logoutNotice = null;
+  saveSession(null);
+  if (s) await call('/session', { method: 'DELETE', auth: { bearer: s.token } }).catch(() => {});
+}
+/** Pick up role or voice changes an admin made; forgets a session the server ended. */
+export async function refreshSession(): Promise<Session | null> {
+  const s = loadSession();
+  if (!s) return null;
+  try {
+    const fresh = await call<Omit<Session, 'token'>>('/session', { auth: { bearer: s.token } });
+    const next: Session = { ...s, ...fresh, token: s.token };
+    if (JSON.stringify(next) !== JSON.stringify(s)) saveSession(next);
+    return next;
+  } catch (e) {
+    return e instanceof ChoirApiError && e.status === 401 ? null : s;
+  }
+}
+let lastRefresh = 0;
+export function _resetSessionStateForTests(): void { lastRefresh = 0; logoutNotice = null; }
+/** refreshSession at most every 20 s (on opening an admin or section screen, and when the app comes back). */
+export function refreshSessionSoon(): void {
+  const now = Date.now();
+  if (!loadSession() || now - lastRefresh < 20_000) return;
+  lastRefresh = now;
+  void refreshSession();
+}
+if (typeof document !== 'undefined' && typeof window !== 'undefined') {
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshSessionSoon(); });
+  window.addEventListener('focus', () => refreshSessionSoon());
+}
+
+export function changePassword(password: string, newPassword: string): Promise<unknown> {
+  const s = loadSession();
+  if (!s) return Promise.reject(new ChoirApiError(401, 'Log in first'));
+  return call('/session/password', { method: 'PUT', auth: { bearer: s.token }, ...json({ password, newPassword }) });
+}
+
+/** The link someone opens to accept an invite (the token stays in the #fragment, so no server logs it). */
+export function inviteLink(token: string): string {
+  const here = typeof location !== 'undefined' ? `${location.origin}${location.pathname}` : '';
+  return `${here}#/invite/${token}`;
+}
+export const lookupInvite = (token: string) =>
+  call<{ code: string; choirName: string; invite: InviteInfo }>('/invites/lookup', { method: 'POST', ...json({ token }) });
+export async function acceptInvite(token: string, name: string, password: string): Promise<Session> {
+  const s = await call<Session>('/invites/accept', { method: 'POST', ...json({ token, name, password }) });
+  adoptSession(s);
+  return s;
+}
+/** Turn the first version's shared admin or section-lead password into my own account. */
+export async function claimAccount(code: string, oldPassword: string, name: string, password: string): Promise<Session> {
+  const s = await call<Session>(`/choirs/${enc(code.toLowerCase())}/claim`, { method: 'POST', ...json({ oldPassword, name, password }) });
+  adoptSession(s);
+  return s;
+}
+
+// Invite links this phone created, so "Copy link" works until they expire (the server keeps only a hash).
+type Remembered = Record<string, { t: string; exp: number }>;
+function remembered(): Remembered {
+  try {
+    const o = JSON.parse(rawGet(INVITES_KEY) ?? '{}');
+    return typeof o === 'object' && o && !Array.isArray(o) ? o : {};
+  } catch {
+    return {};
+  }
+}
+export function rememberInvite(inv: InviteInfo, token: string): void {
+  const now = Date.now();
+  const all = Object.fromEntries(Object.entries(remembered()).filter(([, v]) => v && v.exp > now));
+  all[inv.id] = { t: token, exp: inv.expiresAt };
+  rawSet(INVITES_KEY, JSON.stringify(all));
+}
+export function rememberedInvite(id: string): string | null {
+  const v = remembered()[id];
+  return v && typeof v.t === 'string' && v.exp > Date.now() ? v.t : null;
+}
+
+export const fetchPeople = (code: string, auth: Auth) => call<People>(`/choirs/${enc(code)}/people`, { auth });
+export async function createInvite(code: string, auth: Auth, role: Role, voices: string[], note: string): Promise<{ token: string; invite: InviteInfo }> {
+  const r = await call<{ token: string; invite: InviteInfo }>(`/choirs/${enc(code)}/invites`, { method: 'POST', auth, ...json({ role, voices, note }) });
+  rememberInvite(r.invite, r.token);
+  return r;
+}
+export const revokeInvite = (code: string, auth: Auth, id: string) => call<People>(`/choirs/${enc(code)}/invites/${enc(id)}`, { method: 'DELETE', auth });
+export const updatePerson = (code: string, auth: Auth, id: string, patch: { role?: Role; voices?: string[] }) =>
+  call<People>(`/choirs/${enc(code)}/people/${enc(id)}`, { method: 'PUT', auth, ...json(patch) });
+export const removePerson = (code: string, auth: Auth, id: string) => call<People>(`/choirs/${enc(code)}/people/${enc(id)}`, { method: 'DELETE', auth });
+/** A new-password link for someone who lost theirs. */
+export async function resetPerson(code: string, auth: Auth, id: string): Promise<{ token: string; invite: InviteInfo }> {
+  const r = await call<{ token: string; invite: InviteInfo }>(`/choirs/${enc(code)}/people/${enc(id)}/reset`, { method: 'POST', auth });
+  rememberInvite(r.invite, r.token);
+  return r;
+}
+export const retireOldPasswords = (code: string, auth: Auth) => call<People>(`/choirs/${enc(code)}/legacy`, { method: 'DELETE', auth });
+
 // ------------------------------------------------------------------ super admin
 
-export interface ChoirSummary { code: string; name: string; pieces: number; createdAt: number; hasAdmin: boolean; programme: string | null; leads: string[]; members: number }
-export const superList = (pw: string) => call<{ choirs: ChoirSummary[] }>('/super/choirs', { superAdmin: pw });
-export const superCreate = (pw: string, code: string, name: string, adminPassword: string) =>
-  call('/super/choirs', { method: 'POST', superAdmin: pw, ...json({ code, name, adminPassword }) });
-export const superUpdate = (pw: string, code: string, patch: { name?: string; adminPassword?: string }) =>
-  call(`/super/choirs/${enc(code)}`, { method: 'PUT', superAdmin: pw, ...json(patch) });
-export const superDelete = (pw: string, code: string) => call(`/super/choirs/${enc(code)}`, { method: 'DELETE', superAdmin: pw });
+export interface ChoirSummary {
+  code: string; name: string; pieces: number; createdAt: number; hasAdmin: boolean; programme: string | null; leads: string[]; members: number;
+  admins: string[]; people: number; invites: number; legacy: boolean;
+}
+export const superList = (pw: string) => call<{ choirs: ChoirSummary[] }>('/super/choirs', { auth: { superAdmin: pw } });
+/** Creates the choir and an invite link for its first admin. */
+export async function superCreate(pw: string, code: string, name: string, adminNote: string): Promise<{ code: string; name: string; token: string; invite: InviteInfo }> {
+  const r = await call<{ code: string; name: string; token: string; invite: InviteInfo }>('/super/choirs', { method: 'POST', auth: { superAdmin: pw }, ...json({ code, name, adminNote }) });
+  rememberInvite(r.invite, r.token);
+  return r;
+}
+export const superRename = (pw: string, code: string, name: string) =>
+  call(`/super/choirs/${enc(code)}`, { method: 'PUT', auth: { superAdmin: pw }, ...json({ name }) });
+export const superDelete = (pw: string, code: string) => call(`/super/choirs/${enc(code)}`, { method: 'DELETE', auth: { superAdmin: pw } });
 
-// ------------------------------------------------------------------ remembered passwords (this tab only)
+// ------------------------------------------------------------------ the super-admin password (this tab only)
 
-export function sessionSecret(key: 'admin' | 'super' | 'lead' | 'leadVoice', value?: string | null): string | null {
+export function sessionSecret(key: 'super', value?: string | null): string | null {
   try {
     if (value === null) sessionStorage.removeItem(`sh:pw:${key}`);
     else if (value !== undefined) sessionStorage.setItem(`sh:pw:${key}`, value);

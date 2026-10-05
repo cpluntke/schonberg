@@ -6,17 +6,18 @@ import { IconBack } from '../icons';
 import { loadCycle } from '../../progress/store';
 import { WEEKDAYS } from '../../progress/rehearsal';
 import {
-  apiBase, cachedChoir, checkAdmin, checkLead, choirPieceId, deleteChoirPiece, fetchChoir, fetchSection, joinChoir, leaveChoir, ChoirApiError,
-  saveChoirCycle, sessionSecret, setSectionLead, superCreate, superDelete, superList, superUpdate, uploadChoirPiece,
-  withdrawProgress, type ChoirInfo, type ChoirSummary, type SectionView,
+  apiBase, cachedChoir, changePassword, choirPieceId, claimAccount, deleteChoirPiece, fetchChoir, fetchSection, joinChoir, leaveChoir, ChoirApiError,
+  loadSession, loggedOutNotice, login, logout, onSessionChange, refreshSession, refreshSessionSoon, saveChoirCycle, sessionFor, sessionSecret, superCreate, superDelete,
+  superList, superRename, uploadChoirPiece, withdrawProgress, type Auth, type ChoirInfo, type ChoirSummary, type SectionView, type Session,
 } from '../../progress/choir';
 import { PieceMap } from '../components/PieceMap';
+import { InviteLinkBox, PeoplePanel, roleText, VOICE_NAME, VOICES } from '../components/People';
 import { importScoreFile } from '../../music/import';
 import { mastery, type BarMap } from '../../progress/bars';
 import { shareMyProgress, shareError } from '../play/shareProgress';
 
-const VOICE_NAME: Record<string, string> = { S: 'Sopranos', A: 'Altos', T: 'Tenors', B: 'Basses' };
 const inputStyle: React.CSSProperties = { minHeight: 44, borderRadius: 10, border: '1px solid var(--line)', background: 'var(--surface)', padding: '0 12px' };
+const errStyle: React.CSSProperties = { color: 'var(--accent-text)' };
 
 function Top({ title }: { title: string }) {
   return (
@@ -29,6 +30,26 @@ function Top({ title }: { title: string }) {
 
 function Offline() {
   return <div className="notice">Choirs need the online version of the app (it talks to the choir server).</div>;
+}
+
+/** This phone's admin / section-lead login (re-renders when it changes). */
+export function useSession(refresh = false): Session | null {
+  const [, setV] = useState(0);
+  useEffect(() => onSessionChange(() => setV((x) => x + 1)), []);
+  // Screens that depend on the role pick up an admin's changes (role, voices, removal) on opening.
+  useEffect(() => { if (refresh) refreshSessionSoon(); }, [refresh]);
+  return loadSession();
+}
+
+/** A "Log out" link with a full-size tap target. */
+function LogoutLink({ onClick = () => void logout() }: { onClick?: () => void }) {
+  return <button className="linklike" style={{ minHeight: 44 }} data-testid="logout-link" onClick={onClick}>Log out</button>;
+}
+
+/** Shown when this phone's login ended elsewhere (password changed, account removed or reset). */
+function LoggedOutNotice() {
+  const n = loggedOutNotice();
+  return n ? <div className="notice" role="alert" data-testid="logged-out-notice">{n}</div> : null;
 }
 
 /** Join form, also used in the first-run setup. */
@@ -106,17 +127,10 @@ export function ChoirScreen() {
                 else if (profile.name.trim()) withdrawProgress(profile.choirCode!, profile.name.trim()).catch(() => {});
               }} />
             </label>
-            {!profile.name.trim() && profile.shareProgress && <span className="small" style={{ color: 'var(--accent-text)' }}>Add your name in Voice setup first.</span>}
-            {profile.name.trim() && profile.shareProgress && shareError() && <span className="small" role="alert" style={{ color: 'var(--accent-text)' }}>Not shared yet: {shareError()}</span>}
+            {!profile.name.trim() && profile.shareProgress && <span className="small" style={errStyle}>Add your name in Voice setup first.</span>}
+            {profile.name.trim() && profile.shareProgress && shareError() && <span className="small" role="alert" style={errStyle}>Not shared yet: {shareError()}</span>}
           </div>
-          <div className="card flat">
-            <strong>Roles</strong>
-            <div className="row wrap">
-              <button className="btn small" onClick={() => go({ name: 'choiradmin' })}>Choir admin</button>
-              <button className="btn small" onClick={() => go({ name: 'section' })}>Section lead</button>
-            </div>
-            <span className="tiny muted">Admins curate the programme and upload scores; section leads see where their section struggles. Both need a password from your choir.</span>
-          </div>
+          <AccountCard choir={choir!} />
         </>
       )}
       <button className="linklike tiny muted" style={{ alignSelf: 'center', marginTop: 'auto', minHeight: 44 }} onClick={() => go({ name: 'superadmin' })}>Setting up choirs? (super admin)</button>
@@ -124,7 +138,139 @@ export function ChoirScreen() {
   );
 }
 
-/** Password gate shared by the admin, section-lead and super-admin screens. */
+// ------------------------------------------------------------------ admins' and section leads' accounts
+
+/** Logged in: who you are and where to go. Not logged in: the login form. */
+function AccountCard({ choir }: { choir: ChoirInfo }) {
+  const session = useSession();
+  const s = session && session.code === choir.code ? session : null;
+  const [changing, setChanging] = useState(false);
+  // Pick up a role or voice change (or a removed account) since the last visit.
+  useEffect(() => { if (s) void refreshSession(); }, [s?.token]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!s) {
+    return (
+      <div className="card flat" data-testid="account-card">
+        <strong>Admins and section leads</strong>
+        <LoggedOutNotice />
+        <span className="small muted">Log in with your own name and password. No account yet? Ask your choir admin for an invite link.</span>
+        <LoginForm code={choir.code} legacy={!!choir.legacyLogin} />
+      </div>
+    );
+  }
+  const admin = s.account.role === 'admin';
+  return (
+    <div className="card flat" data-testid="account-card">
+      <span className="eyebrow">Logged in</span>
+      <strong data-testid="account-name">{s.account.name}</strong>
+      <span className="small muted" data-testid="account-role">{roleText(s.account.role, s.account.voices)}</span>
+      <div className="row wrap">
+        {admin && <button className="btn small primary" onClick={() => go({ name: 'choiradmin' })}>Choir admin</button>}
+        <button className="btn small" onClick={() => go({ name: 'section' })}>{admin ? 'Sections' : 'Your section'}</button>
+        <button className="btn small ghost" onClick={() => setChanging(!changing)} aria-expanded={changing}>Change password</button>
+        <button className="btn small ghost" data-testid="logout" onClick={() => void logout()}>Log out</button>
+      </div>
+      {changing && <ChangePassword onDone={() => setChanging(false)} />}
+    </div>
+  );
+}
+
+/** Choir code + name + password → logged in (a session token on this phone; the password isn't kept). */
+export function LoginForm({ code, legacy = false }: { code: string; legacy?: boolean }) {
+  const [name, setName] = useState('');
+  const [pw, setPw] = useState('');
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [claim, setClaim] = useState(false);
+  if (claim) return <ClaimForm code={code} onCancel={() => setClaim(false)} />;
+  return (
+    <form className="col" style={{ gap: 8 }} data-testid="login-form" onSubmit={async (e) => {
+      e.preventDefault();
+      setBusy(true);
+      setErr('');
+      try { await login(code, name.trim(), pw); setPw(''); } catch (e2) { setErr((e2 as Error).message); } finally { setBusy(false); }
+    }}>
+      <label className="field"><span>Your name</span>
+        <input type="text" value={name} onChange={(e) => setName(e.target.value)} autoComplete="username" autoCapitalize="words" maxLength={40} data-testid="login-name" />
+      </label>
+      <label className="field"><span>Password</span>
+        <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="current-password" data-testid="login-password" />
+      </label>
+      <button className="btn primary block" disabled={busy || !name.trim() || !pw} data-testid="login">{busy ? '…' : 'Log in'}</button>
+      {err && <span className="small" role="alert" style={errStyle}>{err}</span>}
+      <span className="tiny muted">Forgot your password? Your choir admin can send you a new link.</span>
+      {legacy && (
+        <button type="button" className="linklike small" style={{ alignSelf: 'flex-start', minHeight: 44 }} onClick={() => setClaim(true)} data-testid="claim-open">
+          Have the old shared admin or section-lead password? Make it your own account
+        </button>
+      )}
+    </form>
+  );
+}
+
+/** The first version's shared passwords: each person turns theirs into a personal account once. */
+function ClaimForm({ code, onCancel }: { code: string; onCancel: () => void }) {
+  const [old, setOld] = useState('');
+  const [name, setName] = useState('');
+  const [pw, setPw] = useState('');
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  return (
+    <form className="col" style={{ gap: 8 }} data-testid="claim-form" onSubmit={async (e) => {
+      e.preventDefault();
+      setBusy(true);
+      setErr('');
+      try { await claimAccount(code, old, name.trim(), pw); toast('Your account is ready: log in with your name from now on'); } catch (e2) { setErr((e2 as Error).message); } finally { setBusy(false); }
+    }}>
+      <span className="small muted">Admins and section leads now have their own accounts. Enter the shared password you used so far, then choose your name and a new password of your own. Each old password works once: whoever uses it first gets the account; everyone else needs an invite link from an admin.</span>
+      <label className="field"><span>Old shared password</span>
+        <input type="password" value={old} onChange={(e) => setOld(e.target.value)} autoComplete="off" />
+      </label>
+      <label className="field"><span>Your name</span>
+        <input type="text" value={name} onChange={(e) => setName(e.target.value)} autoComplete="username" maxLength={40} />
+      </label>
+      <label className="field"><span>Your new password (at least 8 characters)</span>
+        <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" />
+      </label>
+      <button className="btn primary block" disabled={busy || !old || !name.trim() || pw.length < 8}>{busy ? '…' : 'Create my account'}</button>
+      {err && <span className="small" role="alert" style={errStyle}>{err}</span>}
+      <button type="button" className="btn small ghost" onClick={onCancel}>Back to log in</button>
+    </form>
+  );
+}
+
+function ChangePassword({ onDone }: { onDone: () => void }) {
+  const [cur, setCur] = useState('');
+  const [next, setNext] = useState('');
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  return (
+    <form className="col" style={{ gap: 8 }} onSubmit={async (e) => {
+      e.preventDefault();
+      setBusy(true);
+      setErr('');
+      try { await changePassword(cur, next); toast('Password changed. Your other phones are logged out.'); onDone(); } catch (e2) { setErr((e2 as Error).message); } finally { setBusy(false); }
+    }}>
+      <label className="field"><span>Current password</span><input type="password" value={cur} onChange={(e) => setCur(e.target.value)} autoComplete="current-password" /></label>
+      <label className="field"><span>New password (at least 8 characters)</span><input type="password" value={next} onChange={(e) => setNext(e.target.value)} autoComplete="new-password" /></label>
+      <button className="btn block" disabled={busy || !cur || next.length < 8}>{busy ? '…' : 'Change password'}</button>
+      {err && <span className="small" role="alert" style={errStyle}>{err}</span>}
+    </form>
+  );
+}
+
+/** Not logged in on a screen that needs it. */
+function NeedLogin({ code, what }: { code: string; what: string }) {
+  const choir = cachedChoir();
+  return (
+    <div className="card">
+      <LoggedOutNotice />
+      <span className="small muted">{what}</span>
+      <LoginForm code={code} legacy={!!choir?.legacyLogin} />
+    </div>
+  );
+}
+
+/** Password gate of the super-admin screen. */
 function Gate({ label, onSubmit, children }: { label: string; onSubmit: (pw: string) => Promise<void>; children?: React.ReactNode }) {
   const [pw, setPw] = useState('');
   const [err, setErr] = useState('');
@@ -141,7 +287,7 @@ function Gate({ label, onSubmit, children }: { label: string; onSubmit: (pw: str
         <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="current-password" />
       </label>
       <button className="btn primary block" disabled={busy || !pw}>{busy ? '…' : 'Continue'}</button>
-      {err && <span className="small" role="alert" style={{ color: 'var(--accent-text)' }}>{err}</span>}
+      {err && <span className="small" role="alert" style={errStyle}>{err}</span>}
     </form>
   );
 }
@@ -151,8 +297,15 @@ function Gate({ label, onSubmit, children }: { label: string; onSubmit: (pw: str
 export function ChoirAdmin() {
   const [profile] = useProfile();
   useStoreVersion();
+  useSession(true);
   const code = profile.choirCode;
-  const [admin, setAdmin] = useState<string | null>(() => sessionSecret('admin'));
+  const session = sessionFor(code);
+  const isAdmin = session?.account.role === 'admin';
+  // The last admin login on this screen: if it ends elsewhere, the editors stay (with their unsaved
+  // changes) until the person logs in again and publishes.
+  const [lastAuth, setLastAuth] = useState<Auth | null>(null);
+  const token = isAdmin ? session!.token : null;
+  useEffect(() => { if (token) setLastAuth({ bearer: token }); }, [token]);
   const [info, setInfo] = useState<ChoirInfo | null>(() => cachedChoir());
   // Start from the choir's current state, not from this phone's last sync (another admin may have changed it).
   useEffect(() => {
@@ -163,13 +316,14 @@ export function ChoirAdmin() {
   }, [code]);
   if (!apiBase()) return <main className="screen"><Top title="Choir admin" /><Offline /></main>;
   if (!code) return <main className="screen"><Top title="Choir admin" /><div className="notice">Join your choir first (Settings → Your choir).</div></main>;
-  if (!admin) {
+  const auth: Auth | null = token ? { bearer: token } : !session ? lastAuth : null;
+  if (!auth) {
     return (
       <main className="screen">
         <Top title="Choir admin" />
-        <Gate label="Admin password" onSubmit={async (pw) => { await checkAdmin(code, pw); sessionSecret('admin', pw); setAdmin(pw); }}>
-          <span className="small muted">For whoever looks after the choir's programme and scores. The password comes from your choir (or the person who set up the choir).</span>
-        </Gate>
+        {session
+          ? <div className="notice">You're logged in as {session.account.name}, a section lead. Only choir admins can change the programme, the scores and the people. <LogoutLink /></div>
+          : <NeedLogin code={code} what="For whoever looks after the choir's programme, scores and section leads. Log in with your own account." />}
       </main>
     );
   }
@@ -181,16 +335,26 @@ export function ChoirAdmin() {
   return (
     <main className="screen">
       <Top title="Choir admin" />
-      <span className="small muted">{info?.name ?? code} · <button className="linklike" onClick={() => { sessionSecret('admin', null); setAdmin(null); }}>Log out</button></span>
-      <ProgrammeEditor key={`${info?.code}:${info?.cycleUpdatedAt ?? 0}`} code={code} admin={admin} info={info}
+      {session ? (
+        <span className="small muted">{info?.name ?? code} · {session.account.name} · <LogoutLink /></span>
+      ) : (
+        <NeedLogin code={code} what="Your changes below are kept: log in again, then publish them." />
+      )}
+      <ProgrammeEditor key={`${info?.code}:${info?.cycleUpdatedAt ?? 0}`} code={code} auth={auth} info={info}
         onSaved={(i) => { setInfo(i); void refresh(); }} onConflict={(i) => setInfo(i)} />
-      <ScoresEditor code={code} admin={admin} info={info} onChanged={refresh} />
-      <LeadsEditor code={code} admin={admin} info={info} onChanged={refresh} />
+      <ScoresEditor code={code} auth={auth} info={info} onChanged={refresh} />
+      {session && (
+        <div className="card" data-testid="people-editor">
+          <strong>People</strong>
+          <PeoplePanel code={code} auth={auth} />
+          <button className="btn small ghost" onClick={() => go({ name: 'section' })}>See the sections</button>
+        </div>
+      )}
     </main>
   );
 }
 
-function ProgrammeEditor({ code, admin, info, onSaved, onConflict }: { code: string; admin: string; info: ChoirInfo | null; onSaved: (i: ChoirInfo) => void; onConflict: (i: ChoirInfo) => void }) {
+function ProgrammeEditor({ code, auth, info, onSaved, onConflict }: { code: string; auth: Auth; info: ChoirInfo | null; onSaved: (i: ChoirInfo) => void; onConflict: (i: ChoirInfo) => void }) {
   // A new programme starts empty (not from this admin's own phone, which may hold private scores).
   const start: Partial<NonNullable<ChoirInfo['cycle']>> = info?.cycle ?? { name: 'This cycle', pieceIds: [] };
   const [name, setName] = useState(start.name ?? 'This cycle');
@@ -247,7 +411,7 @@ function ProgrammeEditor({ code, admin, info, onSaved, onConflict }: { code: str
       <button className="btn primary block" disabled={busy} data-testid="publish-programme" onClick={async () => {
         setBusy(true);
         try {
-          const i = await saveChoirCycle(code, admin, {
+          const i = await saveChoirCycle(code, auth, {
             name, pieceIds: ids, focusPieceIds: focus.filter((x) => ids.includes(x)),
             ...(weekday >= 0 ? { rehearsalWeekday: weekday, rehearsalTime: time } : rehearsalDate ? { rehearsalDate } : {}),
             ...(concert ? { concertDate: concert } : {}),
@@ -267,7 +431,7 @@ function ProgrammeEditor({ code, admin, info, onSaved, onConflict }: { code: str
   );
 }
 
-function ScoresEditor({ code, admin, info, onChanged }: { code: string; admin: string; info: ChoirInfo | null; onChanged: () => Promise<unknown> }) {
+function ScoresEditor({ code, auth, info, onChanged }: { code: string; auth: Auth; info: ChoirInfo | null; onChanged: () => Promise<unknown> }) {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
   const [composer, setComposer] = useState('');
@@ -284,7 +448,7 @@ function ScoresEditor({ code, admin, info, onChanged }: { code: string; admin: s
           <span className="grow small ellipsis">{p.title || p.filename}{p.composer && <span className="tiny muted"> · {p.composer}</span>}</span>
           <button className="btn small ghost" onClick={async () => {
             if (!confirm(`Remove “${p.title || p.filename}” from the choir?`)) return;
-            try { await deleteChoirPiece(code, admin, p.id); await onChanged(); } catch (e) { toast((e as Error).message); }
+            try { await deleteChoirPiece(code, auth, p.id); await onChanged(); } catch (e) { toast((e as Error).message); }
           }}>Remove</button>
         </div>
       ))}
@@ -316,7 +480,7 @@ function ScoresEditor({ code, admin, info, onChanged }: { code: string; admin: s
             setFileKey((k) => k + 1);
             return;
           }
-          await uploadChoirPiece(code, admin, file!, title.trim() || parsed.title, composer.trim() || parsed.composer || '');
+          await uploadChoirPiece(code, auth, file!, title.trim() || parsed.title, composer.trim() || parsed.composer || '');
           setFile(null);
           setFileKey((k) => k + 1);
           setTitle('');
@@ -333,87 +497,54 @@ function ScoresEditor({ code, admin, info, onChanged }: { code: string; admin: s
   );
 }
 
-function LeadsEditor({ code, admin, info, onChanged }: { code: string; admin: string; info: ChoirInfo | null; onChanged: () => Promise<unknown> }) {
-  const [pw, setPw] = useState<Record<string, string>>({});
-  return (
-    <div className="card" data-testid="leads-editor">
-      <strong>Section leads</strong>
-      <span className="small muted">Give each section lead a password: they'll see which bars their section finds hard (from members who share their progress).</span>
-      {['S', 'A', 'T', 'B'].map((v) => {
-        const has = info?.leads?.includes(v);
-        return (
-          <div key={v} className="row" style={{ gap: 6 }}>
-            <span style={{ width: 80 }} className="small">{VOICE_NAME[v]}{has ? ' ✓' : ''}</span>
-            <input type="password" aria-label={`${VOICE_NAME[v]} lead password`} value={pw[v] ?? ''} onChange={(e) => setPw({ ...pw, [v]: e.target.value })}
-              placeholder={has ? 'new password' : 'password'} autoComplete="new-password" style={{ ...inputStyle, flex: 1, minWidth: 0 }} />
-            <button className="btn small" disabled={(pw[v] ?? '').length < 6} onClick={async () => {
-              try { await setSectionLead(code, admin, v, pw[v]); setPw({ ...pw, [v]: '' }); await onChanged(); toast(`${VOICE_NAME[v]}: section lead set`); } catch (e) { toast((e as Error).message); }
-            }}>Set</button>
-            {has && <button className="btn small ghost" onClick={async () => {
-              try { await setSectionLead(code, admin, v, null); await onChanged(); } catch (e) { toast((e as Error).message); }
-            }}>Remove</button>}
-          </div>
-        );
-      })}
-      <button className="btn small ghost" onClick={() => go({ name: 'section' })}>See the sections</button>
-    </div>
-  );
-}
-
 // ------------------------------------------------------------------ section lead
 
 export function SectionLead() {
   const [profile] = useProfile();
+  useSession(true);
   const code = profile.choirCode;
-  const [voice, setVoice] = useState<string>(['S', 'A', 'T', 'B'].includes(profile.voice) ? profile.voice : 'S');
-  // A section lead's password opens their own voice part only; a choir admin sees every section.
-  const [auth, setAuth] = useState<{ lead: string; voice: string } | { admin: string } | null>(() => {
-    const lead = sessionSecret('lead');
-    const leadVoice = sessionSecret('leadVoice');
-    const admin = sessionSecret('admin');
-    return lead && leadVoice ? { lead, voice: leadVoice } : admin ? { admin } : null;
-  });
-  const shown = auth && 'lead' in auth ? auth.voice : voice;
+  const session = sessionFor(code);
+  const admin = session?.account.role === 'admin';
+  // A section lead sees the voice parts they lead; a choir admin sees every section.
+  const mine = admin ? [...VOICES] as string[] : session?.account.voices ?? [];
+  const [picked, setPicked] = useState<string>(['S', 'A', 'T', 'B'].includes(profile.voice) ? profile.voice : 'S');
+  const shown = mine.includes(picked) ? picked : mine[0];
   const [view, setView] = useState<SectionView | null>(null);
   const [err, setErr] = useState('');
+  const token = session?.token;
   useEffect(() => {
-    if (!auth || !code) return;
+    if (!token || !code || !shown) return;
     let alive = true;
     setErr('');
     setView(null);
-    fetchSection(code, shown, 'lead' in auth ? { lead: auth.lead } : { admin: auth.admin })
+    fetchSection(code, shown, { bearer: token } as Auth)
       .then((v) => { if (alive) setView(v); })
       .catch((e) => { if (alive) setErr((e as Error).message); });
     return () => { alive = false; };
-  }, [auth, code, shown]);
+  }, [token, code, shown]);
   if (!apiBase()) return <main className="screen"><Top title="Section lead" /><Offline /></main>;
   if (!code) return <main className="screen"><Top title="Section lead" /><div className="notice">Join your choir first (Settings → Your choir).</div></main>;
-  const logout = () => { sessionSecret('lead', null); sessionSecret('leadVoice', null); if (auth && 'admin' in auth) sessionSecret('admin', null); setAuth(null); };
+  if (!session) {
+    return (
+      <main className="screen">
+        <Top title="Your section" />
+        <NeedLogin code={code} what="Section leads see which bars their section finds hard. Log in with the account you made from your invite link." />
+      </main>
+    );
+  }
   return (
     <main className="screen">
       <Top title="Your section" />
-      {auth && 'lead' in auth ? (
-        <span className="small muted">{VOICE_NAME[auth.voice]} · <button className="linklike" onClick={logout}>Log out</button></span>
-      ) : (
-        <>
-          {!auth && <span className="small">Which section do you lead?</span>}
-          <div className="chips" role="group" aria-label="Section">
-            {['S', 'A', 'T', 'B'].map((v) => <button key={v} className="chip" aria-pressed={voice === v} onClick={() => setVoice(v)}>{VOICE_NAME[v]}</button>)}
-          </div>
-          {auth && <span className="small muted">As choir admin you see every section · <button className="linklike" onClick={logout}>Log out</button></span>}
-        </>
+      <span className="small muted">{session.account.name} · {admin ? 'as choir admin you see every section' : roleText('lead', session.account.voices)} · <LogoutLink /></span>
+      {mine.length > 1 && (
+        <div className="chips" role="group" aria-label="Section">
+          {mine.map((v) => <button key={v} className="chip" aria-pressed={shown === v} onClick={() => setPicked(v)}>{VOICE_NAME[v]}</button>)}
+        </div>
       )}
-      {!auth ? (
-        <Gate label="Section-lead password" onSubmit={async (pw) => {
-          await checkLead(code, voice, pw);
-          sessionSecret('lead', pw);
-          sessionSecret('leadVoice', voice);
-          setAuth({ lead: pw, voice });
-        }}>
-          <span className="small muted">Your choir admin gives each section lead a password.</span>
-        </Gate>
+      {!shown ? (
+        <div className="notice">You don't lead a section yet. Your choir admin assigns your voice part.</div>
       ) : err ? (
-        <div className="notice" role="alert">{err} <button className="linklike" onClick={logout}>Log in again</button></div>
+        <div className="notice" role="alert">{err}</div>
       ) : !view ? (
         <span className="muted">Loading…</span>
       ) : (
@@ -487,7 +618,9 @@ export function SuperAdmin() {
   const [pw, setPw] = useState<string | null>(() => sessionSecret('super'));
   const [list, setList] = useState<ChoirSummary[] | null>(null);
   const [err, setErr] = useState('');
-  const [form, setForm] = useState({ code: '', name: '', adminPassword: '' });
+  const [form, setForm] = useState({ code: '', name: '', adminNote: '' });
+  const [created, setCreated] = useState<{ name: string; code: string; token: string } | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
   const load = async (p: string) => {
     try { setList((await superList(p)).choirs); setErr(''); } catch (e) { setErr((e as Error).message); }
   };
@@ -498,51 +631,66 @@ export function SuperAdmin() {
       <main className="screen">
         <Top title="Super admin" />
         <Gate label="Super-admin password" onSubmit={async (p) => { await superList(p); sessionSecret('super', p); setPw(p); }}>
-          <span className="small muted">Creates choirs and their admin passwords. The password is set on the server.</span>
+          <span className="small muted">Creates choirs and invites their admins. The password is set on the server.</span>
         </Gate>
       </main>
     );
   }
+  const auth: Auth = { superAdmin: pw };
   return (
     <main className="screen">
       <Top title="Super admin" />
-      <span className="small muted"><button className="linklike" onClick={() => { sessionSecret('super', null); setPw(null); }}>Log out</button></span>
+      <span className="small muted"><LogoutLink onClick={() => { sessionSecret('super', null); setPw(null); }} /></span>
       {err && <div className="notice" role="alert">{err}</div>}
-      <form className="card" data-testid="create-choir" onSubmit={async (e) => {
-        e.preventDefault();
-        try {
-          await superCreate(pw, form.code.trim(), form.name.trim(), form.adminPassword);
-          toast(`Choir created. Members join with “${form.code.trim().toLowerCase()}”.`);
-          setForm({ code: '', name: '', adminPassword: '' });
-          await load(pw);
-        } catch (e2) { toast((e2 as Error).message); }
-      }}>
-        <strong>New choir</strong>
-        <label className="field"><span>Name</span><input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={80} /></label>
-        <label className="field"><span>Choir code (what members type; letters, digits, - and _)</span><input type="text" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} autoCapitalize="none" maxLength={40} /></label>
-        <label className="field"><span>Admin password (at least 6 characters)</span><input type="password" value={form.adminPassword} onChange={(e) => setForm({ ...form, adminPassword: e.target.value })} autoComplete="new-password" /></label>
-        <button className="btn primary block" disabled={form.code.trim().length < 3 || form.adminPassword.length < 6}>Create</button>
-      </form>
+      {created ? (
+        <div className="card" data-testid="choir-created">
+          <span className="eyebrow">Choir created</span>
+          <strong style={{ fontSize: 20 }}>{created.name}</strong>
+          <span className="small">Members join with the code <strong className="mono">{created.code}</strong>.</span>
+          <InviteLinkBox token={created.token} title="Now send this link to the choir's admin"
+            hint="With it they choose their name and password, then invite the section leads. It works once, for 7 days." />
+          <button className="btn block" onClick={() => setCreated(null)}>Create another choir</button>
+        </div>
+      ) : (
+        <form className="card" data-testid="create-choir" onSubmit={async (e) => {
+          e.preventDefault();
+          try {
+            const r = await superCreate(pw, form.code.trim(), form.name.trim(), form.adminNote.trim());
+            setCreated({ name: r.name, code: r.code, token: r.token });
+            setForm({ code: '', name: '', adminNote: '' });
+            await load(pw);
+          } catch (e2) { toast((e2 as Error).message); }
+        }}>
+          <strong>New choir</strong>
+          <label className="field"><span>Name</span><input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={80} data-testid="new-choir-name" /></label>
+          <label className="field"><span>Choir code (what members type; letters, digits, - and _)</span><input type="text" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} autoCapitalize="none" maxLength={40} data-testid="new-choir-code" /></label>
+          <label className="field"><span>Who will be its admin? (optional, to recognise the invite)</span><input type="text" value={form.adminNote} onChange={(e) => setForm({ ...form, adminNote: e.target.value })} maxLength={60} placeholder="e.g. Clara" /></label>
+          <button className="btn primary block" disabled={form.code.trim().length < 3} data-testid="create-choir-btn">Create and get the admin's invite link</button>
+        </form>
+      )}
       {(list ?? []).map((c) => (
         <div key={c.code} className="card flat" data-testid="choir-row">
           <strong>{c.name}</strong>
-          <span className="small muted">code {c.code} · {c.pieces} score{c.pieces === 1 ? '' : 's'} · {c.members} sharing · leads {c.leads.join(' ') || '–'}{c.programme ? ` · ${c.programme}` : ''}</span>
+          <span className="small muted">
+            code {c.code} · {c.pieces} score{c.pieces === 1 ? '' : 's'} · {c.members} sharing{c.programme ? ` · ${c.programme}` : ''}
+          </span>
+          <span className="small">
+            {c.admins.length ? `Admin${c.admins.length > 1 ? 's' : ''}: ${c.admins.join(', ')}` : 'No admin account yet'}
+            {c.leads.length ? ` · section leads for ${c.leads.map((v) => VOICE_NAME[v] ?? v).join(', ')}` : ''}{c.invites ? ` · ${c.invites} open invite${c.invites > 1 ? 's' : ''}` : ''}{c.legacy ? ' · old shared passwords still on' : ''}
+          </span>
           <div className="row wrap">
+            <button className="btn small" aria-expanded={open === c.code} onClick={() => setOpen(open === c.code ? null : c.code)}>People</button>
             <button className="btn small" onClick={async () => {
               const name = prompt('New name', c.name);
               if (!name) return;
-              try { await superUpdate(pw, c.code, { name }); await load(pw); } catch (e) { toast((e as Error).message); }
+              try { await superRename(pw, c.code, name); await load(pw); } catch (e) { toast((e as Error).message); }
             }}>Rename</button>
-            <button className="btn small" onClick={async () => {
-              const p = prompt('New admin password (at least 6 characters)');
-              if (!p) return;
-              try { await superUpdate(pw, c.code, { adminPassword: p }); toast('Admin password changed'); } catch (e) { toast((e as Error).message); }
-            }}>New admin password</button>
             <button className="btn small ghost" onClick={async () => {
               if (prompt(`Type the code “${c.code}” to delete this choir and its scores`) !== c.code) return;
               try { await superDelete(pw, c.code); await load(pw); } catch (e) { toast((e as Error).message); }
             }}>Delete</button>
           </div>
+          {open === c.code && <PeoplePanel code={c.code} auth={auth} superAdmin onChanged={() => void load(pw)} />}
         </div>
       ))}
       {list && !list.length && <span className="muted">No choirs yet.</span>}
