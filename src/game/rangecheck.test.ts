@@ -68,6 +68,28 @@ describe('range check: the glide between notes', () => {
   });
 });
 
+describe('range check: wide vibrato vs drift (any vibrato phase)', () => {
+  /** 0.75 s notes, a scoop into each, then a held note with vibrato (and optional drift). */
+  const voice = (root: number, vib: number, hz: number, phase: number, driftCents = 0) => {
+    const out: { midi: number | null; rms: number }[] = [];
+    PATTERN.forEach((x) => {
+      for (let i = 0; i < 37; i++) {
+        const t = i * 0.02;
+        const scoop = i < 6 ? -80 * (1 - i / 6) : 0;
+        const c = scoop + vib * Math.sin(2 * Math.PI * hz * t + phase) + driftCents * (i - 18) / 18;
+        out.push({ midi: root + x + c / 100, rms: 0.1 });
+      }
+    });
+    return out;
+  };
+  it('±80¢ at 5 Hz with scoops is steady at every phase', () => {
+    for (let k = 0; k < 12; k++) expect(judgePattern(72, voice(72, 80, 5, (k / 12) * 2 * Math.PI)).verdict).toBe('good');
+  });
+  it('a ±70¢ drift through each note is unsteady', () => {
+    expect(judgePattern(72, voice(72, 10, 5.5, 0, 70)).notes.every((n) => n.verdict === 'shaky')).toBe(true);
+  });
+});
+
 describe('range check and vibrato', () => {
   it('a wide, even classical vibrato is steady; an irregular wobble is not', () => {
     const vib = (root: number, cents: number, irregular = false) => {

@@ -3,7 +3,7 @@ import { Tuner, letterName } from './Tuner';
 import { getTracker, estimateLatencyMs } from '../play/session';
 import { getAudioContext, unlockAudio } from '../../audio/context';
 import { scheduleClick, scheduleVoice, synthBus } from '../../audio/synth';
-import { NOTE_SEC, PATTERN, STEP, judgePattern, shouldStop, suggestVoice, summarize, type PatternResult, type Verdict } from '../../game/rangecheck';
+import { NOTE_SEC, PATTERN, STEADY_MAX, STEP, judgePattern, shouldStop, suggestVoice, summarize, type PatternResult, type Verdict } from '../../game/rangecheck';
 import type { RawPitch } from '../../audio/pitch';
 import { useProfile } from '../hooks';
 
@@ -95,16 +95,23 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
       const t0 = ctx.currentTime + 0.25;
       notes.forEach((m, k) => scheduleVoice(ctx, out, m, t0 + k * NOTE_SEC, NOTE_SEC * 0.9, { timbre: 'guide' }));
       // A breath after the pattern, then a click on your first note and soft ticks on the others
-      // so the answer keeps the pattern's pace (clicks aren't pitched, the tracker ignores them).
+      // so the answer keeps the pace. Ticks use the 1760 Hz click (above the pitch tracker's
+      // range); readings right after a tick are dropped anyway, in case a speaker's echo is heard.
       const respStart = t0 + PATTERN.length * NOTE_SEC + 1.0;
       scheduleClick(ctx, out, respStart - 0.02, true, 0.35);
-      for (let k = 1; k < PATTERN.length; k++) scheduleClick(ctx, out, respStart + k * NOTE_SEC - 0.02, false, 0.12);
+      const ticks = [respStart - 0.02];
+      for (let k = 1; k < PATTERN.length; k++) {
+        ticks.push(respStart + k * NOTE_SEC - 0.02);
+        scheduleClick(ctx, out, ticks[k], true, 0.1);
+      }
       const lat = (profile.latencyMs || estimateLatencyMs()) / 1000;
       const respEnd = respStart + PATTERN.length * NOTE_SEC + 0.8;
       const readings: { midi: number | null; rms: number }[] = [];
       const off = tracker.onPitch((p) => {
         const t = p.ctxTime - lat;
-        if (t >= respStart + 0.05 && t <= respEnd) readings.push({ midi: p.midi, rms: p.rms });
+        if (t < respStart + 0.05 || t > respEnd) return;
+        if (ticks.some((tk) => t >= tk && t < tk + 0.08)) return;
+        readings.push({ midi: p.midi, rms: p.rms });
       });
       setRound('listen');
       await sleep(Math.max(0, (respStart - ctx.currentTime) * 1000));
@@ -268,7 +275,7 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
           {phaseRounds.length > 0 && !busy && phaseRounds[phaseRounds.length - 1].r.verdict !== 'good' && (
             <span className="tiny muted">
               {phaseRounds[phaseRounds.length - 1].r.notes.filter((n) => n.verdict !== 'good').map((n) =>
-                `${letterName(n.midi)}: ${n.verdict === 'missed' ? 'not heard' : `${n.cents! > 0 ? '+' : ''}${n.cents}¢${n.spread! > 30 ? ', unsteady' : ''}`}`).join(' · ')}
+                `${letterName(n.midi)}: ${n.verdict === 'missed' ? 'not heard' : `${n.cents! > 0 ? '+' : ''}${n.cents}¢${n.spread! > STEADY_MAX ? ', unsteady' : ''}`}`).join(' · ')}
             </span>
           )}
         </>

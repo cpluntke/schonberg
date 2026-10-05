@@ -10,8 +10,10 @@ export const NOTE_SEC = 0.75;
 /** Readings (20 ms each) at the start and end of each sung note that are the glide in and out. */
 const GLIDE_IN = 5;
 const GLIDE_OUT = 3;
-/** Steadiness limit (cents, median deviation of ~180 ms averages from the note's centre). */
-const STEADY_MAX = 35;
+/** Steadiness limit (cents): half the range of the note's ~180 ms pitch averages. */
+export const STEADY_MAX = 30;
+/** Readings per average: about one vibrato cycle (9 × 20 ms), so an even vibrato averages out. */
+const GROUP = 9;
 /** Semitones between rounds. */
 export const STEP = 2;
 
@@ -44,7 +46,7 @@ export function judgePattern(root: number, readings: Reading[], opts: { toleranc
   const tol = opts.tolerance ?? 50;
   const minN = opts.minReadings ?? 4;
   const pitches = [...new Set(PATTERN)].map((x) => root + x);
-  const bins = new Map<number, { c: number[]; db: number[]; core: number[] }>(pitches.map((p) => [p, { c: [], db: [], core: [] }]));
+  const bins = new Map<number, { c: number[]; db: number[]; core: number[]; groups: number[] }>(pitches.map((p) => [p, { c: [], db: [], core: [], groups: [] }]));
   // Readings arrive in time order: consecutive readings on the same pitch form one sung note. The
   // glide into and out of each note is left out of the pitch and steadiness judgement (it's how
   // anyone moves between notes, and it gets wider high up), as long as enough of the note is left.
@@ -54,6 +56,11 @@ export function judgePattern(root: number, readings: Reading[], opts: { toleranc
     const b = bins.get(run.pitch)!;
     const core = run.c.length >= GLIDE_IN + GLIDE_OUT + 4 ? run.c.slice(GLIDE_IN, run.c.length - GLIDE_OUT) : run.c;
     b.core.push(...core);
+    // Averages over whole vibrato cycles within this sung note (never across two notes, never a
+    // half cycle at the end).
+    for (let i = 0; i + GROUP <= core.length; i += GROUP) b.groups.push(core.slice(i, i + GROUP).reduce((x, y) => x + y, 0) / GROUP);
+    // …and the note's last full cycle, so a drift towards the end isn't cut off.
+    if (core.length > GROUP && core.length % GROUP >= 4) b.groups.push(core.slice(-GROUP).reduce((x, y) => x + y, 0) / GROUP);
     run = null;
   };
   for (const r of readings) {
@@ -80,15 +87,9 @@ export function judgePattern(root: number, readings: Reading[], opts: { toleranc
     if (b.c.length < minN) return { midi: p, cents: null, spread: null, db: null, verdict: 'missed' as Verdict };
     const core = b.core.length >= minN ? b.core : b.c;
     const cents = median(core);
-    // Steadiness on ~one vibrato cycle averages (9 readings ≈ 180 ms), so a wide but even vibrato
-    // isn't "unsteady"; a wobbling or drifting pitch still is.
-    const groups: number[] = [];
-    for (let i = 0; i + 4 < core.length; i += 9) {
-      const g = core.slice(i, i + 9);
-      groups.push(g.reduce((x, y) => x + y, 0) / g.length);
-    }
-    // How far the held pitch wanders: half the range of those averages (a drift through the
-    // note or a slow wobble shows up; an even vibrato averages out).
+    // How far the held pitch wanders: half the range of its per-cycle averages (a drift through
+    // the note or a slow wobble shows up; an even vibrato averages out).
+    const groups = b.groups;
     const spread = groups.length >= 2 ? (Math.max(...groups) - Math.min(...groups)) / 2 : median(core.map((x) => Math.abs(x - cents))) / 2;
     const verdict: Verdict = Math.abs(cents) <= tol && spread <= STEADY_MAX ? 'good' : 'shaky';
     return { midi: p, cents: Math.round(cents), spread: Math.round(spread), db: Math.round(median(b.db)), verdict };
