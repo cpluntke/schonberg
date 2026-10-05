@@ -67,6 +67,13 @@ export function Setup() {
     }
   }
 
+  // A choir member is on the choir's leaderboard by first name: Skip can't go past the name.
+  const needsName = !!profile.choirCode && !name.trim();
+  function skip() {
+    if (needsName) setStep(1);
+    else finish();
+  }
+
   function finish() {
     update({ name: name.trim(), onboarded: true, ...(range ? { rangeLow: range.lo, rangeHigh: range.hi } : {}) });
     go({ name: 'home' }, true);
@@ -77,7 +84,7 @@ export function Setup() {
       <div className="topbar">
         <button className="icon-btn" aria-label="Back" onClick={() => (step > 0 ? setStep(step - 1) : back())}><IconBack /></button>
         <span className="eyebrow grow">{step === 0 ? 'Setup' : 'Voice setup'} · {step + 1} of {steps}</span>
-        <button className="btn ghost small" onClick={finish}>Skip</button>
+        <button className="btn ghost small" onClick={skip} data-testid="setup-skip">Skip</button>
       </div>
       <div className="steps" aria-hidden="true">
         {Array.from({ length: steps }, (_, i) => <span key={i} className={i < step ? 'done' : i === step ? 'cur' : ''} />)}
@@ -93,8 +100,9 @@ export function Setup() {
           {!apiBase() && !introSeen() && <IntroVideoButton label="New here? Watch the 2½-minute intro" className="btn block" />}
           <label className="field">
             <span>Your name (shown on the choir leaderboard)</span>
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="First name" autoComplete="given-name" maxLength={40} />
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="First name" autoComplete="given-name" maxLength={40} autoFocus={needsName} />
           </label>
+          {needsName && <span className="small" role="status" style={{ color: 'var(--accent-text)' }}>Your choir's leaderboard needs your first name.</span>}
           <div className="col">
             <span className="small">Your voice part</span>
             <div className="choice-grid">
@@ -138,8 +146,7 @@ export function Setup() {
             </div>
             <span className="tiny muted">Your own scores can be imported later in the Library.</span>
           </div>
-          {profile.choirCode && !name.trim() && <span className="small" role="status" style={{ color: 'var(--accent-text)' }}>Your choir's leaderboard needs your first name.</span>}
-          <button className="btn primary block" style={{ marginTop: 'auto' }} disabled={!!profile.choirCode && !name.trim()}
+          <button className="btn primary block" style={{ marginTop: 'auto' }} disabled={needsName}
             onClick={() => { update({ name: name.trim() }); setStep(2); }}>Continue</button>
         </>
       )}
@@ -236,7 +243,7 @@ function ChoirStep({ profile, update, onNext }: { profile: Profile; update: (p: 
           )}
           <label className="row small" style={{ gap: 10, alignItems: 'flex-start' }}>
             <input type="checkbox" style={{ width: 22, height: 22, flex: 'none', accentColor: 'var(--accent)' }} checked={!!profile.shareProgress} onChange={(e) => update({ shareProgress: e.target.checked })} />
-            <span>Share my progress with my section lead (which bars are hard for me; they see the section as a whole). My name and voice range are visible to my section lead and the choir admins. You can change this any time under Settings › Your choir.</span>
+            <span>Share my progress with my section lead: which bars are hard for me, shown to leads and admins only as section totals (in a small section they may still tell which are mine), plus my voice range by name. You can change this any time under Settings › Your choir.</span>
           </label>
           <button className="linklike small" style={{ alignSelf: 'flex-start', minHeight: 44 }} onClick={() => { leaveChoir(); update({}); }}>Wrong choir? Use a different code</button>
         </div>

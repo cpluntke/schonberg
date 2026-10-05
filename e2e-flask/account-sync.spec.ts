@@ -60,6 +60,10 @@ test('member: level 1 on phone A, account, phone B gets it; lead sees one entry;
   await pa.getByLabel('Sections').getByRole('button', { name: /level 1/ }).first().click();
   await pa.getByTestId('start').click();
   await expect(pa.getByTestId('pass-banner')).toContainText(/level 1 reached|Passed/, { timeout: 120_000 });
+  // The run also updated her entry on the choir's leaderboard (without opening Ranks).
+  const board = async () => ((await (await request.get(`./api/choirs/${code}/entries`)).json()).entries as { name: string; readiness: number }[])
+    .filter((e) => e.name === 'Anna').map((e) => e.readiness > 0);
+  await expect.poll(board, { timeout: 15_000 }).toContain(true);
   // Results suggests an account (inline, below the main buttons).
   await expect(pa.getByTestId('account-tip')).toBeVisible();
   await pa.getByTestId('account-tip').scrollIntoViewIfNeeded();

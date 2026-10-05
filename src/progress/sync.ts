@@ -501,6 +501,21 @@ export function buildSnapshot(now = Date.now()): { data: ProgressSnapshot; hash:
 
 export interface ApplyResult { pieces: number; profile: boolean; cycle: boolean }
 
+const isStr = (v: unknown): v is string => typeof v === 'string';
+const optional = (v: unknown, ok: (x: unknown) => boolean) => v === undefined || ok(v);
+const strings = (v: unknown) => Array.isArray(v) && v.every(isStr);
+
+/** A saved programme of the right shape (buildSnapshot and the screens rely on it), else null. */
+export function validCycle(v: unknown): Cycle | null {
+  if (!isObj(v) || !isStr(v.name) || !strings(v.pieceIds)) return null;
+  const ok = optional(v.focusPieceIds, strings)
+    && [v.concertDate, v.rehearsalDate, v.rehearsalTime, v.preset].every((x) => optional(x, isStr))
+    && optional(v.rehearsalWeekday, inRange(0, 6))
+    && optional(v.wanted, (w) => Array.isArray(w) && w.every((x) => isObj(x) && isStr(x.title)
+      && optional(x.composer, isStr) && optional(x.note, isStr) && optional(x.focus, isBool)));
+  return ok ? (v as unknown as Cycle) : null;
+}
+
 /** Merge a saved copy into this phone (see the merge rules above). */
 /**
  * `adoptSettings`: this phone already syncs with the account and the copy is newer (another phone of
@@ -537,8 +552,9 @@ export function applySnapshot(d: unknown, opts: { adoptSettings?: boolean } = {}
   }
   if (isObj(d.parts)) for (const [id, part] of Object.entries(d.parts)) if (typeof part === 'string' && !rawGet(`sh:part:${id}`)) rawSet(`sh:part:${id}`, part);
   let cycle = false;
-  if ((!setUp || opts.adoptSettings) && isObj(d.cycle) && Array.isArray(d.cycle.pieceIds)) {
-    saveCycle({ ...loadCycle(), ...(d.cycle as unknown as Cycle) });
+  const remoteCycle = validCycle(d.cycle);
+  if ((!setUp || opts.adoptSettings) && remoteCycle) {
+    saveCycle({ ...loadCycle(), ...remoteCycle });
     if (typeof d.cp === 'string') rawSet('sh:cyclePreset', d.cp);
     rawSet('sh:cycleSeeded', '1');
     cycle = true;

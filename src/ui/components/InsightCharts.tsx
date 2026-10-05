@@ -89,7 +89,7 @@ export function RangeChart({ ranges, voice, part, label }: {
                   </span>
                 </>
               ) : (
-                <span className="tiny muted" style={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', left: 6 }}>not measured</span>
+                <span className="tiny muted" style={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', left: 6, background: 'var(--surface)', padding: '0 4px', borderRadius: 4, whiteSpace: 'nowrap' }}>not measured</span>
               )}
             </div>
           </div>

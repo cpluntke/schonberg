@@ -238,6 +238,29 @@ describe('restoring on a new phone', () => {
     expect(() => applySnapshot({ v: 1 })).toThrow(/damaged/);
     expect(applySnapshot({ v: 1, p: { nopipe: { s: {} }, 'a|b': 'junk' } } as unknown as ProgressSnapshot).pieces).toBe(0);
   });
+
+  it('ignores a programme of the wrong shape, so the next upload can still be built', () => {
+    saveCycle({ name: 'Mine', pieceIds: ['x'] });
+    const bad: unknown[] = [
+      { name: 7, pieceIds: ['a'] },
+      { name: 'Spring', pieceIds: ['a', 3] },
+      { name: 'Spring', pieceIds: ['a'], focusPieceIds: 'a' },
+      { name: 'Spring', pieceIds: ['a'], wanted: [{ title: 5 }] },
+      { name: 'Spring', pieceIds: ['a'], wanted: [{ title: 'Ave', composer: {} }] },
+      { name: 'Spring', pieceIds: ['a'], preset: ['x'] },
+      { name: 'Spring', pieceIds: ['a'], concertDate: 20270320 },
+    ];
+    for (const cycle of bad) {
+      const r = applySnapshot({ v: 1, p: {}, cycle } as unknown as ProgressSnapshot, { adoptSettings: true });
+      expect(r.cycle).toBe(false);
+      expect(loadCycle()).toEqual({ name: 'Mine', pieceIds: ['x'] });
+      expect(() => buildSnapshot()).not.toThrow();
+    }
+    const good = { name: 'Spring', pieceIds: ['a'], wanted: [{ title: 'Ave', composer: 'Byrd' }], rehearsalWeekday: 2 };
+    expect(applySnapshot({ v: 1, p: {}, cycle: good } as unknown as ProgressSnapshot, { adoptSettings: true }).cycle).toBe(true);
+    expect(loadCycle()).toMatchObject(good);
+    expect(() => buildSnapshot()).not.toThrow();
+  });
 });
 
 describe('review fixes', () => {

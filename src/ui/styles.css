@@ -205,6 +205,9 @@ input[type='range'] { accent-color: var(--accent); width: 100%; }
   background: rgba(11, 13, 26, 0.82); z-index: 5;
 }
 .overlay .card { max-width: 420px; width: 100%; }
+/* When the pre-run card is taller than the space (the how-to on a laptop), Start stays in view
+   (down into the overlay padding, its shadow hiding what scrolls under it). */
+.overlay .start-sticky { position: sticky; bottom: -14px; z-index: 1; box-shadow: 0 0 0 10px var(--surface); }
 
 .heat { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 4px; }
 .heat button { height: 44px; border: none; padding: 0; border-radius: 3px; }

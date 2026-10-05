@@ -53,8 +53,9 @@ async function share(request: APIRequestContext, code: string, name: string, voi
   expect(r.status()).toBe(200);
 }
 
-async function loggedIn(browser: Browser, code: string, name: string, voice: string) {
-  const ctx = await browser.newContext({ viewport: SIZES[0] });
+async function loggedIn(browser: Browser, code: string, name: string, voice: string, ip?: string) {
+  // `ip`: a phone of its own for the server's per-client rate limits (they see CF-Connecting-IP).
+  const ctx = await browser.newContext({ viewport: SIZES[0], ...(ip ? { extraHTTPHeaders: { 'CF-Connecting-IP': ip } } : {}) });
   const page = await ctx.newPage();
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
@@ -133,6 +134,15 @@ test('lead sees aggregates and ranges; admin sees S|A|T|B; usage reaches the sup
   await shootEl(admin.page, 'choir-ranges', 'admin-range-charts');
   // The lead can't open the admin view's data.
   expect((await request.get(`./api/choirs/${code}/insights`)).status()).toBe(401);
+  // A member's own account opening the staff pages by address: who they're for, not "section lead".
+  expect((await request.post(`./api/choirs/${code}/members`, { data: { name: 'Mia', password: 'password-123' } })).status()).toBe(201);
+  const mia = await loggedIn(browser, code, 'Mia', 'A', '10.9.9.9');
+  for (const h of ['#/section', '#/choiradmin']) {
+    await mia.page.goto(`./${h}`);
+    await expect(mia.page.getByTestId('staff-only')).toContainText('for section leads and choir admins');
+    await expect(mia.page.locator('main')).not.toContainText(/a section lead\b|Section lead ·/);
+  }
+  await shoot(mia.page, 'member-on-section');
 
   // ---- usage statistics: a real run on a phone, its summary sent the next day
   const yesterday = async () => {
@@ -186,5 +196,5 @@ test('lead sees aggregates and ranges; admin sees S|A|T|B; usage reaches the sup
   await sup.getByTestId('usage-csv').click();
   expect((await dl).suggestedFilename()).toMatch(/^schonberg-usage-.*\.csv$/);
 
-  expect([...lead.errors, ...admin.errors]).toEqual([]);
+  expect([...lead.errors, ...admin.errors, ...mia.errors]).toEqual([]);
 });

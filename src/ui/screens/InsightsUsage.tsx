@@ -100,8 +100,8 @@ export function UsageInsights() {
             <Tile k="Daily actives (yesterday)" v={int(stats.dauY)} sub={`peak ${int(stats.dauMax)}`} />
             <Tile k="Weekly actives" v={int(stats.wau)} />
             <Tile k="28-day actives" v={int(stats.mau)} />
-            <Tile k="Runs a day" v={stats.runsPerDay.toFixed(stats.runsPerDay < 10 ? 1 : 0)} />
-            <Tile k="Minutes practised a day" v={int(stats.minPerDay)} />
+            <Tile k="Runs a day" v={stats.runsPerDay.toFixed(stats.runsPerDay < 10 ? 1 : 0)} sub={daysWithData(stats.withData)} />
+            <Tile k="Minutes practised a day" v={int(stats.minPerDay)} sub={daysWithData(stats.withData)} />
             <Tile k="Back the next week" v={stats.ret ? pct(stats.ret.back, stats.ret.base) : '–'} sub={stats.ret ? `of ${stats.ret.base} installs` : 'needs 2 full weeks'} />
           </div>
           <Section title="Daily actives" note={`${days[0].day} to ${days[days.length - 1].day}`} id="usage-actives">
@@ -188,10 +188,14 @@ function techTotals(days: MetricsDay[], fam: string): Record<string, number> {
   return out;
 }
 
+const daysWithData = (n: number) => `avg. of ${n} day${n === 1 ? '' : 's'} with data`;
+
 function summarise(days: MetricsDay[]) {
   const y = days.length >= 2 ? days[days.length - 2] : days[days.length - 1];
   const last = days[days.length - 1];
-  const nDays = Math.max(1, days.length);
+  // Averages over the days that have data (a new server or a quiet stretch would otherwise dilute them).
+  const withData = days.filter((d) => (d.installs ?? 0) > 0).length;
+  const nDays = Math.max(1, withData);
   const rets = days.filter((d) => d.ret && d.ret.base > 0);
   const ret = rets.length ? rets.reduce((a, d) => ({ base: a.base + d.ret!.base, back: a.back + d.ret!.back }), { base: 0, back: 0 }) : null;
   const js: Record<string, number> = {};
@@ -204,6 +208,7 @@ function summarise(days: MetricsDay[]) {
     runsPerDay: sumKeys(days, (k) => k.startsWith('run.')) / nDays,
     minPerDay: sumKeys(days, (k) => k === 'sec.practice') / 60 / nDays,
     qRuns: sumKeys(days, (k) => k === 'q.runs'),
+    withData,
     ret,
     jsTop: Object.entries(js).sort((a, b) => b[1] - a[1]).slice(0, 8),
   };

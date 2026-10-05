@@ -5,6 +5,7 @@ import { getPiece, noteRangeFor, singableSections } from '../library';
 import { useProfile, useWide } from '../hooks';
 import { LEVELS, LISTEN, MAX_LEVEL, OFF_BOOK_DAYS, effectiveTolerance, fixesBefore, fullRunCounts, pieceReadiness } from '../../progress/ladder';
 import { shareMyProgress } from '../play/shareProgress';
+import { postBoardEntrySoon } from '../play/boardEntry';
 import { syncProgressSoon, suggestAccount } from '../../progress/sync';
 import { recordAttempt, recordFullRun, getProgress, snapshotReadiness, personalBest, practiceDisplay } from '../../progress/store';
 import { keyAtTime } from '../../music/time';
@@ -319,6 +320,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
       snapshotReadiness(piece.id, part.id, pieceReadiness(secs, getProgress(piece.id, part.id)).pct);
     }
     void shareMyProgress();
+    postBoardEntrySoon(piece.id);
     syncProgressSoon();
     suggestAccount(rec.passed);
     setLastResult({
@@ -676,7 +678,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
                   <button className="btn block" onClick={start}>Listen again</button>
                 </>
               ) : (
-                <button className="btn primary block" onClick={start} data-testid="start">
+                <button className="btn primary block start-sticky" onClick={start} data-testid="start">
                   <IconPlay size={18} /> {listenOnly ? 'Listen' : 'Start singing'}
                 </button>
               )}

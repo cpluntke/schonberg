@@ -99,8 +99,9 @@ export function PeoplePanel({ code, auth, superAdmin = false, onChanged }: { cod
   const members = people.accounts.filter((a) => a.role === 'member');
   const person = (a: Account) => (
     <div key={a.id} className="col" style={{ gap: 4, padding: '6px 0', borderBottom: '1px solid var(--surface-2)' }} data-testid="person">
-      <div className="row" style={{ gap: 6 }}>
-        <span className="grow" style={{ overflowWrap: 'anywhere' }}>
+      <div className="row wrap" style={{ gap: 6 }}>
+        {/* The buttons wrap below a name rather than squeeze it (a name breaks only if it's longer than the row). */}
+        <span className="grow" style={{ flexBasis: '9em', overflowWrap: 'break-word' }}>
           <strong>{a.name}</strong>{a.id === people.you && <span className="tiny muted"> (you)</span>}
           <span className="tiny muted" style={{ display: 'block' }}>
             {a.lastLoginAt ? `last login ${day(a.lastLoginAt)}` : 'never logged in'}{a.invitedBy === 'old password' ? ' · joined with the old shared password' : ''}
@@ -191,9 +192,11 @@ export function PeoplePanel({ code, auth, superAdmin = false, onChanged }: { cod
               <input type="date" aria-label="Signed up since" value={since} onChange={(e) => setSince(e.target.value)} style={{ minHeight: 44, flex: 1 }} />
               <button className="btn small ghost danger" disabled={busy || !since} data-testid="remove-since" onClick={() => {
                 const t = new Date(`${since}T00:00:00`).getTime();
-                const n = members.filter((m) => (m.createdAt ?? 0) >= t).length;
+                const names = members.filter((m) => (m.createdAt ?? 0) >= t).map((m) => m.name).sort((a, b) => a.localeCompare(b));
+                const n = names.length;
                 if (!n) { toast('Nobody signed up since then'); return; }
-                if (confirm(`Remove ${n} member account${n === 1 ? '' : 's'} made since ${since}, with their progress?`)) {
+                const list = names.slice(0, 20).join(', ') + (n > 20 ? `, and ${n - 20} more` : '');
+                if (confirm(`Remove ${n} member account${n === 1 ? '' : 's'} made since ${since}, with their progress?\n\n${list}`)) {
                   void run(async () => { const r = await removeMembersSince(code, auth, t); toast(`${r.removed} removed`); return r; });
                 }
               }}>Remove</button>

@@ -129,7 +129,7 @@ export function SectionInsights({ view }: { view: SectionInsightsView }) {
     <>
       <div className="card flat" data-testid="section-summary">
         <strong>{view.sharing} singer{view.sharing === 1 ? '' : 's'} sharing · {view.activeWeek} active this week</strong>
-        <span className="small muted">Progress is shown for the section as a whole, never per singer.{small ? ` Pieces with fewer than ${view.minGroup} singers sharing show counts only.` : ''}</span>
+        <span className="small muted">This view shows the section as a whole, never per singer.{small ? ` Pieces with fewer than ${view.minGroup} singers sharing show counts only.` : ''}</span>
       </div>
       <div className="card" data-testid="section-ranges">
         <strong>Voices in your section</strong>

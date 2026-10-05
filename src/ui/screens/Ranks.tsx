@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { getPiece, chosenPartId, singableSections, type PieceInfo } from '../library';
+import { getPiece, type PieceInfo } from '../library';
 import { useProfile, useStoreVersion, toast, initials } from '../hooks';
-import { loadCycle } from '../../progress/store';
+import { attemptLog, loadCycle } from '../../progress/store';
 import {
-  computeMyEntry, rankEntries, READINESS_VERSION, getLeaderboardBackend, encodeShareCode, importShareCodes, removeLocalEntry, decodeShareCode,
+  rankEntries, READINESS_VERSION, getLeaderboardBackend, encodeShareCode, importShareCodes, removeLocalEntry, decodeShareCode,
   type LeaderboardEntry, type RankBy,
 } from '../../progress/leaderboard';
 import { IconShare } from '../icons';
+import { myBoardEntry, postBoardEntry } from '../play/boardEntry';
 
 const TABS: { by: RankBy; label: string; sub: string }[] = [
   { by: 'readiness', label: 'Ready', sub: 'readiness' },
@@ -34,23 +35,16 @@ export function Ranks() {
   const choir = profile.choirCode || 'local';
   const piece = getPiece(pieceId);
 
-  const computeMyEntryCached = (pc: PieceInfo) => {
-    const pid = chosenPartId(pc, profile.voice);
-    return computeMyEntry(pc.id, pid, singableSections(pc, pid));
-  };
-  const me: LeaderboardEntry | null = piece
-    ? computeMyEntry(piece.id, chosenPartId(piece, profile.voice), singableSections(piece, chosenPartId(piece, profile.voice)))
-    : null;
+  const computeMyEntryCached = (pc: PieceInfo) => myBoardEntry(pc, profile.voice);
+  const me: LeaderboardEntry | null = piece ? myBoardEntry(piece, profile.voice) : null;
 
   useEffect(() => {
     let alive = true;
     if (!pieceId) return;
     (async () => {
       try {
-        // Only post named entries, and only to a real (server) board — posting to the local
-        // store would bump the store version and re-run this effect in a loop.
-        // Every choir member with a name is on the choir's board (part of joining the choir).
-        if (me && profile.choirCode && profile.name && backend.kind === 'http') await backend.put(choir, me);
+        // Named entries on a real (server) board only (see postBoardEntry).
+        if (me) await postBoardEntry(me);
         const list = await backend.list(choir, pieceId);
         const everything = await backend.list(choir);
         if (alive) { setEntries(list); setAllEntries(everything); setErr(null); }
@@ -209,7 +203,9 @@ export function Ranks() {
 
       <div className="card">
         <strong>Compare with your choir</strong>
-        {backend.kind === 'http' ? (
+        {backend.kind === 'http' && profile.choirCode ? (
+          <span className="small muted" data-testid="on-board">You're on your choir's board: everyone in the choir sees your first name, voice and these numbers.</span>
+        ) : backend.kind === 'http' ? (
           <>
             <span className="small muted">Join your choir's board with the code your director shares. Everyone in the choir is on it: your name, voice and these numbers are shown to the choir (nothing else is sent).</span>
             <div className="row">
@@ -240,10 +236,15 @@ export function Ranks() {
   );
 }
 
-/** Once: readiness was recalculated when piece levels started to need a full run-through. */
+/** When piece levels started to need a full run-through (the release that recalculated readiness). */
+const LEVELS_CHANGED_AT = Date.UTC(2026, 9, 5, 3);
+
+/** Once, and only for singers who practised before readiness was recalculated (not on new installs). */
 function LevelsNote() {
   const KEY = 'sh:seenLevelsNote';
-  const [show, setShow] = useState(() => { try { return localStorage.getItem(KEY) !== '1'; } catch { return false; } });
+  const [show, setShow] = useState(() => {
+    try { return localStorage.getItem(KEY) !== '1' && attemptLog().some((e) => e.at < LEVELS_CHANGED_AT); } catch { return false; }
+  });
   if (!show) return null;
   return (
     <div className="notice info row" role="status" data-testid="levels-note">

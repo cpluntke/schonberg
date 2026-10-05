@@ -263,3 +263,29 @@ test('memorisation: piece map, off-book test with peek, cold start, words in rhy
   await expect(page.getByRole('button', { name: 'Print' })).toBeVisible({ timeout: 10_000 });
   expect(errors).toEqual([]);
 });
+
+// A choir member is on the choir's leaderboard by first name: Skip in setup can't go past the name.
+test('setup: Skip with a choir code asks for the first name before finishing', async ({ page }) => {
+  await page.goto('/#/');
+  await page.evaluate(() => {
+    localStorage.setItem('sh:profile', JSON.stringify({ choirCode: 'kammerchor', leaderboardOptIn: true, name: '', onboarded: false }));
+  });
+  await page.goto('/#/setup');
+  await page.getByTestId('setup-skip').click();
+  await expect(page.getByRole('heading', { name: "Who's singing?" })).toBeVisible();
+  await expect(page.getByText("Your choir's leaderboard needs your first name.")).toBeVisible();
+  await page.getByTestId('setup-skip').click(); // still no name: stays here
+  await expect(page.getByRole('heading', { name: "Who's singing?" })).toBeVisible();
+  const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem('sh:profile') ?? '{}'));
+  expect((await stored()).onboarded).toBeFalsy();
+  await page.getByPlaceholder('First name').fill('Sophie');
+  await page.getByTestId('setup-skip').click();
+  await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
+  expect(await stored()).toMatchObject({ name: 'Sophie', onboarded: true, choirCode: 'kammerchor' });
+});
+
+test('setup: Skip without a choir finishes at once, name or not', async ({ page }) => {
+  await page.goto('/#/setup');
+  await page.getByTestId('setup-skip').click();
+  await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
+});

@@ -119,7 +119,7 @@ export function ChoirScreen() {
             {syncMsg && <span className="small muted" role="status">{syncMsg}</span>}
           </div>
           <div className="card">
-            <label className="toggle-row"><span>Share my progress with my section lead<span className="tiny muted" style={{ display: 'block' }}>How each bar is going, so they know what to rehearse (they see the section as a whole, not you). Your name and voice range are visible to your section lead and the choir admins.</span></span>
+            <label className="toggle-row"><span>Share my progress with my section lead<span className="tiny muted" style={{ display: 'block' }}>How each bar is going, so they know what to rehearse. Your lead and the admins see bars and levels only as section totals (in a small section they may still tell which are yours), and your voice range by name. The leaderboard already shows everyone in the choir your first name, voice and readiness.</span></span>
               <input type="checkbox" checked={!!profile.shareProgress} onChange={async (e) => {
                 const on = e.target.checked;
                 update({ shareProgress: on });
@@ -270,6 +270,16 @@ function NeedLogin({ code, what }: { code: string; what: string }) {
   );
 }
 
+/** A member's own account opened a staff page (e.g. by its address): say who it is for, nothing more. */
+function StaffOnly({ name }: { name: string }) {
+  return (
+    <div className="notice" data-testid="staff-only">
+      This page is for section leads and choir admins: they log in with the account from their invite link.
+      You're logged in as {name}, a choir member.
+    </div>
+  );
+}
+
 /** Password gate of the super-admin screen. */
 function Gate({ label, onSubmit, children }: { label: string; onSubmit: (pw: string) => Promise<void>; children?: React.ReactNode }) {
   const [pw, setPw] = useState('');
@@ -321,7 +331,9 @@ export function ChoirAdmin() {
     return (
       <main className="screen">
         <Top title="Choir admin" />
-        {session
+        {session?.account.role === 'member'
+          ? <StaffOnly name={session.account.name} />
+          : session
           ? <div className="notice">You're logged in as {session.account.name}, a section lead. Only choir admins can change the programme, the scores and the people. <LogoutLink /></div>
           : <NeedLogin code={code} what="For whoever looks after the choir's programme, scores and section leads. Log in with your own account." />}
       </main>
@@ -537,13 +549,15 @@ export function SectionLead() {
       .catch((e) => { if (alive) setErr((e as Error).message); });
     return () => { alive = false; };
   }, [token, code, shown]);
-  if (!apiBase()) return <main className="screen"><Top title="Section lead" /><Offline /></main>;
-  if (!code) return <main className="screen"><Top title="Section lead" /><div className="notice">Join your choir first (Settings → Your choir).</div></main>;
-  if (!session) {
+  if (!apiBase()) return <main className="screen"><Top title="Your section" /><Offline /></main>;
+  if (!code) return <main className="screen"><Top title="Your section" /><div className="notice">Join your choir first (Settings → Your choir).</div></main>;
+  if (!session || session.account.role === 'member') {
     return (
       <main className="screen">
         <Top title="Your section" />
-        <NeedLogin code={code} what="Section leads see which bars their section finds hard. Log in with the account you made from your invite link." />
+        {session
+          ? <StaffOnly name={session.account.name} />
+          : <NeedLogin code={code} what="Section leads see which bars their section finds hard. Log in with the account you made from your invite link." />}
       </main>
     );
   }

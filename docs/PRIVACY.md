@@ -1,8 +1,27 @@
 # Privacy: what Schönberg Hero sends, who sees it, how long it stays
 
-Practice data lives on the singer's phone. Three things can reach the choir server (the
-messiermarathon Flask app, `/schonberg/api`), each the singer's own choice. Settings → Privacy shows a
-short version of this page.
+Practice data lives on the singer's phone. Four things can reach the choir server (the
+messiermarathon Flask app, `/schonberg/api`): the choir's leaderboard (part of joining a choir) and
+three things that are the singer's own choice. Settings → Privacy shows a short version of this page.
+
+## In short: who sees what, by name
+
+- **Everyone in the choir** (anyone with the choir code): your first name, voice part and readiness for
+  each programme piece, with your streak and weekly points, on the choir's leaderboard.
+- **Your section lead and the choir admins**, if you share progress: your voice range, by name. Per-bar
+  detail (hardest bars, level spread, ready counts, trends) only as totals for the section.
+- **In a small section** (three or four singers sharing), a lead who knows who practised what may still
+  be able to work out one singer's detail from the totals, or from how they change after that singer
+  practises.
+- **The super admin**: anonymous daily usage totals, never linked to a name.
+
+## 0. The choir's leaderboard (every choir member with a name)
+
+- **Sent** when the singer opens Ranks and after counted runs (at most once a minute per piece), to
+  `PUT /schonberg/api/choirs/<code>/entries/<name>`: first name, voice part, piece, readiness, weekly
+  points, streak and the 7-day readiness gain. There is no opt-out: joining a choir with a code puts
+  the singer on its board (leave the choir to come off it).
+- **Who sees it**: anyone who opens Ranks with the choir's code, by name.
 
 ## 1. Anonymous usage statistics (on by default, switch in Settings → Privacy)
 
@@ -33,13 +52,13 @@ Purpose: to see how the app is used and where it fails, so it can be improved.
     and 28-day actives and, on Mondays, how many of that week's installs came back the next week.
     Kept 400 days.
   - to count an install once a day and compute weekly/28-day actives and the return rate:
-    `actives/YYYY-MM-DD.json`, the set of 16-hex SHA-256 hashes of the install ids active that day,
+    `actives/YYYY-MM-DD.json`, the set of 16-hex HMAC-SHA256 hashes of the install ids active that day,
     keyed with a random server secret. Raw ids are never written. Each day's set is deleted after
     35 days; only the totals remain.
-- **Abuse limits**: unknown keys ignored, counts clamped per key, 16 KB per request, 8 days per
-  request, 10 distinct error hashes per install and day (200 per day file), 30 requests an hour per
-  client address (IPv6: /64), 3000 an hour in all, and the metrics folder is capped at 20 MB (then
-  507). Summaries older than 7 days are refused.
+- **Abuse limits**: unknown keys ignored, counts clamped per key, 16 KB per request (refused without a
+  Content-Length), 8 days per request, 10 distinct error hashes per install and day (200 per day file),
+  30 requests an hour per client address (IPv6: /64), 3000 an hour in all, and the metrics folder is
+  capped at 20 MB (then 507). Summaries older than 7 days are refused.
 - **Who sees it**: only the super admin (Choir → super admin → Usage insights), as charts and a CSV of
   daily totals.
 
@@ -52,8 +71,12 @@ Purpose: to see how the app is used and where it fails, so it can be improved.
   section how many share and were active this week; per piece the level distribution, rehearsal- and
   concert-ready counts, average readiness, hardest bars and the trend versus a week ago. Distributions,
   bars and trends appear only when **at least 3 singers** share that piece (a bar only when 3 have
-  sung it); below that only the counts. **No name is shown next to progress.**
-- **By name**: only the voice range, so leads can plan divisi. A lead sees the ranges of the sections
+  sung it); below that only the counts. These views show no name next to bars, levels or readiness.
+  (Readiness by name is on the choir's leaderboard anyway, see above.)
+- **Small sections**: with only three or four singers sharing, a lead may still be able to work out one
+  singer's detail (for example the only singer who practised this week, or the change in the totals
+  after someone's run). The 3-singer rule hides one or two singers' numbers, not more.
+- **By name**: the voice range, so leads can plan divisi. A lead sees the ranges of the sections
   they lead, an admin all sections; members see none.
 - Trend snapshots: one per day of the section totals (no names), kept 28 days in
   `DATA_DIR/schonberg_insights/<choir>.json`, deleted with the choir.
