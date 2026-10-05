@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { trackStep } from '../../progress/metrics';
 import { useProfile, useStoreVersion } from '../hooks';
 import { loadCycle, saveCycle, type Profile } from '../../progress/store';
 import { apiBase, cachedChoir, leaveChoir } from '../../progress/choir';
@@ -44,6 +45,10 @@ export function Setup() {
   );
   const [lat, setLat] = useState<{ state: 'idle' | 'running' | 'done' | 'fail'; beat: number; ms: number }>({ state: 'idle', beat: 0, ms: profile.latencyMs });
   const steps = 5;
+  // Onboarding funnel (anonymous usage statistics): only the first setup of this install counts.
+  const [firstSetup] = useState(() => !profile.onboarded);
+  useEffect(() => { if (firstSetup) trackStep('setup_started'); }, [firstSetup]);
+  const step1st = (s: Parameters<typeof trackStep>[0]) => { if (firstSetup) trackStep(s); };
 
   async function runLatency() {
     setLat({ state: 'running', beat: 0, ms: 0 });
@@ -79,7 +84,7 @@ export function Setup() {
       </div>
 
       {step === 0 && (
-        <ChoirStep profile={profile} update={update} onNext={() => setStep(1)} />
+        <ChoirStep profile={profile} update={update} onNext={() => { step1st('choir_step'); setStep(1); }} />
       )}
 
       {step === 1 && (
@@ -139,10 +144,14 @@ export function Setup() {
 
       {step === 2 && (
         <RangeCheck
-          onSkip={() => setStep(3)}
-          onDone={(r) => {
+          onSkip={() => { step1st('range_skipped'); setStep(3); }}
+          onDone={(r, reach) => {
             // Keep it right away, even if setup isn't finished.
-            if (r) { setRange(r); update({ rangeLow: r.lo, rangeHigh: r.hi }); }
+            if (r) {
+              setRange(r);
+              update({ rangeLow: r.lo, rangeHigh: r.hi, rangeReachLow: reach?.lo, rangeReachHigh: reach?.hi, rangeAt: Date.now() });
+            }
+            step1st(r ? 'range_done' : 'range_skipped');
             setStep(3);
           }}
         />
@@ -175,7 +184,7 @@ export function Setup() {
               {lat.state === 'done' || lat.state === 'fail' ? 'Measure again' : 'Start the clicks'}
             </button>
           </div>
-          <button className="btn primary block" style={{ marginTop: 'auto' }} onClick={() => setStep(4)}>Continue</button>
+          <button className="btn primary block" style={{ marginTop: 'auto' }} onClick={() => { step1st(lat.state === 'done' ? 'delay_done' : 'delay_skipped'); setStep(4); }}>Continue</button>
         </>
       )}
 
@@ -225,7 +234,7 @@ function ChoirStep({ profile, update, onNext }: { profile: Profile; update: (p: 
           )}
           <label className="row small" style={{ gap: 10, alignItems: 'flex-start' }}>
             <input type="checkbox" style={{ width: 22, height: 22, flex: 'none', accentColor: 'var(--accent)' }} checked={!!profile.shareProgress} onChange={(e) => update({ shareProgress: e.target.checked })} />
-            <span>Share my progress with my section lead (which bars are hard for me). You can change this any time under Settings › Your choir.</span>
+            <span>Share my progress with my section lead (which bars are hard for me; they see the section as a whole). My name and voice range are visible to my section lead and the choir admins. You can change this any time under Settings › Your choir.</span>
           </label>
           <button className="linklike small" style={{ alignSelf: 'flex-start', minHeight: 44 }} onClick={() => { leaveChoir(); update({}); }}>Wrong choir? Use a different code</button>
         </div>

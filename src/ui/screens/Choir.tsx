@@ -1,20 +1,19 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useProfile, useStoreVersion, toast } from '../hooks';
 import { back, go } from '../router';
-import { allPieces, getPiece, syncChoirNow, chosenPartId, singableSections } from '../library';
+import { allPieces, syncChoirNow } from '../library';
 import { IconBack } from '../icons';
-import { loadCycle } from '../../progress/store';
 import { WEEKDAYS } from '../../progress/rehearsal';
 import {
-  apiBase, cachedChoir, changePassword, choirPieceId, claimAccount, deleteChoirPiece, fetchChoir, fetchSection, joinChoir, leaveChoir, ChoirApiError,
+  apiBase, cachedChoir, changePassword, choirPieceId, claimAccount, deleteChoirPiece, fetchChoir, joinChoir, leaveChoir, ChoirApiError,
   loadSession, loggedOutNotice, login, logout, onSessionChange, refreshSession, refreshSessionSoon, saveChoirCycle, sessionFor, sessionSecret, superCreate, superDelete,
   superList, superPurgeMembers, superRename, uploadChoirPiece, withdrawProgress, fetchChoirUsage, mb, type Auth, type ChoirInfo, type ChoirSummary, type ChoirUsage,
-  type SectionView, type ServerUsage, type Session,
+  type ServerUsage, type Session,
 } from '../../progress/choir';
-import { PieceMap } from '../components/PieceMap';
+import { SectionInsights } from '../components/SectionInsights';
+import { fetchSectionInsights, type SectionInsightsView } from '../../progress/insights';
 import { InviteLinkBox, PeoplePanel, roleText, VOICE_NAME, VOICES } from '../components/People';
 import { importScoreFile } from '../../music/import';
-import { mastery, type BarMap } from '../../progress/bars';
 import { shareMyProgress, shareError } from '../play/shareProgress';
 
 const inputStyle: React.CSSProperties = { minHeight: 44, borderRadius: 10, border: '1px solid var(--line)', background: 'var(--surface)', padding: '0 12px' };
@@ -120,7 +119,7 @@ export function ChoirScreen() {
             {syncMsg && <span className="small muted" role="status">{syncMsg}</span>}
           </div>
           <div className="card">
-            <label className="toggle-row"><span>Share my progress with my section lead<span className="tiny muted" style={{ display: 'block' }}>Your name, your voice part and how each bar is going, so they know what to rehearse.</span></span>
+            <label className="toggle-row"><span>Share my progress with my section lead<span className="tiny muted" style={{ display: 'block' }}>How each bar is going, so they know what to rehearse (they see the section as a whole, not you). Your name and voice range are visible to your section lead and the choir admins.</span></span>
               <input type="checkbox" checked={!!profile.shareProgress} onChange={async (e) => {
                 const on = e.target.checked;
                 update({ shareProgress: on });
@@ -166,7 +165,7 @@ function AccountCard({ choir }: { choir: ChoirInfo }) {
       <span className="small muted" data-testid="account-role">{roleText(s.account.role, s.account.voices)}</span>
       <div className="row wrap">
         {admin && <button className="btn small primary" onClick={() => go({ name: 'choiradmin' })}>Choir admin</button>}
-        {s.account.role !== 'member' && <button className="btn small" onClick={() => go({ name: 'section' })}>{admin ? 'Sections' : 'Your section'}</button>}
+        {s.account.role !== 'member' && <button className="btn small" onClick={() => go({ name: admin ? 'choirinsights' : 'section' })}>{admin ? 'Sections' : 'Your section'}</button>}
         <button className="btn small ghost" onClick={() => setChanging(!changing)} aria-expanded={changing}>Change password</button>
         <button className="btn small ghost" data-testid="logout" onClick={() => void logout()}>Log out</button>
       </div>
@@ -348,7 +347,7 @@ export function ChoirAdmin() {
         <div className="card" data-testid="people-editor">
           <strong>People</strong>
           <PeoplePanel code={code} auth={auth} />
-          <button className="btn small ghost" onClick={() => go({ name: 'section' })}>See the sections</button>
+          <button className="btn small ghost" onClick={() => go({ name: 'choirinsights' })}>See the sections</button>
         </div>
       )}
     </main>
@@ -525,7 +524,7 @@ export function SectionLead() {
   const mine = admin ? [...VOICES] as string[] : session?.account.voices ?? [];
   const [picked, setPicked] = useState<string>(['S', 'A', 'T', 'B'].includes(profile.voice) ? profile.voice : 'S');
   const shown = mine.includes(picked) ? picked : mine[0];
-  const [view, setView] = useState<SectionView | null>(null);
+  const [view, setView] = useState<SectionInsightsView | null>(null);
   const [err, setErr] = useState('');
   const token = session?.token;
   useEffect(() => {
@@ -533,7 +532,7 @@ export function SectionLead() {
     let alive = true;
     setErr('');
     setView(null);
-    fetchSection(code, shown, { bearer: token } as Auth)
+    fetchSectionInsights(code, shown, { bearer: token } as Auth)
       .then((v) => { if (alive) setView(v); })
       .catch((e) => { if (alive) setErr((e as Error).message); });
     return () => { alive = false; };
@@ -564,67 +563,9 @@ export function SectionLead() {
       ) : !view ? (
         <span className="muted">Loading…</span>
       ) : (
-        <SectionReport view={view} />
+        <SectionInsights view={view} />
       )}
     </main>
-  );
-}
-
-function SectionReport({ view }: { view: SectionView }) {
-  const cycleIds = loadCycle().pieceIds;
-  const pieceIds = useMemo(() => [...new Set([...cycleIds.filter((id) => view.pieces[id]), ...Object.keys(view.pieces)])], [view, cycleIds]);
-  if (!view.members.length) {
-    return <div className="notice">Nobody in this section shares their progress yet. Members turn it on in Settings → Your choir.</div>;
-  }
-  return (
-    <>
-      <div className="card flat">
-        <strong>{view.members.length} singer{view.members.length > 1 ? 's' : ''} sharing</strong>
-        <table className="small" style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <tbody>
-            {view.members.map((m) => (
-              <tr key={m.name}>
-                <td style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{m.name}</td>
-                <td className="muted tiny">{m.updatedAt ? new Date(m.updatedAt).toLocaleDateString() : ''}</td>
-                <td className="mono" style={{ textAlign: 'right' }}>
-                  {Object.values(m.pieces).length ? `${Math.round((Object.values(m.pieces).reduce((a, p) => a + p.readiness, 0) / Object.values(m.pieces).length) * 100)}%` : '–'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {pieceIds.map((id) => {
-        const piece = getPiece(id);
-        const agg = view.pieces[id];
-        if (!piece) return null;
-        const partId = chosenPartId(piece, view.voice);
-        const part = piece.score.parts.find((p) => p.id === partId);
-        if (!part) return null;
-        const bars: BarMap = {};
-        for (const [m, b] of Object.entries(agg.bars)) bars[Number(m)] = { ema: b.mean, n: b.n, at: 0 };
-        // Same judgement as the map (the section's average), most struggling singers first.
-        const hardest = Object.entries(agg.bars).filter(([m]) => mastery(bars[Number(m)]) === 'weak')
-          .sort((a, b) => a[1].mean - b[1].mean || b[1].weak - a[1].weak).slice(0, 5);
-        const label = (m: string) => piece.score.measures[Number(m)]?.number ?? m;
-        return (
-          <div key={id} className="card" data-testid="section-piece">
-            <strong>{piece.title}</strong>
-            <span className="small muted">{agg.singers} singer{agg.singers > 1 ? 's' : ''} · {part.name}</span>
-            {hardest.length > 0 && (
-              <span className="small">Hardest: {hardest.map(([m, b]) => `bar ${label(m)} (${b.weak} of ${b.n} struggling)`).join(', ')}</span>
-            )}
-            <PieceMap score={piece.score} part={part} sections={singableSections(piece, part.id)} bars={bars}
-              onLoop={(m) => {
-                const ms = piece.score.measures;
-                const a = ms[Math.max(0, m - 1)];
-                const b = ms[Math.min(ms.length - 1, m + 1)];
-                go({ name: 'play', pieceId: piece.id, partId: part.id, sectionId: 'drill', level: 1, mode: '2d', from: a.start, to: b.start + b.dur });
-              }} />
-          </div>
-        );
-      })}
-    </>
   );
 }
 
@@ -662,7 +603,10 @@ export function SuperAdmin() {
   return (
     <main className="screen">
       <Top title="Super admin" />
-      <span className="small muted"><LogoutLink onClick={() => { sessionSecret('super', null); setPw(null); }} /></span>
+      <div className="row wrap" style={{ gap: 8 }}>
+        <button className="btn small" data-testid="open-usage" onClick={() => go({ name: 'usage' })}>Usage insights</button>
+        <LogoutLink onClick={() => { sessionSecret('super', null); setPw(null); }} />
+      </div>
       {err && <div className="notice" role="alert">{err}</div>}
       {created ? (
         <div className="card" data-testid="choir-created">

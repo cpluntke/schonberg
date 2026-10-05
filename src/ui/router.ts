@@ -17,6 +17,8 @@ export type Route =
   | { name: 'choir' }
   | { name: 'choiradmin' }
   | { name: 'section' }
+  | { name: 'choirinsights' }
+  | { name: 'usage' }
   | { name: 'superadmin' }
   | { name: 'invite'; token?: string };
 
@@ -59,6 +61,8 @@ export function parseHash(hash: string): Route {
     case 'choir': return { name: 'choir' };
     case 'choiradmin': return { name: 'choiradmin' };
     case 'section': return { name: 'section' };
+    case 'choirinsights': return { name: 'choirinsights' };
+    case 'usage': return { name: 'usage' };
     case 'superadmin': return { name: 'superadmin' };
     case 'invite': return seg[1] ? { name: 'invite', token: seg[1] } : { name: 'invite' };
   }

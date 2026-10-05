@@ -1,11 +1,13 @@
 // Opt-in: send my per-bar progress on this cycle's pieces to my choir, where my section lead sees
-// what's hard for the section. Called after each run (debounced) and when sharing is switched on.
+// what's hard for the section (aggregated, never by name), plus my voice range
+// (by name, for divisi). Called after each run (debounced) and when sharing is switched on.
 
 import { loadCycle, loadProfile, getProgress } from '../../progress/store';
 import { getBars, type BarMap } from '../../progress/bars';
 import { pieceReadiness } from '../../progress/ladder';
 import { shareProgress, apiBase, sessionFor } from '../../progress/choir';
 import { getPiece, chosenPartId, singableSections } from '../library';
+import { sharedRange } from '../../progress/insights';
 
 const MIN_GAP_MS = 60_000;
 const ERR_KEY = 'sh:shareError';
@@ -50,7 +52,7 @@ async function send(): Promise<void> {
   }
   last = Date.now();
   try {
-    await shareProgress(p.choirCode, name, p.voice, pieces);
+    await shareProgress(p.choirCode, name, p.voice, pieces, sharedRange(p));
     setShareError(null);
   } catch (e) {
     console.warn('share progress', e);

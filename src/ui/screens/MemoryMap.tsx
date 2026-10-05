@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { getPiece, useLibrary } from '../library';
 import { back } from '../router';
 import { useProfile } from '../hooks';
 import { IconBack } from '../icons';
 import { buildMemoryMap, type MapEntry, type MapSection } from '../../game/memorymap';
+import { track } from '../../progress/metrics';
 
 // Scoped styles. Print: hide the app chrome (tab bar `nav.nav`, toasts / update prompt `.toast`,
 // buttons marked .mm-noprint), switch the theme tokens to dark-on-white, keep cards whole.
@@ -128,6 +129,7 @@ function SectionCard({ s, letters }: { s: MapSection; letters: boolean }) {
 }
 
 export function MemoryMap({ pieceId, partId }: { pieceId: string; partId: string }) {
+  useEffect(() => { track('feat.memorymap'); }, []);
   const lib = useLibrary();
   const [profile] = useProfile();
   const piece = getPiece(pieceId);

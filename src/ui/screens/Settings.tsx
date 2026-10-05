@@ -11,6 +11,7 @@ import { NOTATIONS } from './Setup';
 import { noteLabel } from '../../game/notation';
 import { IntroVideoButton } from '../components/IntroVideo';
 import { AccountSync } from '../components/AccountSync';
+import { UsageStats } from '../components/UsageStats';
 
 export function Settings() {
   const [profile, update] = useProfile();
@@ -212,6 +213,8 @@ export function Settings() {
 
       <AccountSync />
 
+      <UsageStats />
+
       <section className="col" style={{ gap: 8 }}>
         <h2 className="eyebrow">Backup file (without a choir account)</h2>
         <span className="small muted">Without a choir account your progress lives only on this device. A backup file keeps everything, including your full practice history, to move it to another phone yourself (imported scores need to be imported again).</span>
@@ -231,7 +234,7 @@ export function Settings() {
       </section>
 
       <section className="col small muted" style={{ gap: 4 }}>
-        <span>Schönberg Hero · your practice stays on this device. Only your choir's leaderboard, the progress you share with your section lead and, with a choir account, the progress kept with it (above) reach the choir server.</span>
+        <span>Schönberg Hero · your practice stays on this device. Only your choir's leaderboard, the progress you share with your section lead, with a choir account the progress kept with it (above), and, if switched on, the anonymous daily usage totals (Privacy) reach the choir server.</span>
         <span>Built-in scores: public-domain editions from the PDMX dataset (MuseScore community, CC BY 4.0 dataset) and original study pieces.</span>
       </section>
     </main>

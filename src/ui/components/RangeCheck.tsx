@@ -20,7 +20,7 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
  * (1-2-3-2-1) the app plays and you sing back, in the middle, going up a step at a time, and going
  * down. Each round is judged for pitch, steadiness and loudness.
  */
-export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; hi: number } | null) => void; onSkip: () => void }) {
+export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; hi: number } | null, reach?: { lo: number; hi: number }) => void; onSkip: () => void }) {
   const [profile] = useProfile();
   const [phase, setPhase] = useState<Phase>('comfortable');
   const [comfy, setComfy] = useState<number | null>(null);
@@ -301,7 +301,7 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
           </div>
           <div className="row" style={{ marginTop: 'auto' }}>
             <button className="btn" onClick={() => { setRounds([]); setComfy(null); setPhase('comfortable'); }}>Start over</button>
-            <button className="btn primary grow" onClick={() => onDone(usable ? summary.steady : null)} data-testid="range-done">Continue</button>
+            <button className="btn primary grow" onClick={() => onDone(usable ? summary.steady : null, usable && summary.reach ? summary.reach : undefined)} data-testid="range-done">Continue</button>
           </div>
         </>
       )}

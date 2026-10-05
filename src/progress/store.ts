@@ -44,6 +44,10 @@ export interface Profile {
   keepRecording?: boolean;
   rangeLow?: number;
   rangeHigh?: number;
+  /** The range check's wider reach (sung, but less steady or quiet) and when it was measured (ms). */
+  rangeReachLow?: number;
+  rangeReachHigh?: number;
+  rangeAt?: number;
   onboarded: boolean;
   leaderboardOptIn: boolean;
   choirCode?: string;
