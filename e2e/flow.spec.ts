@@ -67,6 +67,60 @@ test('score view: switch display, sing level 1 from sheet music, reach results',
   expect(errors).toEqual([]);
 });
 
+// Sheet music is the default at every level; on a laptop the score view is the full score.
+test('new singer: level 3 opens in score view, a 1280-wide screen shows every voice, a phone one staff', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/?simulate=perfect#/');
+  await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
+  await page.getByTestId('piece-row').first().click();
+  await page.getByRole('button', { name: /level 3/ }).first().click();
+  await expect(page.getByTestId('display-score')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('canvas[data-display="score"]')).toHaveCount(1);
+  await expect(page.getByTestId('staves-toggle')).toBeVisible();
+  await expect(page.getByTestId('howto')).toContainText('full score');
+  await page.getByTestId('start').click();
+  await expect.poll(async () => Number(await page.locator('canvas').getAttribute('data-staves')), { timeout: 10_000 }).toBeGreaterThanOrEqual(4);
+  await expect(page.locator('canvas')).toHaveAttribute('aria-label', /^Full score: S A T B, your part: /);
+  const ink = await page.locator('canvas').evaluate((cv: HTMLCanvasElement) => {
+    const d = cv.getContext('2d')!.getImageData(0, 0, cv.width, cv.height).data;
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 450) n++;
+    return n;
+  });
+  expect(ink).toBeGreaterThan(4000);
+
+  // Same singer on a phone: the single staff, no staff choice.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await expect(page.getByTestId('start')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('display-score')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('staves-toggle')).toHaveCount(0);
+  await page.getByTestId('start').click();
+  await expect.poll(async () => page.locator('canvas').getAttribute('data-staves'), { timeout: 10_000 }).toBe('1');
+  expect(errors).toEqual([]);
+});
+
+// Off book the full score must not give the part away: no accompaniment (the organ doubles the
+// alto), no words under the other voices.
+test('off book on a laptop: full score of the voices only', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/?simulate=perfect#/play/vierne-kyrie/P2/all?level=5&from=44&to=70');
+  await expect(page.getByTestId('start')).toBeVisible({ timeout: 20_000 });
+  await page.getByRole('button', { name: 'Test: all hidden' }).click();
+  await page.getByTestId('start').click();
+  await expect.poll(async () => page.locator('canvas').getAttribute('aria-label'), { timeout: 10_000 }).toBe('Full score: S A T B, your part: alto');
+  await expect(page.locator('canvas')).toHaveAttribute('data-staves', '4');
+  // The same run at level 3 adds the organ.
+  await page.goto('/?simulate=perfect#/play/vierne-kyrie/P2/all?level=3&from=44&to=70');
+  await page.getByTestId('start').click();
+  await expect.poll(async () => page.locator('canvas').getAttribute('aria-label'), { timeout: 10_000 }).toBe('Full score: S A T B + organ, your part: alto');
+  expect(errors).toEqual([]);
+});
+
 test('a flat simulated singer does not pass level 4', async ({ page }) => {
   await page.goto('/?simulate=flat#/');
   await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });

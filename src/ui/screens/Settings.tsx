@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { setLastRun } from '../play/runExport';
-import { useProfile, useStoreVersion, toast, daysUntil } from '../hooks';
+import { useProfile, useStoreVersion, toast, daysUntil, useWide } from '../hooks';
 import { nextRehearsal, WEEKDAYS } from '../../progress/rehearsal';
 import { getPiece } from '../library';
 import { go } from '../router';
@@ -13,6 +13,7 @@ import { IntroVideoButton } from '../components/IntroVideo';
 
 export function Settings() {
   const [profile, update] = useProfile();
+  const wide = useWide();
   useStoreVersion();
   const cycle = loadCycle();
   const [backupText, setBackupText] = useState('');
@@ -65,14 +66,29 @@ export function Settings() {
         <h2 className="eyebrow">Practice display</h2>
         <div className="seg" role="group" aria-label="Practice display" data-testid="settings-display">
           {([[undefined, 'Automatic'], ['score', 'Score'], ['highway', 'Highway']] as const).map(([d, label]) => (
-            <button key={label} aria-pressed={profile.display === d} onClick={() => update({ display: d })}>{label}</button>
+            <button key={label} aria-pressed={profile.display === d} onClick={() => update({ display: d, displayChosen: d !== undefined, scoreDefaultNote: false })}>{label}</button>
           ))}
         </div>
         <span className="small muted">
-          {profile.display === 'score' ? 'Your part as sheet music, with your voice drawn on the staff.'
-            : profile.display === 'highway' ? 'Your notes as bars moving towards a line, with your voice as a line.'
-              : 'Sheet music at levels 1 and 2, the note highway from level 3.'} You can also switch before each run.
+          {profile.display === 'highway' ? 'Your notes as bars moving towards a line, with your voice as a line.'
+            : `Your part as sheet music, with your voice drawn on the staff${profile.display ? '' : ' (the default at every level)'}.`} You can also switch before each run.
         </span>
+        {wide && profile.display !== 'highway' && (
+          <>
+            <span className="small" id="settings-staves-label">Sheet music on a wide screen (laptop, tablet in landscape) shows</span>
+            <div className="seg" role="group" aria-labelledby="settings-staves-label" data-testid="settings-staves">
+              {([[undefined, 'Automatic'], ['mine', 'My part'], ['voices', 'All voices'], ['all', '+ Accomp.']] as const).map(([d, label]) => (
+                <button key={label} aria-pressed={profile.scoreStaves === d} onClick={() => update({ scoreStaves: d })}>{label}</button>
+              ))}
+            </div>
+            <span className="small muted">
+              {profile.scoreStaves === 'mine' ? 'Only your part, large.'
+                : profile.scoreStaves === 'voices' ? 'The full score of the voices, your part highlighted.'
+                  : profile.scoreStaves === 'all' ? 'All voices and the piano or organ, your part highlighted (the accompaniment drops out if the screen is too small).'
+                    : 'All voices, plus the piano or organ when the score stays readable (up to 6 voices, a not-too-busy accompaniment).'}
+            </span>
+          </>
+        )}
       </section>
 
       <section className="col" style={{ gap: 8 }}>

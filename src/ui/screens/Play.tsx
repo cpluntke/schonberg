@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { Route } from '../router';
 import { go, back } from '../router';
 import { getPiece, noteRangeFor, singableSections } from '../library';
-import { useProfile } from '../hooks';
+import { useProfile, useWide } from '../hooks';
 import { LEVELS, LISTEN, MAX_LEVEL, OFF_BOOK_DAYS, effectiveTolerance, pieceReadiness } from '../../progress/ladder';
 import { shareMyProgress } from '../play/shareProgress';
 import { recordAttempt, getProgress, snapshotReadiness, personalBest, practiceDisplay } from '../../progress/store';
@@ -24,7 +24,8 @@ const GUIDE_LEARN_MAX_ABOVE = 150;
 import { setLastRun } from '../play/runExport';
 import { getBars, knownByHeart, provenOffBook, recordBars } from '../../progress/bars';
 import { drawHighway2D, pitchWindow, wordInitial, type DrawState } from '../play/highway2d';
-import { drawStaff2D } from '../play/staff2d';
+import { drawScoreView } from '../play/fullscore2d';
+import { defaultShow, hasOtherStaves, isFullScore } from '../play/fullscore';
 import { drawArcade, lanesFor, newFx } from '../play/arcade3d';
 import { setLastResult } from '../play/lastResult';
 import { IconBack, IconPause, IconPlay, IconRestart, IconStop } from '../icons';
@@ -151,6 +152,16 @@ function SingPlay({ route }: { route: PlayRoute }) {
   // 2D practice: sheet music or the note highway (the arcade is always 3D).
   const display = route.mode === '3d' ? 'highway' : practiceDisplay(profile, level);
   const showHowto = !!howtoSeen && !howtoSeen[display];
+  // Wide screens (laptop, tablet in landscape) show the full score: all voices, plus the
+  // accompaniment when it stays readable.
+  const wide = useWide();
+  const autoStaves = useMemo(() => (piece && part ? defaultShow(piece.score, part.id) : 'voices'), [piece, part]);
+  const staves = profile.scoreStaves ?? autoStaves;
+  const others = useMemo(() => (piece && part ? hasOtherStaves(piece.score, part.id) : { voices: false, accompaniment: false }), [piece, part]);
+  const fullScore = useMemo(() => wide && display === 'score' && !!piece && !!part && isFullScore(piece.score, part.id, staves),
+    [wide, display, piece, part, staves]);
+  /** Tapping what Automatic would show keeps Automatic (nothing is pinned). */
+  const pickStaves = (v: 'mine' | 'voices' | 'all') => updateProfile({ scoreStaves: v === autoStaves ? undefined : v });
   const singerIsHigh = profile.voice === 'S' || profile.voice === 'A';
   const partIsHigh = part ? part.voiceType === 'S' || part.voiceType === 'A' : singerIsHigh;
   // Singing a part written for the other voice range (e.g. a tenor practising the soprano line)
@@ -384,6 +395,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
         ghostParts,
         lo, hi, from: section.start, to: section.end,
         beatSec: s ? s.beatSec(Math.max(0, pos)) : 60 / tempoAt(piece.score.tempos, Math.max(0, pos)),
+        staves,
         hide: offBook ? (i: number) => {
           // Cold start: nothing of your part before the entry either (it would give the pitch away).
           if (cold && range && i < range[0]) return 'none';
@@ -395,7 +407,12 @@ function SingPlay({ route }: { route: PlayRoute }) {
         } : undefined,
       };
       if (route.mode === '3d') drawArcade(c, W, H, st, fxRef.current, (lanes ??= lanesFor(st)), ts / 1000);
-      else if (display === 'score') drawStaff2D(c, W, H, st);
+      else if (display === 'score') {
+        const info = drawScoreView(c, W, H, st);
+        const n = String(info.staves);
+        if (canvas.dataset.staves !== n) canvas.dataset.staves = n;
+        if (canvas.getAttribute('aria-label') !== info.label) canvas.setAttribute('aria-label', info.label);
+      }
       else drawHighway2D(c, W, H, st);
 
       if (ts - lastHud > 90) {
@@ -423,7 +440,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [piece, part, section, route.mode, notation, showNames, rate, tolerance, offBook, cold, display]);
+  }, [piece, part, section, route.mode, notation, showNames, rate, tolerance, offBook, cold, display, staves]);
 
   // Seen once a run starts with it on screen (switching display before Start shows the other one's).
   useEffect(() => {
@@ -482,7 +499,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
   const canToggleOwn = listenOnly || level <= 2;
 
   return (
-    <main className="play">
+    <main className={display === 'score' && route.mode === '2d' ? 'play play-score' : 'play'}>
       <h1 className="sr-only">{piece.title}: {part.name}, {section.label}</h1>
       <div className="play-hud">
         <button className="icon-btn" aria-label="Back" onClick={() => { sessionRef.current?.dispose(); leave(); }}><IconBack /></button>
@@ -501,7 +518,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
       </div>
 
       <div className="play-canvas-wrap" ref={wrapRef}>
-        <canvas ref={canvasRef} aria-label={display === 'score' ? 'Sheet music' : 'Note highway'} role="img" data-display={display} />
+        <canvas ref={canvasRef} aria-label={display === 'score' ? undefined : route.mode === '3d' ? 'Arcade' : 'Note highway'} role="img" data-display={display} />
         {hud.count > 0 && running && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
             <span style={{ fontSize: 96, fontWeight: 800, color: 'var(--accent)', textShadow: '0 0 24px #FF7A45' }}>{hud.count}</span>
@@ -547,13 +564,13 @@ function SingPlay({ route }: { route: PlayRoute }) {
                   <span className="tiny muted">Hold “Peek” to see the next bars for two seconds. Pass off book on {OFF_BOOK_DAYS} different days and the section is memorised.</span>
                 </div>
               )}
-              {route.mode === '2d' && !listenOnly && profile.scoreViewNews && display === 'highway' && (
-                <div className="col small" style={{ gap: 6, background: 'var(--bg-2)', borderRadius: 10, padding: '10px 12px' }} data-testid="score-news">
-                  <strong>New: sheet music view</strong>
-                  <span className="muted">See your part as real sheet music, with your voice drawn on the staff: just under a note means flat, just over means sharp.</span>
+              {route.mode === '2d' && !listenOnly && profile.scoreDefaultNote && display === 'score' && (
+                <div className="col small" style={{ gap: 6, background: 'var(--bg-2)', borderRadius: 10, padding: '10px 12px' }} data-testid="score-default-note">
+                  <strong>Sheet music is now the default</strong>
+                  <span className="muted">Your voice is drawn on the staff: just under a note means flat, just over means sharp. Prefer the moving bars? Switch to Highway any time, here or in Settings.</span>
                   <div className="row" style={{ gap: 8 }}>
-                    <button className="btn voice" onClick={() => updateProfile({ display: 'score', scoreViewNews: false })} data-testid="score-news-try">Try it</button>
-                    <button className="btn" onClick={() => updateProfile({ scoreViewNews: false })} data-testid="score-news-dismiss">No thanks</button>
+                    <button className="btn voice" onClick={() => updateProfile({ scoreDefaultNote: false })} data-testid="score-default-ok">Got it</button>
+                    <button className="btn" onClick={() => updateProfile({ display: 'highway', displayChosen: true, scoreDefaultNote: false })} data-testid="score-default-highway">Back to Highway</button>
                   </div>
                 </div>
               )}
@@ -561,9 +578,20 @@ function SingPlay({ route }: { route: PlayRoute }) {
                 <div className="col" style={{ gap: 4 }}>
                   <span className="tiny muted" id="display-label">Score / Highway <span style={{ opacity: 0.8 }}>(remembered)</span></span>
                   <div className="seg" role="group" aria-labelledby="display-label" data-testid="display-toggle">
-                    <button aria-pressed={display === 'score'} onClick={() => updateProfile({ display: 'score', scoreViewNews: false })} data-testid="display-score">Score</button>
-                    <button aria-pressed={display === 'highway'} onClick={() => updateProfile({ display: 'highway', scoreViewNews: false })} data-testid="display-highway">Highway</button>
+                    <button aria-pressed={display === 'score'} onClick={() => updateProfile({ display: 'score', displayChosen: true, scoreDefaultNote: false })} data-testid="display-score">Score</button>
+                    <button aria-pressed={display === 'highway'} onClick={() => updateProfile({ display: 'highway', displayChosen: true, scoreDefaultNote: false })} data-testid="display-highway">Highway</button>
                   </div>
+                </div>
+              )}
+              {route.mode === '2d' && wide && display === 'score' && (others.voices || others.accompaniment) && (
+                <div className="col" style={{ gap: 4 }}>
+                  <span className="tiny muted" id="staves-label">Show <span style={{ opacity: 0.8 }}>{profile.scoreStaves ? '(remembered)' : '(automatic)'}</span></span>
+                  <div className="seg" role="group" aria-labelledby="staves-label" data-testid="staves-toggle">
+                    <button aria-pressed={staves === 'mine' || (staves === 'voices' && !others.voices)} onClick={() => pickStaves('mine')}>My part</button>
+                    {others.voices && <button aria-pressed={staves === 'voices' || (staves === 'all' && !others.accompaniment)} onClick={() => pickStaves('voices')}>All voices</button>}
+                    {others.accompaniment && <button aria-pressed={staves === 'all'} onClick={() => pickStaves('all')} data-testid="staves-all">{others.voices ? '+ Accomp.' : 'With accomp.'}</button>}
+                  </div>
+                  {offBook && staves !== 'mine' && <span className="tiny muted">Off book the full score shows the other voices without their words or the accompaniment, so nothing gives your part away.</span>}
                 </div>
               )}
               {level === 1 && (
@@ -577,9 +605,11 @@ function SingPlay({ route }: { route: PlayRoute }) {
                   <strong>How to read the screen</strong>
                   {display === 'score' ? (
                     <>
-                      <span>Your part as sheet music. The white line moves through the bar: sing the note it's on (it glows <span style={{ color: 'var(--accent)' }}>orange</span>).</span>
+                      {fullScore
+                        ? <span>The full score: your part is the staff with the <span style={{ color: 'var(--voice)' }}>blue</span> band, the other voices are drawn plainly. The white line moves through the bars: sing the note it's on in your staff (it glows <span style={{ color: 'var(--accent)' }}>orange</span>).</span>
+                        : <span>Your part as sheet music. The white line moves through the bar: sing the note it's on (it glows <span style={{ color: 'var(--accent)' }}>orange</span>).</span>}
                       <span><span style={{ color: 'var(--voice)' }}>━</span> Your voice draws a blue line at its exact height on the staff: just under the note means flat, just over means sharp (light orange when out of tune).</span>
-                      <span>Notes turn <span style={{ color: 'var(--voice)' }}>blue</span> when sung well, <span style={{ color: '#F2D15C' }}>yellow</span> when close, <span style={{ color: '#FF5D73' }}>red</span> when missed. The bubble shows how many cents sharp (+) or flat (−) you are.</span>
+                      <span>Notes turn <span style={{ color: 'var(--voice)' }}>blue</span> when sung well, <span style={{ color: '#F2D15C' }}>yellow</span> when close, <span style={{ color: '#FF5D73' }}>red</span> when missed. The bubble shows how many cents sharp (+) or flat (−) you are. Prefer moving bars? Choose Highway above.</span>
                     </>
                   ) : (
                     <>
@@ -737,3 +767,4 @@ export function lyricLine(notes: { lyric?: string; syllabic?: string }[], idx: n
 function emptyResult(): AttemptResult {
   return { accuracy: 0, pitch: 0, rhythm: 0, score: 0, maxCombo: 0, counts: { perfect: 0, good: 0, ok: 0, miss: 0 }, notes: [], perMeasure: {}, insights: [] };
 }
+

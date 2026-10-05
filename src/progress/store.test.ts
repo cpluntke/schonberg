@@ -18,35 +18,82 @@ const at = (y: number, m: number, d: number, h = 12) => new Date(y, m - 1, d, h)
 
 beforeEach(() => { localStorage.clear(); _resetAllForTests(); });
 
-describe('practice display migration', () => {
-  it('singers who practised before the score view keep the highway, once, with the news card', () => {
-    recordAttempt('p', 'S', 'a', 1, res(0.9), 30);
-    // A profile saved before the migration existed:
-    localStorage.setItem('sh:profile', JSON.stringify({ ...DEFAULT_PROFILE, onboarded: true }));
-    const p = loadProfile();
-    expect(p).toMatchObject({ display: 'highway', scoreViewNews: true, displayMigrated: true });
-    expect(practiceDisplay(p, 1)).toBe('highway');
-    // Choosing Automatic later sticks (the migration doesn't run again).
-    saveProfile({ ...p, display: undefined, scoreViewNews: false });
-    expect(loadProfile().display).toBeUndefined();
-    expect(practiceDisplay(loadProfile(), 1)).toBe('score');
+describe('practice display: sheet music by default', () => {
+  const v1 = { ...DEFAULT_PROFILE, onboarded: true, displayMigrated: true };
+
+  it('Automatic is sheet music at every level', () => {
+    expect(practiceDisplay({}, 0)).toBe('score');
+    expect(practiceDisplay({}, 3)).toBe('score');
+    expect(practiceDisplay({}, 5)).toBe('score');
+    expect(practiceDisplay({ display: 'highway' }, 1)).toBe('highway');
   });
 
-  it('new singers keep Automatic (score at levels 1–2)', () => {
+  it('a highway set by the first migration (card never answered) goes back to Automatic, with a note', () => {
+    recordAttempt('p', 'S', 'a', 1, res(0.9), 30);
+    localStorage.setItem('sh:profile', JSON.stringify({ ...v1, display: 'highway', scoreViewNews: true }));
+    const p = loadProfile();
+    expect(p.display).toBeUndefined();
+    expect(p.scoreDefaultNote).toBe(true);
+    expect(p.scoreViewNews).toBeUndefined();
+    expect(practiceDisplay(p, 4)).toBe('score');
+    // Once only: picking the highway afterwards sticks.
+    saveProfile({ ...p, display: 'highway', displayChosen: true, scoreDefaultNote: false });
+    expect(loadProfile().display).toBe('highway');
+  });
+
+  it('a highway the singer chose stays (toggle, Settings or "No thanks" on the old card)', () => {
+    recordAttempt('p', 'S', 'a', 3, res(0.9), 30);
+    localStorage.setItem('sh:profile', JSON.stringify({ ...v1, display: 'highway', scoreViewNews: false }));
+    expect(loadProfile()).toMatchObject({ display: 'highway', displayChosen: true });
+    expect(loadProfile().scoreDefaultNote).toBeFalsy();
+    _resetAllForTests();
+    localStorage.clear();
+    // A newer singer who picked the highway (no card ever) keeps it too.
+    localStorage.setItem('sh:profile', JSON.stringify({ ...v1, display: 'highway' }));
+    expect(loadProfile()).toMatchObject({ display: 'highway', displayChosen: true });
+    _resetAllForTests();
+    localStorage.clear();
+    // Recorded as chosen: kept even with a stale card flag.
+    localStorage.setItem('sh:profile', JSON.stringify({ ...v1, display: 'highway', displayChosen: true, scoreViewNews: true }));
+    expect(loadProfile().display).toBe('highway');
+  });
+
+  it('singers who got the highway automatically (level 3+, or before the score view) get the note once', () => {
+    recordAttempt('p', 'S', 'a', 3, res(0.9), 30);
+    localStorage.setItem('sh:profile', JSON.stringify({ ...v1 }));
+    expect(loadProfile()).toMatchObject({ scoreDefaultNote: true, scoreDefaultMigrated: true });
+    expect(loadProfile().display).toBeUndefined();
+    _resetAllForTests();
+    localStorage.clear();
+    // Practised before the score view existed (no migration yet).
+    recordAttempt('p', 'S', 'a', 1, res(0.9), 30);
+    localStorage.setItem('sh:profile', JSON.stringify({ ...DEFAULT_PROFILE, onboarded: true }));
+    const p = loadProfile();
+    expect(p.display).toBeUndefined();
+    expect(p.scoreDefaultNote).toBe(true);
+    expect(p.displayMigrated).toBe(true);
+  });
+
+  it('new singers and level 1-2 singers on Automatic just get sheet music, no note', () => {
     saveProfile({ ...DEFAULT_PROFILE, onboarded: true });
     const p = loadProfile();
     expect(p.display).toBeUndefined();
-    expect(p.scoreViewNews).toBeFalsy();
-    expect(p.displayMigrated).toBe(true);
-    recordAttempt('p', 'S', 'a', 1, res(0.9), 30);
-    expect(loadProfile().display).toBeUndefined();
+    expect(p.scoreDefaultNote).toBeFalsy();
+    expect(p.scoreDefaultMigrated).toBe(true);
+    recordAttempt('p', 'S', 'a', 3, res(0.9), 30);
+    expect(loadProfile().scoreDefaultNote).toBeFalsy(); // the migration doesn't run again
+    _resetAllForTests();
+    localStorage.clear();
+    recordAttempt('p', 'S', 'a', 2, res(0.9), 30);
+    localStorage.setItem('sh:profile', JSON.stringify({ ...v1 }));
+    expect(loadProfile().scoreDefaultNote).toBeFalsy();
   });
 
-  it('an explicit choice is kept', () => {
+  it('an explicit score choice is kept', () => {
     recordAttempt('p', 'S', 'a', 1, res(0.9), 30);
-    localStorage.setItem('sh:profile', JSON.stringify({ ...DEFAULT_PROFILE, onboarded: true, display: 'score' }));
+    localStorage.setItem('sh:profile', JSON.stringify({ ...v1, display: 'score' }));
     expect(loadProfile()).toMatchObject({ display: 'score' });
-    expect(loadProfile().scoreViewNews).toBeFalsy();
+    expect(loadProfile().scoreDefaultNote).toBeFalsy();
   });
 });
 

@@ -53,3 +53,17 @@ export function initials(s: string): string {
   if (!w.length) return '♪';
   return (w[0][0] + (w.length > 1 ? w[w.length - 1][0] : '')).toUpperCase();
 }
+
+/** Wide screen (laptop, tablet in landscape): the play screen uses the width for the full score. */
+export function useWide(): boolean {
+  const q = '(min-width: 900px)';
+  const [wide, setWide] = useState(() => typeof matchMedia === 'function' && matchMedia(q).matches);
+  useEffect(() => {
+    if (typeof matchMedia !== 'function') return;
+    const m = matchMedia(q);
+    const on = () => setWide(m.matches);
+    m.addEventListener?.('change', on);
+    return () => m.removeEventListener?.('change', on);
+  }, []);
+  return wide;
+}

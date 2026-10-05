@@ -30,6 +30,8 @@ export interface DrawState {
    * Notes already sung are always shown (with their grade), as feedback.
    */
   hide?: (i: number) => 'show' | 'letters' | 'none';
+  /** Score view on a wide screen: your staff only, all voices, or all voices + accompaniment. */
+  staves?: 'mine' | 'voices' | 'all';
 }
 
 /** First letter of the word a syllable starts ("" for a syllable inside a word). */

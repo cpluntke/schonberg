@@ -93,7 +93,7 @@ export function App() {
   }
 
   return (
-    <div className="app">
+    <div className={route.name === 'play' ? 'app app-play' : 'app'}>
       <ErrorBoundary resetKey={JSON.stringify(route)}>{body}</ErrorBoundary>
       <UpdatePrompt hidden={route.name === 'play'} />
       {showNav && (

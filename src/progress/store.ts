@@ -48,19 +48,55 @@ export interface Profile {
   /** Share per-bar progress with the section lead (opt-in). */
   shareProgress?: boolean;
   /**
-   * Practice screen (2D): the note highway or sheet music. Unset = not chosen yet: sheet music at
-   * levels 1–2, the highway from level 3.
+   * Practice screen (2D): the note highway or sheet music. Unset = Automatic: sheet music at every
+   * level.
    */
   display?: 'highway' | 'score';
-  /** The one-time display migration ran (singers who practised before the score view keep the highway). */
+  /** The singer picked the display themselves (before a run or in Settings): no migration changes it. */
+  displayChosen?: boolean;
+  /** The first display migration ran (it gave singers who practised before the score view the highway). */
   displayMigrated?: boolean;
-  /** Show the one-time "New: sheet music view" card on the practice screen. */
+  /** Obsolete: the "New: sheet music view" card (cleared by the score-by-default migration). */
   scoreViewNews?: boolean;
+  /** The score-by-default migration ran. */
+  scoreDefaultMigrated?: boolean;
+  /** Show the one-time note "Sheet music is now the default" on the practice screen. */
+  scoreDefaultNote?: boolean;
+  /**
+   * Score view on a wide screen (laptop, tablet in landscape): your part only, all voices, or all
+   * voices + accompaniment. Unset = all voices + accompaniment when that stays readable.
+   */
+  scoreStaves?: 'mine' | 'voices' | 'all';
 }
 
-/** The practice display to use at a level (the singer's choice, else score at levels 0–2). */
-export function practiceDisplay(p: Pick<Profile, 'display'>, level: number): 'highway' | 'score' {
-  return p.display ?? (level <= 2 ? 'score' : 'highway');
+/** The practice display (the singer's choice, else sheet music at every level). */
+export function practiceDisplay(p: Pick<Profile, 'display'>, _level?: number): 'highway' | 'score' {
+  return p.display ?? 'score';
+}
+
+/**
+ * Sheet music became the default at every level. Singers whose highway was set for them (by the
+ * first migration, its card never answered) go back to Automatic; anyone who used to get the
+ * highway automatically gets a one-time note. A highway the singer chose stays.
+ */
+function migrateScoreDefault(p: Partial<Profile>, log: () => AttemptLog[]): void {
+  const v1 = !!p.displayMigrated;
+  p.displayMigrated = true;
+  p.scoreDefaultMigrated = true;
+  if (p.display === 'highway' && !p.displayChosen) {
+    // The first migration set the highway together with its card; picking a display (or "No
+    // thanks" on the card) cleared the card. A highway with the card still pending wasn't chosen.
+    if (v1 && p.scoreViewNews === true) {
+      delete p.display;
+      p.scoreDefaultNote = true;
+    } else p.displayChosen = true;
+  } else if (p.display === undefined) {
+    const entries = log();
+    // Before the score view everyone practised on the highway; after it, Automatic meant the
+    // highway from level 3.
+    if (entries.length && (!v1 || entries.some((e) => e.level >= 3))) p.scoreDefaultNote = true;
+  }
+  delete p.scoreViewNews;
 }
 
 export interface SectionProgress {
@@ -248,14 +284,9 @@ export function loadProfile(): Profile {
   // Delays saved before the source was recorded may have been measured or learned: treat them as
   // learned (kept, refined when two runs agree, never used to fail a run on timing).
   if (typeof p.latencyMs === 'number' && p.latencyMs > 0 && !p.latencySource) p.latencySource = 'learned';
-  // Once: singers who already practised (before the score view existed) keep the highway they know,
-  // and get a card offering the new view. New singers keep Automatic (sheet music at levels 1–2).
-  if (p.onboarded && !p.displayMigrated) {
-    p.displayMigrated = true;
-    if (p.display === undefined && attemptLog().length > 0) {
-      p.display = 'highway';
-      p.scoreViewNews = true;
-    }
+  // Once: sheet music is the default (see migrateScoreDefault).
+  if (p.onboarded && !p.scoreDefaultMigrated) {
+    migrateScoreDefault(p, attemptLog);
     writeJSON(K.profile, p, false);
   }
   return { ...DEFAULT_PROFILE, ...p };
