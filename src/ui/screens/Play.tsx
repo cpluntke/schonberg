@@ -35,6 +35,7 @@ import { setLastResult } from '../play/lastResult';
 import { IconBack, IconPause, IconPlay, IconRestart, IconStop } from '../icons';
 import type { AttemptResult } from '../../game/types';
 import type { NotationMode } from '../../game/notation';
+import { NotFound } from '../components/NotFound';
 
 type PlayRoute = Extract<Route, { name: 'play' }>;
 
@@ -497,14 +498,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
     };
   }, []);
 
-  if (!piece || !part || !section) {
-    return (
-      <main className="screen">
-        <div className="topbar"><button className="icon-btn" aria-label="Back" onClick={() => back()}><IconBack /></button><h1>Not found</h1></div>
-        <p className="muted">This section couldn't be found. It may have been deleted.</p>
-      </main>
-    );
-  }
+  if (!piece || !part || !section) return <NotFound pieceId={route.pieceId} />;
 
   const lyricNotes = offBook && hiddenRef.current.size
     ? part.notes.map((n, i) => (i <= hud.lyricIdx || !hiddenRef.current.has(n.measure) ? n
@@ -557,8 +551,11 @@ function SingPlay({ route }: { route: PlayRoute }) {
       <div className="play-canvas-wrap" ref={wrapRef}>
         <canvas ref={canvasRef} aria-label={display === 'score' ? undefined : route.mode === '3d' ? 'Arcade' : 'Note highway'} role="img" data-display={display} />
         {hud.count > 0 && running && (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
             <span style={{ fontSize: 96, fontWeight: 800, color: 'var(--accent)', textShadow: '0 0 24px #FF7A45' }}>{hud.count}</span>
+            {sessionRef.current?.resumed && (
+              <span className="small" data-testid="resume-hint" style={{ background: 'rgba(11,13,26,0.85)', borderRadius: 8, padding: '4px 10px' }}>Carry on singing from the line</span>
+            )}
           </div>
         )}
         {phase === 'ready' && (

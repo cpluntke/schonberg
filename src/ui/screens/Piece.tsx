@@ -13,6 +13,7 @@ import { getBars } from '../../progress/bars';
 import { startColdStart } from '../play/cold';
 import { getWords } from '../../progress/words';
 import { STAGE_NAMES } from '../../game/textrhythm';
+import { NotFound } from '../components/NotFound';
 
 /** First few words of the lyric in a section, to recognise the phrase. */
 function snippet(part: { notes: { start: number; lyric?: string; syllabic?: string }[] }, from: number, to: number): string {
@@ -44,14 +45,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({ title: piece?.title ?? '', composer: piece?.composer ?? '' });
 
-  if (!piece) {
-    return (
-      <main className="screen">
-        <div className="topbar"><button className="icon-btn" aria-label="Back" onClick={() => back()}><IconBack /></button><h1>Not found</h1></div>
-        <p className="muted">This piece isn't on this device any more.</p>
-      </main>
-    );
-  }
+  if (!piece) return <NotFound pieceId={pieceId} what="piece" />;
   const vocalParts = piece.score.parts.filter((p) => p.notes.length > 0);
   const part = piece.score.parts.find((p) => p.id === partId) ?? vocalParts[0];
   const sections = part ? singableSections(piece, part.id) : [];
@@ -147,7 +141,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
         )}
         {next && !(next.kind === 'full' && r.unconfirmed > 0) && <span className="tiny muted" style={{ marginTop: -6 }}>{next.reason}</span>}
         <button className="btn ghost small" onClick={() => setShowHelp(!showHelp)} aria-expanded={showHelp}>
-          {showHelp ? 'Hide' : 'How'} the levels work
+          {showHelp ? 'Hide how the levels work' : 'How the levels work'}
         </button>
         {showHelp && (
           <div className="col" style={{ gap: 8 }}>

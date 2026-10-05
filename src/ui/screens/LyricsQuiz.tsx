@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { getPiece, useLibrary } from '../library';
-import { back } from '../router';
+import { back, go } from '../router';
 import { IconBack, IconCheck, IconRestart } from '../icons';
 import { track } from '../../progress/metrics';
+import { missingText } from '../components/NotFound';
 import {
   lyricLines, makeQuiz, hasLyrics, loadQuizStats, recordAnswer, recordRound, type QuizQuestion, type QuizKind,
 } from '../../game/lyrics';
@@ -95,7 +96,8 @@ export function LyricsQuiz({ pieceId, partId }: { pieceId: string; partId: strin
 
   if (!piece) {
     if (!lib.ready) return <Shell title="Lyrics quiz" onBack={goBack}><p className="muted" role="status">Loading the piece…</p></Shell>;
-    return <Shell title="Not found" onBack={goBack}><p className="muted">This piece isn't on this device any more.</p></Shell>;
+    return <Shell title="Not found" onBack={goBack}><p className="muted">{missingText(pieceId, 'piece')}</p>
+      <button className="btn primary block" onClick={() => go({ name: 'home' }, true)}>Home</button></Shell>;
   }
   const sub = `${piece.title}${part ? ` · ${part.name}` : ''}`;
   if (!part) {

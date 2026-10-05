@@ -12,6 +12,7 @@ import { IconBack, IconPause, IconPlay, IconRestart, IconStop } from '../icons';
 import { STAGE_NAMES, scoreWords, syllableOnsets, syllableOnsetsWithLevels, syllablesOf, type Syllable, type WordsResult, type WordsStage } from '../../game/textrhythm';
 import { getWords, recordWords } from '../../progress/words';
 import type { AttemptResult } from '../../game/types';
+import { NotFound } from '../components/NotFound';
 
 type PlayRoute = Extract<Route, { name: 'play' }>;
 
@@ -171,14 +172,7 @@ export function WordsPlay({ route }: { route: PlayRoute }) {
     return () => document.removeEventListener('visibilitychange', onVis);
   }, []);
 
-  if (!piece || !part || !section) {
-    return (
-      <main className="screen">
-        <div className="topbar"><button className="icon-btn" aria-label="Back" onClick={() => back()}><IconBack /></button><h1>Not found</h1></div>
-        <p className="muted">This section couldn't be found.</p>
-      </main>
-    );
-  }
+  if (!piece || !part || !section) return <NotFound pieceId={route.pieceId} />;
   const shown = part.notes.map((n, i) => (i <= lyricIdx || stage === 0 ? n
     : { ...n, lyric: stage === 1 ? wordInitial(n) || undefined : undefined, syllabic: 'single' as const }));
   const lyric = lyricLine(shown, lyricIdx, range);
