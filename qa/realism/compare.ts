@@ -152,7 +152,7 @@ export function fidelityPair(setups: RunSetup[], latencyMs: number): { before: F
 /** Oracle (true f0, true latency) through each pipeline's plain scorer. */
 export function oracle(setup: RunSetup): { before: AttemptResult; after: AttemptResult } {
   const L = levelSetup(setup.level);
-  const opts = { toleranceCents: L.toleranceCents, tuning: 'equal' as const, octaveTolerant: false };
+  const opts = { toleranceCents: L.toleranceCents, tuning: 'equal' as const, octaveTolerant: false, rate: setup.take.rate };
   const s = oracleSamples(setup.take, { latencyMs: setup.take.trueLatencyMs, from: setup.from });
   return { before: headScoreAttempt(setup.ctx, s, opts) as unknown as AttemptResult, after: curScoreAttempt(setup.ctx, s, opts) };
 }

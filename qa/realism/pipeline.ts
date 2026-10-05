@@ -15,7 +15,7 @@ import { fixSubharmonic, windowFor } from '../../src/audio/pitch';
 import type { Part } from '../../src/music/types';
 import { scoreAttempt as headScoreAttempt } from './baseline/scoring';
 import { bubbleStats, lossBreakdown, type BubbleStats, type LossBreakdown } from './fidelity';
-import { avgCents, emulateLatencyLearn, gradeLetter, levelSetup, readingsToSamples, type Scorer } from './harness';
+import { avgCents, emulateLatencyLearn, gradeLetter, letterFor, levelSetup, readingsToSamples, type Scorer } from './harness';
 import { hashSeed } from './prng';
 import type { RenderedTake } from './singer';
 import { PITCH_CURRENT, PITCH_HEAD, trackOffline, type PitchImpl, type TrackReading } from './tracker';
@@ -179,7 +179,7 @@ export function runSession(spec: PipelineSpec, setup: RunSetup, profile: Profile
   const { take, part, ctx, level } = setup;
   const L = levelSetup(level);
   const rate = take.rate;
-  const opts: ScoringOptions = setup.scoring ?? { toleranceCents: L.toleranceCents, tuning: 'equal', octaveTolerant: false };
+  const opts: ScoringOptions = setup.scoring ?? { toleranceCents: L.toleranceCents, tuning: 'equal', octaveTolerant: false, rate: take.rate };
   const latencyUsed = profile.latencyMs > 0 ? profile.latencyMs : spec.estimateMs;
   // The app stops listening min(700, latency + 120) ms after the player ends.
   const stopSec = (setup.to - take.scoreTimeAtSample0) / rate + Math.min(0.7, latencyUsed / 1000 + 0.12);
@@ -265,9 +265,9 @@ export function runSession(spec: PipelineSpec, setup: RunSetup, profile: Profile
   });
 
   return {
-    pipeline: spec.id, latencyUsedMs: latencyUsed, windowN: N, result, plain, letter: gradeLetter(result.accuracy), passed,
+    pipeline: spec.id, latencyUsedMs: latencyUsed, windowN: N, result, plain, letter: after ? letterFor(level, result) : gradeLetter(result.accuracy), passed,
     timingFailMs, alignedMs, match, learnedMs: next.latencyMs !== profile.latencyMs ? next.latencyMs : null,
     medianOnsetMs: medOnset, avgCents: avgCents(result), insights: result.insights.map((i) => i.kind), profile: next,
-    samples, readings, loss: lossBreakdown(part, result, samples, L.toleranceCents), bubble,
+    samples, readings, loss: lossBreakdown(part, result, samples, L.toleranceCents, 0.18 * rate), bubble,
   };
 }

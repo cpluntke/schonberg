@@ -190,7 +190,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
         listenOnly,
         cue: route.sectionId === 'entries' || route.sectionId === 'cold' ? 'none' : spec?.cue ?? 'note',
         leadFrom: route.sectionId === 'cold' ? coldLeadFrom(piece.score, section.start) : undefined,
-        scoring: { toleranceCents: tolerance, tuning: profile.tuning, octaveTolerant },
+        scoring: { toleranceCents: tolerance, tuning: profile.tuning, octaveTolerant, rate },
         latencyMs: profile.latencyMs || 0,
         range,
         // Tenors and basses (or anyone whose range reaches low) keep the long analysis window.

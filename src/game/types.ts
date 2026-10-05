@@ -29,6 +29,11 @@ export interface ScoringOptions {
    * on the note counts as in tune. Default 0.18 (one cycle at ~5.5 Hz); 0 disables.
    */
   vibratoWindow?: number;
+  /**
+   * Tempo factor of the run (level 1: 0.7). Vibrato happens in real time, so the smoothing window
+   * in score seconds is vibratoWindow × rate: one vibrato cycle whatever the tempo. Default 1.
+   */
+  rate?: number;
 }
 
 export interface NoteResult {
@@ -60,10 +65,11 @@ export interface NoteResult {
    */
   unsure?: 'short' | 'range';
   /**
-   * An unsure note graded below "good" that the tracker still heard clearly wrong: 'silent' = no
-   * voice at all inside the written note; 'off' = graded miss, with enough of the note's own readings
-   * to judge it (shortNoteDev) and their median at least CLEAR_OFF_TOL tolerances off (but within
-   * 6 semitones: further off is the tracker locking onto a fraction of the pitch).
+   * An unsure note graded below "good" that was still clearly wrong: 'silent' = no sound at all
+   * inside the written note (no voiced reading, every reading below the silence level; either kind
+   * of unsure note); 'off' = a very short note graded miss, with enough of its own readings to judge
+   * it (shortNoteDev) and their median at least CLEAR_OFF_TOL tolerances off (but within 6
+   * semitones: further off is the tracker locking onto a fraction of the pitch).
    */
   clearly?: 'off' | 'silent';
 }

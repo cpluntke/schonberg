@@ -2,8 +2,8 @@
 // scorer can't judge reliably (NoteResult.unsure) are forgiven below "good", unless the tracker
 // clearly heard them wrong (NoteResult.clearly).
 import { beforeEach, describe, expect, it } from 'vitest';
-import { TRACKER_HIGH_HZ, TRACKER_LOW_HZ, scoreAttempt, type ScoringContext } from '../game/scoring';
-import { MAX_HZ, MIN_HZ } from '../audio/pitch';
+import { SILENCE_RMS, TRACKER_HIGH_HZ, TRACKER_LOW_HZ, scoreAttempt, type ScoringContext } from '../game/scoring';
+import { MAX_HZ, MIN_HZ, RMS_GATE } from '../audio/pitch';
 import { makePart, makeScore, sampleSinging } from '../game/testutil';
 import type { AttemptResult, Grade, NoteResult, ScoringOptions } from '../game/types';
 import type { Section } from '../music/types';
@@ -133,9 +133,17 @@ describe('level 1: what the scorer can’t judge reliably', () => {
     expect([TRACKER_LOW_HZ, TRACKER_HIGH_HZ]).toEqual([MIN_HZ, MAX_HZ]);
     const deep = makePart('B', [[33, 1], [45, 1]], 60); // A1 (55 Hz), A2
     const c: ScoringContext = { score: makeScore([deep], 60), part: deep, range: [0, 1] };
-    const r = scoreAttempt(c, sampleSinging(deep, () => null), L1);
+    expect(SILENCE_RMS).toBe(RMS_GATE);
+    // Sung (there is sound), but the tracker can't read a pitch that low: forgiven.
+    const heard = sampleSinging(deep, () => null).map((x) => (x.time < 1 ? { ...x, rms: 0.08, clarity: 0.4 } : x));
+    const r = scoreAttempt(c, heard, L1);
     expect(r.notes.map((n) => n.unsure ?? null)).toEqual(['range', null]);
+    expect(r.notes[0].clearly).toBeUndefined();
     expect(r.notes.map(noteVerdict)).toEqual(['forgiven', 'wrong']);
+    // Not sung at all (silence): that fails, like any note not sung.
+    const silent = scoreAttempt(c, sampleSinging(deep, () => null), L1);
+    expect(silent.notes[0]).toMatchObject({ unsure: 'range', clearly: 'silent' });
+    expect(noteVerdict(silent.notes[0])).toBe('wrong');
   });
 
   it('a note tied over the end of the section is judged on the part before the end', () => {

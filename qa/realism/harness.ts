@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import type { AttemptResult, PitchSample, ScoringOptions, TuningMode } from '../../src/game/types';
 import type { ScoringContext } from '../../src/game/scoring';
 import { scoreAttempt as scoreCurrent } from '../../src/game/scoring';
-import { LEVELS, effectiveTolerance, type Strictness } from '../../src/progress/ladder';
+import { LEVELS, attemptPasses, effectiveTolerance, levelSpec, wrongNotes, type Strictness } from '../../src/progress/ladder';
 import { scoreAttempt as scoreHead } from './baseline/scoring';
 import { loadPiece, noteRangeFor } from './scores';
 import { trackOffline, type TrackOptions, type TrackReading } from './tracker';
@@ -57,13 +57,18 @@ export function levelSetup(level: number, strictness: Strictness = 'standard'): 
   return { level: spec.level, rate: spec.rate, toleranceCents: effectiveTolerance(spec.level, strictness), pass: spec.pass, guide: spec.guide };
 }
 
-/** Results.tsx gradeLetter. */
-export function gradeLetter(acc: number): string {
-  if (acc >= 0.95) return 'S';
-  if (acc >= 0.85) return 'A';
-  if (acc >= 0.7) return 'B';
-  if (acc >= 0.5) return 'C';
-  return 'D';
+/**
+ * Results.tsx gradeLetter: from accuracy, but at an every-note level (level 1) a run with a wrong
+ * note shows at most a B, so the letter never reads as a pass next to "Not yet".
+ */
+export function gradeLetter(acc: number, wrongAtEveryNote = false): string {
+  const l = acc >= 0.95 ? 'S' : acc >= 0.85 ? 'A' : acc >= 0.7 ? 'B' : acc >= 0.5 ? 'C' : 'D';
+  return wrongAtEveryNote && (l === 'S' || l === 'A') ? 'B' : l;
+}
+
+/** The letter Results shows for `result` at `level`. */
+export function letterFor(level: number, result: AttemptResult): string {
+  return gradeLetter(result.accuracy, levelSpec(level).everyNote && wrongNotes(result).length > 0);
 }
 
 /** Results.tsx "avg ±N¢" (median of per-note cents within ±100). */
@@ -127,8 +132,8 @@ export interface ScoreOptions {
   samples?: PitchSample[];
 }
 
-function passOf(level: number | undefined, acc: number): boolean | null {
-  return level && level >= 1 && level <= 4 ? acc >= LEVELS[level - 1].pass : null;
+function passOf(level: number | undefined, result: AttemptResult): boolean | null {
+  return level && level >= 1 && level <= 5 ? attemptPasses(level, result) : null;
 }
 
 /** Track + score mono PCM described by a sidecar. */
@@ -142,14 +147,14 @@ export async function scorePcm(pcm: Float32Array, sc: Sidecar, o: ScoreOptions =
   const readings = o.samples ? [] : trackOffline(pcm, sc.sampleRate, { untilSec: o.untilSec, windowN: sc.windowN, ...o.track });
   const samples = o.samples ?? readingsToSamples(readings, sc);
   const ctx: ScoringContext = { score: piece.score, part, range, end: sc.to };
-  const opts: ScoringOptions = { toleranceCents: sc.toleranceCents, tuning: sc.tuning, octaveTolerant: sc.octaveTolerant };
+  const opts: ScoringOptions = { toleranceCents: sc.toleranceCents, tuning: sc.tuning, octaveTolerant: sc.octaveTolerant, rate: sc.rate };
   const result = scorer(ctx, samples, opts);
   const out: Scored = {
-    result, letter: gradeLetter(result.accuracy), passed: passOf(sc.level, result.accuracy), avgCents: avgCents(result), range, samples, readings,
+    result, letter: sc.level ? letterFor(sc.level, result) : gradeLetter(result.accuracy), passed: passOf(sc.level, result), avgCents: avgCents(result), range, samples, readings,
   };
   if (o.uncalibrated) {
     const l = emulateLatencyLearn(ctx, result, samples, sc.rate, sc.latencyMs, opts, scorer);
-    if (l) out.learned = { latencyMs: l.latencyMs, result: l.result, letter: gradeLetter(l.result.accuracy), passed: passOf(sc.level, l.result.accuracy) };
+    if (l) out.learned = { latencyMs: l.latencyMs, result: l.result, letter: sc.level ? letterFor(sc.level, l.result) : gradeLetter(l.result.accuracy), passed: passOf(sc.level, l.result) };
   }
   return out;
 }
@@ -225,6 +230,6 @@ export async function scoreRecordingApp(wavPath: string, sidecar: Sidecar | stri
   const profile = sc.calibrated ? measured(sc.latencyMs) : { latencyMs: sc.latencyMs };
   return runSession(AFTER, {
     take, part, ctx: { score: piece.score, part, range, end: sc.to }, from: sc.from, to: sc.to, level: sc.level ?? 1, microSeed: 1, windowN: sc.windowN,
-    scoring: { toleranceCents: sc.toleranceCents, tuning: sc.tuning, octaveTolerant: sc.octaveTolerant },
+    scoring: { toleranceCents: sc.toleranceCents, tuning: sc.tuning, octaveTolerant: sc.octaveTolerant, rate: sc.rate },
   }, profile);
 }

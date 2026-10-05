@@ -254,6 +254,19 @@ export function writeCurrentReport(): boolean {
   const l1 = read('l1-doo');
   const l1adv = read('l1-doo-adv');
   if (l1 || l1adv) l1Section(L, l1 ?? [], l1adv);
+  const vib = read('vibrato');
+  if (vib) {
+    L.push('## 9. Wide vibrato at level 1, and wrong notes at every level (current app)');
+    L.push('');
+    L.push(`Every vocal part × section of the library (warm-up and choir library), sung on “doo” at the level's tempo with a vibrato centred on every note (5.5 Hz real time unless noted, from 0.15 s into the note, random phase). Pitch-level readings every 20 ms real, no audio, so the question is the scorer's smoothing alone. Before = the scorer at \`${vib.baseRef ?? '–'}\` (vibrato window 0.18 score s at every tempo), after = the window follows the tempo (0.18 s real). Sections passing level 1 (every note right):`);
+    L.push('');
+    L.push(table(['singer', 'sections', 'before', 'after'], vib.good.map((r: Any) => [r.singer, r.sections, r.before ?? '–', r.after])));
+    L.push('');
+    L.push('**Wrong notes, with a ±40¢ vibrato** (only the sections where the singer sings a wrong note; sections passing; levels 2–5 judge by percentage, so a single wrong note passes there by design):');
+    L.push('');
+    L.push(table(['singer', 'level', 'sections', 'before', 'after'], vib.wrong.map((r: Any) => [r.singer, r.level, r.sections, r.before ?? '–', r.after])));
+    L.push('');
+  }
   writeFileSync(resolve(ROOT, 'docs/qa/realism-current.md'), L.join('\n'));
   return true;
 }

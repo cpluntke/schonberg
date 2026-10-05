@@ -1,19 +1,14 @@
 {
  "meta": {
-  "head": "dec6845",
+  "head": "cdc3a69",
   "dirty": [
    "rc/game/scoring.ts",
    "src/game/types.ts",
-   "src/progress/ladder.ts",
-   "src/progress/store.ts",
-   "src/ui/play/highway2d.ts",
+   "src/ui/components/IntroVideo.tsx",
    "src/ui/play/lastResult.ts",
-   "src/ui/play/session.ts",
-   "src/ui/play/staff2d.ts",
-   "src/ui/screens/Piece.tsx",
    "src/ui/screens/Play.tsx",
    "src/ui/screens/Results.tsx",
-   "src/ui/styles.css"
+   "src/ui/play/noteFault.ts"
   ],
   "policy": [
    "LATE_FAIL_MS=250",
@@ -482,7 +477,7 @@
          "settleMs": 351.1904761904717
         },
         "loss": {
-         "early": 0.7083333333333334,
+         "early": 0.7314814814814815,
          "perfect": 20,
          "demoted": 0,
          "lowHit": 1
@@ -569,10 +564,10 @@
         "pipeline": "after",
         "latencyUsedMs": 130,
         "windowN": 1024,
-        "pitch": 0.9523809523809523,
+        "pitch": 0.9588534442903376,
         "rhythm": 0.8880317460317455,
         "accuracy": 0.9523809523809523,
-        "letter": "S",
+        "letter": "B",
         "passed": false,
         "timingFailMs": null,
         "alignedMs": 130,
@@ -595,7 +590,7 @@
          "settleMs": 309.523809523806
         },
         "loss": {
-         "early": 0.5285714285714286,
+         "early": 0.5735294117647058,
          "perfect": 20,
          "demoted": 0,
          "lowHit": 1
@@ -682,10 +677,10 @@
         "pipeline": "after (80 ms estimate)",
         "latencyUsedMs": 80,
         "windowN": 1024,
-        "pitch": 0.9523809523809523,
+        "pitch": 0.9589642308536318,
         "rhythm": 0.8046984126984122,
         "accuracy": 0.9523809523809523,
-        "letter": "S",
+        "letter": "B",
         "passed": false,
         "timingFailMs": null,
         "alignedMs": 140,
@@ -708,7 +703,7 @@
          "settleMs": 359.52380952380565
         },
         "loss": {
-         "early": 0.7431192660550459,
+         "early": 0.74,
          "perfect": 20,
          "demoted": 0,
          "lowHit": 1
@@ -1133,7 +1128,7 @@
          "settleMs": 284.523809523808
         },
         "loss": {
-         "early": 0,
+         "early": 1,
          "perfect": 21,
          "demoted": 0,
          "lowHit": 0
@@ -1248,7 +1243,7 @@
          "settleMs": 345.2380952380944
         },
         "loss": {
-         "early": 0.9642857142857143,
+         "early": 0.9863013698630136,
          "perfect": 21,
          "demoted": 0,
          "lowHit": 0
@@ -1361,7 +1356,7 @@
          "settleMs": 311.90476190476153
         },
         "loss": {
-         "early": 0.9354838709677419,
+         "early": 1,
          "perfect": 21,
          "demoted": 0,
          "lowHit": 0
@@ -1474,7 +1469,7 @@
          "settleMs": 361.9047619047613
         },
         "loss": {
-         "early": 0.9459459459459459,
+         "early": 0.971830985915493,
          "perfect": 21,
          "demoted": 0,
          "lowHit": 0
@@ -1510,7 +1505,7 @@
          "settleMs": 360.71428571428487
         },
         "loss": {
-         "early": 0.9866666666666667,
+         "early": 1,
          "perfect": 21,
          "demoted": 0,
          "lowHit": 0
@@ -2818,7 +2813,7 @@
          "settleMs": 146.5686274509786
         },
         "loss": {
-         "early": 0.30434782608695654,
+         "early": 0.25,
          "perfect": 41,
          "demoted": 0,
          "lowHit": 1
@@ -2908,7 +2903,7 @@
         "pitch": 0.9761904761904762,
         "rhythm": 0.9354999999999972,
         "accuracy": 0.9761904761904762,
-        "letter": "S",
+        "letter": "B",
         "passed": false,
         "timingFailMs": null,
         "alignedMs": 140,
@@ -2931,7 +2926,7 @@
          "settleMs": 289.21568627450614
         },
         "loss": {
-         "early": 0.7671232876712328,
+         "early": 0.7922077922077922,
          "perfect": 41,
          "demoted": 0,
          "lowHit": 1
@@ -3021,7 +3016,7 @@
         "pitch": 0.9761904761904762,
         "rhythm": 0.8514444444444417,
         "accuracy": 0.9761904761904762,
-        "letter": "S",
+        "letter": "B",
         "passed": false,
         "timingFailMs": null,
         "alignedMs": 150,
@@ -3044,7 +3039,7 @@
          "settleMs": 338.23529411764275
         },
         "loss": {
-         "early": 0.9162011173184358,
+         "early": 0.926829268292683,
          "perfect": 41,
          "demoted": 0,
          "lowHit": 1
@@ -3207,7 +3202,7 @@
          "settleMs": 255.5555555555444
         },
         "loss": {
-         "early": 1,
+         "early": 0.7894736842105263,
          "perfect": 15,
          "demoted": 0,
          "lowHit": 1
@@ -3279,7 +3274,7 @@
          "settleMs": 281.94444444443207
         },
         "loss": {
-         "early": 0.7307692307692307,
+         "early": 0.6363636363636364,
          "perfect": 14,
          "demoted": 1,
          "lowHit": 1
@@ -3294,11 +3289,11 @@
         "pipeline": "after",
         "latencyUsedMs": 130,
         "windowN": 1024,
-        "pitch": 1,
+        "pitch": 0.9716456717622274,
         "rhythm": 1,
-        "accuracy": 1,
-        "letter": "S",
-        "passed": true,
+        "accuracy": 0.96875,
+        "letter": "B",
+        "passed": false,
         "timingFailMs": null,
         "alignedMs": 80,
         "match": 0.813113992470871,
@@ -3309,9 +3304,9 @@
          "great"
         ],
         "counts": {
-         "perfect": 16,
+         "perfect": 15,
          "good": 0,
-         "ok": 0,
+         "ok": 1,
          "miss": 0
         },
         "bubble": {
@@ -3320,10 +3315,10 @@
          "settleMs": 238.88888888887791
         },
         "loss": {
-         "early": 0.9090909090909091,
-         "perfect": 16,
+         "early": 0.75,
+         "perfect": 15,
          "demoted": 0,
-         "lowHit": 0
+         "lowHit": 1
         }
        },
        {
@@ -3369,7 +3364,7 @@
         "pitch": 0.9375,
         "rhythm": 0.9883437500000001,
         "accuracy": 0.928125,
-        "letter": "A",
+        "letter": "B",
         "passed": false,
         "timingFailMs": null,
         "alignedMs": 0,
@@ -3393,7 +3388,7 @@
          "settleMs": 180.55555555554693
         },
         "loss": {
-         "early": 0.5263157894736842,
+         "early": 0.6176470588235294,
          "perfect": 14,
          "demoted": 1,
          "lowHit": 1
@@ -3408,11 +3403,11 @@
         "pipeline": "after (80 ms estimate)",
         "latencyUsedMs": 80,
         "windowN": 1024,
-        "pitch": 1,
+        "pitch": 0.9716456717622278,
         "rhythm": 0.9808511904761875,
-        "accuracy": 1,
-        "letter": "S",
-        "passed": true,
+        "accuracy": 0.96875,
+        "letter": "B",
+        "passed": false,
         "timingFailMs": null,
         "alignedMs": 130,
         "match": 0.8164000382387172,
@@ -3423,9 +3418,9 @@
          "great"
         ],
         "counts": {
-         "perfect": 16,
+         "perfect": 15,
          "good": 0,
-         "ok": 0,
+         "ok": 1,
          "miss": 0
         },
         "bubble": {
@@ -3434,10 +3429,10 @@
          "settleMs": 288.8888888888759
         },
         "loss": {
-         "early": 1,
-         "perfect": 16,
+         "early": 0.9,
+         "perfect": 15,
          "demoted": 0,
-         "lowHit": 0
+         "lowHit": 1
         }
        },
        {
@@ -3483,7 +3478,7 @@
         "pitch": 0.9375,
         "rhythm": 0.9883437500000001,
         "accuracy": 0.928125,
-        "letter": "A",
+        "letter": "B",
         "passed": false,
         "timingFailMs": null,
         "alignedMs": 0,
@@ -3507,7 +3502,7 @@
          "settleMs": 180.55555555554693
         },
         "loss": {
-         "early": 0.5263157894736842,
+         "early": 0.6176470588235294,
          "perfect": 14,
          "demoted": 1,
          "lowHit": 1
@@ -3663,7 +3658,7 @@
          "settleMs": 306.9444444444302
         },
         "loss": {
-         "early": 1,
+         "early": 0.9473684210526315,
          "perfect": 16,
          "demoted": 0,
          "lowHit": 0
@@ -3776,7 +3771,7 @@
          "settleMs": 356.94444444442814
         },
         "loss": {
-         "early": 0.96875,
+         "early": 0.9436619718309859,
          "perfect": 16,
          "demoted": 0,
          "lowHit": 0
@@ -4062,7 +4057,7 @@
         "pipeline": "after",
         "latencyUsedMs": 130,
         "windowN": 1024,
-        "pitch": 0.9851009669255263,
+        "pitch": 0.9872583328257898,
         "rhythm": 1,
         "accuracy": 0.9934782608695653,
         "letter": "S",
@@ -4088,7 +4083,7 @@
          "settleMs": 255.882352941181
         },
         "loss": {
-         "early": 0.23076923076923078,
+         "early": 0,
          "perfect": 22,
          "demoted": 0,
          "lowHit": 1
@@ -4124,7 +4119,7 @@
          "settleMs": 221.56862745098232
         },
         "loss": {
-         "early": 1,
+         "early": 0,
          "perfect": 23,
          "demoted": 0,
          "lowHit": 0
@@ -4160,7 +4155,7 @@
          "settleMs": 149.0196078431388
         },
         "loss": {
-         "early": 1,
+         "early": 0,
          "perfect": 23,
          "demoted": 0,
          "lowHit": 0
@@ -4175,7 +4170,7 @@
         "pipeline": "after (80 ms estimate)",
         "latencyUsedMs": 80,
         "windowN": 1024,
-        "pitch": 0.985100966925526,
+        "pitch": 0.9872583328257896,
         "rhythm": 0.9775362318840607,
         "accuracy": 0.9934782608695653,
         "letter": "S",
@@ -4201,7 +4196,7 @@
          "settleMs": 305.8823529411816
         },
         "loss": {
-         "early": 0.6666666666666666,
+         "early": 0.5,
          "perfect": 22,
          "demoted": 0,
          "lowHit": 1
@@ -4273,7 +4268,7 @@
          "settleMs": 151.96078431372703
         },
         "loss": {
-         "early": 1,
+         "early": 0,
          "perfect": 23,
          "demoted": 0,
          "lowHit": 0
@@ -4352,7 +4347,7 @@
          "settleMs": 198.03921568627672
         },
         "loss": {
-         "early": 1,
+         "early": 0,
          "perfect": 23,
          "demoted": 0,
          "lowHit": 0
@@ -4542,7 +4537,7 @@
          "settleMs": 344.1176470588273
         },
         "loss": {
-         "early": 0.9775280898876404,
+         "early": 1,
          "perfect": 23,
          "demoted": 0,
          "lowHit": 0
@@ -4614,7 +4609,7 @@
          "settleMs": 183.33333333333596
         },
         "loss": {
-         "early": 1,
+         "early": 0,
          "perfect": 23,
          "demoted": 0,
          "lowHit": 0
@@ -5031,7 +5026,7 @@
       "settleMs": 161.27450980392013
      },
      "loss": {
-      "early": 0.6875,
+      "early": 1,
       "perfect": 42,
       "demoted": 0,
       "lowHit": 0
@@ -5076,7 +5071,7 @@
          "settleMs": 243.1372549019574
         },
         "loss": {
-         "early": 0.6111111111111112,
+         "early": 0.6551724137931034,
          "perfect": 35,
          "demoted": 2,
          "lowHit": 5
@@ -5117,7 +5112,7 @@
          "settleMs": 216.17647058823303
         },
         "loss": {
-         "early": 0.9,
+         "early": 1,
          "perfect": 42,
          "demoted": 0,
          "lowHit": 0
@@ -5158,7 +5153,7 @@
          "settleMs": 271.5686274509772
         },
         "loss": {
-         "early": 0.9523809523809523,
+         "early": 1,
          "perfect": 42,
          "demoted": 0,
          "lowHit": 0
@@ -5201,7 +5196,7 @@
          "settleMs": 310.2941176470548
         },
         "loss": {
-         "early": 0.9,
+         "early": 0.9225352112676056,
          "perfect": 39,
          "demoted": 2,
          "lowHit": 1
@@ -5216,10 +5211,10 @@
         "pipeline": "after",
         "latencyUsedMs": 130,
         "windowN": 1024,
-        "pitch": 0.9827096698358441,
+        "pitch": 0.9761904761904762,
         "rhythm": 0.9239444444444422,
         "accuracy": 0.9761904761904762,
-        "letter": "S",
+        "letter": "B",
         "passed": false,
         "timingFailMs": null,
         "alignedMs": 140,
@@ -5242,7 +5237,7 @@
          "settleMs": 307.3529411764672
         },
         "loss": {
-         "early": 0.7792207792207793,
+         "early": 0.8421052631578947,
          "perfect": 41,
          "demoted": 0,
          "lowHit": 1
@@ -5257,10 +5252,10 @@
         "pipeline": "after (80 ms estimate)",
         "latencyUsedMs": 80,
         "windowN": 1024,
-        "pitch": 0.9835235247452244,
+        "pitch": 0.9761904761904762,
         "rhythm": 0.839888888888885,
         "accuracy": 0.9726190476190476,
-        "letter": "S",
+        "letter": "B",
         "passed": false,
         "timingFailMs": null,
         "alignedMs": 140,
@@ -5283,7 +5278,7 @@
          "settleMs": 354.9019607843097
         },
         "loss": {
-         "early": 0.9024390243902439,
+         "early": 0.9290322580645162,
          "perfect": 40,
          "demoted": 1,
          "lowHit": 1
@@ -5410,7 +5405,7 @@
          "settleMs": 299.9999999999997
         },
         "loss": {
-         "early": 0.9166666666666666,
+         "early": 1,
          "perfect": 20,
          "demoted": 0,
          "lowHit": 1
@@ -5492,7 +5487,7 @@
          "settleMs": 339.28571428571377
         },
         "loss": {
-         "early": 0.9166666666666666,
+         "early": 1,
          "perfect": 21,
          "demoted": 0,
          "lowHit": 0
@@ -18632,7 +18627,7 @@
         "settleMs": 410.71428571429135
        },
        "loss": {
-        "early": 0.2079207920792079,
+        "early": 0.20595533498759305,
         "perfect": 13,
         "demoted": 0,
         "lowHit": 8
@@ -18722,7 +18717,7 @@
        "pipeline": "after",
        "latencyUsedMs": 130,
        "windowN": 1024,
-       "pitch": 0.6288296961086491,
+       "pitch": 0.6321628482924072,
        "rhythm": 0.87734126984127,
        "accuracy": 0.6190476190476191,
        "letter": "C",
@@ -18748,7 +18743,7 @@
         "settleMs": 453.57142857143566
        },
        "loss": {
-        "early": 0.21158690176322417,
+        "early": 0.20638820638820637,
         "perfect": 13,
         "demoted": 0,
         "lowHit": 8
@@ -19032,7 +19027,7 @@
         "settleMs": 190.00000000000256
        },
        "loss": {
-        "early": 0.44776119402985076,
+        "early": 0.47692307692307695,
         "perfect": 4,
         "demoted": 17,
         "lowHit": 3
@@ -19047,7 +19042,7 @@
        "pipeline": "after",
        "latencyUsedMs": 130,
        "windowN": 1024,
-       "pitch": 0.8808452896075307,
+       "pitch": 0.8769927123662035,
        "rhythm": 1,
        "accuracy": 0.7687499999999999,
        "letter": "B",
@@ -19073,7 +19068,7 @@
         "settleMs": 267.50000000000244
        },
        "loss": {
-        "early": 0.4507042253521127,
+        "early": 0.44594594594594594,
         "perfect": 4,
         "demoted": 17,
         "lowHit": 3
@@ -19308,7 +19303,7 @@
         "settleMs": 161.66666666666643
        },
        "loss": {
-        "early": 0.2608695652173913,
+        "early": 0.25,
         "perfect": 2,
         "demoted": 19,
         "lowHit": 3
@@ -19344,7 +19339,7 @@
         "settleMs": 226.66666666666794
        },
        "loss": {
-        "early": 0.4358974358974359,
+        "early": 0.40476190476190477,
         "perfect": 2,
         "demoted": 21,
         "lowHit": 1
@@ -19380,7 +19375,7 @@
         "settleMs": 295.00000000000443
        },
        "loss": {
-        "early": 0.25263157894736843,
+        "early": 0.2717948717948718,
         "perfect": 2,
         "demoted": 17,
         "lowHit": 5
@@ -19395,7 +19390,7 @@
        "pipeline": "after",
        "latencyUsedMs": 130,
        "windowN": 1024,
-       "pitch": 0.8864714158644631,
+       "pitch": 0.8775323006126499,
        "rhythm": 1,
        "accuracy": 0.75,
        "letter": "B",
@@ -19421,17 +19416,17 @@
         "settleMs": 190.833333333334
        },
        "loss": {
-        "early": 0.17777777777777778,
+        "early": 0.17543859649122806,
         "perfect": 1,
-        "demoted": 20,
-        "lowHit": 3
+        "demoted": 19,
+        "lowHit": 4
        }
       },
       {
        "pipeline": "after",
        "latencyUsedMs": 130,
        "windowN": 1024,
-       "pitch": 0.9557363910979598,
+       "pitch": 0.9583333333333334,
        "rhythm": 1,
        "accuracy": 0.8208333333333333,
        "letter": "B",
@@ -19457,7 +19452,7 @@
         "settleMs": 223.33333333333454
        },
        "loss": {
-        "early": 0.42424242424242425,
+        "early": 0.42105263157894735,
         "perfect": 1,
         "demoted": 22,
         "lowHit": 1
@@ -19467,9 +19462,9 @@
        "pipeline": "after",
        "latencyUsedMs": 130,
        "windowN": 1024,
-       "pitch": 0.8327527663254476,
+       "pitch": 0.875,
        "rhythm": 1,
-       "accuracy": 0.7145833333333332,
+       "accuracy": 0.75,
        "letter": "B",
        "passed": false,
        "timingFailMs": null,
@@ -19483,9 +19478,9 @@
        ],
        "counts": {
         "perfect": 1,
-        "good": 19,
+        "good": 20,
         "ok": 0,
-        "miss": 4
+        "miss": 3
        },
        "bubble": {
         "lagShare": 0.55,
@@ -19493,10 +19488,10 @@
         "settleMs": 314.16666666667237
        },
        "loss": {
-        "early": 0.22058823529411764,
+        "early": 0.233502538071066,
         "perfect": 1,
-        "demoted": 18,
-        "lowHit": 5
+        "demoted": 20,
+        "lowHit": 3
        }
       }
      ]
@@ -19783,7 +19778,7 @@
         "settleMs": 291.6666666666643
        },
        "loss": {
-        "early": 0.22857142857142856,
+        "early": 0.23300970873786409,
         "perfect": 2,
         "demoted": 17,
         "lowHit": 2
@@ -19798,7 +19793,7 @@
        "pipeline": "after",
        "latencyUsedMs": 130,
        "windowN": 1024,
-       "pitch": 0.908967317418022,
+       "pitch": 0.9090398245327823,
        "rhythm": 1,
        "accuracy": 0.7833333333333331,
        "letter": "B",
@@ -19824,7 +19819,7 @@
         "settleMs": 349.99999999999784
        },
        "loss": {
-        "early": 0.24107142857142858,
+        "early": 0.25773195876288657,
         "perfect": 2,
         "demoted": 17,
         "lowHit": 2
@@ -20061,7 +20056,7 @@
         "settleMs": 449.9999999999974
        },
        "loss": {
-        "early": 0.18292682926829268,
+        "early": 0.20809248554913296,
         "perfect": 0,
         "demoted": 18,
         "lowHit": 3
@@ -20098,7 +20093,7 @@
         "settleMs": 426.190476190472
        },
        "loss": {
-        "early": 0.171875,
+        "early": 0.15384615384615385,
         "perfect": 0,
         "demoted": 16,
         "lowHit": 5
@@ -20134,7 +20129,7 @@
         "settleMs": 341.6666666666698
        },
        "loss": {
-        "early": 0.21487603305785125,
+        "early": 0.27102803738317754,
         "perfect": 2,
         "demoted": 14,
         "lowHit": 5
@@ -20149,7 +20144,7 @@
        "pipeline": "after",
        "latencyUsedMs": 130,
        "windowN": 1024,
-       "pitch": 0.8904859839838475,
+       "pitch": 0.8874273962076513,
        "rhythm": 0.9523809523809523,
        "accuracy": 0.7690476190476188,
        "letter": "B",
@@ -20175,7 +20170,7 @@
         "settleMs": 557.1428571428557
        },
        "loss": {
-        "early": 0.17647058823529413,
+        "early": 0.19393939393939394,
         "perfect": 0,
         "demoted": 18,
         "lowHit": 3
@@ -20185,9 +20180,9 @@
        "pipeline": "after",
        "latencyUsedMs": 130,
        "windowN": 1024,
-       "pitch": 0.8019943698180737,
+       "pitch": 0.7959149288025752,
        "rhythm": 0.991412698412699,
-       "accuracy": 0.6880952380952379,
+       "accuracy": 0.6714285714285713,
        "letter": "C",
        "passed": false,
        "timingFailMs": null,
@@ -20197,12 +20192,13 @@
        "medianOnsetMs": 32.28571428571517,
        "avgCents": -41,
        "insights": [
-        "flat-overall"
+        "flat-overall",
+        "leaps"
        ],
        "counts": {
         "perfect": 0,
-        "good": 17,
-        "ok": 0,
+        "good": 16,
+        "ok": 1,
         "miss": 4
        },
        "bubble": {
@@ -20211,7 +20207,7 @@
         "settleMs": 491.6666666666569
        },
        "loss": {
-        "early": 0.20075757575757575,
+        "early": 0.1891891891891892,
         "perfect": 0,
         "demoted": 16,
         "lowHit": 5
@@ -20221,9 +20217,9 @@
        "pipeline": "after",
        "latencyUsedMs": 130,
        "windowN": 1024,
-       "pitch": 0.9360093143933069,
+       "pitch": 0.9177858608978572,
        "rhythm": 0.9994682539682539,
-       "accuracy": 0.8238095238095237,
+       "accuracy": 0.8071428571428569,
        "letter": "B",
        "passed": false,
        "timingFailMs": null,
@@ -20237,8 +20233,8 @@
        ],
        "counts": {
         "perfect": 2,
-        "good": 18,
-        "ok": 0,
+        "good": 17,
+        "ok": 1,
         "miss": 1
        },
        "bubble": {
@@ -20247,10 +20243,10 @@
         "settleMs": 328.5714285714343
        },
        "loss": {
-        "early": 0.16666666666666666,
+        "early": 0.20833333333333334,
         "perfect": 2,
-        "demoted": 16,
-        "lowHit": 3
+        "demoted": 15,
+        "lowHit": 4
        }
       }
      ]
@@ -20542,7 +20538,7 @@
         "settleMs": 286.6666666666657
        },
        "loss": {
-        "early": 0.8819875776397516,
+        "early": 0.94,
         "perfect": 5,
         "demoted": 0,
         "lowHit": 19
@@ -20557,7 +20553,7 @@
        "pipeline": "after",
        "latencyUsedMs": 130,
        "windowN": 1024,
-       "pitch": 0.579309956704427,
+       "pitch": 0.5755159622261056,
        "rhythm": 0.45448611111111087,
        "accuracy": 0.5770833333333333,
        "letter": "C",
@@ -20583,7 +20579,7 @@
         "settleMs": 393.33333333333366
        },
        "loss": {
-        "early": 0.8773006134969326,
+        "early": 0.9407894736842105,
         "perfect": 13,
         "demoted": 1,
         "lowHit": 10
@@ -20818,7 +20814,7 @@
         "settleMs": 314.1666666666659
        },
        "loss": {
-        "early": 0.8323699421965318,
+        "early": 0.8674698795180723,
         "perfect": 5,
         "demoted": 0,
         "lowHit": 19
@@ -20855,7 +20851,7 @@
         "settleMs": 297.4999999999999
        },
        "loss": {
-        "early": 0.8497109826589595,
+        "early": 0.901840490797546,
         "perfect": 5,
         "demoted": 0,
         "lowHit": 19
@@ -20892,7 +20888,7 @@
         "settleMs": 302.50000000000085
        },
        "loss": {
-        "early": 0.8421052631578947,
+        "early": 0.8780487804878049,
         "perfect": 5,
         "demoted": 2,
         "lowHit": 17
@@ -20934,7 +20930,7 @@
         "settleMs": 383.3333333333335
        },
        "loss": {
-        "early": 0.9225806451612903,
+        "early": 0.9657534246575342,
         "perfect": 24,
         "demoted": 0,
         "lowHit": 0
@@ -20971,7 +20967,7 @@
         "settleMs": 397.50000000000045
        },
        "loss": {
-        "early": 0.8881987577639752,
+        "early": 0.9470198675496688,
         "perfect": 24,
         "demoted": 0,
         "lowHit": 0
@@ -21301,7 +21297,7 @@
         "settleMs": 453.571428571427
        },
        "loss": {
-        "early": 0.8450704225352113,
+        "early": 0.8931297709923665,
         "perfect": 12,
         "demoted": 0,
         "lowHit": 9
@@ -21343,7 +21339,7 @@
         "settleMs": 449.99999999999807
        },
        "loss": {
-        "early": 0.8482758620689655,
+        "early": 0.9097744360902256,
         "perfect": 21,
         "demoted": 0,
         "lowHit": 0
@@ -21576,7 +21572,7 @@
         "settleMs": 465.4761904761905
        },
        "loss": {
-        "early": 0.8095238095238095,
+        "early": 0.85625,
         "perfect": 21,
         "demoted": 0,
         "lowHit": 0
@@ -21690,7 +21686,7 @@
         "settleMs": 457.1428571428566
        },
        "loss": {
-        "early": 0.8445945945945946,
+        "early": 0.9037037037037037,
         "perfect": 21,
         "demoted": 0,
         "lowHit": 0
@@ -21700,9 +21696,9 @@
        "pipeline": "after",
        "latencyUsedMs": 130,
        "windowN": 1024,
-       "pitch": 0.9885007357349161,
+       "pitch": 0.9918433338783207,
        "rhythm": 0.7512460317460312,
-       "accuracy": 0.9928571428571429,
+       "accuracy": 1,
        "letter": "S",
        "passed": true,
        "timingFailMs": null,
@@ -21716,8 +21712,8 @@
         "great"
        ],
        "counts": {
-        "perfect": 20,
-        "good": 1,
+        "perfect": 21,
+        "good": 0,
         "ok": 0,
         "miss": 0
        },
@@ -21727,10 +21723,10 @@
         "settleMs": 466.6666666666656
        },
        "loss": {
-        "early": 0.7852760736196319,
-        "perfect": 20,
+        "early": 0.8581081081081081,
+        "perfect": 21,
         "demoted": 0,
-        "lowHit": 1
+        "lowHit": 0
        }
       },
       {
@@ -22822,7 +22818,7 @@
         "settleMs": 992.8571428571364
        },
        "loss": {
-        "early": 0.1867612293144208,
+        "early": 0.18527315914489312,
         "perfect": 6,
         "demoted": 0,
         "lowHit": 15
@@ -23195,9 +23191,9 @@
        "pipeline": "after",
        "latencyUsedMs": 130,
        "windowN": 1024,
-       "pitch": 0.5491485069217446,
+       "pitch": 0.563772758470156,
        "rhythm": 0.15291269841269917,
-       "accuracy": 0.5238095238095238,
+       "accuracy": 0.5476190476190477,
        "letter": "C",
        "passed": false,
        "timingFailMs": 440,
@@ -23214,8 +23210,8 @@
        "counts": {
         "perfect": 7,
         "good": 0,
-        "ok": 8,
-        "miss": 6
+        "ok": 9,
+        "miss": 5
        },
        "bubble": {
         "lagShare": 1,
@@ -23233,10 +23229,10 @@
        "pipeline": "after",
        "latencyUsedMs": 130,
        "windowN": 1024,
-       "pitch": 0.5386006306020514,
+       "pitch": 0.5544559163335137,
        "rhythm": 0.15291269841269872,
-       "accuracy": 0.4523809523809524,
-       "letter": "D",
+       "accuracy": 0.5238095238095238,
+       "letter": "C",
        "passed": false,
        "timingFailMs": 440,
        "alignedMs": 440,
@@ -23252,8 +23248,8 @@
        "counts": {
         "perfect": 7,
         "good": 0,
-        "ok": 5,
-        "miss": 9
+        "ok": 8,
+        "miss": 6
        },
        "bubble": {
         "lagShare": 1,
@@ -23271,9 +23267,9 @@
        "pipeline": "after",
        "latencyUsedMs": 130,
        "windowN": 1024,
-       "pitch": 0.5537343456784773,
+       "pitch": 0.5691439892409046,
        "rhythm": 0.15491269841269747,
-       "accuracy": 0.5476190476190477,
+       "accuracy": 0.5714285714285714,
        "letter": "C",
        "passed": false,
        "timingFailMs": 440,
@@ -23290,8 +23286,8 @@
        "counts": {
         "perfect": 7,
         "good": 0,
-        "ok": 9,
-        "miss": 5
+        "ok": 10,
+        "miss": 4
        },
        "bubble": {
         "lagShare": 1,
@@ -23591,7 +23587,7 @@
         "settleMs": 287.5000000000003
        },
        "loss": {
-        "early": 0.965034965034965,
+        "early": 1,
         "perfect": 7,
         "demoted": 0,
         "lowHit": 17
@@ -23609,7 +23605,7 @@
        "pitch": 0.874569108937246,
        "rhythm": 0.7357152777777776,
        "accuracy": 0.8562500000000001,
-       "letter": "A",
+       "letter": "B",
        "passed": false,
        "timingFailMs": null,
        "alignedMs": 80,
@@ -23632,7 +23628,7 @@
         "settleMs": 373.3333333333343
        },
        "loss": {
-        "early": 0.9793103448275862,
+        "early": 1,
         "perfect": 18,
         "demoted": 3,
         "lowHit": 3
@@ -23868,7 +23864,7 @@
         "settleMs": 284.166666666666
        },
        "loss": {
-        "early": 0.9202453987730062,
+        "early": 0.9673202614379085,
         "perfect": 24,
         "demoted": 0,
         "lowHit": 0
@@ -23983,7 +23979,7 @@
         "settleMs": 361.6666666666668
        },
        "loss": {
-        "early": 0.9861111111111112,
+        "early": 0.9925925925925926,
         "perfect": 24,
         "demoted": 0,
         "lowHit": 0
@@ -24019,7 +24015,7 @@
         "settleMs": 367.50000000000017
        },
        "loss": {
-        "early": 0.9714285714285714,
+        "early": 0.9924242424242424,
         "perfect": 24,
         "demoted": 0,
         "lowHit": 0
@@ -24345,7 +24341,7 @@
         "settleMs": 397.6190476190458
        },
        "loss": {
-        "early": 0.9380530973451328,
+        "early": 0.9702970297029703,
         "perfect": 17,
         "demoted": 0,
         "lowHit": 4
@@ -24386,7 +24382,7 @@
         "settleMs": 404.7619047619034
        },
        "loss": {
-        "early": 0.9568965517241379,
+        "early": 0.9813084112149533,
         "perfect": 21,
         "demoted": 0,
         "lowHit": 0
@@ -24620,7 +24616,7 @@
         "settleMs": 441.66666666666544
        },
        "loss": {
-        "early": 0.8011363636363636,
+        "early": 0.8588957055214724,
         "perfect": 20,
         "demoted": 0,
         "lowHit": 1
@@ -24656,7 +24652,7 @@
         "settleMs": 229.7619047619069
        },
        "loss": {
-        "early": 0.14705882352941177,
+        "early": 0.10714285714285714,
         "perfect": 20,
         "demoted": 0,
         "lowHit": 1
@@ -24734,7 +24730,7 @@
         "settleMs": 407.1428571428557
        },
        "loss": {
-        "early": 0.8716216216216216,
+        "early": 0.9236641221374046,
         "perfect": 21,
         "demoted": 0,
         "lowHit": 0
@@ -24744,10 +24740,10 @@
        "pipeline": "after",
        "latencyUsedMs": 130,
        "windowN": 1024,
-       "pitch": 0.9665819749904753,
+       "pitch": 0.9686883467650934,
        "rhythm": 0.8565793650793646,
        "accuracy": 0.9523809523809523,
-       "letter": "S",
+       "letter": "B",
        "passed": false,
        "timingFailMs": null,
        "alignedMs": 140,
@@ -24770,7 +24766,7 @@
         "settleMs": 459.5238095238107
        },
        "loss": {
-        "early": 0.7986111111111112,
+        "early": 0.8076923076923077,
         "perfect": 20,
         "demoted": 0,
         "lowHit": 1
@@ -27015,7 +27011,7 @@
      "acc": 0.7733630952380952
     },
     "after": {
-     "pitch": 0.9870904640247353,
+     "pitch": 0.9912003182657252,
      "acc": 0.9937499999999999
     }
    }
@@ -27058,7 +27054,7 @@
      "settleMs": 158.33333333333368
     },
     "loss": {
-     "early": 0.2631578947368421,
+     "early": 0.2903225806451613,
      "perfect": 20,
      "demoted": 0,
      "lowHit": 4
@@ -27094,7 +27090,7 @@
      "settleMs": 143.33333333333513
     },
     "loss": {
-     "early": 0.18421052631578946,
+     "early": 0.20588235294117646,
      "perfect": 24,
      "demoted": 0,
      "lowHit": 0
@@ -27220,7 +27216,7 @@
      "settleMs": 172.6190476190459
     },
     "loss": {
-     "early": 0.12987012987012986,
+     "early": 0.14084507042253522,
      "perfect": 19,
      "demoted": 0,
      "lowHit": 2
@@ -27256,7 +27252,7 @@
      "settleMs": 149.9999999999997
     },
     "loss": {
-     "early": 0.13924050632911392,
+     "early": 0.1506849315068493,
      "perfect": 21,
      "demoted": 0,
      "lowHit": 0
@@ -27384,7 +27380,7 @@
      "settleMs": 256.6666666666668
     },
     "loss": {
-     "early": 0.1492842535787321,
+     "early": 0.14989733059548255,
      "perfect": 14,
      "demoted": 0,
      "lowHit": 10
@@ -27394,7 +27390,7 @@
     "pipeline": "after",
     "latencyUsedMs": 150,
     "windowN": 1024,
-    "pitch": 0.9741809280494707,
+    "pitch": 0.9824006365314504,
     "rhythm": 0.999298611111111,
     "accuracy": 0.9874999999999999,
     "letter": "S",
@@ -27406,7 +27402,6 @@
     "medianOnsetMs": 45.42857142857087,
     "avgCents": 1,
     "insights": [
-     "sharp-long-notes",
      "great"
     ],
     "counts": {
@@ -27549,7 +27544,7 @@
      "settleMs": 204.76190476190044
     },
     "loss": {
-     "early": 0.20945945945945946,
+     "early": 0.20567375886524822,
      "perfect": 18,
      "demoted": 0,
      "lowHit": 3
@@ -27585,7 +27580,7 @@
      "settleMs": 134.52380952380867
     },
     "loss": {
-     "early": 0.2052980132450331,
+     "early": 0.19863013698630136,
      "perfect": 21,
      "demoted": 0,
      "lowHit": 0
@@ -27713,7 +27708,7 @@
      "settleMs": 323.33333333333275
     },
     "loss": {
-     "early": 0.19473684210526315,
+     "early": 0.19538188277087035,
      "perfect": 9,
      "demoted": 0,
      "lowHit": 15
@@ -27723,11 +27718,11 @@
     "pipeline": "after",
     "latencyUsedMs": 150,
     "windowN": 1024,
-    "pitch": 0.9849873685647966,
+    "pitch": 0.9815222586371712,
     "rhythm": 1,
-    "accuracy": 0.99375,
-    "letter": "S",
-    "passed": true,
+    "accuracy": 0.9791666666666666,
+    "letter": "B",
+    "passed": false,
     "timingFailMs": null,
     "alignedMs": 0,
     "match": 0.2759355122488891,
@@ -27739,8 +27734,8 @@
     ],
     "counts": {
      "perfect": 23,
-     "good": 1,
-     "ok": 0,
+     "good": 0,
+     "ok": 1,
      "miss": 0
     },
     "bubble": {
@@ -27749,7 +27744,7 @@
      "settleMs": 179.16666666666518
     },
     "loss": {
-     "early": 0.17876106194690267,
+     "early": 0.1771019677996422,
      "perfect": 23,
      "demoted": 0,
      "lowHit": 1
@@ -27879,7 +27874,7 @@
      "settleMs": 545.2380952380975
     },
     "loss": {
-     "early": 0.1649016641452345,
+     "early": 0.15960912052117263,
      "perfect": 6,
      "demoted": 0,
      "lowHit": 15
@@ -27889,9 +27884,9 @@
     "pipeline": "after",
     "latencyUsedMs": 150,
     "windowN": 1024,
-    "pitch": 0.8112107752722677,
+    "pitch": 0.8309770106431371,
     "rhythm": 0.87915873015873,
-    "accuracy": 0.8023809523809524,
+    "accuracy": 0.8261904761904763,
     "letter": "B",
     "passed": false,
     "timingFailMs": null,
@@ -27906,8 +27901,8 @@
     "counts": {
      "perfect": 16,
      "good": 1,
-     "ok": 0,
-     "miss": 4
+     "ok": 1,
+     "miss": 3
     },
     "bubble": {
      "lagShare": 0.7142857142857143,
@@ -27915,7 +27910,7 @@
      "settleMs": 352.38095238095286
     },
     "loss": {
-     "early": 0.1617440225035162,
+     "early": 0.16216216216216217,
      "perfect": 16,
      "demoted": 0,
      "lowHit": 5
@@ -28045,7 +28040,7 @@
      "settleMs": 328.3333333333336
     },
     "loss": {
-     "early": 0.15682281059063136,
+     "early": 0.15337423312883436,
      "perfect": 10,
      "demoted": 1,
      "lowHit": 13
@@ -28055,10 +28050,10 @@
     "pipeline": "after",
     "latencyUsedMs": 130,
     "windowN": 1024,
-    "pitch": 0.978900166202917,
+    "pitch": 0.9802509539549448,
     "rhythm": 0.9982083333333334,
     "accuracy": 0.9791666666666666,
-    "letter": "S",
+    "letter": "B",
     "passed": false,
     "timingFailMs": null,
     "alignedMs": 0,
@@ -28210,7 +28205,7 @@
      "settleMs": 307.1428571428537
     },
     "loss": {
-     "early": 0.2631578947368421,
+     "early": 0.2684563758389262,
      "perfect": 18,
      "demoted": 0,
      "lowHit": 3
@@ -28246,7 +28241,7 @@
      "settleMs": 238.09523809523733
     },
     "loss": {
-     "early": 0.2974683544303797,
+     "early": 0.2847682119205298,
      "perfect": 21,
      "demoted": 0,
      "lowHit": 0
@@ -28377,7 +28372,7 @@
      "settleMs": 202.500000000003
     },
     "loss": {
-     "early": 0.3888888888888889,
+     "early": 0.41237113402061853,
      "perfect": 17,
      "demoted": 0,
      "lowHit": 7
@@ -28387,7 +28382,7 @@
     "pipeline": "after",
     "latencyUsedMs": 150,
     "windowN": 1024,
-    "pitch": 0.9965548793932176,
+    "pitch": 1,
     "rhythm": 1,
     "accuracy": 0.99375,
     "letter": "S",
@@ -28414,7 +28409,7 @@
      "settleMs": 182.4999999999999
     },
     "loss": {
-     "early": 0.25118483412322273,
+     "early": 0.2608695652173913,
      "perfect": 23,
      "demoted": 1,
      "lowHit": 0
@@ -28542,7 +28537,7 @@
      "settleMs": 261.90476190475886
     },
     "loss": {
-     "early": 0.26838235294117646,
+     "early": 0.2795275590551181,
      "perfect": 13,
      "demoted": 0,
      "lowHit": 8
@@ -28552,10 +28547,10 @@
     "pipeline": "after",
     "latencyUsedMs": 150,
     "windowN": 1024,
-    "pitch": 0.933641108191974,
+    "pitch": 0.9357671845181144,
     "rhythm": 0.9523809523809523,
     "accuracy": 0.9452380952380953,
-    "letter": "A",
+    "letter": "B",
     "passed": false,
     "timingFailMs": null,
     "alignedMs": 0,
@@ -28579,7 +28574,7 @@
      "settleMs": 213.09523809523597
     },
     "loss": {
-     "early": 0.23872679045092837,
+     "early": 0.239067055393586,
      "perfect": 19,
      "demoted": 0,
      "lowHit": 2
@@ -28865,7 +28860,7 @@
      "settleMs": 157.1428571428556
     },
     "loss": {
-     "early": 0.7777777777777778,
+     "early": 0.8333333333333334,
      "perfect": 19,
      "demoted": 0,
      "lowHit": 2
@@ -28901,7 +28896,7 @@
      "settleMs": 304.7619047619125
     },
     "loss": {
-     "early": 0.44,
+     "early": 0.5,
      "perfect": 21,
      "demoted": 0,
      "lowHit": 0
@@ -34630,8 +34625,8 @@
      "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.7850000000000008,
-     "plainAcc": 0.7850000000000008,
+     "acc": 0.7912500000000008,
+     "plainAcc": 0.7912500000000008,
      "passed": false,
      "alignedMs": 0,
      "fast": {
@@ -34816,8 +34811,8 @@
      "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.7233766233766241,
-     "plainAcc": 0.7233766233766241,
+     "acc": 0.7298701298701307,
+     "plainAcc": 0.7298701298701307,
      "passed": false,
      "alignedMs": 0,
      "fast": {

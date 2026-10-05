@@ -23,7 +23,7 @@ For every note in your part:
 - **Intonation ("In tune").**
   - Judging starts when your voice *arrives* within tolerance of the note: at most 0.15 s (and 35% of the note) after the written start, plus the device delay the line-up corrects. The glide into the note, the overshoot and a late consonant don't count.
   - Judging stops when you head for the next note (at most 0.12 s early).
-  - Vibrato is cancelled by two cascaded moving averages (≈180 ms and ≈220 ms). These remove vibratos from about 4 to 8 Hz almost completely, so a vibrato centred on the note counts as in tune.
+  - Vibrato is cancelled by two cascaded moving averages (≈180 ms and ≈220 ms of real time, whatever the tempo: at level 1's 70% they span fewer score seconds). These remove vibratos from about 4 to 8 Hz almost completely, so a vibrato centred on the note counts as in tune.
   - A short dropout of the detector (up to 20% of the note) doesn't count against you.
 - **Very short notes** (fast passages, e.g. 16ths at 104–144 bpm, ~0.1 s). The voice rarely settles: it glides in, overshoots, and the next syllable's consonant cuts it off, so the detector gets only two to four readings per note.
   - When it has at least **two readings**, including an **uninterrupted run** (no unvoiced reading between) that stands for at least **30%** of the note and reaches past its first **35%**, it is judged on the **median of all its readings from the written start to the written end** (full credit once they stand for 40% of it). One reading, readings only in the attack, or scattered single frames — where consonants and the guide leaking into the mic land — are not enough. Readings at the start still nearer the previous note, and at the end already nearer the next note, are the transitions and don't count (within the same 0.15 s / 35% and 0.12 s / 20% limits as above). Readings after the written end never count for the note: they could just as well be a singer one note behind.
@@ -40,10 +40,12 @@ For every note in your part:
   there, and the app stops listening shortly after.
 - **Level 1: every note right.** Level 1 (sung on “doo”) passes only when every note is *good* or
   better. A note the scorer can't judge reliably is let off below *good*: a very short note (as
-  above), or a written pitch outside the detector's 60–1400 Hz. It still counts as wrong when the
-  detector clearly heard it wrong: no voice at all inside a very short note, or a *miss* whose own
+  above), or a written pitch outside the detector's 60–1400 Hz. It still counts as wrong when it was
+  clearly wrong: **no sound at all** inside the note (no pitched reading, and every reading below the
+  detector's level gate; this applies to both kinds), or, for a very short note, a *miss* whose own
   readings were enough to judge it with their median at least 1.5 × the tolerance (and at most 6
-  semitones) off. Each note
+  semitones) off. A note outside the detector's range that was sung (there is sound, but no pitch
+  the detector can read) is let off. Each note
   result carries this as `unsure` (`'short'` / `'range'`) and `clearly` (`'silent'` / `'off'`); see
   [LEVELS.md](LEVELS.md).
 - **Sections within a full run.** A run of the whole piece also scores each section (the average grade of its notes). The piece level needs the run *and* every section at the level's pass mark; see [LEVELS.md](LEVELS.md).

@@ -81,6 +81,11 @@ export const TRACKER_HIGH_HZ = 1400;
  * own readings put it this many tolerances (or more) off: the tracker heard a definite wrong pitch.
  */
 export const CLEAR_OFF_TOL = 1.5;
+/**
+ * Below this input level (RMS) a reading is silence (src/audio/pitch.ts RMS_GATE): an unsure note
+ * with no voiced reading and every reading this quiet wasn't sung at all (NoteResult.clearly 'silent').
+ */
+export const SILENCE_RMS = 0.005;
 
 export const GRADE_POINTS: Record<Grade, number> = { perfect: 100, good: 70, ok: 40, miss: 0 };
 export const GRADE_VALUE: Record<Grade, number> = { perfect: 1, good: 0.85, ok: 0.5, miss: 0 };
@@ -240,6 +245,9 @@ class NoteAcc {
   /** ...and which run of uninterrupted voiced readings each belongs to (counts the unvoiced ones in the note). */
   nR: number[] = [];
   nBreaks = 0;
+  /** Readings inside the written note, and how many of them had sound (level at or above SILENCE_RMS). */
+  inNote = 0;
+  loudInNote = 0;
   final: NoteResult | null = null;
   constructor(readonly w: NoteWindow) {}
 }
@@ -307,7 +315,8 @@ export class LiveScorer {
     this.accs = this.windows.map((w) => new NoteAcc(w));
     for (const a of this.accs) this.byIndex.set(a.w.index, a);
     this.tol = opts.toleranceCents;
-    this.vibWin = opts.vibratoWindow ?? DEFAULT_VIBRATO_WINDOW;
+    // Vibrato is real time: at a slower tempo one cycle spans fewer score seconds (ScoringOptions.rate).
+    this.vibWin = (opts.vibratoWindow ?? DEFAULT_VIBRATO_WINDOW) * (opts.rate && opts.rate > 0 ? opts.rate : 1);
   }
 
   get combo(): number { return this._combo; }
@@ -405,6 +414,10 @@ export class LiveScorer {
       }
     }
     const tol = this.tol + w.tolExtra;
+    if (t >= w.start && t < w.start + w.note.dur) {
+      a.inNote++;
+      if (dev !== null || c.s.rms >= SILENCE_RMS) a.loudInNote++;
+    }
     if (w.short && dev === null && t >= w.start && t < w.start + w.note.dur) a.nBreaks++;
     if (w.short && dev !== null && t >= w.start && t < w.start + w.note.dur) {
       a.nT.push(t);
@@ -544,20 +557,20 @@ export class LiveScorer {
     // so a normal vibrato (or the glide in) doesn't read as sagging or creeping.
     let drift: number | null = null;
     if (jD.length >= 6) {
-      const sm = vibratoSmoothed(jT, jD, this.vibWin > 0 ? this.vibWin : DEFAULT_VIBRATO_WINDOW) ?? jD;
+      const sm = vibratoSmoothed(jT, jD, this.vibWin > 0 ? this.vibWin : DEFAULT_VIBRATO_WINDOW * (this.opts.rate && this.opts.rate > 0 ? this.opts.rate : 1)) ?? jD;
       const third = Math.floor(sm.length / 3);
       drift = median(sm.slice(-third))! - median(sm.slice(0, third))!;
     }
     // Notes the scorer can't judge reliably (see NoteResult.unsure): a written pitch outside the
     // tracker's range, or a very short note (the voice rarely settles; few readings). Below "good",
-    // say whether the tracker still clearly heard it wrong: no voice at all inside the note, or a
-    // definite pitch (enough of its own readings, see shortNoteDev) clearly off.
+    // say whether it was still clearly wrong: no sound at all inside the note (either kind), or (very
+    // short notes) a definite pitch, from enough of its own readings (see shortNoteDev), clearly off.
     const unsure: NoteResult['unsure'] = w.outOfRange ? 'range' : w.short ? 'short' : undefined;
     let clearly: NoteResult['clearly'];
-    if (unsure === 'short' && GRADE_RANK[grade] < GRADE_RANK.good) {
-      if (a.nT.length === 0 && a.nBreaks > 0) clearly = 'silent';
+    if (unsure && GRADE_RANK[grade] < GRADE_RANK.good) {
+      if (a.inNote > 0 && a.loudInNote === 0) clearly = 'silent';
       // (A reading more than SHORT_FAR off is the tracker locking onto a fraction of the pitch, not a sung note.)
-      else if (grade === 'miss' && shortDev !== null && Math.abs(shortDev) >= CLEAR_OFF_TOL * tolN && Math.abs(shortDev) <= SHORT_FAR) clearly = 'off';
+      else if (unsure === 'short' && grade === 'miss' && shortDev !== null && Math.abs(shortDev) >= CLEAR_OFF_TOL * tolN && Math.abs(shortDev) <= SHORT_FAR) clearly = 'off';
     }
     const scoopMed = median(a.scoopDevs);
     // A scoop is a glide INTO the note: the body must end up clearly closer to the target than the

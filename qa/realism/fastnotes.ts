@@ -136,7 +136,7 @@ export function diagnose(run: RenderedRun, mod: ScoringModule = curScoring): { n
   const { passage, level, take, outcome } = run;
   const rate = take.rate;
   const tol = tolOf(level);
-  const opts = { toleranceCents: tol, tuning: 'equal' as const, octaveTolerant: false };
+  const opts = { toleranceCents: tol, tuning: 'equal' as const, octaveTolerant: false, rate };
   const ctx: ScoringContext = { score: passage.score, part: passage.part, range: passage.range, end: passage.to };
   const lag = (outcome.alignedMs / 1000) * rate;
   const view = afterScorerView(passage.part, outcome.samples).map((s) => ({ ...s, time: s.time - lag }));
