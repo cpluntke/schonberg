@@ -5,13 +5,15 @@ k=Kokoro('/tmp/kokoro/kokoro-v1.0.onnx','/tmp/kokoro/voices-v1.0.bin')
 from kokoro_onnx.tokenizer import Tokenizer
 tok=Tokenizer()
 L=json.load(open('script.json')); V={'N':'af_heart','B':'am_michael'}
+PHONEMES={'Schönberg':'ʃˈɜːnbɛɹk','do re mi':'dˈoʊ ɹˈɛ mˈiː'}
 SR=24000; t=0.9; chunks=[]; lines=[]; subs=[]; prev=None
 for l in L:
-    # German name: say "Schönberg" as ʃˈøːnbɛɐ̯k would be ideal; the English voice has no ø, so use
-    # the closest English vowel (ʃˈɜːn-) and a German-style ending (-bɛɹk) via a phoneme override.
-    if 'Schönberg' in l['say']:
-        parts = l['say'].split('Schönberg')
-        ph = ' ʃˈɜːnbɛɹk '.join(tok.phonemize(x, lang='en-us').strip() for x in parts).strip()
+    # Pronunciation fixes via phoneme overrides (the English voice misreads these):
+    # "Schönberg": no ø in English, so the closest vowel (ʃˈɜːn-) and a German-style ending (-bɛɹk);
+    # "do re mi": solfège "doh, reh, mee", not "doo, ree, my".
+    hit = next((w for w in PHONEMES if w in l['say']), None)
+    if hit:
+        ph = (' ' + PHONEMES[hit] + ' ').join(tok.phonemize(x, lang='en-us').strip() for x in l['say'].split(hit)).strip()
         print('phonemes:', ph)
         a,sr=k.create(ph,voice=V[l['sp']],speed=0.97 if l['sp']=='N' else 1.0,lang='en-us',is_phonemes=True)
     else:
