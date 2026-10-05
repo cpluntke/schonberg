@@ -4,7 +4,7 @@
 import { get as idbGet, set as idbSet, del as idbDel, keys as idbKeys } from 'idb-keyval';
 import type { Score, Section, VoiceType } from '../music/types';
 import type { AttemptResult, TuningMode } from '../game/types';
-import { LEVELS, MAX_LEVEL, OFF_BOOK_DAYS, isDue, sectionAccuracies, type Strictness } from './ladder';
+import { LEVELS, MAX_LEVEL, OFF_BOOK_DAYS, fixesBefore, isDue, sectionChecks, type Strictness } from './ladder';
 
 /** Structurally identical to game/notation.ts NotationMode. */
 export type NotationMode = 'letter' | 'fixed' | 'movable' | 'jianpu' | 'pc';
@@ -476,12 +476,13 @@ export function recordFullRun(
   const accuracy = Number.isFinite(result.accuracy) ? result.accuracy : 0;
   const score = Number.isFinite(result.score) ? result.score : 0;
   const prevLevel = full.level ?? 0;
-  const accs = sectionAccuracies(sections, noteStart, result);
+  const checks = sectionChecks(sections, noteStart, result);
   const runSections: FullRunSection[] = [...sections].sort((a, b) => a.index - b.index)
-    .filter((s) => accs[s.id] != null)
-    .map((s) => ({ id: s.id, accuracy: accs[s.id], passed: accs[s.id] >= pass }));
+    .filter((s) => checks[s.id] != null)
+    .map((s) => ({ id: s.id, accuracy: checks[s.id].accuracy, passed: checks[s.id].checked >= pass - 1e-9 }));
   const overallPassed = accuracy >= pass && !opts.timingFail;
-  const pending = (full.toFix?.[lvl] ?? []).filter((id) => sections.some((s) => s.id === id));
+  // Only fixes at the level being worked toward lock the run (ladder.fixTarget).
+  const pending = fixesBefore(sections, prog, lvl);
   const blocked = opts.counted && pending.length > 0 ? pending : undefined;
   const counted = opts.counted && !blocked;
 
@@ -498,6 +499,8 @@ export function recordFullRun(
       if (!rs.passed || opts.timingFail) continue;
       const sp: SectionProgress = prog.sections[rs.id] ?? { level: 0, best: {}, attempts: 0 };
       passSection(sp, lvl, rs.accuracy, now);
+      // Held in a counted run of the whole piece: that's a review of the section, whatever its level.
+      sp.lastPassed = now;
       prog.sections[rs.id] = sp;
       clearFix(full, rs.id, lvl);
     }

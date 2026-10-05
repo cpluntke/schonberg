@@ -242,22 +242,24 @@ describe('off book needs two days', () => {
 });
 
 describe('piece levels from full runs (docs/LEVELS.md)', () => {
-  // Three 8-second sections; two notes in each (note i starts at second 4·i).
+  // Three 8-second sections; eight notes in each (note i starts at second i).
   const secs: Section[] = [0, 1, 2].map((i) => ({
     id: `s${i}`, index: i, label: `Bars ${i * 4 + 1}–${i * 4 + 4}`, startMeasure: i * 4, endMeasure: i * 4 + 3, start: i * 8, end: i * 8 + 8,
   }));
-  const noteStart = (i: number) => (i >= 0 && i < 6 ? i * 4 : undefined);
+  const noteStart = (i: number) => (i >= 0 && i < 24 ? i : undefined);
   type G = 'perfect' | 'good' | 'ok' | 'miss';
-  /** A full-run result with these grades for notes 0..5 (two per section); accuracy as the app computes it. */
+  /** A full-run result with these grades for notes 0..; accuracy as the app computes it. */
   const run = (grades: G[]): AttemptResult => {
     const v = { perfect: 1, good: 0.85, ok: 0.5, miss: 0 };
     const notes = grades.map((grade, index) => ({ index, grade }));
     const accuracy = grades.reduce((a, g) => a + v[g], 0) / grades.length;
     return { ...res(accuracy), notes } as unknown as AttemptResult;
   };
-  const allGood: G[] = ['perfect', 'perfect', 'good', 'perfect', 'perfect', 'good'];
-  // Overall 0.83 (passes level 3 at 0.8), but s1 only 0.5.
-  const oneSlips: G[] = ['perfect', 'perfect', 'perfect', 'miss', 'perfect', 'perfect'];
+  const good8: G[] = ['perfect', 'perfect', 'good', 'perfect', 'perfect', 'good', 'perfect', 'perfect'];
+  const half8: G[] = ['perfect', 'miss', 'perfect', 'miss', 'perfect', 'miss', 'perfect', 'miss'];
+  const allGood: G[] = [...good8, ...good8, ...good8];
+  // Overall 0.81 (passes level 3 at 0.8), but s1 only 0.5.
+  const oneSlips: G[] = [...good8, ...half8, ...good8];
   const counted = { counted: true };
 
   it('a counted full run that passes grants the piece level and credits every section', async () => {
@@ -327,6 +329,37 @@ describe('piece levels from full runs (docs/LEVELS.md)', () => {
     // Even a failing practice run marks nothing to fix.
     recordFullRun('p', 'S', 3, run(oneSlips), secs, noteStart, { counted: false });
     expect(getProgress('p', 'S')!.full?.toFix).toBeUndefined();
+  });
+
+  it('a new singer failing a run far above their level gets no lock and keeps their Next up', async () => {
+    const { recordFullRun } = await import('./store');
+    const { nextStep, fixesBefore } = await import('./ladder');
+    const bad: G[] = [...half8, ...half8, ...half8];
+    const r = recordFullRun('p', 'S', 5, run(bad), secs, noteStart, counted);
+    expect(r.toFix).toEqual(['s0', 's1', 's2']);
+    const prog = getProgress('p', 'S')!;
+    expect(fixesBefore(secs, prog, 5)).toEqual([]);
+    expect(nextStep(secs, prog)).toMatchObject({ sectionId: 's0', level: 1, kind: 'section' });
+    // Trying level 5 again counts (no lock).
+    expect(recordFullRun('p', 'S', 5, run(bad), secs, noteStart, counted).counted).toBe(true);
+  });
+
+  it('a short section is not failed by one weak note', async () => {
+    const { recordFullRun } = await import('./store');
+    // s2 has only two notes here: one perfect, one ok.
+    const short = (i: number) => (i < 16 ? i : i === 16 ? 17 : i === 17 ? 20 : undefined);
+    const r = recordFullRun('p', 'S', 3, run([...good8, ...good8, 'perfect', 'ok']), secs, short, counted);
+    expect(r.sections[2]).toMatchObject({ id: 's2', accuracy: 0.75, passed: true });
+    expect(r.passed).toBe(true);
+  });
+
+  it('a counted full run refreshes the review date of sections above its level', async () => {
+    const { recordFullRun } = await import('./store');
+    const old = at(2026, 9, 1);
+    recordAttempt('p', 'S', 's0', 4, res(0.95), 10, old);
+    const now = at(2026, 10, 5);
+    recordFullRun('p', 'S', 2, run(allGood), secs, noteStart, { ...counted, now });
+    expect(getProgress('p', 'S')!.sections.s0).toMatchObject({ level: 4, lastPassed: now });
   });
 
   it('late entries fail the run even with the right notes', async () => {

@@ -17,7 +17,7 @@ test('a perfect simulated singer passes level 1 and levels up', async ({ page })
 
   // Wait for the results screen (sections are short; allow for count-in + 70% tempo).
   await expect(page.getByTestId('pass-banner')).toBeVisible({ timeout: 90_000 });
-  await expect(page.getByTestId('pass-banner')).toContainText(/Level 1 reached|Passed/);
+  await expect(page.getByTestId('pass-banner')).toContainText(/level 1 reached|Passed/);
   const score = await page.getByTestId('result-score').textContent();
   expect(Number((score ?? '0').replace(/\D/g, ''))).toBeGreaterThan(0);
   expect(errors).toEqual([]);
@@ -54,7 +54,7 @@ test('score view: switch display, sing level 1 from sheet music, reach results',
   expect(ink).toBeGreaterThan(2000);
 
   await expect(page.getByTestId('pass-banner')).toBeVisible({ timeout: 90_000 });
-  await expect(page.getByTestId('pass-banner')).toContainText(/Level 1 reached|Passed/);
+  await expect(page.getByTestId('pass-banner')).toContainText(/level 1 reached|Passed/);
 
   // Settings: the same choice, including going back to automatic.
   await page.goto('/#/settings');
@@ -91,6 +91,22 @@ test('a perfect simulated full run at level 1 grants piece level 1', async ({ pa
   });
   expect(full).toMatchObject({ level: 1, attempts: 1 });
   expect(errors).toEqual([]);
+});
+
+// A new singer whose full run far above their level fails: the slips are shown, nothing locks,
+// and the next step is still level 1 of the first section.
+test('a failed full run above the singer’s level does not take over Next up', async ({ page }) => {
+  test.setTimeout(150_000);
+  await page.goto('/?simulate=flat#/piece/warmup-chorale');
+  await expect(page.getByTestId('full-run-card')).toBeVisible({ timeout: 20_000 });
+  await page.getByTestId('full-4').click();
+  await page.getByTestId('start').click();
+  await expect(page.getByTestId('pass-banner')).toContainText('Not yet', { timeout: 120_000 });
+  await expect(page.getByTestId('fix-first')).toHaveCount(0);
+  await page.goto('/#/piece/warmup-chorale');
+  await expect(page.getByTestId('piece-next')).toContainText('level 1');
+  await expect(page.getByTestId('later-fix')).toBeVisible();
+  await expect(page.getByTestId('full-4')).toBeEnabled();
 });
 
 test('a flat simulated singer does not pass level 4', async ({ page }) => {
@@ -178,7 +194,7 @@ test('memorisation: piece map, off-book test with peek, cold start, words in rhy
   await page.getByTestId('cold-start').click();
   await page.getByTestId('start').click();
   await expect(page.getByTestId('cold-again')).toBeVisible({ timeout: 90_000 });
-  await expect(page.getByText(/Level \d reached/)).toHaveCount(0);
+  await expect(page.getByText(/level \d reached/i)).toHaveCount(0);
   // Words in rhythm.
   await page.goto('/?simulate=perfect#/piece/warmup-chorale');
   await page.getByTestId('words-card').getByRole('button', { name: 'Read along' }).first().click();

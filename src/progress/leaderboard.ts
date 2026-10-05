@@ -20,7 +20,15 @@ export interface LeaderboardEntry {
   /** Readiness gain over the last 7 days (0..1, may be negative). */
   improved: number;
   updatedAt: number;
+  /**
+   * How readiness was computed: 2 = piece levels from full run-throughs (docs/LEVELS.md). Absent in
+   * entries from older app versions (readiness from section levels alone, so not comparable).
+   */
+  v?: number;
 }
+
+/** Current readiness formula (see LeaderboardEntry.v). */
+export const READINESS_VERSION = 2;
 
 export type RankBy = 'readiness' | 'streak' | 'improved' | 'weekly';
 
@@ -65,6 +73,7 @@ export function computeMyEntry(
     streak: streakDays(new Date(now)),
     improved: Math.round(improved * 1000) / 1000,
     updatedAt: now,
+    v: READINESS_VERSION,
   };
 }
 
@@ -98,7 +107,9 @@ export function sanitizeEntry(v: unknown): LeaderboardEntry | null {
   if (!name || !pieceId || readiness == null || weeklyScore == null || streak == null || improved == null || updatedAt == null) {
     return null;
   }
-  return { name, voice, pieceId, readiness, weeklyScore: Math.round(weeklyScore), streak: Math.round(streak), improved, updatedAt };
+  const e: LeaderboardEntry = { name, voice, pieceId, readiness, weeklyScore: Math.round(weeklyScore), streak: Math.round(streak), improved, updatedAt };
+  if (o.v === READINESS_VERSION) e.v = READINESS_VERSION;
+  return e;
 }
 
 // ---------------------------------------------------------------- share codes
@@ -123,7 +134,7 @@ function b64urlDecode(s: string): string {
 export function encodeShareCode(e: LeaderboardEntry): string {
   const arr = [
     e.name, e.voice, e.pieceId, Math.round(e.readiness * 1000), Math.round(e.weeklyScore),
-    e.streak, Math.round(e.improved * 1000), Math.round(e.updatedAt / 1000),
+    e.streak, Math.round(e.improved * 1000), Math.round(e.updatedAt / 1000), ...(e.v ? [e.v] : []),
   ];
   return SHARE_PREFIX + b64urlEncode(JSON.stringify(arr));
 }
@@ -137,7 +148,7 @@ export function decodeShareCode(str: string): LeaderboardEntry | null {
     if (!Array.isArray(a) || a.length < 8) return null;
     return sanitizeEntry({
       name: a[0], voice: a[1], pieceId: a[2], readiness: a[3] / 1000, weeklyScore: a[4],
-      streak: a[5], improved: a[6] / 1000, updatedAt: a[7] * 1000,
+      streak: a[5], improved: a[6] / 1000, updatedAt: a[7] * 1000, v: a[8],
     });
   } catch {
     return null;

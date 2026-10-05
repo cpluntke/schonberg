@@ -129,8 +129,13 @@ export interface Readiness {
   unconfirmed: number;
   /** Sections at the next piece level or above (the progress bar toward it); null at level 5. */
   toward: { level: number; done: number; total: number } | null;
-  /** Sections that slipped in a full run and must pass on their own first, lowest level first. */
+  /**
+   * Sections that slipped in a full run at a level the singer is working toward (see fixTarget):
+   * they must pass on their own before a full run at that level counts. Lowest level first.
+   */
   toFix: { level: number; sectionIds: string[] }[];
+  /** Sections that slipped in a full run above that level: information only (no lock, not in Next up). */
+  laterFixes: { level: number; sectionIds: string[] }[];
   /** Full runs passed off book so far (days), while the piece isn't memorised yet. */
   offBookDays: number;
 }
@@ -145,29 +150,49 @@ export function pieceLevel(sections: Section[], prog: PieceProgress | undefined)
   return full;
 }
 
-/** Pending "to fix" sections per level (only sections of this part), lowest level first. */
-export function pendingFixes(sections: Section[], prog: PieceProgress | undefined): { level: number; sectionIds: string[] }[] {
+/**
+ * The level the singer is working toward: the next piece level, or the level every section has
+ * already reached if that's higher (confirm it with a full run). To-fix lists only lock the full
+ * run and drive Next up up to this level; a failed run further ahead (a new singer trying level 5)
+ * mustn't take over.
+ */
+export function fixTarget(sections: Section[], prog: PieceProgress | undefined): number {
+  const minSec = sections.length ? Math.min(...sections.map((s) => Math.min(MAX_LEVEL, levelOf(prog, s.id)))) : 0;
+  return Math.min(MAX_LEVEL, Math.max(pieceLevel(sections, prog) + 1, minSec));
+}
+
+/**
+ * Pending "to fix" sections per level (only sections of this part), lowest level first. `active`
+ * (locks the full run at that level, leads Next up): the level is at most fixTarget, or the run
+ * mostly held there (at most half the sections slipped and all the others are at that level), as
+ * when an experienced singer goes straight to level 3 and one section slips. A run far above the
+ * singer's level that mostly failed is information only.
+ */
+export function pendingFixes(sections: Section[], prog: PieceProgress | undefined): { level: number; sectionIds: string[]; active: boolean }[] {
   const tf = prog?.full?.toFix;
   if (!tf || sections.length < 2) return [];
+  const target = fixTarget(sections, prog);
   const order = [...sections].sort((a, b) => a.index - b.index).map((s) => s.id);
-  const out: { level: number; sectionIds: string[] }[] = [];
+  const out: { level: number; sectionIds: string[]; active: boolean }[] = [];
   for (const k of Object.keys(tf).map(Number).filter((l) => l >= 1 && l <= MAX_LEVEL).sort((a, b) => a - b)) {
     const ids = order.filter((id) => (tf[k] ?? []).includes(id));
-    if (ids.length) out.push({ level: k, sectionIds: ids });
+    if (!ids.length) continue;
+    const heldElsewhere = ids.length * 2 <= sections.length && sections.every((s) => ids.includes(s.id) || levelOf(prog, s.id) >= k);
+    out.push({ level: k, sectionIds: ids, active: k <= target || heldElsewhere });
   }
   return out;
 }
 
-/** Sections still to fix before a full run at `level` can count. */
+/** Sections still to fix before a full run at `level` can count (only levels up to fixTarget lock). */
 export function fixesBefore(sections: Section[], prog: PieceProgress | undefined, level: number): string[] {
-  return pendingFixes(sections, prog).find((f) => f.level === level)?.sectionIds ?? [];
+  return pendingFixes(sections, prog).find((f) => f.level === level && f.active)?.sectionIds ?? [];
 }
 
 export function pieceReadiness(sections: Section[], prog: PieceProgress | undefined): Readiness {
   if (sections.length === 0) {
     return {
       pct: 0, pieceLevel: 0, minLevel: 0, rehearsalReady: false, concertReady: false, memorised: false, memorisedSections: 0,
-      unconfirmed: 0, toward: null, toFix: [], offBookDays: 0,
+      unconfirmed: 0, toward: null, toFix: [], laterFixes: [], offBookDays: 0,
     };
   }
   const P = pieceLevel(sections, prog);
@@ -193,7 +218,8 @@ export function pieceReadiness(sections: Section[], prog: PieceProgress | undefi
     memorisedSections: mem,
     unconfirmed: min > P ? min : 0,
     toward: P >= MAX_LEVEL ? null : { level: P + 1, done: towardDone, total: sections.length },
-    toFix: pendingFixes(sections, prog),
+    toFix: pendingFixes(sections, prog).filter((f) => f.active).map(({ level, sectionIds }) => ({ level, sectionIds })),
+    laterFixes: pendingFixes(sections, prog).filter((f) => !f.active).map(({ level, sectionIds }) => ({ level, sectionIds })),
     offBookDays: P === 4 ? prog?.full?.offBookDays?.length ?? 0 : 0,
   };
 }
@@ -221,6 +247,37 @@ export function sectionAccuracies(
   }
   const out: Record<string, number> = {};
   for (const [id, e] of sum) out[id] = e.s / e.n;
+  return out;
+}
+
+/** Fewer judged notes than this in a section: one weak note shouldn't decide a whole level. */
+export const SHORT_SECTION_NOTES = 8;
+
+/**
+ * Each section's result within one run of the whole piece: its accuracy (shown), and the value the
+ * pass mark is checked against. Short sections (fewer than SHORT_SECTION_NOTES judged notes) get
+ * one note of slack: their weakest note counts as sung well, so a single "ok" can't fail a level.
+ */
+export function sectionChecks(
+  sections: Section[],
+  noteStart: (index: number) => number | undefined,
+  result: Pick<AttemptResult, 'notes'>,
+): Record<string, { accuracy: number; checked: number; notes: number }> {
+  const vals = new Map<string, number[]>();
+  for (const n of result.notes) {
+    const t = noteStart(n.index);
+    if (t == null) continue;
+    const sec = sections.find((s) => t >= s.start - 1e-6 && t < s.end - 1e-6);
+    if (!sec) continue;
+    vals.set(sec.id, [...(vals.get(sec.id) ?? []), GRADE_VALUE[n.grade]]);
+  }
+  const out: Record<string, { accuracy: number; checked: number; notes: number }> = {};
+  for (const [id, v] of vals) {
+    const sum = v.reduce((a, b) => a + b, 0);
+    const accuracy = sum / v.length;
+    const checked = v.length < SHORT_SECTION_NOTES ? (sum - Math.min(...v) + 1) / v.length : accuracy;
+    out[id] = { accuracy, checked, notes: v.length };
+  }
   return out;
 }
 
@@ -252,8 +309,9 @@ export function nextStep(sections: Section[], prog: PieceProgress | undefined, n
   const P = pieceLevel(sections, prog);
   const today = todayKey(now);
   const label = (id: string) => sections.find((s) => s.id === id)?.label ?? id;
-  // 1. Sections that slipped in a full run: fix them on their own before the next full run.
-  const fix = pendingFixes(sections, prog)[0];
+  // 1. Sections that slipped in a full run at the level being worked toward: fix them on their own
+  // before the next full run. (Slips in a run above that level are information only.)
+  const fix = pendingFixes(sections, prog).find((f) => f.active);
   if (fix) {
     const more = fix.sectionIds.length - 1;
     return {
@@ -285,7 +343,16 @@ export function nextStep(sections: Section[], prog: PieceProgress | undefined, n
       reason: `Review ${due.s.label}: last passed ${days} days ago. Keep it at ${levelSpec(l).name}.`,
     };
   }
-  // 4. Every section is above the piece level: confirm it with a full run. (Off book needs a
+  // 4. Memorising: the whole piece passed from memory on one day, so sing it all from memory again
+  // on another day (not today).
+  const fullDays = prog?.full?.offBookDays ?? [];
+  if (multi && P === 4 && fullDays.length > 0 && !fullDays.includes(today)) {
+    return {
+      sectionId: 'all', level: 5, kind: 'full',
+      reason: `Sing the whole piece from memory again: day ${Math.min(OFF_BOOK_DAYS, fullDays.length + 1)} of ${OFF_BOOK_DAYS}.`,
+    };
+  }
+  // 5. Every section is above the piece level: confirm it with a full run. (Off book needs a
   // second day: a piece already sung from memory today waits until tomorrow.)
   if (multi) {
     const minSec = Math.min(...sections.map((s) => Math.min(MAX_LEVEL, levelOf(prog, s.id))));
@@ -299,7 +366,7 @@ export function nextStep(sections: Section[], prog: PieceProgress | undefined, n
       return { sectionId: 'all', level: minSec, kind: 'full', reason };
     }
   }
-  // 5. Earliest section with the lowest level. (A section already sung from memory today waits
+  // 6. Earliest section with the lowest level. (A section already sung from memory today waits
   // until tomorrow.)
   let best: Section | null = null;
   let bestLevel = 5;
@@ -370,8 +437,10 @@ export function targetForDate(
  * everything hidden and no peeking. Says why not, for the results screen.
  */
 export function fullRunCounts(o: {
-  level: number; rate: number; partial: boolean; resumed: boolean; timingUnsure: boolean; offBookPractice: boolean;
-}): { counted: boolean; why?: 'stopped' | 'paused' | 'tempo' | 'timing' | 'offbook' } {
+  level: number; rate: number; partial: boolean; resumed: boolean; timingUnsure: boolean; offBookPractice: boolean; arcade?: boolean;
+}): { counted: boolean; why?: 'arcade' | 'stopped' | 'paused' | 'tempo' | 'timing' | 'offbook' } {
+  // The arcade is a reward mode: its runs of the whole piece are for fun, never a level test.
+  if (o.arcade) return { counted: false, why: 'arcade' };
   if (o.partial) return { counted: false, why: 'stopped' };
   if (o.resumed) return { counted: false, why: 'paused' };
   if (o.rate < levelSpec(o.level).rate - 1e-6) return { counted: false, why: 'tempo' };

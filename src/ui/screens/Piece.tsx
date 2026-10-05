@@ -205,11 +205,17 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
               </div>
             </div>
           ))}
+          {r.laterFixes.map((f) => (
+            <span key={f.level} className="tiny muted" data-testid="later-fix">
+              In your run at level {f.level}, {f.sectionIds.map(label).join(', ')} slipped: practise {f.sectionIds.length > 1 ? 'them' : 'it'} at level {f.level} when you get there.
+            </span>
+          ))}
           {P === 4 && r.offBookDays > 0 && !r.toFix.length && (
             <span className="tiny muted">Whole piece from memory: day {r.offBookDays} of {OFF_BOOK_DAYS}. Sing it all at level 5 again on another day.</span>
           )}
           <div className="row wrap" style={{ gap: 6 }}>
             <button className="btn small ghost" onClick={() => play('all', Math.max(2, Math.min(4, P || 3)), '3d')}><IconCube size={16} color="#B3A6FF" /> Arcade run</button>
+            <span className="tiny muted" style={{ alignSelf: 'center' }}>just for fun: doesn't count for a level</span>
           </div>
         </div>
       )}

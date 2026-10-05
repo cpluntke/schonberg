@@ -50,6 +50,13 @@ describe('leaderboard', () => {
     expect(e.readiness).toBeCloseTo(1 / 8);
     expect(e.improved).toBeCloseTo(0.125);
   });
+  it('entries carry the readiness formula version; older entries stay unmarked', () => {
+    saveProfile({ ...loadProfile(), name: 'Me', voice: 'T' });
+    const mine = computeMyEntry('p', 'T', sections);
+    expect(mine.v).toBe(2);
+    expect(decodeShareCode(encodeShareCode(mine))?.v).toBe(2);
+    expect(decodeShareCode(encodeShareCode(entry))?.v).toBeUndefined();
+  });
   it('ranking', () => {
     const a = { ...entry, name: 'A', readiness: 0.5, streak: 10, improved: 0 };
     const b = { ...entry, name: 'B', readiness: 0.9, streak: 1, improved: 0.4 };

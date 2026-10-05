@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { Section } from '../music/types';
 import {
   LEVELS, LISTEN, levelSpec, strictnessFactor, effectiveTolerance, pieceReadiness, nextStep,
-  sectionStatus, targetForDate, pieceLevel, sectionAccuracies, fullRunCounts, fullRunDue, fixesBefore,
+  sectionStatus, targetForDate, pieceLevel, sectionAccuracies, fullRunCounts, fullRunDue, fixesBefore, fixTarget, sectionChecks,
 } from './ladder';
 import type { FullRunProgress, PieceProgress, SectionProgress } from './store';
 
@@ -45,7 +45,7 @@ describe('ladder', () => {
   it('readiness: ready only through the piece level (full runs)', () => {
     expect(pieceReadiness(secs, undefined)).toEqual({
       pct: 0, pieceLevel: 0, minLevel: 0, rehearsalReady: false, concertReady: false, memorised: false, memorisedSections: 0,
-      unconfirmed: 0, toward: { level: 1, done: 0, total: 4 }, toFix: [], offBookDays: 0,
+      unconfirmed: 0, toward: { level: 1, done: 0, total: 4 }, toFix: [], laterFixes: [], offBookDays: 0,
     });
     // Section levels alone count half and never make the piece ready.
     const r = pieceReadiness(secs, prog([4, 3, 3, 2]));
@@ -90,6 +90,40 @@ describe('ladder', () => {
     expect(n.reason).toMatch(/slipped in your full run/);
     // Ids of other parts' sections are ignored.
     expect(fixesBefore(secs, withFull(prog([1, 1, 1, 1]), { toFix: { 2: ['x9'] } }), 2)).toEqual([]);
+  });
+  it('a failed run far above the singer’s level is information only: no lock, Next up unchanged', () => {
+    // A new singer tries level 3 (or 5) and every section slips.
+    const p = withFull(prog([0, 0, 0, 0]), { level: 0, toFix: { 3: ['s0', 's1', 's2', 's3'], 5: ['s0', 's1'] } });
+    expect(fixTarget(secs, p)).toBe(1);
+    expect(nextStep(secs, p, NOW)).toMatchObject({ sectionId: 's0', level: 1, kind: 'section' });
+    expect(fixesBefore(secs, p, 3)).toEqual([]);
+    const r = pieceReadiness(secs, p);
+    expect(r.toFix).toEqual([]);
+    expect(r.laterFixes.map((f) => f.level)).toEqual([3, 5]);
+    // Once the singer works toward level 3, the list counts again.
+    const later = withFull(prog([3, 3, 3, 3]), { level: 2, toFix: { 3: ['s1'] } });
+    expect(nextStep(secs, later, NOW)).toMatchObject({ sectionId: 's1', level: 3, kind: 'fix' });
+    // A run that mostly held (one section of four slipped, the rest at that level) is a real fix list.
+    const skip = withFull(prog([3, 0, 3, 3]), { level: 0, toFix: { 3: ['s1'] } });
+    expect(fixesBefore(secs, skip, 3)).toEqual(['s1']);
+    expect(nextStep(secs, skip, NOW)).toMatchObject({ sectionId: 's1', level: 3, kind: 'fix' });
+  });
+  it('nextStep: after the whole piece from memory on day 1, day 2 is the full run again', () => {
+    const p = withFull(prog([4, 4, 4, 4], { s0: { offBookDays: ['2026-10-03'] } }), { level: 4, offBookDays: ['2026-10-03'] });
+    expect(nextStep(secs, p, NOW)).toMatchObject({ sectionId: 'all', level: 5, kind: 'full', reason: expect.stringMatching(/day 2 of 2/) });
+  });
+  it('sectionChecks: short sections get one weak note of slack', () => {
+    const starts = [0, 1, 9, 10, 11, 12, 13, 14, 15, 16];
+    const res = { notes: [
+      { index: 0, grade: 'perfect' }, { index: 1, grade: 'ok' }, // s0: 2 notes, 0.75 → checked 1
+      ...[2, 3, 4, 5, 6, 7, 8].map((index) => ({ index, grade: 'perfect' })), { index: 9, grade: 'ok' }, // s1 8 notes (9..16 → s1 and s2)
+    ] } as never;
+    const c = sectionChecks(secs, (i) => starts[i], res);
+    expect(c.s0.accuracy).toBeCloseTo(0.75);
+    expect(c.s0.checked).toBe(1);
+    expect(c.s1.notes).toBe(7);
+    expect(c.s2.checked).toBe(1);
+    expect(fullRunCounts({ level: 3, rate: 1, partial: false, resumed: false, timingUnsure: false, offBookPractice: false, arcade: true }).why).toBe('arcade');
   });
   it('sectionAccuracies: each section scored within one run', () => {
     const starts = [0, 2, 9, 10, 17, 40];

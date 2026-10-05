@@ -284,7 +284,8 @@ function SingPlay({ route }: { route: PlayRoute }) {
     // not stopped early, not paused and resumed, at the level's tempo.
     const isFull = section.id === 'all';
     const resumed = !!sess?.resumed;
-    const fullCounted = isFull && fullRunCounts({ level, rate, partial, resumed, timingUnsure: timingUnsure != null, offBookPractice }).counted;
+    const arcade = route.mode === '3d';
+    const fullCounted = isFull && fullRunCounts({ level, rate, partial, resumed, timingUnsure: timingUnsure != null, offBookPractice, arcade }).counted;
     const sectionLadder = realSection && !partial && timingUnsure == null && !offBookPractice && fullTempo;
     // Practice runs (slower tempo, stopped early) are logged but never change section levels.
     const recId = sectionLadder || !realSection ? section.id : 'practice';
@@ -316,6 +317,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
       fixed,
       notCounted: (realSection || isFull) && !ladder
         ? (partial ? 'stopped early'
+          : isFull && arcade ? 'arcade runs of the whole piece are just for fun'
           : isFull && resumed ? 'you paused and carried on (a run of the whole piece counts only in one go)'
           : full?.blocked ? `first fix ${full.blocked.map((id) => secs.find((s) => s.id === id)?.label ?? id).join(', ')} on ${full.blocked.length > 1 ? 'their' : 'its'} own at level ${level}`
           : offBookPractice ? (peekedN > 0 ? `you peeked at ${peekedN} bar${peekedN > 1 ? 's' : ''}` : 'some bars were still showing (practice mode)')
@@ -644,7 +646,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
               <strong style={{ fontSize: 18 }}>Paused</strong>
               {isFullRun && <span className="small muted">A run of the whole piece counts only in one go: carry on to practise, or restart to sing it through for the level.</span>}
               <button className="btn primary block" onClick={() => { sessionRef.current?.resume(); setPhase('running'); }}><IconPlay size={18} /> Resume</button>
-              <button className="btn block" onClick={() => { sessionRef.current?.dispose(); sessionRef.current = null; start(); }}><IconRestart size={18} /> Restart section</button>
+              <button className="btn block" onClick={() => { sessionRef.current?.dispose(); sessionRef.current = null; start(); }}><IconRestart size={18} /> {isFullRun ? 'Restart' : 'Restart section'}</button>
               {!listenOnly && <button className="btn block" onClick={() => sessionRef.current?.finish()}>Finish &amp; see results</button>}
               <button className="btn ghost block" onClick={() => { sessionRef.current?.dispose(); leave(); }}>Quit</button>
             </div>

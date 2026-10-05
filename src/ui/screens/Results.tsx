@@ -6,7 +6,7 @@ import { toast } from '../hooks';
 import { getLastResult } from '../play/lastResult';
 import { getPiece, singableSections } from '../library';
 import { go } from '../router';
-import { LEVELS, OFF_BOOK_DAYS, nextStep } from '../../progress/ladder';
+import { LEVELS, OFF_BOOK_DAYS, fixesBefore, nextStep } from '../../progress/ladder';
 import { getProgress } from '../../progress/store';
 import { IconDown, IconUp, IconClock, IconLoop, IconStar, IconPlay, IconCube } from '../icons';
 import type { Insight } from '../../game/types';
@@ -54,10 +54,13 @@ export function Results() {
   const sections = singableSections(piece, lr.partId);
   const prog = getProgress(piece.id, lr.partId);
   const next = nextStep(sections, prog);
-  const isPB = lr.prevBest != null && r.score > lr.prevBest;
+  // Practice runs (stopped, slower, paused…) don't set personal bests.
+  const isPB = !lr.notCounted && lr.prevBest != null && r.score > lr.prevBest;
   const label = (id: string) => sections.find((s) => s.id === id)?.label ?? id;
   const fixedNote = lr.fixed?.[lr.fixed.length - 1];
-  const nextFix = lr.full?.counted && !lr.full.passed ? lr.full.toFix[0] : undefined;
+  // Fix first only when this run's level is the one being worked toward (a slip in a run further
+  // ahead is shown, but the next step stays the usual one).
+  const nextFix = lr.full?.counted && !lr.full.passed ? fixesBefore(sections, prog, lr.level)[0] : undefined;
   const leveledUp = lr.ladder && lr.newLevel > lr.prevLevel;
 
   const sungCents = r.notes.map((n) => n.cents).filter((c): c is number => c != null && Math.abs(c) < 100).sort((a, b) => a - b);
@@ -110,7 +113,7 @@ export function Results() {
           {lr.passed && lr.level === 5 && lr.newLevel < 5
             ? <><strong>Sung from memory!</strong> That's day {lr.offBookDays ?? 1} of {OFF_BOOK_DAYS}: do it again on another day and the section counts as memorised.{leveledUp ? ` (And it's concert-ready now.)` : ''}</>
             : leveledUp
-            ? <><strong>Level {lr.newLevel} reached: {LEVELS[lr.newLevel - 1]?.name}!</strong> {lr.newLevel >= 5 ? 'This section is memorised.' : lr.newLevel >= 4 ? 'This section is concert-ready.' : lr.newLevel >= 3 ? 'This section is rehearsal-ready.' : ''}</>
+            ? <><strong>{section?.label ?? 'Section'}: level {lr.newLevel} reached ({LEVELS[lr.newLevel - 1]?.name})!</strong> {lr.newLevel >= 5 ? 'This section is memorised.' : lr.newLevel >= 4 ? 'This section is concert-ready.' : lr.newLevel >= 3 ? 'This section is rehearsal-ready.' : ''}</>
             : lr.passed
               ? <><strong>Passed.</strong> You keep level {lr.newLevel}.</>
               : lr.timingFail != null && r.accuracy >= (spec?.pass ?? 0.8)
@@ -165,7 +168,7 @@ export function Results() {
               </div>
             );
           })}
-          <span className="tiny muted">Each section needs {Math.round((spec?.pass ?? 0.8) * 100)}% within the run, like the run as a whole.</span>
+          <span className="tiny muted">Each section needs {Math.round((spec?.pass ?? 0.8) * 100)}% within the run, like the run as a whole (short sections get one weak note of slack).</span>
         </div>
       )}
 

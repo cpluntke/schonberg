@@ -292,6 +292,9 @@ export class PracticeSession {
     this.resumeToken++;
     if (this.phase !== 'playing' && this.phase !== 'countin') return;
     this.resumeFrom = Math.max(this.cfg.from, Math.min(this.player.position, this.cfg.to));
+    // A pause counts as breaking the run only once the singer's first note has started (pausing
+    // during the count-in or the opening rest just starts again).
+    if (this.resumeFrom > this.firstNoteTime() + 1e-3) this.pausedMidRun = true;
     this.unsubEnd?.();
     this.unsubEnd = null;
     this.player.stop();
@@ -346,7 +349,15 @@ export class PracticeSession {
 
   /** The run was paused and resumed (not sung in one go). */
   get resumed(): boolean {
-    return this.plays > 1;
+    return this.pausedMidRun && this.plays > 1;
+  }
+
+  private pausedMidRun = false;
+
+  /** Score time of the singer's first note in this run. */
+  private firstNoteTime(): number {
+    const r = this.cfg.range;
+    return r ? this.cfg.part.notes[r[0]]?.start ?? this.cfg.from : this.cfg.from;
   }
 
   finish() {
