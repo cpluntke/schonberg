@@ -430,7 +430,7 @@ function ProgrammeEditor({ code, auth, info, library, draft, onDraft, onSaved, o
           return (
             <div key={p.id} className="row" style={{ gap: 6 }}>
               <button className="chip grow" style={{ textAlign: 'left' }} aria-pressed={on} onClick={() => { setIds(toggle(ids, p.id)); if (on) setFocus(focus.filter((x) => x !== p.id)); }}>
-                {p.title}<span className="tiny muted"> · {p.composer}</span>
+                {p.title}{p.composer && <span className="tiny muted"> · {p.composer}</span>}
               </button>
               <button className="chip" aria-pressed={focus.includes(p.id)} disabled={!on} aria-label={`Next rehearsal: ${p.title}`} onClick={() => setFocus(toggle(focus, p.id))}>★</button>
             </div>

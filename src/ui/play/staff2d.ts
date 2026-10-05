@@ -11,7 +11,7 @@ import { F_CLEF, G_CLEF, GLYPH_UNITS_PER_SPACE } from './clefGlyphs';
 import type { KeySig, Part, Score } from '../../music/types';
 import type { Grade, PitchSample } from '../../game/types';
 import { beatToTime, timeToBeat } from '../../music/time';
-import { spellPc } from '../../game/notation';
+import { noteLabel, spellPc, type NotationMode } from '../../game/notation';
 import { COLORS, wordInitial, type DrawState } from './highway2d';
 
 const EPS = 0.01;
@@ -520,6 +520,8 @@ export interface LayoutOpts {
   sp: number;
   /** Width in px of a lyric syllable in the lyric font. */
   textW: (s: string) => number;
+  /** Note names under the notes: width in px of a note's name (they take room like syllables). */
+  nameW?: NameW;
   maxBars?: number;
   left?: number;
   right?: number;
@@ -549,15 +551,26 @@ export const hasSecond = (e: StaffEvent) => {
   return false;
 };
 export const ACC_W = 1.25;
+/** Least gap between two note names (staff spaces). */
+export const NAME_GAP = 0.45;
 
-function measureWidths(sm: StaffMeasure, sp: number, textW: (s: string) => number, inside: boolean) {
+/** Width in px of the name of a note (`midi` in `key`), as printed under the staff. */
+export type NameW = (midi: number, key: KeySig) => number;
+
+/** Widths of the note names of a bar's events (0 for rests and tied continuations). */
+export function nameWidths(sm: StaffMeasure, nameW: NameW | undefined): number[] {
+  return sm.events.map((e) => (nameW && e.kind === 'note' && e.first && e.midi != null ? nameW(e.midi, sm.key) : 0));
+}
+
+function measureWidths(sm: StaffMeasure, sp: number, textW: (s: string) => number, inside: boolean, nameW?: NameW) {
   const evs = sm.events;
   const lw = evs.map((e) => (e.lyric ? textW(e.lyric) : 0));
+  const nw = nameWidths(sm, nameW);
   const gaps: number[] = [];
   let changeW = 0;
   if (inside && sm.keyChange) changeW += keyChangeW(sm.key.fifths, sm.prevFifths) * sp;
   if (inside && sm.timeChange) changeW += TIME_W * sp;
-  let lead = Math.max(1.3 * sp + (hasAcc(evs[0]) ? ACC_W * sp : 0), lw[0] / 2 + 0.4 * sp);
+  let lead = Math.max(1.3 * sp + (hasAcc(evs[0]) ? ACC_W * sp : 0), lw[0] / 2 + 0.4 * sp, (nw[0] ?? 0) / 2 + 0.4 * sp);
   if (evs[0]?.measureRest) lead = 2.2 * sp;
   for (let j = 0; j < evs.length; j++) {
     const e = evs[j];
@@ -572,8 +585,9 @@ function measureWidths(sm: StaffMeasure, sp: number, textW: (s: string) => numbe
         const hyph = e.syllabic === 'begin' || e.syllabic === 'middle';
         g = Math.max(g, lw[j] / 2 + lw[j + 1] / 2 + (hyph ? 1.4 : 0.6) * sp);
       }
+      if (nw[j] || nw[j + 1]) g = Math.max(g, nw[j] / 2 + nw[j + 1] / 2 + NAME_GAP * sp);
     } else {
-      g = Math.max(g, lw[j] / 2 + 0.5 * sp + (e.syllabic === 'begin' || e.syllabic === 'middle' ? 0.6 * sp : 0));
+      g = Math.max(g, lw[j] / 2 + 0.5 * sp + (e.syllabic === 'begin' || e.syllabic === 'middle' ? 0.6 * sp : 0), nw[j] / 2 + 0.5 * sp);
     }
     gaps.push(g);
   }
@@ -603,8 +617,8 @@ export function layoutStaff(score: Score, part: Part, m0: number, m1: number, o:
     const kw = sm.keyChange ? keyChangeW(sm.key.fifths, sm.prevFifths) : keyW(sm.key.fifths);
     return (CLEF_W + kw + (sm.timeChange ? TIME_W : 0) + 0.4) * sp;
   };
-  const inner = sms.map((sm) => measureWidths(sm, sp, o.textW, true));
-  const opening = sms.map((sm) => measureWidths(sm, sp, o.textW, false));
+  const inner = sms.map((sm) => measureWidths(sm, sp, o.textW, true, o.nameW));
+  const opening = sms.map((sm) => measureWidths(sm, sp, o.textW, false, o.nameW));
   const groups = breakSystems(opening.map((w, k) => prefixW(k) + w.total), inner.map((w) => w.total), avail, maxBars);
   const systems: StaffSystem[] = groups.map((g, gi) => {
     const firstSm = sms[g[0]];
@@ -1247,13 +1261,60 @@ export interface Cached {
   band: number;
   lyricFont: string;
   lyricOff: number;
+  /** Note names on (your own staff, levels 1–3): bottom line → their baseline, and their font. */
+  nameOff?: number;
+  nameFont?: string;
   sys: (SysDraw | undefined)[];
   textW: Map<string, number>;
 }
 let cache: Cached | null = null;
 
 export function lyricFontFor(sp: number) {
-  return `600 ${Math.round(Math.max(11, Math.min(15, sp * 1.45)))}px "Bricolage Grotesque", system-ui, sans-serif`;
+  return `600 ${lyricPx(sp)}px "Bricolage Grotesque", system-ui, sans-serif`;
+}
+
+const lyricPx = (sp: number) => Math.round(Math.max(11, Math.min(15, sp * 1.45)));
+const namePx = (sp: number) => Math.round(Math.max(10, Math.min(13, sp * 1.1)));
+
+/** Note names: a little smaller than the words, in their own row between the staff and the words. */
+export function nameFontFor(sp: number) {
+  return `700 ${namePx(sp)}px "Bricolage Grotesque", system-ui, sans-serif`;
+}
+
+/** Are note names printed on your staff? (Levels 1–3; never while bars are hidden off book.) */
+export const namesOn = (s: Pick<DrawState, 'showNames' | 'hide'>) => s.showNames && !s.hide;
+
+/**
+ * Rows under a staff whose lowest notehead is `noteBelow` spaces under the bottom line, at staff
+ * space `sp`: the words' baseline at least `min` and `pad` under it (spaces under the bottom line)
+ * and, with names on, the names' baseline in a row of their own above the words.
+ */
+export function textRows(noteBelow: number, sp: number, o: { min: number; pad: number; names: boolean; notation: NotationMode }): { nameOff?: number; lyricOff: number } {
+  if (!o.names) return { lyricOff: Math.max(o.min, noteBelow + o.pad) };
+  const n = namePx(sp) / sp;
+  const l = lyricPx(sp) / sp;
+  // Jianpu's octave dots sit above or below the digit: a little more room.
+  const dots = o.notation === 'jianpu' ? 0.45 : 0;
+  // The names' capitals clear the notes as the words' would; the words' capitals clear the names.
+  const nameOff = Math.max(o.min - 0.1, noteBelow + o.pad - 0.1 + Math.max(0, 0.72 * n - 0.8)) + dots;
+  return { nameOff, lyricOff: nameOff + Math.max(1.75, 0.72 * l + 0.6 * n) + dots };
+}
+
+/** Width measure for note names in `font` (cached per text). */
+export function nameMeasure(c: Ctx, font: string, notation: NotationMode): NameW {
+  const memo = new Map<string, number>();
+  return (midi, key) => {
+    const t = noteLabel(midi, notation, key).text;
+    let w = memo.get(t);
+    if (w == null) {
+      const f = c.font;
+      c.font = font;
+      w = c.measureText(t).width;
+      c.font = f;
+      memo.set(t, w);
+    }
+    return w;
+  };
 }
 
 /** Staff-space size: a portrait phone gets fewer but bigger systems (filling the height), so the
@@ -1265,7 +1326,8 @@ export function staffSpace(W: number, H: number, perSys: number): { sp: number; 
 }
 
 function getLayout(c: Ctx, W: number, H: number, s: DrawState): Cached {
-  const key = `${s.score.id}|${s.part.id}|${s.part.notes.length}|${s.from}|${s.to}|${W}|${H}|${fontGen}`;
+  const names = namesOn(s);
+  const key = `${s.score.id}|${s.part.id}|${s.part.notes.length}|${s.from}|${s.to}|${W}|${H}|${fontGen}|${names ? s.notation : '-'}`;
   if (cache && cache.key === key) return cache;
   const [m0, m1] = measureSpan(s.score, s.from, s.to);
   const clef = clefFor(s.part);
@@ -1281,23 +1343,34 @@ function getLayout(c: Ctx, W: number, H: number, s: DrawState): Cached {
     hi = Math.max(hi, st);
   }
   const above = Math.max(3.4, (hi - (mid + 4)) / 2 + 2.6);
-  const lyricOff = Math.max(3.2, ((mid - 4) - lo) / 2 + 2.6); // bottom line → lyric baseline
-  const below = lyricOff + 1.3;
-  const perSys = above + 4 + below;
+  // Bottom line → note names' and lyrics' baselines (names: sized for a typical staff, then again
+  // for the one chosen).
+  const noteBelow = ((mid - 4) - lo) / 2;
+  const rows = (q: number) => textRows(noteBelow, q, { min: 3.2, pad: 2.6, names, notation: s.notation });
+  let { nameOff, lyricOff } = rows(12);
+  let below = lyricOff + 1.3;
+  let perSys = above + 4 + below;
   let { sp, floor } = staffSpace(W, H, perSys);
   let layout: StaffLayout;
   // Bigger staff, but a bar never squeezed much below its natural width (shrink until it fits).
   for (let guard = 0; ; guard++) {
+    const nameW = names ? nameMeasure(c, nameFontFor(sp), s.notation) : undefined;
     c.font = lyricFontFor(sp);
     const textW = (t: string) => c.measureText(t).width;
-    layout = layoutStaff(s.score, s.part, m0, m1, { width: W, sp, textW, maxBars: W < 520 ? 3 : W < 860 ? 4 : 6 });
+    layout = layoutStaff(s.score, s.part, m0, m1, { width: W, sp, textW, nameW, maxBars: W < 520 ? 3 : W < 860 ? 4 : 6 });
     let worst = Infinity;
     for (const sy of layout.systems) worst = Math.min(worst, sy.squeeze);
     if (worst >= 0.9 || sp <= floor + 1e-6 || guard >= 6) break;
     sp = Math.max(floor, sp * 0.92);
   }
+  if (names) {
+    ({ nameOff, lyricOff } = rows(sp));
+    below = lyricOff + 1.3;
+    perSys = above + 4 + below;
+  }
   cache = {
     key, layout, above, below, band: perSys * sp, lyricFont: lyricFontFor(sp), lyricOff,
+    nameOff, nameFont: names ? nameFontFor(sp) : undefined,
     sys: [], textW: new Map(),
   };
   return cache;
@@ -1452,13 +1525,15 @@ export function drawStaffFrame(c: Ctx, g: Pick<SysGeo, 'sys' | 'top' | 'mid'>, l
   if (sys.timeSig) drawTimeSig(c, sys.timeX, mid, sp, sys.timeSig, INK.clef);
 
   // Barlines + numbers.
-  c.font = `600 ${Math.round(Math.max(9, sp * 0.95))}px "JetBrains Mono", monospace`;
-  c.textBaseline = 'alphabetic';
-  c.textAlign = 'left';
+  const numFont = `600 ${Math.round(Math.max(9, sp * 0.95))}px "JetBrains Mono", monospace`;
   for (let mi = 0; mi < sys.measures.length; mi++) {
     const m = sys.measures[mi];
     const last = mi === sys.measures.length - 1;
     if (o.barlines) drawBarline(c, m, last, s.score.measures.length, top, 4 * sp + lw, sp, lw);
+    // (Set every bar: a time signature drawn in the bar before changes the font.)
+    c.font = numFont;
+    c.textBaseline = 'alphabetic';
+    c.textAlign = 'left';
     c.fillStyle = INK.barNo;
     const nx = mi === 0 ? sys.clefX : m.x0 - 0.2 * sp;
     if (o.numbers && m.sm.number !== '0') c.fillText(m.sm.number, nx, top - 1.75 * sp);
@@ -1600,6 +1675,40 @@ export function drawStaffNotes(c: Ctx, g: SysGeo, layout: StaffLayout, L: Cached
   }
 
   drawLyrics(c, g, s, L, v);
+  if (L.nameOff != null && L.nameFont && !v.plain) drawNames(c, g, s, L, v);
+}
+
+/** Note names (in your notation) in a row under your staff, one under each note it starts. */
+function drawNames(c: Ctx, g: SysGeo, s: DrawState, L: Cached, v: Vis) {
+  const sp = L.layout.sp;
+  const by = g.top + (4 + L.nameOff!) * sp;
+  c.font = L.nameFont!;
+  c.textBaseline = 'alphabetic';
+  c.textAlign = 'center';
+  const notes = s.part.notes;
+  for (const eg of g.sd.evs) {
+    const e = eg.ev;
+    if (e.kind !== 'note' || !e.first || e.midi == null) continue;
+    const i = e.noteIndex!;
+    if (v.vis(i) !== 'show') continue;
+    const lab = noteLabel(notes[i].midi, s.notation, eg.m.sm.key);
+    const now = v.isNow(i);
+    c.fillStyle = !v.inRange(i) || (v.isPast(i) && !now) ? INK.lyricPast : now ? COLORS.target : COLORS.label;
+    c.globalAlpha = alphaOf(v, i);
+    c.fillText(lab.text, eg.x, by);
+    const dots = lab.dotsAbove || lab.dotsBelow;
+    if (dots) {
+      const r = Math.max(1.2, 0.13 * sp);
+      for (let d = 0; d < dots; d++) {
+        const dy = lab.dotsAbove ? by - 1.25 * sp - d * 0.4 * sp : by + 0.45 * sp + d * 0.4 * sp;
+        c.beginPath();
+        c.arc(eg.x, dy, r, 0, Math.PI * 2);
+        c.fill();
+      }
+    }
+  }
+  c.globalAlpha = 1;
+  c.textAlign = 'left';
 }
 
 /** Outlines over the noteheads the voice trace runs through (sung or being sung). */
@@ -1755,7 +1864,7 @@ export function updateTrace(s: DrawState, L: Cached) {
   const tempos = s.score.tempos;
   const notes = s.part.notes;
   const yMin = -(2 + L.above - 0.6) * sp;
-  const yMax = (2 + L.lyricOff - 1.5) * sp;
+  const yMax = (2 + (L.nameOff ?? L.lyricOff) - 1.5) * sp;
   const dyOf = (st: number) => -((st - layout.mid) * sp) / 2;
   let allFinal = true;
   for (let q = tr.done; q < smp.length; q++) {
@@ -1917,7 +2026,7 @@ export function drawBubble(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: numbe
       && notes[ev.noteIndex].start + notes[ev.noteIndex].dur > s.pos;
     const step = sungStep(last.midi, keyAtBeat(s.score, lb), ev && !hiddenEv ? nearestHead(ev, last.midi) : null);
     const yMin = g.top - (L.above - 0.6) * sp;
-    const yMax = g.top + (4 + L.lyricOff - 1.5) * sp;
+    const yMax = g.top + (4 + (L.nameOff ?? L.lyricOff) - 1.5) * sp;
     py = Math.max(yMin, Math.min(yMax, g.mid - ((step - L.layout.mid) * sp) / 2));
   }
   c.fillStyle = 'rgba(76,201,240,0.28)';

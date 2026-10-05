@@ -478,3 +478,12 @@ describe('time helpers', () => {
     expect(beatTimes(s68, 0, 10).map((b) => b.time)).toEqual([0, 1.5]);
   });
 });
+
+describe('title and composer from the credits', () => {
+  it('splits a "Title - Composer" credit when the score has no title (the Ravel library file)', async () => {
+    const buf = readFileSync(resolve(__dirname, '../../library/scores/ravel-nicolette.mxl'));
+    const s = await importScoreFile('ravel-nicolette.mxl', buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+    expect(s.title).toBe('Nicolette');
+    expect(s.composer).toBe('Ravel');
+  });
+});

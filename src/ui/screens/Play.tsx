@@ -36,6 +36,7 @@ import { useResume } from '../play/useResume';
 import { IconBack, IconPause, IconPlay, IconRestart, IconStop } from '../icons';
 import type { AttemptResult } from '../../game/types';
 import type { NotationMode } from '../../game/notation';
+import { NotFound } from '../components/NotFound';
 
 type PlayRoute = Extract<Route, { name: 'play' }>;
 
@@ -499,14 +500,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
     };
   }, []);
 
-  if (!piece || !part || !section) {
-    return (
-      <main className="screen">
-        <div className="topbar"><button className="icon-btn" aria-label="Back" onClick={() => back()}><IconBack /></button><h1>Not found</h1></div>
-        <p className="muted">This section couldn't be found. It may have been deleted.</p>
-      </main>
-    );
-  }
+  if (!piece || !part || !section) return <NotFound pieceId={route.pieceId} />;
 
   const lyricNotes = offBook && hiddenRef.current.size
     ? part.notes.map((n, i) => (i <= hud.lyricIdx || !hiddenRef.current.has(n.measure) ? n
@@ -560,8 +554,11 @@ function SingPlay({ route }: { route: PlayRoute }) {
         <canvas ref={canvasRef} aria-label={display === 'score' ? undefined : route.mode === '3d' ? 'Arcade' : 'Note highway'} role="img" data-display={display} />
         <div className="sr-only" aria-live="polite" data-testid="countin-live">{hud.count > 0 && running ? String(hud.count) : ''}</div>
         {hud.count > 0 && running && (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
             <span style={{ fontSize: 96, fontWeight: 800, color: 'var(--accent)', textShadow: '0 0 24px #FF7A45' }}>{hud.count}</span>
+            {sessionRef.current?.resumed && (
+              <span className="small" data-testid="resume-hint" style={{ background: 'rgba(11,13,26,0.85)', borderRadius: 8, padding: '4px 10px' }}>Carry on singing from the line</span>
+            )}
           </div>
         )}
         {phase === 'ready' && (
@@ -728,14 +725,15 @@ function SingPlay({ route }: { route: PlayRoute }) {
                 disabled={me && !canToggleOwn}
                 title={me && !canToggleOwn ? 'At this level you sing without your part' : undefined}
                 onClick={() => togglePart(p.id)}>
-                {shortName(p.name)}{me ? ' · you' : ''}{on ? '' : ' (off)'}
+                {shortName(p.name)}{me ? <span className="you"> · you</span> : ''}{on ? '' : ' (off)'}
               </button>
             );
           })}
         </div>
-        <div className="row">
-          <button className="btn small" disabled={!running} onClick={() => { sessionRef.current?.dispose(); sessionRef.current = null; start(); }}>
-            <IconRestart size={16} /> Restart
+        {/* With Peek too, Restart and Finish show only their icons on a phone (Pause always fits). */}
+        <div className={`row play-actions${offBook && running && hiddenRef.current.size > 0 ? ' compact' : ''}`}>
+          <button className="btn small" aria-label="Restart" disabled={!running} onClick={() => { sessionRef.current?.dispose(); sessionRef.current = null; start(); }}>
+            <IconRestart size={16} /> <span className="lbl">Restart</span>
           </button>
           <div className="grow" />
           {offBook && running && hiddenRef.current.size > 0 && (
@@ -748,7 +746,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
           )}
           {running ? (
             <>
-              {!listenOnly && <button className="btn small" onClick={() => sessionRef.current?.finish()}><IconStop size={14} color="#EEF0FF" /> Finish</button>}
+              {!listenOnly && <button className="btn small" aria-label="Finish" onClick={() => sessionRef.current?.finish()}><IconStop size={14} color="#EEF0FF" /> <span className="lbl">Finish</span></button>}
               <button className="big-play" aria-label="Pause" onClick={() => { sessionRef.current?.pause(); setPhase('paused'); }}><IconPause /></button>
             </>
           ) : (
@@ -815,7 +813,15 @@ export function lyricLine(notes: { lyric?: string; syllabic?: string }[], idx: n
   if (now && done && !(nowNote?.syllabic === 'middle' || nowNote?.syllabic === 'end')) now = ' ' + now;
   let next = joinSyl(nextNotes);
   if (next && nextNotes.find((n) => n.lyric) && !['middle', 'end'].includes(nextNotes.find((n) => n.lyric)!.syllabic ?? '')) next = ' ' + next;
-  return { done: done.slice(-28), now, next };
+  return { done: tailWords(done, 28), now, next };
+}
+
+/** The end of `text`, at most about `max` characters, starting at a word (never "ald steht"). */
+function tailWords(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const cut = text.length - max;
+  const sp = text.indexOf(' ', cut - 1);
+  return sp < 0 ? text.slice(cut) : text.slice(sp + 1);
 }
 
 function emptyResult(): AttemptResult {

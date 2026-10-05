@@ -8,6 +8,7 @@ import { allPieces } from '../library';
 import { IntroVideoButton, introSeen } from '../components/IntroVideo';
 import { go, back } from '../router';
 import { RangeCheck } from '../components/RangeCheck';
+import { micErrorText } from '../components/Tuner';
 import { getTracker } from '../play/session';
 import { shareMyProgress } from '../play/shareProgress';
 import { getAudioContext, unlockAudio } from '../../audio/context';
@@ -44,7 +45,7 @@ export function Setup() {
   const [range, setRange] = useState<{ lo: number; hi: number } | null>(
     profile.rangeLow && profile.rangeHigh ? { lo: profile.rangeLow, hi: profile.rangeHigh } : null,
   );
-  const [lat, setLat] = useState<{ state: 'idle' | 'running' | 'done' | 'fail'; beat: number; ms: number }>({ state: 'idle', beat: 0, ms: profile.latencyMs });
+  const [lat, setLat] = useState<{ state: 'idle' | 'running' | 'done' | 'fail'; beat: number; ms: number; mic?: string }>({ state: 'idle', beat: 0, ms: profile.latencyMs });
   const steps = 5;
   // Onboarding funnel (anonymous usage statistics): only the first setup of this install counts.
   const [firstSetup] = useState(() => !profile.onboarded);
@@ -64,7 +65,8 @@ export function Setup() {
       } else setLat({ state: 'fail', beat: 0, ms: 0 });
     } catch (e) {
       console.error(e);
-      setLat({ state: 'fail', beat: 0, ms: 0 });
+      // No microphone (blocked, none, not https): say so, not "sing louder".
+      setLat({ state: 'fail', beat: 0, ms: 0, mic: (e as { code?: string } | null)?.code ? micErrorText(e) : undefined });
     }
   }
 
@@ -187,7 +189,7 @@ export function Setup() {
                 <span className="small muted">Saved. Scoring compensates for this delay.</span>
               </>
             ) : lat.state === 'fail' ? (
-              <span className="small" style={{ color: 'var(--accent-text)', textAlign: 'center' }}>Couldn't hear enough “ta”s. Sing louder and closer to the mic, then try again, or skip this step.</span>
+              <span className="small" role="status" style={{ color: 'var(--accent-text)', textAlign: 'center' }}>{lat.mic ?? 'Couldn\'t hear enough “ta”s. Sing louder and closer to the mic, then try again, or skip this step.'}</span>
             ) : (
               <span className="small muted">{profile.latencyMs ? `Current setting: ${profile.latencyMs} ms` : 'Not measured yet.'}</span>
             )}
@@ -240,7 +242,7 @@ function ChoirStep({ profile, update, onNext }: { profile: Profile; update: (p: 
           <strong style={{ fontSize: 20 }}>{choir!.name}</strong>
           {(choir!.cycle || choir!.pieces.length > 0) && (
             <span className="small muted">
-              {choir!.cycle ? `Programme: ${choir!.cycle.name}. ` : ''}{choir!.pieces.length ? `${choir!.pieces.length} score${choir!.pieces.length === 1 ? '' : 's'} from the choir are on their way to your phone.` : ''}
+              {choir!.cycle ? `Programme: ${choir!.cycle.name}. ` : ''}{choir!.pieces.length ? (choir!.pieces.length === 1 ? '1 score from the choir is on its way to your phone.' : `${choir!.pieces.length} scores from the choir are on their way to your phone.`) : ''}
             </span>
           )}
           <label className="row small" style={{ gap: 10, alignItems: 'flex-start' }}>

@@ -7,7 +7,7 @@ import type { Score } from '../../music/types';
 import type { Part } from '../../music/types';
 import {
   beamGroups, breakSystems, buildMeasures, clefFor, eventHas, eventSteps, keyAlts, layoutStaff, measureSpan, midiToStep,
-  middleStep, spell, splitDuration, staffSpace, STAFF_GRADE, sungStep, systemAt, writtenValue, xAtBeat, type StaffEvent,
+  middleStep, spell, splitDuration, staffSpace, STAFF_GRADE, sungStep, systemAt, textRows, writtenValue, xAtBeat, type StaffEvent,
 } from './staff2d';
 
 const C = { fifths: 0, mode: 'major' as const };
@@ -194,6 +194,26 @@ describe('bars', () => {
     expect(acc(0)).toEqual([1, null, 0, 1]);
     // bar 2: tied F♯ (no sign), F♯ (sign again: the tie doesn't carry it), F♮ (natural)
     expect(acc(1)).toEqual([null, 1, 0]);
+  });
+
+  it('makes room for note names under the notes (their own row, wide enough between notes)', () => {
+    // Sixteenths: the names ("Sol♯"-wide) push the notes apart.
+    const part = makePart('s', Array.from({ length: 16 }, (_, i) => [60 + (i % 5), 0.25] as [number, number]));
+    const score = makeScore([part]);
+    const xs = (o: { nameW?: (m: number) => number }) =>
+      layoutStaff(score, part, 0, 0, { width: 4000, sp: 9, textW, ...o }).systems[0].measures[0].events.map((e) => e.x);
+    const plain = xs({});
+    const named = xs({ nameW: () => 50 });
+    for (let i = 1; i < named.length; i++) {
+      expect(named[i] - named[i - 1]).toBeGreaterThanOrEqual(50);
+      expect(plain[i] - plain[i - 1]).toBeLessThan(50);
+    }
+    // Rows: the names sit between the notes and the words; without names the words move up.
+    const on = textRows(1, 12, { min: 3.2, pad: 2.6, names: true, notation: 'letter' });
+    const off = textRows(1, 12, { min: 3.2, pad: 2.6, names: false, notation: 'letter' });
+    expect(on.nameOff).toBeGreaterThanOrEqual(off.lyricOff - 0.2);
+    expect(on.lyricOff - on.nameOff!).toBeGreaterThanOrEqual(1.75);
+    expect(off.nameOff).toBeUndefined();
   });
 
   it('cancels the old key with naturals when a key change opens a system', () => {

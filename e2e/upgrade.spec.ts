@@ -63,6 +63,16 @@ test('a new solo singer gets the Abendlied as the programme, and no library file
   await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId('piece-row')).toHaveCount(1);
   await expect(page.getByTestId('piece-row')).toContainText('Abendlied');
+  // No made-up dates; setup is the one primary action until it's done.
+  await expect(page.getByRole('button', { name: 'Set dates' })).toBeVisible();
+  await expect(page.locator('main')).not.toContainText(/Rehearsal in \d/);
+  await expect(page.getByTestId('home-setup')).toHaveClass(/primary/);
+  await expect(page.locator('main .btn.primary')).toHaveCount(1);
+  // A link to a piece this phone never had: Back and Home, no "any more".
+  await page.goto('/#/play/choir-nope/P1/all?level=1');
+  await expect(page.getByTestId('not-found')).toContainText('This choir piece isn\'t on this device');
+  await page.getByRole('button', { name: 'Home' }).click();
+  await expect(page.getByText('Repertoire')).toBeVisible();
   await page.goto('/#/library');
   await expect(page.locator('main')).not.toContainText('Debussy');
   for (const f of ['pieces/repertoire.json', 'pieces/cycle.json', 'pieces/pd/debussy-dieu.mxl']) {

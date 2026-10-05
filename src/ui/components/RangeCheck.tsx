@@ -225,7 +225,7 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
               <div className="bar" aria-label="Holding the note"><span style={{ width: `${hold * 100}%` }} /></div>
               <div style={{ minHeight: 64 }}>
               {silentFor > 5 && hold === 0 ? (
-                <span className="small muted" role="status">Can't hear you yet. Is the microphone on (tap the tuner above)? Then sing a little louder, close to the phone.</span>
+                <span className="small muted" role="status">Can't hear you yet. If you see “Turn on microphone” above, tap it. Then sing a little louder, close to the phone.</span>
               ) : waited > 8 && hold < 0.5 ? (
                 <span className="small muted" role="status">Hold one note on the same pitch: the bar fills after two seconds. Any comfortable “ah” is fine. In a noisy room, move closer to the phone.</span>
               ) : null}

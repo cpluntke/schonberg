@@ -158,7 +158,7 @@ export function Ranks() {
               <span style={{ width: 36, height: 36, borderRadius: 18, background: 'var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13 }}>{initials(e.name)}</span>
               <div className="grow col" style={{ gap: 0 }}>
                 <span style={{ fontWeight: 600 }}>{isMe ? (profile.name ? `${e.name} (you)` : 'You') : e.name}</span>
-                <span className="tiny muted">{({ S: 'Soprano', A: 'Alto', T: 'Tenor', B: 'Bass' } as Record<string, string>)[e.voice] ?? ''} · {e.streak}-day streak{old ? ' · older app: readiness not comparable' : ''}</span>
+                <span className="tiny muted">{[({ S: 'Soprano', A: 'Alto', T: 'Tenor', B: 'Bass' } as Record<string, string>)[e.voice], e.streak > 0 ? `${e.streak}-day streak` : '', old ? 'older app: readiness not comparable' : ''].filter(Boolean).join(' · ')}</span>
               </div>
               <span className="mono" style={{ fontWeight: 600 }}>{metric(e)}</span>
               {!isMe && backend.kind === 'local' && (
@@ -201,7 +201,7 @@ export function Ranks() {
               </tbody>
             </table>
           </div>
-          <span className="tiny muted">Built from your own progress plus the rankings you've collected. Rehearsal-ready ≈ 75%.</span>
+          <span className="tiny muted">Built from your own progress plus the rankings you've collected. Readiness is the way to concert-ready (100% = the whole piece sung through at level 4); rehearsal-ready means sung through at level 3.</span>
         </div>
       )}
 
