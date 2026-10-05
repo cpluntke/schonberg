@@ -257,6 +257,26 @@ describe('restoring on a new phone', () => {
     expect(applySnapshot({ v: 1, p: { nopipe: { s: {} }, 'a|b': 'junk' } } as unknown as ProgressSnapshot).pieces).toBe(0);
   });
 
+  it('a new phone that was never set up does not undo the setup of a set-up phone (and vice versa it adopts it)', () => {
+    // Phone 1: set up (voice, range, name). Phone 2 logged in fresh and saved its defaults.
+    const setUp = { ...DEFAULT_PROFILE, name: 'Clara', voice: 'A' as const, rangeLow: 53, rangeHigh: 74, onboarded: true, latencyMs: 120, notation: 'movable' as const };
+    saveProfile(setUp);
+    const fresh = { ...DEFAULT_PROFILE, name: '', onboarded: false, choirCode: 'kammerchor', leaderboardOptIn: true };
+    applySnapshot({ v: 1, p: {}, profile: fresh } as unknown as ProgressSnapshot, { adoptSettings: true });
+    const p1 = loadProfile();
+    expect(p1).toMatchObject({ name: 'Clara', voice: 'A', rangeLow: 53, rangeHigh: 74, onboarded: true, latencyMs: 120, notation: 'movable' });
+    expect(p1.choirCode).toBe('kammerchor'); // what it lacked is filled in
+    // The other way round: the fresh phone takes the set-up phone's settings (not its delay).
+    localStorage.clear();
+    _resetAllForTests();
+    saveProfile({ ...DEFAULT_PROFILE, latencyMs: 80 });
+    applySnapshot({ v: 1, p: {}, profile: setUp } as unknown as ProgressSnapshot, { adoptSettings: true });
+    expect(loadProfile()).toMatchObject({ name: 'Clara', voice: 'A', rangeLow: 53, rangeHigh: 74, onboarded: true, latencyMs: 80, notation: 'movable' });
+    // Two set-up phones: the newer copy's settings win, but onboarded and the name are never lost.
+    applySnapshot({ v: 1, p: {}, profile: { ...setUp, voice: 'T', rangeLow: 48, name: '' } } as unknown as ProgressSnapshot, { adoptSettings: true });
+    expect(loadProfile()).toMatchObject({ name: 'Clara', voice: 'T', rangeLow: 48, rangeHigh: 74, onboarded: true });
+  });
+
   it('ignores a programme of the wrong shape, so the next upload can still be built', () => {
     saveCycle({ name: 'Mine', pieceIds: ['x'] });
     const bad: unknown[] = [

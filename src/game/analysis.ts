@@ -1,6 +1,7 @@
 // Turns per-note results into at most three plain-language coaching insights.
 
 import type { Score, ScoreNote } from '../music/types';
+import { barRangeLabel } from '../music/sections';
 import type { Grade, Insight, NoteResult, PitchSample } from './types';
 import type { ScoringContext } from './scoring';
 
@@ -30,10 +31,9 @@ function barLabel(score: Score, i: number): string {
   return score.measures[i]?.number ?? String(i + 1);
 }
 
-/** "bar 12" / "bars 12–14" */
+/** "bar 12" / "bars 12–14" ("upbeat–bar 3" from a pickup bar 0, as the sections are named) */
 export function barsText(score: Score, range: [number, number]): string {
-  const [a, b] = range;
-  return a === b ? `bar ${barLabel(score, a)}` : `bars ${barLabel(score, a)}–${barLabel(score, b)}`;
+  return barRangeLabel(score, range[0], range[1], true);
 }
 
 /** "bars 3, 7 and 12" (deduplicated, at most `max` listed). */

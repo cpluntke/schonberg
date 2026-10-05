@@ -9,6 +9,7 @@ import { IntroVideoButton, introSeen } from '../components/IntroVideo';
 import { go, back } from '../router';
 import { RangeCheck } from '../components/RangeCheck';
 import { getTracker } from '../play/session';
+import { shareMyProgress } from '../play/shareProgress';
 import { getAudioContext, unlockAudio } from '../../audio/context';
 import { measureLatency } from '../../audio/latency';
 import type { VoiceType } from '../../music/types';
@@ -159,6 +160,7 @@ export function Setup() {
             if (r) {
               setRange(r);
               update({ rangeLow: r.lo, rangeHigh: r.hi, rangeReachLow: reach?.lo, rangeReachHigh: reach?.hi, rangeAt: Date.now() });
+              void shareMyProgress(true); // the section lead sees the new range now, not after the next run
             }
             step1st(r ? 'range_done' : 'range_skipped');
             setStep(3);

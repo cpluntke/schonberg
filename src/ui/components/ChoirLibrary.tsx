@@ -39,7 +39,9 @@ export function LibraryPanel({ code, auth, info, draft, embedded = false, onAdde
       setList((l) => l?.map((x) => (x.id === p.id ? { ...x, scoreId: r.piece.id, inProgramme: x.inProgramme || r.programme } : x)) ?? l);
       toast(local && toProgramme
         ? `“${p.title}” added to the choir's scores and to the programme above: publish it to send it to the choir`
-        : `“${p.title}” added${r.programme ? ' to the programme' : ''}: members get it the next time they open the app`);
+        : toProgramme && !r.programme
+          ? `“${p.title}” added to the choir's scores, but the programme is full: take a piece out of it to make room`
+          : `“${p.title}” added${r.programme ? ' to the programme' : ''}: members get it the next time they open the app`);
       onAdded?.(r.choir ?? null);
     } catch (e) {
       toast((e as Error).message);

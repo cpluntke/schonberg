@@ -6,6 +6,7 @@ import {
 import { loadProfile } from '../../progress/store';
 import { answerStaffSync, confirmMerge, loadMeta, pendingQuestion, staffSyncQuestion, syncEnabled, uploadProgress } from '../../progress/sync';
 import { syncChoirNow } from '../library';
+import { shareMyProgress } from '../play/shareProgress';
 import { go } from '../router';
 
 /** What the account keeps, in one line (Settings and the one-time notice). */
@@ -228,6 +229,7 @@ export function AccountSync() {
               const r = await uploadProgress(true);
               setBusy(false);
               if (!r.ask) toast(r.ok ? 'Progress saved' : `Not saved: ${r.error}`);
+              if (r.ok) void shareMyProgress(); // and what the section lead sees (if shared; at most once a minute)
             }}>Save now</button>
           )}
           {session.account.role === 'member' && (

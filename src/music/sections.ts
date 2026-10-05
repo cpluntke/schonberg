@@ -6,6 +6,17 @@ import type { Score, Section } from './types';
 const MIN_BARS = 4;
 const MAX_BARS = 12;
 
+/**
+ * "Bar 3", "Bars 3–6"; a range from a pickup bar numbered 0 reads "Upbeat" / "Upbeat–bar 6" (how the
+ * sections are named). `lower`: "bars 3–6" / "upbeat–bar 6", inside a sentence.
+ */
+export function barRangeLabel(score: Score, a: number, b: number, lower = false): string {
+  const num = (i: number) => score.measures[i]?.number ?? String(i + 1);
+  const na = num(a), nb = num(b);
+  const s = a === 0 && na === '0' ? (a === b ? 'Upbeat' : `Upbeat–bar ${nb}`) : a === b ? `Bar ${na}` : `Bars ${na}–${nb}`;
+  return lower ? s.charAt(0).toLowerCase() + s.slice(1) : s;
+}
+
 /** 0..1: how good a phrase boundary the barline before measure `m` is. */
 function boundaryQuality(score: Score, m: number): number {
   const B = score.measures[m]?.startBeat;
@@ -122,13 +133,8 @@ export function computeSections(score: Score, opts?: { targetBars?: number }): S
   }
 
   const sections: Section[] = [];
-  const barLabel = (a: number, b: number) => {
-    const na = ms[a].number;
-    const nb = ms[b].number;
-    // A pickup bar is usually numbered 0: read it as "upbeat".
-    if (a === 0 && na === '0') return a === b ? 'Upbeat' : `Upbeat–bar ${nb}`;
-    return a === b ? `Bar ${na}` : `Bars ${na}–${nb}`;
-  };
+  // A pickup bar is usually numbered 0: read it as "upbeat".
+  const barLabel = (a: number, b: number) => barRangeLabel(score, a, b);
   for (const s of segs) {
     const chunks = splitSegment(score, s.a, s.b, target, scale);
     chunks.forEach(([a, b]) => {

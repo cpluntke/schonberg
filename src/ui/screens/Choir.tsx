@@ -406,14 +406,16 @@ function ProgrammeEditor({ code, auth, info, library, draft, onDraft, onSaved, o
   // Choose from built-in pieces and the choir's own scores (scores on one phone only can't be shared).
   const choirIds = new Set((info?.pieces ?? []).map((p) => localPieceId(code, p)));
   const choices = allPieces().filter((p) => p.builtin && !p.id.includes('~') || p.id.startsWith(`choir-${code}-`) || choirIds.has(p.id));
-  // In the programme but not on this phone: a library piece the choir hasn't added (e.g. a former
-  // built-in piece), or a choir score this phone hasn't downloaded yet.
+  // In the programme but not on this phone: a choir score this phone hasn't downloaded yet, or a
+  // library piece without a score in the choir. The server copies a library piece's score in by
+  // itself when it serves the choir (a former built-in piece), so that one is missing only when the
+  // choir's storage is full.
   const missing = ids.filter((id) => !choices.some((p) => p.id === id));
   const missingLabel = (id: string) => {
     const lib = library?.find((p) => p.id === id);
     const score = (info?.pieces ?? []).find((p) => localPieceId(code, p) === id);
     if (score) return { title: score.title || score.filename, note: 'not on this phone yet' };
-    if (lib) return { title: lib.title, note: 'no score yet: add it from the Library below' };
+    if (lib) return { title: lib.title, note: 'members don’t have this score yet: is the choir’s storage full?' };
     return { title: id, note: 'members don’t have this score' };
   };
   const toggle = (arr: string[], id: string) => (arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]);

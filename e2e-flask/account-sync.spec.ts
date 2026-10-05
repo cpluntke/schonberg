@@ -135,6 +135,11 @@ test('member: level 1 on phone A, account, phone B gets it; lead sees one entry;
   expect(await rev()).toBe(r0);
   // The lead still sees one entry.
   expect((await section(request, code, lead)).ranges.map((m) => m.name)).toEqual(['Anna']);
+  // Logged in: Home no longer offers "New phone? Log in…" (the setup card still shows: never set up).
+  await pb.goto('./#/');
+  await expect(pb.getByRole('button', { name: 'Start setup' })).toBeVisible({ timeout: 30_000 });
+  await expect(pb.getByTestId('home-account')).toHaveCount(0);
+  await shot(pb, '5b-phone-b-home-logged-in.png');
 
   // ---- the admin removes her (People, on a laptop)
   const c = await browser.newContext({ viewport: { width: 390, height: 844 } });

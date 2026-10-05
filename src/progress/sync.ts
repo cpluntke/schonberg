@@ -561,8 +561,15 @@ export function applySnapshot(d: unknown, opts: { adoptSettings?: boolean } = {}
   }
   const profile = isObj(d.profile);
   if (opts.adoptSettings) {
+    const here = loadProfile();
     const { latencyMs: _l, ...remote } = cleanProfile(d.profile);
-    saveProfile({ ...loadProfile(), ...remote }); // also tells the screens
+    // A copy from a phone that was never set up (just logged in) holds that phone's defaults (voice,
+    // no range, onboarded false): a set-up phone keeps its own settings and only fills in what it
+    // lacks. A phone not set up takes the copy's. Setup is never undone, a name never blanked.
+    const out: Profile = here.onboarded && remote.onboarded !== true ? mergeProfile(here, d.profile, true) : { ...here, ...remote };
+    out.onboarded = here.onboarded || remote.onboarded === true;
+    if (!out.name.trim() && here.name.trim()) out.name = here.name;
+    saveProfile(out); // also tells the screens
   } else {
     saveProfile(mergeProfile(loadProfile(), d.profile, setUp)); // also tells the screens
   }

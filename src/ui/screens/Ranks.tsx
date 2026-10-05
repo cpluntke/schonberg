@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getPiece, type PieceInfo } from '../library';
+import { getPiece, useLibrary, type PieceInfo } from '../library';
 import { useProfile, useStoreVersion, toast, initials } from '../hooks';
 import { attemptLog, loadCycle } from '../../progress/store';
 import {
@@ -23,7 +23,11 @@ export function Ranks() {
   useStoreVersion();
   const cycle = loadCycle();
   const pieces = cycle.pieceIds.map((id) => getPiece(id)).filter(Boolean) as PieceInfo[];
-  const [pieceId, setPieceId] = useState(pieces[0]?.id ?? '');
+  useLibrary(); // redraw when the choir's scores arrive
+  const [chosen, setPieceId] = useState(pieces[0]?.id ?? '');
+  // The programme's scores may arrive after this screen opened (a new phone, or #/ranks opened first):
+  // until a piece is chosen that is there, show the first one (and fetch its board).
+  const pieceId = pieces.some((p) => p.id === chosen) ? chosen : (pieces[0]?.id ?? '');
   const [by, setBy] = useState<RankBy>('readiness');
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [allEntries, setAllEntries] = useState<LeaderboardEntry[]>([]);

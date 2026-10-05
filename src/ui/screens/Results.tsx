@@ -8,6 +8,7 @@ import { getPiece, singableSections } from '../library';
 import { go } from '../router';
 import { LEVELS, OFF_BOOK_DAYS, fixesBefore, nextStep } from '../../progress/ladder';
 import { getProgress } from '../../progress/store';
+import { barRangeLabel } from '../../music/sections';
 import { IconDown, IconUp, IconClock, IconLoop, IconStar, IconPlay, IconCube } from '../icons';
 import type { Insight } from '../../game/types';
 import { accountTipPending, dismissAccountTip } from '../../progress/sync';
@@ -190,7 +191,7 @@ export function Results() {
             <span className="row" style={{ gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: '#4CC9F0' }} />solid</span>
             <span className="row" style={{ gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: '#1D4F63' }} />ok</span>
             <span className="row" style={{ gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: '#FF7A45' }} />needs work</span>
-            <span className="grow" style={{ textAlign: 'right' }}>bars {mnum(measureIdx[0])}–{mnum(measureIdx[measureIdx.length - 1])}</span>
+            <span className="grow" style={{ textAlign: 'right' }}>{barRangeLabel(piece.score, measureIdx[0], measureIdx[measureIdx.length - 1], true)}</span>
           </div>
         </div>
       )}
@@ -209,7 +210,7 @@ export function Results() {
               </div>
               {i.measures && i.kind !== 'great' && (
                 <button className="btn small" onClick={() => playLoop(i.measures![0], i.measures![1], 1)}>
-                  <IconLoop size={16} /> Loop bars {mnum(i.measures[0])}–{mnum(i.measures[1])} slowly
+                  <IconLoop size={16} /> Loop {barRangeLabel(piece.score, i.measures[0], i.measures[1], true)} slowly
                 </button>
               )}
             </div>

@@ -138,3 +138,33 @@ test('admin adds the Madrigal from the library; a member gets it; solo phones an
 
   expect([...adm.errors, ...sup.errors, ...mem.errors, ...solo.errors]).toEqual([]);
 });
+
+test('a choir from before the library keeps its former built-in piece: the server adds the score, Ranks opened first shows it', async ({ browser, request }) => {
+  test.setTimeout(180_000);
+  const code = `old${Date.now() % 100000}`;
+  const r = await request.post('./api/super/choirs', { data: { code, name: 'Kammerchor Old' }, headers: { 'X-Super-Admin': SUPER } });
+  expect(r.status()).toBe(201);
+  const admin = await (await request.post('./api/invites/accept', { data: { token: (await r.json()).token, name: 'Clara', password: 'password-123' } })).json();
+  // Published while Debussy was still built into the app: the programme names it, the choir has no score.
+  const put = await request.put(`./api/choirs/${code}/cycle`, { data: { name: 'Autumn', pieceIds: ['debussy-dieu'], base: 0 }, headers: { Authorization: `Bearer ${admin.token}` } });
+  expect(put.status()).toBe(200);
+
+  // A new phone of a member opens Ranks first (the choir's scores haven't arrived yet).
+  const mem = await phone(browser, 'A');
+  await mem.page.evaluate(([c]) => {
+    const p = JSON.parse(localStorage.getItem('sh:profile')!);
+    localStorage.setItem('sh:profile', JSON.stringify({ ...p, name: 'Mia', choirCode: c }));
+  }, [code]);
+  const board = mem.page.waitForRequest((q) => q.url().includes(`/choirs/${code}/entries?pieceId=debussy-dieu`), { timeout: 30_000 });
+  await mem.page.goto('./#/ranks');
+  await board;
+  await expect(mem.page.getByLabel('Piece')).toHaveValue('debussy-dieu');
+  await shoot(mem.page, 'ranks-first');
+  // The server copied the library score into the choir's scores (once).
+  const info = await (await request.get(`./api/choirs/${code}`)).json();
+  expect(info.pieces.map((p: { libraryId?: string }) => p.libraryId)).toEqual(['debussy-dieu']);
+  expect(info.cycle.pieceIds).toEqual(['debussy-dieu']);
+  await mem.page.goto('./#/');
+  await expect(mem.page.getByTestId('piece-row').filter({ hasText: 'Dieu! qu' })).toBeVisible({ timeout: 30_000 });
+  expect(mem.errors).toEqual([]);
+});
