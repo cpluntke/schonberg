@@ -16,6 +16,8 @@ export interface LastResult {
   newLevel: number;
   /** True when the attempt counted toward the section ladder. */
   ladder: boolean;
+  /** Judged note by note (level 1: every note right); absent in results saved by older versions. */
+  everyNote?: boolean;
   /** Tolerance (cents) the run was scored with (the level's, after the strictness factor). */
   tolerance?: number;
   /** Best score at this section+level before this attempt (null if first). */

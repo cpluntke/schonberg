@@ -40,8 +40,13 @@ test('level 1 on “doo”: one flat note fails it, and Results says which', asy
   await expect(page.getByTestId('doo-label')).toBeVisible();
   await expect(page.getByTestId('pass-banner')).toContainText(/one note wasn’t right/, { timeout: 90_000 });
   await expect(page.getByTestId('wrong-bar')).toHaveCount(1);
-  await expect(page.getByTestId('wrong-bar')).toContainText(/Bar \d+:.*note \d+.*was flat \(−\d+¢\)/);
-  await expect(page.getByTestId('wrong-bar').getByRole('button', { name: /Loop bar \d+ slowly/ })).toBeVisible();
+  await expect(page.getByTestId('wrong-bar')).toContainText(/(Bar \d+|Upbeat):.*note \d+.*was flat \(−\d+¢\)/);
+  await expect(page.getByTestId('wrong-bar').getByRole('button', { name: /Loop (bar \d+|upbeat) slowly/ })).toBeVisible();
+  // 95% accuracy, but a wrong note: the letter doesn't read as a pass.
+  await expect(page.getByTestId('grade')).toHaveText('B');
+  // The bar holding the wrong note "needs work" in the bar-by-bar strip.
+  const orange = await page.locator('.heat button').evaluateAll((bs) => bs.filter((b) => getComputedStyle(b).backgroundColor === 'rgb(255, 122, 69)').length);
+  expect(orange).toBe(1);
   // The section didn't pass: still level 0.
   const level = await page.evaluate(() => {
     const k = Object.keys(localStorage).find((x) => x.startsWith('sh:progress:warmup-chorale:'));
@@ -49,6 +54,18 @@ test('level 1 on “doo”: one flat note fails it, and Results says which', asy
     return p ? Object.values(p.sections as Record<string, { level: number }>)[0]?.level ?? 0 : 0;
   });
   expect(level).toBe(0);
+  // A result saved by an older version (no note verdicts, passed on the 75% mark) reads as it was
+  // judged then: no "Notes to fix" next to "level 1 reached".
+  await page.evaluate(() => {
+    const r = JSON.parse(sessionStorage.getItem('sh:lastResult')!);
+    delete r.everyNote;
+    for (const n of r.result.notes) { delete n.unsure; delete n.clearly; }
+    Object.assign(r, { passed: true, prevLevel: 0, newLevel: 1 });
+    sessionStorage.setItem('sh:lastResult', JSON.stringify(r));
+  });
+  await page.reload();
+  await expect(page.getByTestId('pass-banner')).toContainText('level 1 reached');
+  await expect(page.getByTestId('wrong-notes')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 

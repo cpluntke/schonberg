@@ -105,7 +105,7 @@ function TryItNow({ onClose }: { onClose: () => void }) {
       {step(1, setupDone, 'Put on headphones, do the voice setup', 'Choir code, a short do-re-mi, and the delay check', setupDone ? 'Redo' : 'Start voice setup',
         () => go({ name: 'setup' }), !setupDone)}
       {first && first.name === 'play' && step(2, false, first.level <= 1 ? 'Sing level 1 of your first section' : `Sing your next step: level ${first.level}`,
-        firstPiece ? `${firstPiece.title}${first.level <= 1 ? ': slow, with your part playing' : ''}` : 'Slow, with your part playing', 'Sing it',
+        firstPiece ? `${firstPiece.title}${first.level <= 1 ? ': slow, on “doo”, with your part playing' : ''}` : 'Slow, on “doo”, with your part playing', 'Sing it',
         () => go(first), setupDone)}
     </div>
   );

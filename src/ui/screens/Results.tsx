@@ -9,6 +9,7 @@ import { go } from '../router';
 import { LEVELS, OFF_BOOK_DAYS, effectiveTolerance, fixesBefore, nextStep, wrongNotes } from '../../progress/ladder';
 import { getProgress, loadProfile } from '../../progress/store';
 import { barRangeLabel } from '../../music/sections';
+import { noteFault } from '../play/noteFault';
 import { IconDown, IconUp, IconClock, IconLoop, IconStar, IconPlay, IconCube } from '../icons';
 import type { Insight, NoteResult } from '../../game/types';
 import type { PieceInfo } from '../library';
@@ -20,12 +21,13 @@ function goPlay(r: Parameters<typeof go>[0]) {
   go(r, true);
 }
 
-function gradeLetter(acc: number): string {
-  if (acc >= 0.95) return 'S';
-  if (acc >= 0.85) return 'A';
-  if (acc >= 0.7) return 'B';
-  if (acc >= 0.5) return 'C';
-  return 'D';
+/**
+ * The letter from accuracy. At an every-note level (level 1) a run with a wrong note shows at most a
+ * B, so it never reads as success next to "Not yet" (qa/realism/harness.ts mirrors this).
+ */
+function gradeLetter(acc: number, wrongAtEveryNote = false): string {
+  const l = acc >= 0.95 ? 'S' : acc >= 0.85 ? 'A' : acc >= 0.7 ? 'B' : acc >= 0.5 ? 'C' : 'D';
+  return wrongAtEveryNote && (l === 'S' || l === 'A') ? 'B' : l;
 }
 
 function insightIcon(i: Insight) {
@@ -92,8 +94,13 @@ export function Results() {
   };
 
   // Level 1: every note must be right. The notes that weren't, by bar, with a loop to drill them.
-  const wrong = spec?.everyNote ? wrongNotes(r) : [];
+  // Judged note by note (level 1). A result saved by an older version has no verdicts (it passed or
+  // failed on the 75% mark): show it as it was judged then.
+  const everyNote = !!spec?.everyNote && !!lr.everyNote;
+  const wrong = everyNote ? wrongNotes(r) : [];
+  const wrongBars = new Set(wrong.map((n) => part?.notes[n.index]?.measure));
   const tol = lr.tolerance ?? effectiveTolerance(lr.level, loadProfile().strictness);
+  const letter = gradeLetter(r.accuracy, wrong.length > 0);
 
   // A run that failed (or didn't count) on timing isn't an "excellent run".
   // Nor is a level-1 run with a wrong note.
@@ -140,9 +147,9 @@ export function Results() {
                 ? lr.suggestDelayCheck
                   ? <><strong>Not yet:</strong> the notes were right ({Math.round(r.accuracy * 100)}%), but your voice reached the app about {lr.timingFail} ms after the beat. Either your headphones changed since the delay check (redo it in Voice setup, it takes 10 seconds) or you're singing behind the music: breathe early and sing with it, not after it.</>
                   : <><strong>Not yet:</strong> the notes were right ({Math.round(r.accuracy * 100)}%), but you came in about {lr.timingFail} ms behind the beat. Breathe early and sing with the music, not after it.</>
-                : spec?.everyNote && wrong.length
+                : everyNote && wrong.length
                   ? <><strong>Not yet: {wrong.length === 1 ? 'one note wasn’t' : `${wrong.length} notes weren’t`} right.</strong> At level 1 every note counts. Loop {wrong.length === 1 ? 'its bar' : 'those bars'} slowly (below), then try again.</>
-                  : spec?.everyNote
+                  : everyNote
                     ? <><strong>Not yet:</strong> {Math.round(r.accuracy * 100)}%: too many notes were too unclear to judge. Sing every note on “doo”, clearly and steadily, and try again.</>
                     : <><strong>Not yet:</strong> {Math.round(r.accuracy * 100)}% of {Math.round((spec?.pass ?? 0.8) * 100)}% needed. Use the tips below and try again.</>}
         </div>
@@ -157,7 +164,7 @@ export function Results() {
       )}
 
       <div className="row" style={{ gap: 20 }}>
-        <div className="grade-tile" aria-label={`Grade ${gradeLetter(r.accuracy)}`}>{gradeLetter(r.accuracy)}</div>
+        <div className="grade-tile" aria-label={`Grade ${letter}`} data-testid="grade">{letter}</div>
         <div className="col" style={{ gap: 4 }}>
           <span className="mono" style={{ fontSize: 30, fontWeight: 600 }} data-testid="result-score">{r.score.toLocaleString()}</span>
           <span className="small" style={{ color: 'var(--voice)' }}>
@@ -182,7 +189,7 @@ export function Results() {
               <div key={x.id} className="row" style={{ gap: 8, padding: '6px 0', borderBottom: '1px solid var(--surface-2)' }} data-testid={fix ? 'full-section-fix' : 'full-section'}>
                 <span className="grow small ellipsis" style={{ fontWeight: 600 }}>{label(x.id)}</span>
                 <span className="mono small" style={{ color: x.passed ? 'var(--voice)' : 'var(--accent-text)' }}>
-                  {Math.round(x.accuracy * 100)}%{spec?.everyNote && x.wrong?.length ? ` · ${x.wrong.length} note${x.wrong.length > 1 ? 's' : ''}` : ''}
+                  {Math.round(x.accuracy * 100)}%{everyNote && x.wrong?.length ? ` · ${x.wrong.length} note${x.wrong.length > 1 ? 's' : ''}` : ''}
                 </span>
                 {fix ? (
                   <button className="btn small" style={{ minWidth: 112 }} onClick={() => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: x.id, level: lr.level, mode: '2d' })}>
@@ -195,7 +202,7 @@ export function Results() {
             );
           })}
           <span className="tiny muted">
-            {spec?.everyNote
+            {everyNote
               ? 'At level 1 every note of every section must be right. Very short notes the app can’t judge reliably are let off unless clearly wrong.'
               : `Each section needs ${Math.round((spec?.pass ?? 0.8) * 100)}% within the run, like the run as a whole (short sections get one weak note of slack).`}
           </span>
@@ -213,7 +220,8 @@ export function Results() {
           <div className="heat">
             {measureIdx.map((m) => {
               const v = r.perMeasure[m];
-              const bg = v >= 0.85 ? '#4CC9F0' : v >= 0.6 ? '#1D4F63' : '#FF7A45';
+              // Level 1: a bar with a wrong note needs work, whatever its average.
+              const bg = wrongBars.has(m) ? '#FF7A45' : v >= 0.85 ? '#4CC9F0' : v >= 0.6 ? '#1D4F63' : '#FF7A45';
               return <button key={m} aria-label={`Bar ${mnum(m)}: ${Math.round(v * 100)}%`} title={`Bar ${mnum(m)} · ${Math.round(v * 100)}%`} style={{ background: bg, color: bg === '#1D4F63' ? '#EEF0FF' : '#0B0D1A', fontSize: 11, fontWeight: 700, fontFamily: 'var(--mono)' }} onClick={() => playLoop(m - 1, m + 1)}>{mnum(m)}</button>;
             })}
           </div>
@@ -319,6 +327,7 @@ type LR = NonNullable<ReturnType<typeof getLastResult>>;
 /** The verdict on a counted run of the whole piece: the piece level, or what to fix first. */
 function FullRunBanner({ lr, full, label }: { lr: LR; full: NonNullable<LR['full']>; label: (id: string) => string }) {
   const spec = LEVELS[lr.level - 1];
+  const everyNote = !!spec?.everyNote && !!lr.everyNote;
   const need = Math.round((spec?.pass ?? 0.8) * 100);
   const acc = Math.round(lr.result.accuracy * 100);
   const up = full.newLevel > full.prevLevel;
@@ -332,7 +341,7 @@ function FullRunBanner({ lr, full, label }: { lr: LR; full: NonNullable<LR['full
           ? <><strong>Piece level {full.newLevel} reached: {LEVELS[full.newLevel - 1]?.name}!</strong> You sang it all in one go. {READY[full.newLevel] ?? ''}</>
           : full.passed
             ? <><strong>Passed.</strong> The piece keeps level {full.newLevel}.</>
-            : fixes.length && spec?.everyNote
+            : fixes.length && everyNote
               ? <><strong>Not every note was right</strong> in {list}. At level 1 every note counts: fix {fixes.length > 1 ? 'each one' : 'it'} at level 1 on its own (marked below), then sing it all again.</>
             : fixes.length && full.overallPassed
               ? <><strong>{acc}% overall, but not every section held.</strong> {list} {fixes.length > 1 ? 'were' : 'was'} below {need}% in the run. Fix {fixes.length > 1 ? 'each one' : 'it'} at level {lr.level} on its own, then sing it all again.</>
@@ -340,22 +349,13 @@ function FullRunBanner({ lr, full, label }: { lr: LR; full: NonNullable<LR['full
                 ? <><strong>Not yet:</strong> {acc}% of {need}% needed. Practise {list} at level {lr.level} (marked below), then sing it all again.</>
                 : lr.timingFail != null
                   ? <><strong>Not yet:</strong> the notes were right ({acc}%), but you came in about {lr.timingFail} ms behind the beat. Breathe early and sing with the music, not after it.</>
-                  : spec?.everyNote
+                  : everyNote
                     ? <><strong>Not yet:</strong> {acc}%: too many notes were too unclear to judge. Sing every note on “doo”, clearly and steadily.</>
                     : <><strong>Not yet:</strong> {acc}% of {need}% needed.</>}
     </div>
   );
 }
 
-/** What went wrong with a note, in a few words ("flat (−62¢)", "not sung"). */
-export function noteFault(n: NoteResult, tol: number): string {
-  if (n.octave) return 'in the wrong octave';
-  if (n.clearly === 'silent' || n.cents == null || n.voicedRatio < 0.2) return 'not sung';
-  const c = Math.round(n.cents);
-  if (c <= -tol) return `flat (−${-c}¢)`;
-  if (c >= tol) return `sharp (+${c}¢)`;
-  return n.voicedRatio < 0.6 ? 'too short (late or cut off)' : 'not steady on the note';
-}
 
 /** Level 1: the notes that weren't right, grouped by bar, each bar with a slow loop to drill it. */
 function WrongNotes({ piece, part, notes, tol, loop }: {
@@ -369,7 +369,6 @@ function WrongNotes({ piece, part, notes, tol, loop }: {
     bars.set(m, [...(bars.get(m) ?? []), n]);
   }
   const list = [...bars.entries()].sort((a, b) => a[0] - b[0]);
-  const mnum = (m: number) => piece.score.measures[m]?.number ?? String(m + 1);
   /** 1-based position of the note within its bar. */
   const nth = (i: number) => {
     const m = part.notes[i].measure;
@@ -383,14 +382,14 @@ function WrongNotes({ piece, part, notes, tol, loop }: {
       {list.slice(0, MAX_BARS).map(([m, ns]) => (
         <div key={m} className="card" style={{ padding: '10px 14px', gap: 8 }} data-testid="wrong-bar">
           <span className="small">
-            <strong>Bar {mnum(m)}:</strong>{' '}
+            <strong>{barRangeLabel(piece.score, m, m)}:</strong>{' '}
             {ns.map((n, k) => {
               const ly = part.notes[n.index]?.lyric;
               return <span key={n.index}>{k ? '; ' : ''}note {nth(n.index)}{ly ? ` (“${ly}”)` : ''} was {noteFault(n, tol)}</span>;
             })}
           </span>
           <button className="btn small" onClick={() => loop(m)}>
-            <IconLoop size={16} /> Loop bar {mnum(m)} slowly
+            <IconLoop size={16} /> Loop {barRangeLabel(piece.score, m, m, true)} slowly
           </button>
         </div>
       ))}

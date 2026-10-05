@@ -21,16 +21,18 @@ the scorer already allows for, like any consonant).
 
 **Every note must be right** (`LevelSpec.everyNote`): a level-1 attempt passes only when every note
 is graded *good* or *perfect* (±50¢ at 70% tempo, the usual grades, see [SCORING.md](SCORING.md)).
-One flat note fails it, and Results says which: “Bar 5: note 3 was flat (−62¢)”, with a button to
-loop that bar slowly.
+One flat note fails it, and Results says which: “Bar 5: note 3 was flat (−62¢)” (big misses in
+words: “a wrong note (about 2 semitones low)”, “sung an octave low”), with a button to loop that bar
+slowly; that bar shows as “needs work” in the bar strip, and the grade letter shows at most a B.
 
 - **Notes the app can't judge reliably are let off** (`ladder.noteVerdict`): a note below *good*
   is forgiven when the scorer flags it as unsure (`NoteResult.unsure`): a **very short note** (its
   judged part is under 0.15 s of score time, the notes the scorer already grades leniently because
   the voice rarely settles and the tracker gets only a few readings), or a written pitch **outside
   the tracker's range** (60–1400 Hz).
-- **…unless the tracker clearly heard it wrong** (`NoteResult.clearly`): a very short note with no
-  voice at all inside it (“not sung”), or one graded *miss* whose own readings were enough to judge
+- **…unless it was clearly wrong** (`NoteResult.clearly`): **no sound at all** inside the note
+  (“not sung”; for both kinds, so a note out of the tracker's range must still be sung), or a very
+  short note graded *miss* whose own readings were enough to judge
   it (the same test the scorer uses for fast notes) with their median at least 1.5 tolerances off
   (75¢ at level 1: a wrong note, not a wobble), but no more than 6 semitones off (further off is
   the tracker locking onto a fraction of the pitch, not a sung note).

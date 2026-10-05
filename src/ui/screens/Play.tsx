@@ -330,7 +330,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
     suggestAccount(rec.passed);
     setLastResult({
       pieceId: piece.id, partId: part.id, sectionId: section.id, level, mode: route.mode,
-      from: section.start, to: section.end, result: r, ladder, prevBest, tolerance,
+      from: section.start, to: section.end, result: r, ladder, prevBest, tolerance, everyNote: !!spec?.everyNote,
       latencyAdjusted,
       alignedMs,
       suggestDelayCheck,
@@ -571,6 +571,12 @@ function SingPlay({ route }: { route: PlayRoute }) {
               <span className="eyebrow">{listenOnly ? 'Level 0 · Listen' : `Level ${level} · ${levelInfo?.name}`}</span>
               <strong style={{ fontSize: 18 }}>{section.label}</strong>
               {!cold && <span className="small muted">{listenOnly ? LISTEN.description : levelInfo?.description}</span>}
+              {/* What the level asks, near the top: on a small phone the sticky Start button covers the card's lower part. */}
+              {!listenOnly && levelInfo && !cold && (
+                <span className="tiny mono muted">
+                  {Math.round(rate * 100)}% tempo · ±{tolerance}¢ · pass: {passLabel(levelInfo)} · start: {levelInfo.cue === 'chord' ? 'chord only' : 'your note'}
+                </span>
+              )}
               {doo && !listenOnly && (
                 <div className="notice info small" data-testid="doo-note">
                   <strong>Sing every note on “doo”.</strong> The words are shown faintly; you sing them from level 2.
@@ -589,11 +595,6 @@ function SingPlay({ route }: { route: PlayRoute }) {
                   Stopping or pausing makes it a practice run.
                 </span>
               ))}
-              {!listenOnly && levelInfo && !cold && (
-                <span className="tiny mono muted">
-                  {Math.round(rate * 100)}% tempo · ±{tolerance}¢ · pass: {passLabel(levelInfo)} · start: {levelInfo.cue === 'chord' ? 'chord only' : 'your note'}
-                </span>
-              )}
               {cold && (
                 <span className="small">
                   {coldLeadFrom(piece.score, section.start) != null ? "You'll hear two bars of the other voices, then come in" : 'After a count-in, come in'}{' '}
