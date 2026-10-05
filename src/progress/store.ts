@@ -235,19 +235,80 @@ function ls(): Storage | null {
 }
 
 export function rawGet(key: string): string | null {
+  // A value kept in memory after a failed write is newer than any copy on disk.
+  const m = memStorage.get(key);
+  if (m !== undefined) return m;
   const s = ls();
   if (s) {
     try { return s.getItem(key); } catch { /* fall through */ }
   }
-  return memStorage.get(key) ?? null;
+  return null;
+}
+
+let storageFull = false;
+const storageFullListeners = new Set<() => void>();
+/** True once a write could not be saved on this device (storage full or disabled) this session. */
+export function storageSaveFailed(): boolean { return storageFull; }
+/** Called once, the first time a write can't be saved on this device. */
+export function onStorageSaveFailed(cb: () => void): () => void {
+  storageFullListeners.add(cb);
+  return () => { storageFullListeners.delete(cb); };
+}
+function markStorageFull(): void {
+  if (storageFull) return;
+  storageFull = true;
+  for (const cb of [...storageFullListeners]) {
+    try { cb(); } catch (e) { console.error(e); }
+  }
+}
+
+/** Entries of the attempt log kept when storage is full (the oldest are only used for long-term stats). */
+const LOG_KEEP_WHEN_FULL = 300;
+
+/** Make room on a full device without touching progress: drop the diagnostics log, trim the attempt log. */
+function freeSpace(s: Storage, except: string): boolean {
+  let freed = false;
+  try {
+    if (except !== 'sh:errors' && s.getItem('sh:errors') != null) { s.removeItem('sh:errors'); freed = true; }
+  } catch { /* ignore */ }
+  if (except !== K.log) {
+    try {
+      const raw = memStorage.get(K.log) ?? s.getItem(K.log);
+      const log = raw ? JSON.parse(raw) : null;
+      if (Array.isArray(log) && log.length > LOG_KEEP_WHEN_FULL) {
+        const v = JSON.stringify(log.slice(log.length - LOG_KEEP_WHEN_FULL));
+        s.setItem(K.log, v);
+        memStorage.delete(K.log);
+        freed = true;
+      }
+    } catch { /* ignore */ }
+  }
+  return freed;
 }
 
 export function rawSet(key: string, value: string): void {
   const s = ls();
   if (s) {
-    try { s.setItem(key, value); return; } catch { /* quota / disabled */ }
+    try { s.setItem(key, value); memStorage.delete(key); return; } catch { /* quota / disabled */ }
+    try {
+      if (freeSpace(s, key)) { s.setItem(key, value); memStorage.delete(key); return; }
+    } catch { /* still full */ }
+    if (key === K.log) {
+      // The attempt log itself: keep its newest entries.
+      try {
+        const log = JSON.parse(value);
+        if (Array.isArray(log) && log.length > LOG_KEEP_WHEN_FULL) {
+          s.setItem(key, JSON.stringify(log.slice(log.length - LOG_KEEP_WHEN_FULL)));
+          memStorage.delete(key);
+          return;
+        }
+      } catch { /* still full */ }
+    }
   }
+  // Kept in memory (read first by rawGet), so this session sees the newest value; the older copy on
+  // disk (if any) stays as the best thing to come back to after a reload.
   memStorage.set(key, value);
+  if (s) markStorageFull();
 }
 
 export function rawRemove(key: string): void {
@@ -680,9 +741,30 @@ export function readinessHistory(pieceId: string, partId: string): { day: string
 
 export const DEFAULT_CYCLE: Cycle = { name: 'This cycle', pieceIds: [] };
 
+const isStr = (v: unknown): v is string => typeof v === 'string';
+const strIds = (v: unknown): string[] | undefined => (Array.isArray(v) ? v.filter(isStr) : undefined);
+
+/** The cycle, with each field checked (a bad field from an old version, a backup or a sync falls back, the rest is kept). */
 export function loadCycle(): Cycle {
-  const c = readJSON<Partial<Cycle>>(K.cycle, {}, isObj);
-  return { ...DEFAULT_CYCLE, ...c, pieceIds: Array.isArray(c.pieceIds) ? c.pieceIds : [] };
+  const c = readJSON<Record<string, unknown>>(K.cycle, {}, isObj);
+  const out: Cycle = { ...DEFAULT_CYCLE, pieceIds: strIds(c.pieceIds) ?? [] };
+  if (isStr(c.name)) out.name = c.name;
+  if (isStr(c.concertDate)) out.concertDate = c.concertDate;
+  if (isStr(c.rehearsalDate)) out.rehearsalDate = c.rehearsalDate;
+  if (Number.isInteger(c.rehearsalWeekday) && (c.rehearsalWeekday as number) >= 0 && (c.rehearsalWeekday as number) <= 6) out.rehearsalWeekday = c.rehearsalWeekday as number;
+  if (isStr(c.rehearsalTime)) out.rehearsalTime = c.rehearsalTime;
+  const focus = strIds(c.focusPieceIds);
+  if (focus) out.focusPieceIds = focus;
+  if (Array.isArray(c.wanted)) {
+    out.wanted = c.wanted.filter((w): w is Record<string, unknown> & { title: string } => isObj(w) && isStr(w.title)).map((w) => {
+      const x: WantedPiece = { title: w.title, composer: isStr(w.composer) ? w.composer : '' };
+      if (isStr(w.note)) x.note = w.note;
+      if (w.focus === true) x.focus = true;
+      return x;
+    });
+  }
+  if (isStr(c.preset)) out.preset = c.preset;
+  return out;
 }
 export function saveCycle(c: Cycle): void { writeJSON(K.cycle, c); }
 
@@ -775,4 +857,5 @@ export function _resetAllForTests(): void {
   memStorage.clear();
   memScores.clear();
   schemaChecked = false;
+  storageFull = false;
 }

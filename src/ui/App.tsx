@@ -25,6 +25,7 @@ import { UsageInsights } from './screens/InsightsUsage';
 import { startUsageStats } from './usage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { UpdatePrompt } from './components/UpdatePrompt';
+import { StorageFullNotice } from './components/StorageFullNotice';
 import { flushProgress, onAccountConfirmed, syncProgressSoon } from '../progress/sync';
 import { shareMyProgress } from './play/shareProgress';
 
@@ -117,6 +118,7 @@ export function App() {
     <div className={route.name === 'play' ? 'app app-play' : 'app'}>
       <ErrorBoundary resetKey={JSON.stringify(route)}>{body}</ErrorBoundary>
       <UpdatePrompt hidden={route.name === 'play'} />
+      <StorageFullNotice hidden={route.name === 'play'} />
       {showNav && (
         <nav className="nav" aria-label="Main">
           <div className="nav-inner">

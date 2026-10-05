@@ -6,7 +6,7 @@ import {
   _resetAllForTests, loadProfile, saveProfile, getProgress, recordAttempt, attemptLog, streakDays,
   dueForReview, practiceMinutes, loadCycle, saveCycle, exportBackup, importBackup, subscribe,
   personalBest, snapshotReadiness, readinessHistory, saveImportedScore, loadImportedScores,
-  deleteImportedScore, LOG_CAP, DEFAULT_PROFILE, practiceDisplay,
+  deleteImportedScore, LOG_CAP, DEFAULT_PROFILE, practiceDisplay, storageSaveFailed, onStorageSaveFailed,
 } from './store';
 
 const DAY = 86_400_000;
@@ -492,5 +492,67 @@ describe('piece levels from full runs (docs/LEVELS.md)', () => {
     expect(after.sections.s1.level).toBe(4);
     expect(after.sections.all.level).toBe(4); // left alone, ignored
     expect(after.totalAttempts).toBe(11);
+  });
+});
+
+describe('storage full (quota exceeded)', () => {
+  const quota = () => { const e = new Error('QuotaExceededError'); e.name = 'QuotaExceededError'; throw e; };
+
+  it('the newest progress is what is read back after a failed write, and the singer is told once', () => {
+    expect(recordAttempt('p', 'S', 's0', 1, res(0.9))).toMatchObject({ newLevel: 1 });
+    const told = vi.fn();
+    const off = onStorageSaveFailed(told);
+    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(quota);
+    try {
+      expect(recordAttempt('p', 'S', 's0', 2, res(0.9))).toMatchObject({ passed: true, newLevel: 2 });
+      expect(getProgress('p', 'S')!.sections.s0.level).toBe(2);
+      expect(attemptLog()).toHaveLength(2);
+      recordAttempt('p', 'S', 's0', 3, res(0.95));
+      expect(getProgress('p', 'S')!.sections.s0.level).toBe(3);
+      expect(storageSaveFailed()).toBe(true);
+      expect(told).toHaveBeenCalledTimes(1);
+    } finally { spy.mockRestore(); off(); }
+    // The older copy on disk is kept as the fallback after a reload.
+    expect(JSON.parse(localStorage.getItem('sh:progress:p:S')!).sections.s0.level).toBe(1);
+    // Once there's room again, the write goes to disk and the memory copy no longer shadows it.
+    recordAttempt('p', 'S', 's0', 3, res(0.95));
+    expect(JSON.parse(localStorage.getItem('sh:progress:p:S')!).sections.s0.level).toBe(3);
+    localStorage.setItem('sh:progress:p:S', JSON.stringify({ ...JSON.parse(localStorage.getItem('sh:progress:p:S')!), totalAttempts: 99 }));
+    expect(getProgress('p', 'S')!.totalAttempts).toBe(99);
+  });
+
+  it('makes room by trimming the attempt log (never progress) and retries', () => {
+    const old = Array.from({ length: 1500 }, (_, i) => ({ at: 1000 + i, pieceId: 'x', partId: 'S', sectionId: 'a', level: 1, accuracy: 0.5, score: 1, passed: false }));
+    localStorage.setItem('sh:log', JSON.stringify(old));
+    localStorage.setItem('sh:errors', '[]');
+    const real = Storage.prototype.setItem;
+    // Full until the log has been trimmed.
+    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, k: string, v: string) {
+      const log = this.getItem('sh:log');
+      if (log && log.length > 100_000 && k !== 'sh:log') quota();
+      return real.call(this, k, v);
+    });
+    try {
+      recordAttempt('p', 'S', 's0', 1, res(0.9));
+    } finally { spy.mockRestore(); }
+    expect(storageSaveFailed()).toBe(false);
+    expect(JSON.parse(localStorage.getItem('sh:progress:p:S')!).sections.s0.level).toBe(1);
+    expect(localStorage.getItem('sh:errors')).toBeNull();
+    const log = attemptLog();
+    expect(log.length).toBeLessThan(400);
+    expect(log[log.length - 1]).toMatchObject({ pieceId: 'p', sectionId: 's0' });
+  });
+});
+
+describe('loadCycle validates its fields', () => {
+  it('keeps good fields and drops bad ones', () => {
+    localStorage.setItem('sh:cycle', JSON.stringify({
+      name: 7, pieceIds: ['a', 3, null, 'b'], focusPieceIds: 'a', concertDate: '2026-12-01', rehearsalWeekday: 9,
+      rehearsalTime: '19:30', wanted: [{ title: 'Vinea', composer: 'Victoria', focus: true }, { composer: 'x' }, 'y', { title: 'No composer' }],
+    }));
+    expect(loadCycle()).toEqual({
+      name: 'This cycle', pieceIds: ['a', 'b'], concertDate: '2026-12-01', rehearsalTime: '19:30',
+      wanted: [{ title: 'Vinea', composer: 'Victoria', focus: true }, { title: 'No composer', composer: '' }],
+    });
   });
 });

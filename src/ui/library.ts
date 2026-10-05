@@ -127,7 +127,8 @@ function dropFormerBuiltins() {
 }
 
 async function loadAll() {
-  migrateIds();
+  // Nothing here may leave the app on "Loading repertoire…": each step guards its own errors.
+  try { migrateIds(); } catch (e) { console.error('migrateIds', e); }
   const base = import.meta.env.BASE_URL || './';
   const manifest = await loadManifest(base, 'manifest.json');
   if (!manifest.length) loadError = 'Could not load the built-in pieces.';
@@ -160,11 +161,23 @@ async function loadAll() {
   );
   try {
     const imported = await loadImportedScores();
-    for (const s of imported) pieces.set(s.id, makePiece(s));
+    // One bad score must not hide the others.
+    for (const s of imported) {
+      try { pieces.set(s.id, makePiece(s)); } catch (e) { console.error('Failed to load imported score', s?.id, e); }
+    }
   } catch (e) {
     console.error(e);
   }
-  dropFormerBuiltins();
+  try { dropFormerBuiltins(); } catch (e) { console.error('dropFormerBuiltins', e); }
+  try { seedCycle(); } catch (e) { console.error('seedCycle', e); }
+  loaded = true;
+  emit();
+  // Your choir's programme and scores (in the background; works offline from the last sync).
+  void syncChoirNow();
+}
+
+/** First start: the default solo programme. */
+function seedCycle() {
   const cycle = loadCycle();
   let seeded = false;
   try { seeded = !!localStorage.getItem('sh:cycleSeeded'); } catch { /* storage blocked */ }
@@ -182,10 +195,6 @@ async function loadAll() {
     saveCycle(cycle);
     try { localStorage.setItem('sh:cycleSeeded', '1'); } catch { /* storage blocked */ }
   }
-  loaded = true;
-  emit();
-  // Your choir's programme and scores (in the background; works offline from the last sync).
-  void syncChoirNow();
 }
 
 let syncing: Promise<Awaited<ReturnType<typeof syncChoir>>> | null = null;
