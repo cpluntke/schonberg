@@ -1,7 +1,9 @@
 // Standard MIDI File → Score.
-// Header data (tempo map, time & key signatures, ppq) comes from @tonejs/midi; per-track raw events
-// (needed to split by channel and to read lyric meta events) from `midi-file`, the parser @tonejs/midi uses.
-import { Midi } from '@tonejs/midi';
+// Everything is read from the raw events of `midi-file` (the parser @tonejs/midi uses): the header
+// data (ppq, tempo map, time & key signatures, name) the way @tonejs/midi's Header reads it, and the
+// per-track events (needed to split by channel and to read lyric meta events). @tonejs/midi's own
+// Midi constructor isn't used: building its tracks is quadratic in the number of notes (seconds
+// for a large file, much worse on a phone).
 import { parseMidi as parseSmf } from 'midi-file';
 import type { KeySig, Measure, Part, Score, ScoreNote } from './types';
 import { beatToTime, buildTempoMap } from './time';
@@ -26,18 +28,18 @@ function cleanLyric(t: string): { text: string; hyphen: boolean } | null {
 export function parseMidi(data: ArrayBuffer | Uint8Array, opts?: { id?: string; title?: string }): Score {
   const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
   if (bytes.length < 14 || String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) !== 'MThd') throw new Error('Invalid MIDI file (missing "MThd" header)');
-  let tone: Midi;
   let smf: ReturnType<typeof parseSmf>;
   try {
-    tone = new Midi(bytes);
     smf = parseSmf(bytes);
+    if (!smf || !Array.isArray(smf.tracks)) throw new Error('no tracks');
   } catch (e) {
     throw new Error(`Invalid MIDI file: ${(e as Error)?.message ?? 'could not be read'}`);
   }
-  const ppq = tone.header.ppq || 480;
+  const header = readHeader(smf);
+  const ppq = header.ppq || 480;
 
   // ---- tempo map
-  const tempos = buildTempoMap(tone.header.tempos.map((t) => ({ beat: t.ticks / ppq, bpm: t.bpm })));
+  const tempos = buildTempoMap(header.tempos.map((t) => ({ beat: t.ticks / ppq, bpm: t.bpm })));
 
   // ---- collect notes per (track, channel) + lyrics per track
   type Group = { track: number; channel: number; name: string; program: number; notes: RawMidiNote[] };
@@ -92,7 +94,7 @@ export function parseMidi(data: ArrayBuffer | Uint8Array, opts?: { id?: string; 
   const orphanLyrics = lyricsByTrack.filter((l, ti) => l.length && !groups.some((g) => g.track === ti)).flat();
 
   // ---- measures
-  const sigs = [...tone.header.timeSignatures].sort((a, b) => a.ticks - b.ticks);
+  const sigs = [...header.timeSignatures].sort((a, b) => a.ticks - b.ticks);
   // the piece ends with its last note (a stray meta event far after it would add hundreds of empty bars)
   let noteEndTick = 0;
   for (const g of groups) for (const n of g.notes) noteEndTick = Math.max(noteEndTick, n.tick + n.durTicks);
@@ -202,7 +204,7 @@ export function parseMidi(data: ArrayBuffer | Uint8Array, opts?: { id?: string; 
     };
   });
 
-  const title = opts?.title || tone.header.name || 'Untitled';
+  const title = opts?.title || header.name || 'Untitled';
   const noteCount = parts.reduce((s, p) => s + p.notes.length, 0);
   let duration = Math.max(0, beatToTime(tempos, endBeat));
   for (const p of parts) for (const n of p.notes) duration = Math.max(duration, n.start + n.dur);
@@ -217,6 +219,35 @@ export function parseMidi(data: ArrayBuffer | Uint8Array, opts?: { id?: string; 
     tempos,
     duration,
   };
+}
+
+/**
+ * Tempo changes and time signatures from all tracks, and the name (the first track's trackName),
+ * as @tonejs/midi's Header reads them.
+ */
+function readHeader(smf: ReturnType<typeof parseSmf>): {
+  ppq: number;
+  tempos: { ticks: number; bpm: number }[];
+  timeSignatures: { ticks: number; timeSignature: [number, number] }[];
+  name: string;
+} {
+  const tempos: { ticks: number; bpm: number }[] = [];
+  const timeSignatures: { ticks: number; timeSignature: [number, number] }[] = [];
+  let name = '';
+  smf.tracks.forEach((events, ti) => {
+    let tick = 0;
+    for (const ev of events) {
+      tick += ev.deltaTime;
+      const e = ev as unknown as { type: string; numerator?: number; denominator?: number; microsecondsPerBeat?: number; text?: string };
+      if (e.type === 'timeSignature') timeSignatures.push({ ticks: tick, timeSignature: [e.numerator ?? 4, e.denominator ?? 4] });
+      else if (e.type === 'setTempo' && e.microsecondsPerBeat) tempos.push({ ticks: tick, bpm: 60_000_000 / e.microsecondsPerBeat });
+      else if (ti === 0 && e.type === 'trackName') name = e.text ?? '';
+    }
+  });
+  tempos.sort((a, b) => a.ticks - b.ticks);
+  timeSignatures.sort((a, b) => a.ticks - b.ticks);
+  const ppq = (smf.header as { ticksPerBeat?: number }).ticksPerBeat ?? 0;
+  return { ppq, tempos, timeSignatures, name };
 }
 
 /** True if more than 20% of notes overlap a previous note (chords → not a single vocal line). */
