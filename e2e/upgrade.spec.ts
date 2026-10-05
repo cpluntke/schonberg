@@ -83,3 +83,26 @@ test('a new solo singer gets the Abendlied as the programme, and no library file
   }
   expect(errors).toEqual([]);
 });
+
+// Older installs were seeded with made-up dates (rehearsal in 4 days, concert 28 days later): cleared once.
+test('an old demo programme loses its made-up dates, real dates stay', async ({ page }) => {
+  await page.goto('/#/diagnostics');
+  await page.evaluate(() => {
+    localStorage.setItem('sh:profile', JSON.stringify({ name: 'Ben', voice: 'B', notation: 'letter', strictness: 'standard', tuning: 'equal', latencyMs: 120, onboarded: true }));
+    localStorage.setItem('sh:cycle', JSON.stringify({ name: 'Demo cycle', pieceIds: ['warmup-chorale'], rehearsalDate: '2026-09-01', concertDate: '2026-09-29' }));
+    localStorage.setItem('sh:cycleSeeded', '1');
+    localStorage.removeItem('sh:demoDatesCleared'); // as on an install from before the cleanup
+  });
+  await page.goto('/?demo=1#/');
+  await expect(page.getByTestId('piece-row')).toHaveCount(1, { timeout: 20_000 });
+  let cycle = await page.evaluate(() => JSON.parse(localStorage.getItem('sh:cycle')!));
+  expect(cycle.rehearsalDate).toBeUndefined();
+  expect(cycle.concertDate).toBeUndefined();
+  await expect(page.getByText('The concert is over')).toHaveCount(0);
+  // Dates the singer sets afterwards are theirs: the cleanup never runs again.
+  await page.evaluate(() => localStorage.setItem('sh:cycle', JSON.stringify({ name: 'Demo cycle', pieceIds: ['warmup-chorale'], rehearsalDate: '2026-11-01', concertDate: '2026-11-29' })));
+  await page.goto('/?demo=2#/');
+  await expect(page.getByTestId('piece-row')).toHaveCount(1, { timeout: 20_000 });
+  cycle = await page.evaluate(() => JSON.parse(localStorage.getItem('sh:cycle')!));
+  expect(cycle.concertDate).toBe('2026-11-29');
+});

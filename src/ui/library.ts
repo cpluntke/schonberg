@@ -126,6 +126,20 @@ function dropFormerBuiltins() {
   }
 }
 
+/**
+ * Older installs seeded the demo programme with made-up dates (rehearsal in 4 days, concert 28 days
+ * after that), which read as the singer's own. Clear them once, only while they still look seeded.
+ */
+function dropDemoDates() {
+  try { if (localStorage.getItem('sh:demoDatesCleared')) return; } catch { return; }
+  const c = loadCycle();
+  const day = (d?: string) => (d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? Date.parse(`${d}T00:00:00Z`) / 86400000 : NaN);
+  if (!c.preset && c.name === 'Demo cycle' && day(c.concertDate) - day(c.rehearsalDate) === 28) {
+    saveCycle({ ...c, rehearsalDate: undefined, concertDate: undefined });
+  }
+  try { localStorage.setItem('sh:demoDatesCleared', '1'); } catch { /* storage blocked */ }
+}
+
 async function loadAll() {
   // Nothing here may leave the app on "Loading repertoire…": each step guards its own errors.
   try { migrateIds(); } catch (e) { console.error('migrateIds', e); }
@@ -169,6 +183,7 @@ async function loadAll() {
     console.error(e);
   }
   try { dropFormerBuiltins(); } catch (e) { console.error('dropFormerBuiltins', e); }
+  try { dropDemoDates(); } catch (e) { console.error('dropDemoDates', e); }
   try { seedCycle(); } catch (e) { console.error('seedCycle', e); }
   loaded = true;
   emit();
