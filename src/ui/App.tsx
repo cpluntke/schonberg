@@ -22,6 +22,7 @@ import { ChoirScreen, ChoirAdmin, SectionLead, SuperAdmin } from './screens/Choi
 import { InviteScreen } from './screens/Invite';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { UpdatePrompt } from './components/UpdatePrompt';
+import { backupSoon } from '../progress/backup';
 
 const TABS: { name: Route['name']; label: string; icon: React.ReactNode }[] = [
   { name: 'home', label: 'Home', icon: <IconHome /> },
@@ -51,6 +52,14 @@ export function App() {
     };
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);
+  }, []);
+  // Progress backup: on start and whenever the app comes back, if something changed (at most once a minute).
+  useEffect(() => {
+    backupSoon();
+    const onBack = () => { if (!document.hidden) backupSoon(); };
+    document.addEventListener('visibilitychange', onBack);
+    window.addEventListener('focus', onBack);
+    return () => { document.removeEventListener('visibilitychange', onBack); window.removeEventListener('focus', onBack); };
   }, []);
   // Accessibility: on every screen change, move focus to the screen's heading and update the title.
   useEffect(() => {

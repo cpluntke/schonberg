@@ -10,6 +10,7 @@ import { effectiveTolerance } from '../../progress/ladder';
 import { NOTATIONS } from './Setup';
 import { noteLabel } from '../../game/notation';
 import { IntroVideoButton } from '../components/IntroVideo';
+import { BackupPanel } from '../components/BackupPanel';
 
 export function Settings() {
   const [profile, update] = useProfile();
@@ -209,9 +210,11 @@ export function Settings() {
         <button className="btn small" onClick={() => go({ name: 'diagnostics' })}>Diagnostics &amp; problem report</button>
       </section>
 
+      <BackupPanel />
+
       <section className="col" style={{ gap: 8 }}>
-        <h2 className="eyebrow">Backup</h2>
-        <span className="small muted">Your progress lives on this device. Save a backup to move it to another phone (imported scores need to be imported again).</span>
+        <h2 className="eyebrow">Backup file</h2>
+        <span className="small muted">Your progress lives on this device. A backup file keeps everything, including your full practice history (imported scores need to be imported again).</span>
         <div className="row">
           <button className="btn small grow" onClick={download}>Save backup file</button>
           <button className="btn small grow" onClick={() => fileRef.current?.click()}>Restore from file</button>
@@ -228,7 +231,7 @@ export function Settings() {
       </section>
 
       <section className="col small muted" style={{ gap: 4 }}>
-        <span>Schönberg Hero · runs entirely on your device.</span>
+        <span>Schönberg Hero · runs on your device. The choir server only gets what you choose to share or back up.</span>
         <span>Built-in scores: public-domain editions from the PDMX dataset (MuseScore community, CC BY 4.0 dataset) and original study pieces.</span>
       </section>
     </main>

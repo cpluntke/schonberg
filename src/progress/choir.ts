@@ -112,7 +112,9 @@ export async function joinChoir(code: string): Promise<ChoirInfo> {
 export function leaveChoir(): void {
   const p = loadProfile();
   if (p.choirCode && p.shareProgress && p.name.trim()) withdrawProgress(p.choirCode, p.name.trim()).catch(() => {});
-  saveProfile({ ...p, choirCode: undefined, shareProgress: false });
+  // Backups were on because of the choir: they stay on (turn them off in Settings).
+  const keepBackup = p.backup === undefined && !!rawGet('schonberg:backupKey') ? { backup: true } : {};
+  saveProfile({ ...p, choirCode: undefined, shareProgress: false, ...keepBackup });
   writeJSON(CACHE, null);
   try { localStorage.removeItem('sh:choirApplied'); } catch { /* ignore */ }
   // An admin's or section lead's login belongs to that choir.
@@ -385,11 +387,29 @@ export const retireOldPasswords = (code: string, auth: Auth) => call<People>(`/c
 
 // ------------------------------------------------------------------ super admin
 
+/** One choir's storage (scores against the per-choir cap, shared progress, members sharing it). */
+export interface ChoirUsage {
+  scoresBytes: number; progressBytes: number; bytes: number; capBytes: number; pieces: number; maxPieces: number; members: number;
+  /** All Schönberg data on the server (admins' view). */
+  server?: { totalBytes: number; capBytes: number };
+}
+/** All Schönberg data on the server, and the singers' backups. */
+export interface ServerUsage {
+  totalBytes: number; capBytes: number;
+  backups: { count: number; bytes: number; max: number; capBytes: number };
+}
 export interface ChoirSummary {
   code: string; name: string; pieces: number; createdAt: number; hasAdmin: boolean; programme: string | null; leads: string[]; members: number;
   admins: string[]; people: number; invites: number; legacy: boolean;
+  usage?: ChoirUsage;
 }
-export const superList = (pw: string) => call<{ choirs: ChoirSummary[] }>('/super/choirs', { auth: { superAdmin: pw } });
+export const superList = (pw: string) => call<{ choirs: ChoirSummary[]; usage?: ServerUsage }>('/super/choirs', { auth: { superAdmin: pw } });
+export const fetchChoirUsage = (code: string, auth: Auth) => call<ChoirUsage>(`/choirs/${enc(code)}/usage`, { auth });
+/** "12.3 MB" (one decimal below 10 MB). */
+export function mb(bytes: number): string {
+  const v = bytes / (1024 * 1024);
+  return `${v < 10 ? v.toFixed(1) : Math.round(v)} MB`;
+}
 /** Creates the choir and an invite link for its first admin. */
 export async function superCreate(pw: string, code: string, name: string, adminNote: string): Promise<{ code: string; name: string; token: string; invite: InviteInfo }> {
   const r = await call<{ code: string; name: string; token: string; invite: InviteInfo }>('/super/choirs', { method: 'POST', auth: { superAdmin: pw }, ...json({ code, name, adminNote }) });

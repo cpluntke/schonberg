@@ -30,6 +30,7 @@ export const SOLID = 0.85;
 export const OK = 0.6;
 
 const key = (pieceId: string, partId: string) => `sh:bars:${pieceId}:${partId}`;
+export const barsKey = key;
 const isMap = (v: unknown) => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 export function getBars(pieceId: string, partId: string): BarMap {

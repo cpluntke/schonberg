@@ -69,6 +69,11 @@ export interface Profile {
    * voices + accompaniment. Unset = all voices + accompaniment when that stays readable.
    */
   scoreStaves?: 'mine' | 'voices' | 'all';
+  /**
+   * Keep a compact copy of my progress on the choir server (src/progress/backup.ts). Unset = on for
+   * singers who joined a choir, off otherwise.
+   */
+  backup?: boolean;
 }
 
 /** The practice display (the singer's choice, else sheet music at every level). */
@@ -247,6 +252,11 @@ export function rawRemove(key: string): void {
   memStorage.delete(key);
 }
 
+/** Storage keys starting with `prefix` (e.g. 'sh:words:'). */
+export function keysWithPrefix(prefix: string): string[] {
+  return allKeys().filter((k) => k.startsWith(prefix));
+}
+
 function allKeys(): string[] {
   const out = new Set<string>(memStorage.keys());
   const s = ls();
@@ -323,6 +333,9 @@ export function loadProfile(): Profile {
   return { ...DEFAULT_PROFILE, ...p };
 }
 export function saveProfile(p: Profile): void { writeJSON(K.profile, p); }
+
+/** The storage key of one piece/part's progress (for the server backup). */
+export const progressKey = K.progress;
 
 // ---------------------------------------------------------------- progress
 

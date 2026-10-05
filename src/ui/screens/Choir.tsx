@@ -8,7 +8,8 @@ import { WEEKDAYS } from '../../progress/rehearsal';
 import {
   apiBase, cachedChoir, changePassword, choirPieceId, claimAccount, deleteChoirPiece, fetchChoir, fetchSection, joinChoir, leaveChoir, ChoirApiError,
   loadSession, loggedOutNotice, login, logout, onSessionChange, refreshSession, refreshSessionSoon, saveChoirCycle, sessionFor, sessionSecret, superCreate, superDelete,
-  superList, superRename, uploadChoirPiece, withdrawProgress, type Auth, type ChoirInfo, type ChoirSummary, type SectionView, type Session,
+  superList, superRename, uploadChoirPiece, withdrawProgress, fetchChoirUsage, mb, type Auth, type ChoirInfo, type ChoirSummary, type ChoirUsage,
+  type SectionView, type ServerUsage, type Session,
 } from '../../progress/choir';
 import { PieceMap } from '../components/PieceMap';
 import { InviteLinkBox, PeoplePanel, roleText, VOICE_NAME, VOICES } from '../components/People';
@@ -439,10 +440,25 @@ function ScoresEditor({ code, auth, info, onChanged }: { code: string; auth: Aut
   const [fileKey, setFileKey] = useState(0);
   // The title filled in from the file name (replaced when another file is chosen).
   const [autoTitle, setAutoTitle] = useState('');
+  const [usage, setUsage] = useState<ChoirUsage | null>(null);
+  const pieceStamp = (info?.pieces ?? []).map((p) => p.id).join(',');
+  useEffect(() => {
+    let alive = true;
+    fetchChoirUsage(code, auth).then((u) => { if (alive) setUsage(u); }).catch(() => { /* shown when the server answers */ });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code, pieceStamp]);
+  const full = usage ? usage.scoresBytes >= usage.capBytes * 0.9 || (usage.server ? usage.server.totalBytes >= usage.server.capBytes * 0.9 : false) : false;
   return (
     <div className="card" data-testid="scores-editor">
       <strong>Scores</strong>
       <span className="small muted">MusicXML (.musicxml, .xml, .mxl) or MIDI, up to 6 MB. Everyone with the choir code can download them, so only upload scores your choir may share.</span>
+      {usage && (
+        <span className="small" data-testid="choir-usage" style={full ? errStyle : undefined}>
+          {mb(usage.scoresBytes)} of {mb(usage.capBytes)} used · {usage.pieces} score{usage.pieces === 1 ? '' : 's'} · {usage.members} singer{usage.members === 1 ? '' : 's'} sharing progress
+          {usage.server && usage.server.totalBytes >= usage.server.capBytes * 0.9 ? ' · the server is nearly full' : ''}
+        </span>
+      )}
       {(info?.pieces ?? []).map((p) => (
         <div key={p.id} className="row" style={{ gap: 6 }}>
           <span className="grow small ellipsis">{p.title || p.filename}{p.composer && <span className="tiny muted"> · {p.composer}</span>}</span>
@@ -617,12 +633,18 @@ function SectionReport({ view }: { view: SectionView }) {
 export function SuperAdmin() {
   const [pw, setPw] = useState<string | null>(() => sessionSecret('super'));
   const [list, setList] = useState<ChoirSummary[] | null>(null);
+  const [usage, setUsage] = useState<ServerUsage | null>(null);
   const [err, setErr] = useState('');
   const [form, setForm] = useState({ code: '', name: '', adminNote: '' });
   const [created, setCreated] = useState<{ name: string; code: string; token: string } | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const load = async (p: string) => {
-    try { setList((await superList(p)).choirs); setErr(''); } catch (e) { setErr((e as Error).message); }
+    try {
+      const r = await superList(p);
+      setList(r.choirs);
+      setUsage(r.usage ?? null);
+      setErr('');
+    } catch (e) { setErr((e as Error).message); }
   };
   useEffect(() => { if (pw) void load(pw); }, [pw]);
   if (!apiBase()) return <main className="screen"><Top title="Super admin" /><Offline /></main>;
@@ -668,11 +690,18 @@ export function SuperAdmin() {
           <button className="btn primary block" disabled={form.code.trim().length < 3} data-testid="create-choir-btn">Create and get the admin's invite link</button>
         </form>
       )}
+      {usage && (
+        <div className="card flat" data-testid="server-usage">
+          <strong>Storage</strong>
+          <span className="small">{mb(usage.totalBytes)} of {mb(usage.capBytes)} used by all choirs and backups</span>
+          <span className="small muted">Singers' progress backups: {usage.backups.count} of {usage.backups.max} · {mb(usage.backups.bytes)} of {mb(usage.backups.capBytes)}</span>
+        </div>
+      )}
       {(list ?? []).map((c) => (
         <div key={c.code} className="card flat" data-testid="choir-row">
           <strong>{c.name}</strong>
           <span className="small muted">
-            code {c.code} · {c.pieces} score{c.pieces === 1 ? '' : 's'} · {c.members} sharing{c.programme ? ` · ${c.programme}` : ''}
+            code {c.code} · {c.pieces} score{c.pieces === 1 ? '' : 's'}{c.usage ? ` (${mb(c.usage.bytes)} of ${mb(c.usage.capBytes)})` : ''} · {c.members} sharing{c.programme ? ` · ${c.programme}` : ''}
           </span>
           <span className="small">
             {c.admins.length ? `Admin${c.admins.length > 1 ? 's' : ''}: ${c.admins.join(', ')}` : 'No admin account yet'}
