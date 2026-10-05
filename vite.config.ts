@@ -10,7 +10,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'prompt',
       injectRegister: false,
-      includeAssets: ['icon.svg', 'pieces/*'],
+      includeAssets: ['icon.svg', 'apple-touch-icon.png', 'pieces/*'],
       manifest: {
         name: 'Schönberg Hero',
         short_name: 'Schönberg',

@@ -150,6 +150,7 @@ function getFull(c: Ctx, W: number, H: number, s: DrawState, show: StaffShow): F
   }
   if (!pick) {
     noFit = key;
+    if (full) releaseLayers(full);
     return null;
   }
   let sp = pick.sp;
@@ -198,6 +199,7 @@ function getFull(c: Ctx, W: number, H: number, s: DrawState, show: StaffShow): F
   const label = `Full score: ${voicesTxt}${instOwn ? `${voicesTxt ? ' + ' : ''}${lowerName(instOwn.spec.name)}` : ''}`
     + `${accRow ? ` + ${lowerName(accRow.spec.name)}` : ''}, your part: ${lowerName(s.part.name)}`;
   const fit = Math.max(1, Math.floor(avail / (sysH + SYS_GAP * sp)));
+  if (full) releaseLayers(full);
   full = {
     key, F, rows, own, sp, sysH, fit, nameFont: nameFont(nameSize), layers: new Map(), layerDpr: 0,
     info: {
@@ -227,6 +229,7 @@ function drawScoreViewInner(c: Ctx, W: number, H: number, s: DrawState): ScoreVi
   const show = s.staves ?? 'all';
   const F = W >= FULL_MIN_W && show !== 'mine' ? getFull(c, W, H, s, show) : null;
   if (!F) {
+    if (full?.layers.size) releaseLayers(full);
     drawStaff2D(c, W, H, s);
     return { full: false, label: `Sheet music: ${s.part.name}`, staves: 1, accompaniment: false, lyricsAll: false, systems: 0 };
   }
@@ -251,6 +254,12 @@ function drawStatic(c: Ctx, F: FullCache, geos: SysGeo[], s: DrawState) {
   F.rows.forEach((r, i) => {
     if (r.s) drawStaffNotes(c, geos[i], r.L.layout, r.L, r.s, r.plain);
   });
+}
+
+/** Release a replaced cache's layer bitmaps now (iOS keeps canvas memory until the size is zeroed). */
+function releaseLayers(F: FullCache) {
+  for (const cv of F.layers.values()) { cv.width = 0; cv.height = 0; }
+  F.layers.clear();
 }
 
 /** The static part of system j, rendered once at device resolution (null without a canvas API). */
@@ -308,8 +317,7 @@ function drawFull(c: Ctx, W: number, H: number, s: DrawState, F: FullCache) {
   const v: Vis = { vis, isPast, isNow, inRange };
   const dpr = c.getTransform().a || 1;
   if (F.layerDpr !== dpr) {
-    for (const cv of F.layers.values()) cv.width = cv.height = 0;
-    F.layers.clear();
+    releaseLayers(F);
     F.layerDpr = dpr;
   }
 
