@@ -64,8 +64,11 @@ export function Ranks() {
   const others = entries.filter((e) => !(me && e.name === me.name && e.pieceId === me.pieceId));
   const all = me ? [...others, { ...me, name: me.name }] : others;
   const ranked = rankEntries(all, by);
+  // Averages only use entries with the current readiness formula (older app versions report
+  // section-based readiness, which isn't comparable); they're still listed, greyed.
+  const current = (e: LeaderboardEntry) => e.v === READINESS_VERSION || (me != null && e.name === me.name && e.pieceId === me.pieceId);
   const sections = (['S', 'A', 'T', 'B'] as const).map((vt) => {
-    const es = all.filter((e) => e.voice === vt);
+    const es = all.filter((e) => e.voice === vt && current(e));
     return { vt, n: es.length, avg: es.length ? es.reduce((a, e) => a + e.readiness, 0) / es.length : 0 };
   });
   const maxAvg = Math.max(0.01, ...sections.map((s) => s.avg));
@@ -129,7 +132,7 @@ export function Ranks() {
       </div>
 
       <div className="card">
-        <div className="row between"><h2 style={{ fontSize: 15 }}>Section battle</h2><span className="tiny muted">avg. readiness</span></div>
+        <div className="row between"><h2 style={{ fontSize: 15 }}>Section battle</h2><span className="tiny muted">avg. readiness (current app)</span></div>
         {sections.map((s) => (
           <div key={s.vt} className="row">
             <span style={{ width: 22, fontWeight: 800 }}>{s.vt}</span>
@@ -188,7 +191,7 @@ export function Ranks() {
                     <tr key={pc.id} style={{ borderTop: '1px solid var(--surface-2)' }}>
                       <th scope="row" style={{ textAlign: 'left', padding: '6px', fontWeight: 600, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pc.title}</th>
                       {(['S', 'A', 'T', 'B'] as const).map((vt) => {
-                        const v = es.filter((e) => e.voice === vt);
+                        const v = es.filter((e) => e.voice === vt && (e === mine || e.v === READINESS_VERSION));
                         const avg = v.length ? v.reduce((a, e) => a + e.readiness, 0) / v.length : null;
                         const bg = avg == null ? 'transparent' : avg >= 0.75 ? '#1D4F63' : avg >= 0.4 ? '#2A2F55' : '#4A2418';
                         return <td key={vt} className="mono" style={{ textAlign: 'center', padding: '6px', background: bg }}>{avg == null ? '–' : `${Math.round(avg * 100)}%`}</td>;
