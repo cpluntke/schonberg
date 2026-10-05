@@ -173,12 +173,7 @@ async function loadAll() {
     const preferred = ['warmup-chorale'].filter((id) => pieces.has(id));
     cycle.pieceIds = preferred.length ? preferred : [...pieces.values()].filter((p) => p.builtin).slice(0, 4).map((p) => p.id);
     cycle.name = cycle.name === 'This cycle' ? 'Demo cycle' : cycle.name;
-    const iso = (days: number) => {
-      const d = new Date(Date.now() + days * 86400000);
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    };
-    cycle.rehearsalDate ??= iso(4);
-    cycle.concertDate ??= iso(32);
+    // No made-up dates: they stay empty until the singer or the choir sets them.
     saveCycle(cycle);
     try { localStorage.setItem('sh:cycleSeeded', '1'); } catch { /* storage blocked */ }
   }

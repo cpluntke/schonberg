@@ -42,6 +42,10 @@ export function Home() {
   const focusMissing = (cycle.wanted ?? []).filter((w) => w.focus && !statuses.some((s) => sameWork(s.piece.title, w.title)));
   const target = cycleTarget(statuses, toRehearsal, toConcert, focusStatuses.length ? focusStatuses : null);
   const avg = statuses.length ? statuses.reduce((a, s) => a + s.pct, 0) / statuses.length : 0;
+  const noDates = !nr && !cycle.concertDate;
+  // The concert is over: what comes next (the choir's next programme, or the singer's own dates).
+  const fromChoir = !!profile.choirCode || !!cycle.preset?.startsWith('choir:');
+  const concertOver = toConcert != null && toConcert < 0;
 
   return (
     <main className="screen">
@@ -78,7 +82,7 @@ export function Home() {
             </div>
           </div>
           <IntroVideoButton className="btn block" />
-          <button className="btn voice block" onClick={() => go({ name: 'setup' })}>Start setup</button>
+          <button className="btn primary block" data-testid="home-setup" onClick={() => go({ name: 'setup' })}>Start setup</button>
           {apiBase() && !loadSession() && ( // (logged in already: nothing to get back)
             <button className="linklike small muted" style={{ alignSelf: 'center', minHeight: 40 }} data-testid="home-account"
               onClick={() => { try { sessionStorage.setItem('sh:openAccount', 'login'); } catch { /* ignore */ } go({ name: 'settings' }); }}>New phone? Log in to your choir account to get your progress back</button>
@@ -89,7 +93,7 @@ export function Home() {
       <section className="card">
         <div className="row between">
           <div className="eyebrow">{cycle.name || 'This cycle'}</div>
-          <button className="btn ghost small" onClick={() => go({ name: 'settings' })}>Edit dates</button>
+          <button className="btn ghost small" onClick={() => go({ name: 'settings' })}>{noDates ? 'Set dates' : 'Edit dates'}</button>
         </div>
         <div className="row" style={{ gap: 16 }}>
           <Countdown label="Rehearsal" days={toRehearsal} date={nr?.label} raw />
@@ -112,10 +116,18 @@ export function Home() {
             ))}
           </div>
         )}
+        {concertOver && (
+          <div className="notice info small col" style={{ gap: 8 }} data-testid="concert-over">
+            <span>{fromChoir
+              ? 'The concert is over. Your choir will publish the next programme here; until then, keep your pieces fresh.'
+              : 'The concert is over. Set the dates of your next rehearsal and concert to plan the next cycle.'}</span>
+            {!fromChoir && <button className="btn small" style={{ alignSelf: 'flex-start' }} onClick={() => go({ name: 'settings' })}>Set new dates</button>}
+          </div>
+        )}
         {target && <div className="small" style={{ color: 'var(--accent-text)' }}>{target}</div>}
         {focus && focus.next ? (
           <>
-            <NextUp status={focus} />
+            <NextUp status={focus} secondary={!profile.onboarded} />
             {plan.length > 1 && (
               <div className="col" style={{ gap: 0 }}>
                 <span className="tiny muted">Also today</span>
@@ -147,7 +159,7 @@ export function Home() {
             <div className="grow col" style={{ gap: 2 }}>
               <span className="ellipsis" style={{ fontWeight: 600, fontSize: 15 }}>{s.piece.title}</span>
               <span className="small muted ellipsis">
-                {s.piece.composer}{s.partName ? ` · ${s.partName}` : ''}
+                {[s.piece.composer, s.partName].filter(Boolean).join(' · ')}
                 {s.next?.kind === 'fix' ? ` · ${s.toFix.reduce((n, f) => n + f.sectionIds.length, 0)} to fix` : s.fullDue ? ' · full run due for review' : s.due.length ? ` · ${s.due.length} due for review` : ''}
               </span>
             </div>
@@ -162,7 +174,7 @@ export function Home() {
             <div className="mono-tile" style={{ color: 'var(--muted)', border: '1px dashed var(--line)', background: 'transparent' }}>+</div>
             <div className="grow col" style={{ gap: 2 }}>
               <span className="ellipsis" style={{ fontWeight: 600, fontSize: 15 }}>{w.title}</span>
-              <span className="small muted ellipsis">{w.composer} · {w.note ?? 'import your choir’s score'}</span>
+              <span className="small muted ellipsis">{[w.composer, w.note ?? 'import your choir’s score'].filter(Boolean).join(' · ')}</span>
             </div>
             <span className="badge muted">Import</span>
           </button>
@@ -207,7 +219,8 @@ export function pieceLabel(s: PieceStatus): string {
   return s.pct > 0 ? 'in progress' : 'not started';
 }
 
-function NextUp({ status }: { status: PieceStatus }) {
+/** `secondary`: before the voice setup, setup is the one primary action and practising comes second. */
+function NextUp({ status, secondary }: { status: PieceStatus; secondary?: boolean }) {
   const n = status.next!;
   const spec = levelSpec(n.level);
   // An experienced singer can skip the sections: offer the full run at the next piece level.
@@ -219,8 +232,8 @@ function NextUp({ status }: { status: PieceStatus }) {
         <span style={{ fontSize: 20, fontWeight: 800 }}>{status.piece.title}</span>
         <span className="small muted">{n.reason}{spec && !n.reason.includes(spec.name) ? ` (level ${n.level}, ${spec.name})` : ''}</span>
       </div>
-      <button className="btn primary block" onClick={() => go({ name: 'play', pieceId: status.piece.id, partId: status.partId, sectionId: n.sectionId, level: n.level, mode: '2d' })}>
-        <IconPlay size={18} /> {n.sectionId === 'all' ? 'Sing it all now' : n.kind === 'fix' ? 'Fix it now' : 'Practise now'}
+      <button className={`btn block${secondary ? '' : ' primary'}`} onClick={() => go({ name: 'play', pieceId: status.piece.id, partId: status.partId, sectionId: n.sectionId, level: n.level, mode: '2d' })}>
+        <IconPlay size={18} {...(secondary ? { color: '#FF7A45' } : {})} /> {n.sectionId === 'all' ? 'Sing it all now' : n.kind === 'fix' ? 'Fix it now' : 'Practise now'}
       </button>
       {skip > 0 && (
         <button className="btn ghost small" data-testid="skip-to-full" onClick={() => go({ name: 'play', pieceId: status.piece.id, partId: status.partId, sectionId: 'all', level: skip, mode: '2d' })}>
