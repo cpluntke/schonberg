@@ -117,17 +117,20 @@ describe('ladder', () => {
     const res = { notes: [
       { index: 0, grade: 'perfect' }, { index: 1, grade: 'ok' }, // s0: 2 notes, 0.75 → checked (1 + 0.85) / 2
       ...[2, 3, 4, 5, 6, 7, 8].map((index) => ({ index, grade: 'perfect' })), // s1: 7 notes
-      { index: 9, grade: 'ok' }, // s2: a single note, no slack
+      { index: 9, grade: 'ok' }, // s2: a single note sung "ok" counts as good
       { index: 10, grade: 'miss' }, // s3: a single missed note
     ] } as never;
     const c = sectionChecks(secs, (i) => starts[i], res);
     expect(c.s0.accuracy).toBeCloseTo(0.75);
     expect(c.s0.checked).toBeCloseTo(0.925);
     expect(c.s1.notes).toBe(7);
-    expect(c.s2.checked).toBe(0.5);
+    expect(c.s2.checked).toBeCloseTo(0.85);
     expect(c.s3.checked).toBe(0);
     const two = sectionChecks(secs, (i) => [0, 1][i], { notes: [{ index: 0, grade: 'miss' }, { index: 1, grade: 'ok' }] } as never);
     expect(two.s0.checked).toBe(0.25); // under 50%: no slack
+    // A missed note is never forgiven: perfect + miss = 50% stays 50%.
+    const miss = sectionChecks(secs, (i) => [0, 1][i], { notes: [{ index: 0, grade: 'perfect' }, { index: 1, grade: 'miss' }] } as never);
+    expect(miss.s0.checked).toBe(0.5);
     expect(fullRunCounts({ level: 3, rate: 1, partial: false, resumed: false, timingUnsure: false, offBookPractice: false, arcade: true }).why).toBe('arcade');
   });
   it('fixListLocks: only a run that held at the level locks it', () => {

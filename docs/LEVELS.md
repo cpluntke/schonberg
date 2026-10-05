@@ -26,8 +26,8 @@ A piece reaches level N only through a **full run-through at level N**, in one g
   level's tempo, e.g. the level-1 tempo slider below 70%, is practice too, and so is a level-5 run
   with bars still showing or a peek. Arcade runs of the whole piece are just for fun and never count.)
 - **Every section is scored within the run** (the same measure as the run's accuracy: the
-  average grade of its notes). Sections with 2–7 notes get one weak note of slack (it counts as
-  "good"), so a single "ok" note can't fail a level. A section under 50% in the run never counts as held. The level is granted only when the run passes overall **and every
+  average grade of its notes). Sections with fewer than 8 notes get one weak note of slack (it counts as
+  "good"), so a single "ok" note can't fail a level; a missed note is never forgiven. A section under 50% in the run never counts as held. The level is granted only when the run passes overall **and every
   section reaches the pass mark**.
 - A section below the pass mark is **"to fix at level N"**. Until it passes at level N (or higher)
   as a section on its own, a full run at level N can't count: the piece screen greys out that

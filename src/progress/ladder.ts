@@ -293,9 +293,11 @@ export function sectionChecks(
   for (const [id, v] of vals) {
     const sum = v.reduce((a, b) => a + b, 0);
     const accuracy = sum / v.length;
-    // Slack from two notes up: the weakest note counts as "good". A section that got no real
-    // score in the run (under 50%) is never checked as held.
-    const slack = v.length >= 2 && v.length < SHORT_SECTION_NOTES ? (sum - Math.min(...v) + GRADE_VALUE.good) / v.length : accuracy;
+    // Short sections: their weakest note counts as "good", as long as it was sung at all (a
+    // missed note is never forgiven). A one-note section sung "ok" therefore holds; one that's
+    // missed doesn't. A section that got no real score in the run (under 50%) never holds.
+    const weakest = Math.min(...v);
+    const slack = v.length < SHORT_SECTION_NOTES && weakest > 0 ? (sum - weakest + GRADE_VALUE.good) / v.length : accuracy;
     const checked = accuracy < MIN_SECTION_SCORE ? accuracy : Math.max(accuracy, slack);
     out[id] = { accuracy, checked, notes: v.length };
   }
