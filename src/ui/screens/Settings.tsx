@@ -19,6 +19,8 @@ export function Settings() {
   useStoreVersion();
   const cycle = loadCycle();
   const [backupText, setBackupText] = useState('');
+  // The delay field while typing ('' when cleared), so it never shows "0120".
+  const [delayText, setDelayText] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const dMajor = { beat: 0, time: 0, fifths: 2, mode: 'major' as const };
 
@@ -38,6 +40,12 @@ export function Settings() {
   }
 
   function restore(text: string) {
+    // Check the file first: only a real backup asks to replace anything.
+    const bad = backupProblem(text);
+    if (bad) {
+      toast(bad);
+      return;
+    }
     if (!confirm('Replace your current progress and settings with this backup?')) return;
     try {
       importBackup(text);
@@ -168,7 +176,7 @@ export function Settings() {
               const on = (cycle.focusPieceIds ?? []).includes(id);
               return (
                 <label key={id} className="toggle-row">
-                  <span className="ellipsis">{pc.title} <span className="muted small">· {pc.composer}</span></span>
+                  <span className="ellipsis">{pc.title}{pc.composer && <span className="muted small"> · {pc.composer}</span>}</span>
                   <input type="checkbox" checked={on} onChange={() => setCycle({ focusPieceIds: on ? (cycle.focusPieceIds ?? []).filter((x) => x !== id) : [...(cycle.focusPieceIds ?? []), id] })} />
                 </label>
               );
@@ -188,8 +196,13 @@ export function Settings() {
           </select>
         </div>
         <label className="toggle-row"><span>Headphone/mic delay (ms)</span>
-          <input type="number" min={0} max={600} step={5} value={profile.latencyMs} aria-label="Delay in milliseconds"
-            onChange={(e) => update({ latencyMs: Math.max(0, Math.min(600, Number(e.target.value) || 0)), latencySource: 'measured' })}
+          <input type="number" min={0} max={600} step={5} value={delayText ?? String(profile.latencyMs)} aria-label="Delay in milliseconds"
+            onChange={(e) => {
+              const ms = Math.max(0, Math.min(600, Math.round(Number(e.target.value)) || 0));
+              setDelayText(e.target.value.trim() === '' ? '' : String(ms));
+              update({ latencyMs: ms, latencySource: 'measured' });
+            }}
+            onBlur={() => setDelayText(null)}
             style={{ width: 90, minHeight: 40, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--line)', padding: '0 8px' }} />
         </label>
         <label className="toggle-row"><span>Practice beat<span className="tiny muted" style={{ display: 'block' }}>A soft click keeps the tempo where you sing on your own.</span></span>
@@ -239,4 +252,13 @@ export function Settings() {
       </section>
     </main>
   );
+}
+
+/** Why `text` can't be restored (null for a Schönberg Hero backup). Same checks as importBackup. */
+export function backupProblem(text: string): string | null {
+  let b: unknown;
+  try { b = JSON.parse(text); } catch { return 'This is not a valid backup file (bad JSON).'; }
+  const o = b as { app?: unknown; data?: unknown } | null;
+  if (!o || typeof o !== 'object' || o.app !== 'schonberg-hero' || !o.data || typeof o.data !== 'object') return 'This is not a Schönberg Hero backup.';
+  return null;
 }

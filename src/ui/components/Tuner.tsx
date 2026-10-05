@@ -50,9 +50,7 @@ export function Tuner({ notation, onReading, autoStart = false }: {
       });
       setState('on');
     } catch (e) {
-      const code = (e as { code?: string }).code;
-      setErr(code === 'denied' ? 'Microphone access was blocked. Allow it in the browser’s site settings, then try again.'
-        : code === 'insecure' ? 'The microphone only works over https.' : 'No microphone could be opened.');
+      setErr(micErrorText(e));
       setState('error');
     }
   }
@@ -102,4 +100,11 @@ export function Tuner({ notation, onReading, autoStart = false }: {
       )}
     </div>
   );
+}
+
+/** What to tell the singer when the microphone can't be opened (the tuner, the range and delay checks). */
+export function micErrorText(e: unknown): string {
+  const code = (e as { code?: string } | null)?.code;
+  return code === 'denied' ? 'Microphone access was blocked. Allow it in the browser’s site settings, then try again.'
+    : code === 'insecure' ? 'The microphone only works over https.' : 'No microphone could be opened.';
 }

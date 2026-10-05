@@ -3,7 +3,7 @@ import { getLastRun, shareRun } from '../play/runExport';
 import { startColdStart } from '../play/cold';
 import { STAGE_NAMES, WORDS_PASS, type WordsStage } from '../../game/textrhythm';
 import { toast } from '../hooks';
-import { getLastResult } from '../play/lastResult';
+import { getLastResult, lastRunPiece } from '../play/lastResult';
 import { getPiece, singableSections } from '../library';
 import { go } from '../router';
 import { LEVELS, OFF_BOOK_DAYS, fixesBefore, nextStep } from '../../progress/ladder';
@@ -41,10 +41,22 @@ export function Results() {
   const lr = getLastResult();
   const piece = lr ? getPiece(lr.pieceId) : undefined;
   if (!lr || !piece) {
+    // The details live only while the app is open; the progress itself was saved.
+    const lastId = lr?.pieceId ?? lastRunPiece();
+    const lastPiece = lastId ? getPiece(lastId) : undefined;
     return (
-      <main className="screen">
-        <h1 className="hero">No results yet</h1>
-        <button className="btn primary" onClick={() => go({ name: 'home' })}>Home</button>
+      <main className="screen" data-testid="no-results">
+        <h1 className="hero">No results to show</h1>
+        <span className="small muted">
+          {lastPiece ? 'The details of your last run are gone (the app was closed or reloaded), but your progress from it was saved.'
+            : 'Sing a section and your results appear here.'}
+        </span>
+        {lastPiece && (
+          <button className="btn primary block" onClick={() => go({ name: 'piece', pieceId: lastPiece.id }, true)}>
+            Open {lastPiece.title}
+          </button>
+        )}
+        <button className={`btn block${lastPiece ? '' : ' primary'}`} onClick={() => go({ name: 'home' }, true)}>Home</button>
       </main>
     );
   }
@@ -266,6 +278,11 @@ export function Results() {
             </button>
           ) : !(!lr.passed && lr.ladder) && !lr.full?.blocked ? (
             <button className="btn block" onClick={() => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, level: lr.level, mode: lr.mode, ...(lr.sectionId === 'drill' || lr.sectionId === 'cold' ? { from: lr.from, to: lr.to } : {}) })}>Again</button>
+          ) : lr.sectionId === 'all' && (nextFix || lr.full?.blocked) ? (
+            // Until the slipped sections pass on their own, another full run at this level is practice.
+            <button className="btn block" data-testid="sing-all-again" onClick={() => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: 'all', level: lr.level, mode: '2d' })}>
+              Sing it all again <span className="tiny muted">(practice)</span>
+            </button>
           ) : null}
           <button className="btn block" onClick={() => go({ name: 'piece', pieceId: piece.id })}>All sections</button>
         </div>

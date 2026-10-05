@@ -873,6 +873,14 @@ export function parseMusicXML(xml: string, opts?: { id?: string }): Score {
       for (const w of kids(c, 'credit-words')) if (!composer && /\(\s*\d{4}\s*[-–]\s*\d{4}\s*\)/.test(txt(w))) composer = txt(w);
   }
   composer = composer.replace(/\s+/g, ' ').trim();
+  // (The id stays what it was before the split below: the same file keeps its progress.)
+  const idKey = `${title}|${composer}`;
+  // No title, and a credit like "Nicolette - Ravel": the title and the composer in one line.
+  const both = /^(.*\p{L}.*?)\s+[-–—]\s+(.*\p{L}.*)$/u.exec(composer);
+  if (title === 'Untitled' && both) {
+    title = both[1].trim();
+    composer = both[2].trim();
+  }
 
   const noteCount = parts.reduce((s, p) => s + p.notes.length, 0);
   let lastEnd = 0;
@@ -880,7 +888,7 @@ export function parseMusicXML(xml: string, opts?: { id?: string }): Score {
   const duration = Math.max(lastEnd, beatToTime(tempos, totalBeats));
 
   return {
-    id: opts?.id ?? 'xml-' + hashString(`${title}|${composer}|${noteCount}|${totalBeats.toFixed(3)}`),
+    id: opts?.id ?? 'xml-' + hashString(`${idKey}|${noteCount}|${totalBeats.toFixed(3)}`),
     title,
     composer,
     source: 'musicxml',

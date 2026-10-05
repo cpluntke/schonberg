@@ -47,6 +47,18 @@ let last: LastResult | null = null;
 export function setLastResult(r: LastResult) {
   last = r;
   try { sessionStorage.setItem('sh:lastResult', JSON.stringify(r)); } catch { /* quota */ }
+  // Which piece the last run was (kept when the app is closed: Results can then lead back to it).
+  try { localStorage.setItem(LAST_PIECE_KEY, JSON.stringify({ pieceId: r.pieceId, at: Date.now() })); } catch { /* storage blocked */ }
+}
+
+const LAST_PIECE_KEY = 'sh:lastRunPiece';
+
+/** The piece of the last run on this device, also after the app was closed (no result details). */
+export function lastRunPiece(): string | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(LAST_PIECE_KEY) ?? 'null') as { pieceId?: unknown } | null;
+    return typeof v?.pieceId === 'string' ? v.pieceId : null;
+  } catch { return null; }
 }
 
 export function getLastResult(): LastResult | null {
