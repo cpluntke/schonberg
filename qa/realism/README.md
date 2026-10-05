@@ -28,7 +28,8 @@ The default run takes about 2.5 minutes on 4 cores. It runs the `cmp-*.test.ts` 
 | `pipeline.ts` | `runSession(BEFORE / AFTER, setup, profile)`: one practice run through the whole app pipeline. A `Profile` (stored delay, source, hint) carries over between runs. Also `PLAY_POLICY` and `afterScorerView`. |
 | `compare.ts`, `cmp-experiments.ts`, `cmp-*.test.ts` | Before/after experiments on shared renders. |
 | `report-current.ts`, `global-setup.ts`, `observations-current.md` | Merges the parts into the before/after doc. |
-| `variants.ts` | Generates copies of `src/game/scoring.ts` and `align.ts` with another `TRANSITION_MAX` (the sweep). |
+| `variants.ts` | Generates copies of `src/game/scoring.ts` and `align.ts` with another `TRANSITION_MAX` (the sweep). `gitVariant(ref)` loads `scoring.ts`, `align.ts` and `pitch.ts` as committed at a git ref (pass `{ ...AFTER, impl, pitch, pitchKey }` to `runSession`). |
+| `fastnotes.ts`, `cmp-fast.test.ts` | Fast notes: the pieces' fast bars and synthetic 8ths/16ths at 80–144 bpm (with/without consonants), good and adversarial singers, before (`FAST_BASE_REF`, default `54ea7b9`) vs after on the same renders. `diagnose(run)` replays the scorer on the exact samples and names the rule that dropped each ok/miss note. Report section 7. |
 | `harness.ts` | `scoreRecording` (raw scorer path), `scoreRecordingApp` (current app end of run), `scorePcm`, `readingsToSamples`, `oracleSamples`, `emulateLatencyLearn` (old learning), `gradeLetter`, `levelSetup`, the `Scorer` type. |
 | `fidelity.ts` | Tracker vs truth, overshoot, loss breakdown, and the cents bubble (`reference: 'playhead' | 'sample'`). |
 | `experiment.ts`, `run.test.ts` | The original baseline experiments. |

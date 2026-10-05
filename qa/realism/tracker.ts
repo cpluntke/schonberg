@@ -1,7 +1,8 @@
 // Offline equivalent of the browser PitchTracker (src/audio/pitch.ts):
 // every hop (setInterval 20 ms, with jitter) read the latest N samples the AnalyserNode holds
 // (it updates in 128-frame render quanta), detectPitch → gatePitch → PitchSmoother, and stamp the
-// reading like the app: ctxTime = currentTime − windowSec/2 − INTERVAL.
+// reading like the app: the previous frame's window centre (current pitch.ts, one-frame look-ahead),
+// or currentTime − windowSec/2 − INTERVAL (older versions).
 import * as current from '../../src/audio/pitch';
 import * as head from './baseline/pitch';
 import { Rng } from './prng';
@@ -11,12 +12,15 @@ export interface PitchImpl {
   detectPitch(frame: Float32Array, sampleRate: number): { hz: number; clarity: number; rms: number };
   gatePitch(r: { hz: number; clarity: number; rms: number }): number | null;
   newSmoother(): { push(m: number | null): number | null };
+  /** The app stamps the smoothed reading with the previous frame's own window centre (current pitch.ts); else centre − hop. */
+  stampPrevFrame?: boolean;
 }
 
 export const PITCH_CURRENT: PitchImpl = {
   detectPitch: current.detectPitch,
   gatePitch: (r) => current.gatePitch(r),
   newSmoother: () => new current.PitchSmoother(),
+  stampPrevFrame: true,
 };
 
 /** Frozen copy of src/audio/pitch.ts at the baseline commit. */
@@ -44,7 +48,7 @@ export interface TrackOptions {
 export interface TrackReading {
   /** Rec time (s) of the window's centre. */
   centreSec: number;
-  /** Rec time the app stamps the reading with: centre − one hop (median-of-3 delay). = ctxTime − ctx0. */
+  /** Rec time the app stamps the smoothed reading with (the previous frame's centre, or centre − one hop). = ctxTime − ctx0. */
   stampSec: number;
   /** Raw detected Hz when it passed the gates. */
   hz: number | null;
@@ -68,6 +72,7 @@ export function trackOffline(pcm: Float32Array, sampleRate: number, opts: TrackO
   const out: TrackReading[] = [];
   const frame = new Float32Array(N);
   let lastEnd = -1;
+  let prevCentre: number | null = null;
   for (let k = 0; ; k++) {
     const t = (k + 1) * hop + (jit > 0 ? rng.uniform(-jit, jit) : 0);
     if (t > until) break;
@@ -80,7 +85,9 @@ export function trackOffline(pcm: Float32Array, sampleRate: number, opts: TrackO
     const gated = impl.gatePitch(r);
     const midi = smoother.push(gated);
     const centreSec = (end - N / 2) / sampleRate;
-    out.push({ centreSec, stampSec: centreSec - hop, hz: gated == null ? null : r.hz, rawMidi: gated, midi, clarity: r.clarity, rms: r.rms });
+    const stampSec = impl.stampPrevFrame && prevCentre !== null ? prevCentre : centreSec - hop;
+    prevCentre = centreSec;
+    out.push({ centreSec, stampSec, hz: gated == null ? null : r.hz, rawMidi: gated, midi, clarity: r.clarity, rms: r.rms });
   }
   return out;
 }

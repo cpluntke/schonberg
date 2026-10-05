@@ -113,6 +113,30 @@ export interface AlignedResult {
   beyondCapMs?: number;
 }
 
+/** With a measured delay, the line-up corrects it by at most this many seconds. */
+const CALIBRATED_MAX = 0.08;
+/**
+ * Measured delay: a voice that lines up only this far late (share of a typical note, at least
+ * LATE_PLAUSIBLE s) or early (share of a note, at least EARLY_PLAUSIBLE s and at most CALIBRATED_MAX)
+ * is singing the neighbouring notes, not suffering a delay error: in fast passages the ±80 ms
+ * correction would otherwise line a voice a note behind or ahead up with the right notes. Late bounds
+ * are wider because the glide into each note makes every voice look a little late (one note ahead
+ * looks only ~2/3 of a note early).
+ */
+const LATE_NOTE_SHARE = 0.85;
+const LATE_PLAUSIBLE = 0.1;
+const EARLY_NOTE_SHARE = 0.5;
+const EARLY_PLAUSIBLE = 0.05;
+/** Where the voice really lines up is searched within ± this many seconds. */
+const WIDE_SEARCH = 0.25;
+
+/** Median real-time duration (s) of the notes in the scored range. */
+function typicalNoteSec(ctx: ScoringContext, rate: number): number {
+  const [a, b] = ctx.range;
+  const d = ctx.part.notes.slice(Math.max(0, a), b + 1).map((n) => n.dur / rate).sort((x, y) => x - y);
+  return d.length ? d[d.length >> 1] : Infinity;
+}
+
 /**
  * Score a finished run, judging intonation after lining the voice up with the music.
  *
@@ -129,13 +153,30 @@ export function scoreAligned(
 ): AlignedResult {
   const rate = run.rate > 0 ? run.rate : 1;
   const prep = (xs: PitchSample[]) => (run.liftSubharmonics ? liftSubharmonics(ctx.part, xs) : xs);
-  // Search a plausible range of device delays around the current setting (total ≥ ~20 ms).
-  const lo = run.calibrated ? -0.08 : Math.max(-0.25, -(run.latencyMs - 20) / 1000);
+  // Search a plausible range of device delays around the current setting (total ≥ ~20 ms); with a
+  // measured delay only a small correction.
+  const lo = run.calibrated ? -CALIBRATED_MAX : Math.max(-0.25, -(run.latencyMs - 20) / 1000);
   // Never look further than a plausible total device delay (a singer one note behind mustn't be
   // "lined up" with the next note).
   const hiCap = run.maxTotalMs != null ? (run.maxTotalMs - run.latencyMs) / 1000 : 0.3;
-  const hi = run.calibrated ? 0.08 : Math.max(0, Math.min(0.3, hiCap));
+  const hi = run.calibrated ? CALIBRATED_MAX : Math.max(0, Math.min(0.3, hiCap));
   let estimate = estimateLag(ctx.part, ctx.range, samples, { minLag: Math.min(0, lo) * rate, maxLag: hi * rate, step: 0.01 * rate });
+  if (run.calibrated) {
+    // Look at where the voice really lines up (a wider search). Displaced by about a note (see
+    // LATE_NOTE_SHARE): no shift, it is judged as sung. In fast passages (where 80 ms is half a
+    // note or more), a voice that lines up a little beyond CALIBRATED_MAX is corrected by that much
+    // (a delay error just past the limit costs a little, not everything). Otherwise the search above
+    // stands. A voice on the wrong notes lines up nowhere: no shift.
+    const T = typicalNoteSec(ctx, rate);
+    const wide = estimateLag(ctx.part, ctx.range, samples, { minLag: -WIDE_SEARCH * rate, maxLag: WIDE_SEARCH * rate, step: 0.01 * rate });
+    const lagSec = wide.lag / rate;
+    const lateLimit = Math.max(LATE_NOTE_SHARE * T, LATE_PLAUSIBLE);
+    const earlyLimit = Math.max(EARLY_PLAUSIBLE, Math.min(EARLY_NOTE_SHARE * T, CALIBRATED_MAX));
+    if (wide.confident && (lagSec > lateLimit || lagSec < -earlyLimit)) estimate = { ...wide, lag: 0, confident: false };
+    else if (T < 2 * CALIBRATED_MAX && wide.confident && Math.abs(lagSec) > CALIBRATED_MAX) {
+      estimate = { ...wide, lag: Math.sign(lagSec) * Math.floor(CALIBRATED_MAX / 0.01 + 1e-9) * 0.01 * rate };
+    }
+  }
   let beyondCapMs: number | undefined;
   if (!run.calibrated && run.maxTotalMs != null && hi < 0.45) {
     // Beyond the plausible range the voice may line up much better: a very slow device (or a singer

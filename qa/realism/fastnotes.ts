@@ -100,9 +100,10 @@ export type Reason =
   | 'no readings: voice before/after the body (timing)'
   | 'arrival never reached'
   | 'only transition readings in the note'
+  | 'too few readings in the note to judge it'
   | 'all excluded as release'
   | 'judged readings cover too little'
-  | 'tracker smear / smoother lag'
+  | 'tracker smear (window, reverb, smoother)'
   | 'singer not settled (glide)'
   | 'singer off (wrong pitch)';
 
@@ -124,7 +125,7 @@ export interface NoteDiag {
 const tolOf = (level: number) => levelSetup(level).toleranceCents;
 
 /** The scorer module a diagnosis replays (src/game/scoring.ts, or a git variant of it). */
-export type ScoringModule = Pick<typeof curScoring, 'LiveScorer' | 'judgedSpan'> & { shortNoteDev?: typeof curScoring.shortNoteDev };
+export type ScoringModule = Pick<typeof curScoring, 'LiveScorer' | 'judgedSpan'> & { shortNoteDev?: typeof curScoring.shortNoteDev; shortNoteReadings?: typeof curScoring.shortNoteReadings };
 
 /**
  * Per-note diagnosis of a run. Replays the app's final scorer (afterScorerView + the alignment shift)
@@ -168,19 +169,26 @@ export function diagnose(run: RenderedRun, mod: ScoringModule = curScoring): { n
     // Very short notes in the new scorer: judged on the note's own readings.
     const shortPath = !!(w.short && mod.shortNoteDev && a.nT);
     let shortNone = false;
+    let shortFew = false;
     let inNoteCount = 0;
     if (shortPath) {
       const nT = a.nT!;
       const nD = a.nD!;
       const inNote = nT.map((t, k) => k).filter((k) => nT[k] >= w.start && nT[k] < w.start + w.note.dur);
       inNoteCount = inNote.length;
-      if (mod.shortNoteDev!(a as never, tolN, false) === null) shortNone = inNote.length > 0;
+      if (mod.shortNoteDev!(a as never, tolN, false) === null && inNote.length > 0) {
+        // No reading left after the transitions, or too few to judge the note on (shortNoteReadings).
+        const left = mod.shortNoteReadings ? mod.shortNoteReadings(a as never, tolN, false).devs.length : 0;
+        if (left === 0) shortNone = true;
+        else shortFew = true;
+      }
       jT = nT;
       jD = nD;
     }
     let reason: Reason = 'hit';
     if (final.grade === 'ok' || final.grade === 'miss') {
       if (shortNone) reason = 'only transition readings in the note';
+      else if (shortFew) reason = 'too few readings in the note to judge it';
       else if (shortPath ? inNoteCount === 0 : n === 0) {
         const inBody = raw.filter((r) => r.time >= w.bodyStart && r.time < w.bodyEnd);
         const unclear = inBody.filter((r) => r.raw == null && r.rms >= RMS_GATE && r.clarity < CLARITY_GATE && Number.isFinite(r.truth)).length;
@@ -198,7 +206,7 @@ export function diagnose(run: RenderedRun, mod: ScoringModule = curScoring): { n
           const tmd = median(tr);
           const sungMed = median(take.notes.filter((x) => x.index === w.index).map((x) => 100 * (x.targetMidi - w.target)));
           if (sungMed !== null && Math.abs(sungMed) > tolN) reason = 'singer off (wrong pitch)';
-          else if (tmd !== null && Math.abs(tmd) <= tolN) reason = 'tracker smear / smoother lag';
+          else if (tmd !== null && Math.abs(tmd) <= tolN) reason = 'tracker smear (window, reverb, smoother)';
           else reason = 'singer not settled (glide)';
         }
       }

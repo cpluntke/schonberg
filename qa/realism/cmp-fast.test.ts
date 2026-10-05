@@ -19,7 +19,8 @@ it('fast notes (before vs after)', async () => {
     const rows = rep.good.filter((r) => r.level === level);
     const n = rows.reduce((s, r) => s + total(r.after), 0);
     const after = rows.reduce((s, r) => s + misses(r.after), 0) / n;
-    expect.soft(after, `good singer L${level}: share of fast notes lost`).toBeLessThan(level === 2 ? 0.04 : 0.07);
+    // (before the fix: 7.2 % at L2 and 11.7 % at L4; after: 3.5 % and 6.8 %)
+    expect.soft(after, `good singer L${level}: share of fast notes lost`).toBeLessThan(level === 2 ? 0.045 : 0.075);
     if (rep.baseRef) {
       const before = rows.reduce((s, r) => s + misses(r.before!), 0) / n;
       expect.soft(after, `good singer L${level}: fewer fast notes lost than before`).toBeLessThan(before);
@@ -35,11 +36,11 @@ it('fast notes (before vs after)', async () => {
     if (r.singer === SINGERS.wrongNotes.name) expect.soft(r.after.passed, label).toBe(false);
     if (r.singer === SINGERS.flat40.name && r.level >= 2) expect.soft(r.after.passed, label).toBe(false);
     if (r.singer === SINGERS.oneBehind.name) {
-      // The scorer itself never accepts it (the live view / unshifted run)...
+      // Neither the scorer (the live view / unshifted run) nor the end-of-run line-up accepts it:
+      // with a measured delay, nothing is shifted when the voice lines up about a note late or early
+      // (align.ts).
       expect.soft(r.after.plainAcc, label).toBeLessThan(pass);
-      // ...and the run fails unless the end-of-run line-up (±80 ms with a measured delay, align.ts)
-      // shifts the voice by about a whole note — only possible on 16ths at ≥ 104 bpm (see the report).
-      if (!r.passage.includes('16ths')) expect.soft(r.after.passed, label).toBe(false);
+      expect.soft(r.after.passed, label).toBe(false);
     }
   }
 });

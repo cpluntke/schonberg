@@ -4,7 +4,7 @@
 // → every ~20 ms (setInterval, keeps running when rAF is throttled) detectPitch() on the latest
 // 1024 or 2048 samples (≈21 / 43 ms at 48 kHz; the shorter window for voices that don't go below
 // ~C3, so note changes smear less) → gate (rms / clarity / 60–1400 Hz) → PitchSmoother
-// (median-of-3 + octave-jump guard).
+// (one-frame look-ahead glitch removal).
 
 import { PitchDetector } from 'pitchy';
 
@@ -93,60 +93,42 @@ export function median(xs: number[]): number {
   return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2;
 }
 
+/** A reading this far (semitones) from both voiced neighbours, on the same side, is a glitch. */
+export const SPIKE_SEMITONES = 1.5;
+
 /**
- * Light smoothing for a stream of gated MIDI readings.
- * - Median of the last 3 voiced readings (with < 3 readings, the latest is returned so
- *   onsets aren't delayed).
- * - Octave-jump guard: a single frame ~12 semitones (±1.5) away from the current pitch is
- *   held back; if the next frame confirms it, the jump is accepted (history reset), if it
- *   returns, the outlier is discarded.
- * - History is cleared after `resetAfter` consecutive unvoiced frames so a new note
- *   isn't smeared with the previous one.
+ * Glitch removal for a stream of gated MIDI readings, with a fixed one-frame look-ahead: `push`
+ * (frame k) returns the reading of frame k−1, judged against both of its neighbours. That is the
+ * one-frame delay the tracker's timestamps assume (ctxTime = window centre − one interval), and it
+ * holds for every output, voicing on- and offsets included.
+ * - A frame that sticks out from both voiced neighbours by more than SPIKE_SEMITONES on the same
+ *   side (a one-frame octave jump or a wild reading) is replaced by the median of the three. A voice
+ *   can't leave a note by a semitone and a half and come back within two frames (~40 ms).
+ * - Every other frame is passed through unchanged. (A running median-of-3 also flattens real
+ *   one- and two-frame features: in fast passages a 0.1 s note's whole plateau or turning point.)
+ * - Unvoiced frames stay unvoiced, and nothing is carried across them, so a new note isn't smeared
+ *   with the previous one. A one-frame octave jump that the next frame confirms is accepted.
  */
 export class PitchSmoother {
-  private hist: number[] = [];
-  private pending: number | null = null;
-  private unvoicedRun = 0;
-  constructor(private resetAfter = 3) {}
+  /** Frames k−2 and k−1 (null = unvoiced / none yet). */
+  private a: number | null = null;
+  private b: number | null = null;
 
   reset(): void {
-    this.hist = [];
-    this.pending = null;
-    this.unvoicedRun = 0;
+    this.a = null;
+    this.b = null;
   }
 
   push(m: number | null): number | null {
-    if (m == null) {
-      this.unvoicedRun++;
-      this.pending = null;
-      if (this.unvoicedRun >= this.resetAfter) this.hist = [];
-      return null;
-    }
-    this.unvoicedRun = 0;
-    const last = this.hist.length ? this.hist[this.hist.length - 1] : null;
-    if (this.pending != null) {
-      const p = this.pending;
-      this.pending = null;
-      if (Math.abs(m - p) < 1.5) {
-        // Confirmed jump: start fresh at the new register.
-        this.hist = [p, m];
-        return m;
-      }
-      // Outlier returned (or something else): drop it and continue normally.
-    } else if (last != null && isOctaveJump(m - last)) {
-      this.pending = m;
-      return this.current();
-    }
-    this.hist.push(m);
-    if (this.hist.length > 3) this.hist.shift();
-    return this.current();
-  }
-
-  private current(): number | null {
-    const n = this.hist.length;
-    if (n === 0) return null;
-    if (n < 3) return this.hist[n - 1];
-    return median(this.hist);
+    const prev = this.a;
+    const mid = this.b;
+    this.a = mid;
+    this.b = m;
+    if (mid == null) return null;
+    if (prev == null || m == null) return mid;
+    const T = SPIKE_SEMITONES;
+    if ((mid - prev > T && mid - m > T) || (prev - mid > T && m - mid > T)) return median([prev, mid, m]);
+    return mid;
   }
 }
 
@@ -163,9 +145,21 @@ export function fixSubharmonic(midi: number, expected: number | null): number {
   return midi;
 }
 
-function isOctaveJump(d: number): boolean {
-  const a = Math.abs(d);
-  return (a > 10.5 && a < 13.5) || (a > 22.5 && a < 25.5);
+/**
+ * Holds one frame back, to go with PitchSmoother's one-frame look-ahead: `push(frame k)` returns
+ * frame k−1 (null at the start), so a smoothed pitch is sent with its own frame's time, Hz,
+ * clarity and level.
+ */
+export class FrameDelay<T> {
+  private prev: T | null = null;
+  push(cur: T): T | null {
+    const p = this.prev;
+    this.prev = cur;
+    return p;
+  }
+  reset(): void {
+    this.prev = null;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -230,6 +224,8 @@ export class PitchTracker {
   private timer: ReturnType<typeof setInterval> | null = null;
   private buf: Float32Array<ArrayBuffer>;
   private smoother = new PitchSmoother();
+  /** The previous frame (the one the smoother reports on this tick): window centre and raw values. */
+  private frames = new FrameDelay<{ ctxTime: number; hz: number | null; clarity: number; rms: number }>();
   private stopped = false;
   private winN = FFT_SIZE;
 
@@ -286,6 +282,7 @@ export class PitchTracker {
     if (n !== this.winN) {
       this.winN = n;
       this.smoother.reset();
+      this.frames.reset();
     }
   }
 
@@ -305,14 +302,11 @@ export class PitchTracker {
     const r = detectPitch(frame, this.ctx.sampleRate);
     const gated = gatePitch(r);
     const midi = this.smoother.push(gated);
-    const p: RawPitch = {
-      // Centre of the analysis window, minus the median-of-3 smoother's one-frame delay.
-      ctxTime: this.ctx.currentTime - this.windowSec / 2 - INTERVAL_MS / 1000,
-      hz: gated == null ? null : r.hz,
-      midi,
-      clarity: r.clarity,
-      rms: r.rms,
-    };
+    const cur = { ctxTime: this.ctx.currentTime - this.windowSec / 2, hz: gated == null ? null : r.hz, clarity: r.clarity, rms: r.rms };
+    // The smoother reports the previous frame (one-frame look-ahead): send it with that frame's own
+    // window centre, Hz, clarity and level, so every field of a reading describes the same moment.
+    const f = this.frames.push(cur) ?? { ...cur, ctxTime: cur.ctxTime - INTERVAL_MS / 1000 };
+    const p: RawPitch = { ctxTime: f.ctxTime, hz: f.hz, midi, clarity: f.clarity, rms: f.rms };
     this.last = p;
     for (const cb of this.listeners) {
       try {

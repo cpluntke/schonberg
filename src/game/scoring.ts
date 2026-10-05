@@ -24,7 +24,33 @@ const HALF_COVER_MAX = 0.025;
 /** Assumed half-period for the first/last sample (no neighbour known). */
 const EDGE_HALF_COVER = 0.01;
 const SCOOP_WINDOW = 0.15;
+/** A note whose body is shorter than this is "very short" (fast passages): also judged as a whole (shortNoteDev). */
 const SHORT_BODY = 0.15;
+/**
+ * Very short notes: a reading this far (cents) from the note and from both neighbours is a tracker
+ * error (McLeod locking onto a subharmonic, e.g. ×⅕ ≈ −2786¢, in a fast change), not a sung pitch.
+ */
+const SHORT_FAR = 600;
+/** Very short notes: how uneven a swing around the note may be (swingsAround). */
+const SWING_RATIO = 1.5;
+/**
+ * Very short notes are judged on their own readings (shortNoteDev) only with at least this many of
+ * them, standing for at least SHORT_MIN_COVER of the note: one reading (an attack, a consonant, the
+ * guide bleeding into the mic) says little about what was sung.
+ */
+const SHORT_MIN_READINGS = 2;
+const SHORT_MIN_COVER = 0.3;
+/**
+ * ...of which an uninterrupted run (no unvoiced reading between) must stand for SHORT_MIN_COVER and
+ * reach at least this far into the note: the attack alone, or scattered single frames, are where
+ * consonants and guide bleed land.
+ */
+const SHORT_MIN_REACH = 0.35;
+/** Readings standing for this share of a very short note count as the whole note (hit ratio 1). */
+const SHORT_FULL_COVER = 0.4;
+/** A very short note is "on the note" (for the in-tune-moment rescue) with its median within this many tolerances, at most ON_NOTE_MAX cents. */
+const ON_NOTE_TOL = 1.6;
+const ON_NOTE_MAX = 50;
 /** Default vibrato smoothing window (≈ one vibrato cycle at 5.5 Hz). */
 export const DEFAULT_VIBRATO_WINDOW = 0.18;
 /**
@@ -157,6 +183,10 @@ interface NoteWindow {
   legatoTo: number | null;
   /** Extra tolerance (cents) — just-intonation mode accepts both the pure and the tempered pitch. */
   tolExtra: number;
+  /** Very short note (body < SHORT_BODY): also judged on all its readings from the written start to end. */
+  short: boolean;
+  /** The note can be finalized once samples are past this time. */
+  doneAt: number;
 }
 
 class NoteAcc {
@@ -184,6 +214,14 @@ class NoteAcc {
   bT: number[] = [];
   bD: number[] = [];
   bW: number[] = [];
+  /** Very short notes: every voiced reading within the written note (time, deviation). */
+  nT: number[] = [];
+  nD: number[] = [];
+  /** ...and the seconds of the written note each of them stands for. */
+  nW: number[] = [];
+  /** ...and which run of uninterrupted voiced readings each belongs to (counts the unvoiced ones in the note). */
+  nR: number[] = [];
+  nBreaks = 0;
   final: NoteResult | null = null;
   constructor(readonly w: NoteWindow) {}
 }
@@ -211,7 +249,11 @@ function noteWindows(ctx: ScoringContext, opts: ScoringOptions): NoteWindow[] {
     // Just intonation: aim halfway between pure and tempered and widen the window by the same
     // amount, so singing either what the (tempered) backing plays or the pure interval is fine.
     const half = targetOffset / 2;
-    out.push({ index: i, note, target: note.midi + half / 100, targetOffset, start: note.start, bodyStart, bodyEnd, legatoFrom, legatoTo, tolExtra: Math.abs(half) });
+    const short = bodyEnd - bodyStart < SHORT_BODY;
+    out.push({
+      index: i, note, target: note.midi + half / 100, targetOffset, start: note.start, bodyStart, bodyEnd, legatoFrom, legatoTo, tolExtra: Math.abs(half),
+      short, doneAt: short ? note.start + note.dur : bodyEnd,
+    });
   }
   return out;
 }
@@ -314,8 +356,8 @@ export class LiveScorer {
 
   private apply(c: Covered): void {
     const t = c.s.time;
-    // Finalize notes whose body is completely before this sample's coverage.
-    while (this.cur < this.accs.length && this.accs[this.cur].w.bodyEnd <= c.from) {
+    // Finalize notes whose body (very short notes: the whole note) is completely before this sample's coverage.
+    while (this.cur < this.accs.length && this.accs[this.cur].w.doneAt <= c.from) {
       this.finalize(this.accs[this.cur]);
       this.cur++;
     }
@@ -341,7 +383,13 @@ export class LiveScorer {
       }
     }
     const tol = this.tol + w.tolExtra;
-    const inTol = dev !== null && Math.abs(dev) <= tol;
+    if (w.short && dev === null && t >= w.start && t < w.start + w.note.dur) a.nBreaks++;
+    if (w.short && dev !== null && t >= w.start && t < w.start + w.note.dur) {
+      a.nT.push(t);
+      a.nD.push(dev);
+      a.nW.push(Math.max(0, Math.min(c.to, w.start + w.note.dur) - Math.max(c.from, w.start)));
+      a.nR.push(a.nBreaks);
+    }
     // Onset & scoop use samples from the note start (grace included).
     if (t >= w.start && t < w.bodyEnd) {
       // Timing is judged independently of intonation: the note "starts" with the first voiced
@@ -440,17 +488,32 @@ export class LiveScorer {
         if (Math.abs(median(jD)!) <= tolN) hitTime = jW.reduce((x, y) => x + y, 0) + excused;
       }
     }
-    const hitRatio = clamp(hitTime / Math.max(1e-3, bodyDur - excused), 0, 1);
+    let hitRatio = clamp(hitTime / Math.max(1e-3, bodyDur - excused), 0, 1);
     const voicedRatio = clamp(a.voicedTime / Math.max(1e-3, w.bodyEnd - w.bodyStart), 0, 1);
-    const medDev = jD.length ? median(jD) : median(a.devs);
+    let medDev = jD.length ? median(jD) : median(a.devs);
+    // Very short notes: what was sung is the median of the note's own readings (see shortNoteDev).
+    // Very short notes: what was sung is the median of the note's own readings (see shortNoteDev),
+    // credited in proportion to how much of the note they stand for.
+    const sr = w.short ? shortNoteReadings(a, tolN, this.opts.octaveTolerant) : null;
+    const shortReadings = sr && enoughShortReadings(sr, w) ? sr.devs : [];
+    const shortDev = median(shortReadings);
+    if (sr && shortDev !== null) {
+      medDev = shortDev;
+      if (Math.abs(shortDev) <= tolN) hitRatio = Math.max(hitRatio, Math.min(1, sr.cover / (SHORT_FULL_COVER * w.note.dur)));
+    }
     const tol = tolN;
     let grade: Grade =
       hitRatio >= 0.8 && medDev !== null && Math.abs(medDev) <= tol / 2 ? 'perfect'
         : hitRatio >= 0.6 ? 'good'
           : hitRatio >= 0.35 ? 'ok'
             : 'miss';
-    // Very short notes: one in-tune moment (within the judged part) is enough for "good".
-    if (w.bodyEnd - w.bodyStart < SHORT_BODY && jD.some((d) => Math.abs(d) <= tolN) && GRADE_RANK[grade] < GRADE_RANK.good) grade = 'good';
+    // Very short notes: one in-tune moment (within the judged part), or the voice swinging evenly
+    // around the note (see swingsAround), is enough for "good" — as long as the note as a whole was
+    // on this note and not on a neighbouring semitone (a voice sitting on the previous pitch, or on
+    // a wrong note, passes through the target on its way to the next).
+    const onNote = shortDev === null || Math.abs(shortDev) < Math.min(ON_NOTE_MAX, ON_NOTE_TOL * tolN);
+    const moment = jD.some((d) => Math.abs(d) <= tolN) || swingsAround(shortReadings, tolN);
+    if (w.short && onNote && moment && GRADE_RANK[grade] < GRADE_RANK.good) grade = 'good';
     // With octave tolerance on (the singer deliberately sings the part in their own octave),
     // folding is expected and not an error.
     const octave = !this.opts.octaveTolerant && a.devs.length > 0 && a.octaveSamples > a.devs.length / 2;
@@ -523,6 +586,88 @@ export function judgedSpan(a: { w: NoteWindow; bT: number[]; bD: number[]; bW: n
     }
   }
   return { k0, k1, from, to: Math.max(to, from + 1e-3) };
+}
+
+/**
+ * Very short notes (fast passages). In ~0.1 s the voice rarely settles: it glides in, overshoots, and
+ * the next syllable's consonant cuts it off, so only one or two readings fall in the body (after
+ * the grace and tail), often mid-transition. What was sung for the note is better told by all of
+ * its own readings from the written start to the written end (shortNoteDev: their median):
+ * - leading readings still nearer the previous pitch and trailing ones already nearer the next
+ *   pitch are the transitions and are left out, up to the same caps as in judgedSpan (so a singer
+ *   who stays on the previous pitch through the note is not excused);
+ * - readings more than SHORT_FAR from the note and from both neighbours are tracker errors and are
+ *   left out — unless they are the majority (then that is what was sung, e.g. an octave off).
+ * Readings outside the written note are not used: just after its end they may as well be a singer
+ * one note behind. Returns the deviations (cents) in time order, and the seconds of the note they stand for.
+ */
+export function shortNoteReadings(a: { w: NoteWindow; nT: number[]; nD: number[]; nW?: number[]; nR?: number[] }, tol: number, octaveTolerant: boolean): { devs: number[]; cover: number; reach: boolean } {
+  const w = a.w;
+  const end = w.start + w.note.dur;
+  const fold = (d: number) => (octaveTolerant ? d - 1200 * Math.round(d / 1200) : d);
+  const away = (d: number, other: number | null) => fold(d - 100 * ((other ?? w.note.midi) - w.target));
+  // Out of tolerance, and nearer the neighbour's pitch than this note's.
+  const nearer = (d: number, other: number | null) => {
+    if (other === null || other === w.note.midi) return false;
+    const x = fold(d);
+    return Math.abs(x) > tol && Math.abs(away(d, other)) < Math.abs(x);
+  };
+  const far = (d: number) => Math.abs(fold(d)) > SHORT_FAR && Math.abs(away(d, w.legatoFrom)) > SHORT_FAR && Math.abs(away(d, w.legatoTo)) > SHORT_FAR;
+  let T = a.nT;
+  let D = a.nD;
+  let W = a.nW ?? a.nT.map(() => 0);
+  let R = a.nR ?? a.nT.map(() => 0);
+  const nFar = D.filter(far).length;
+  if (nFar > 0 && 2 * nFar <= D.length) {
+    const keep = D.map((d) => !far(d));
+    T = T.filter((_, k) => keep[k]);
+    W = W.filter((_, k) => keep[k]);
+    R = R.filter((_, k) => keep[k]);
+    D = D.filter((_, k) => keep[k]);
+  }
+  const capStart = w.start + Math.min(TRANSITION_MAX, 0.35 * w.note.dur);
+  const capEnd = end - Math.min(RELEASE_MAX, 0.2 * w.note.dur);
+  let k0 = 0;
+  let k1 = T.length;
+  while (k0 < k1 && T[k0] <= capStart && nearer(D[k0], w.legatoFrom)) k0++;
+  while (k1 > k0 && T[k1 - 1] >= capEnd && nearer(D[k1 - 1], w.legatoTo)) k1--;
+  // Sung, not a blip: two readings in a row without an unvoiced one between, reaching past SHORT_MIN_REACH.
+  // Sung, not blips: a run of readings without an unvoiced one between that stands for at least
+  // SHORT_MIN_COVER of the note and reaches past SHORT_MIN_REACH of it.
+  let reach = false;
+  for (let k = k0, runCover = 0; k < k1; k++) {
+    runCover = (k > k0 && R[k] === R[k - 1] ? runCover : 0) + W[k];
+    if (runCover >= SHORT_MIN_COVER * w.note.dur && T[k] >= w.start + SHORT_MIN_REACH * w.note.dur) reach = true;
+  }
+  return { devs: D.slice(k0, k1), cover: W.slice(k0, k1).reduce((x, y) => x + y, 0), reach };
+}
+
+/** Enough of a very short note's own readings to judge it on them (SHORT_MIN_READINGS, SHORT_MIN_COVER, SHORT_MIN_REACH). */
+function enoughShortReadings(r: { devs: number[]; cover: number; reach: boolean }, w: NoteWindow): boolean {
+  return r.devs.length >= SHORT_MIN_READINGS && r.cover >= SHORT_MIN_COVER * w.note.dur && r.reach;
+}
+
+/** Very short notes: the median deviation (cents) of the note's own readings (shortNoteReadings), or null when there are too few. */
+export function shortNoteDev(a: { w: NoteWindow; nT: number[]; nD: number[]; nW?: number[]; nR?: number[] }, tol: number, octaveTolerant: boolean): number | null {
+  const r = shortNoteReadings(a, tol, octaveTolerant);
+  return enoughShortReadings(r, a.w) ? median(r.devs) : null;
+}
+
+/**
+ * The voice swung evenly around the note: two consecutive readings on either side of it, each within
+ * twice the tolerance, and neither more than SWING_RATIO times as far from the note as the other.
+ * In a fast run the voice glides in, overshoots and rings, and with only two to four readings per
+ * note the tracker often misses the moments it is on the note; the median then lands on whichever
+ * side happened to be read more often. A voice centred off the note (flat, or on a neighbouring
+ * note) swings around that pitch instead, so its readings rarely straddle the note evenly.
+ */
+export function swingsAround(devs: number[], tol: number): boolean {
+  for (let k = 1; k < devs.length; k++) {
+    const x = Math.abs(devs[k - 1]);
+    const y = Math.abs(devs[k]);
+    if (devs[k - 1] * devs[k] < 0 && Math.max(x, y) <= 2 * tol && Math.max(x, y) <= SWING_RATIO * Math.min(x, y)) return true;
+  }
+  return false;
 }
 
 /** Centred moving average whose window is shifted (not truncated) to stay inside the samples. */
