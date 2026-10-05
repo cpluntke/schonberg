@@ -32,6 +32,7 @@ For every note in your part:
   - *OK*: ≥35% in tune.
   - Otherwise *miss*.
   - Accuracy is the average over notes (perfect 1, good 0.85, OK 0.5). The letter grade comes from accuracy.
+- **Sections within a full run.** A run of the whole piece also scores each section (the average grade of its notes). The piece level needs the run *and* every section at the level's pass mark; see [LEVELS.md](LEVELS.md).
 - **Rhythm.** When each note starts: the first sustained (≥60 ms) sound that is closer to this note than to the previous one. This is judged separately from pitch.
 
 ## Device delay (latency)

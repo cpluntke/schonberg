@@ -12,7 +12,7 @@ test('a perfect simulated singer passes level 1 and levels up', async ({ page })
   await expect(page.getByRole('heading', { name: 'Sections' })).toBeVisible();
 
   // Level 1 of the first section.
-  await page.getByRole('button', { name: /level 1/ }).first().click();
+  await page.getByLabel('Sections').getByRole('button', { name: /level 1/ }).first().click(); // a section, not the full run
   await page.getByTestId('start').click();
 
   // Wait for the results screen (sections are short; allow for count-in + 70% tempo).
@@ -32,7 +32,7 @@ test('score view: switch display, sing level 1 from sheet music, reach results',
   await page.goto('/?simulate=perfect#/');
   await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
   await page.getByTestId('piece-row').first().click();
-  await page.getByRole('button', { name: /level 1/ }).first().click();
+  await page.getByLabel('Sections').getByRole('button', { name: /level 1/ }).first().click(); // a section, not the full run
 
   // Nothing chosen yet: level 1 suggests the score.
   await expect(page.getByTestId('display-score')).toHaveAttribute('aria-pressed', 'true');
@@ -67,11 +67,37 @@ test('score view: switch display, sing level 1 from sheet music, reach results',
   expect(errors).toEqual([]);
 });
 
+// Piece levels (docs/LEVELS.md): a full run-through at level 1, available right away, earns piece level 1.
+test('a perfect simulated full run at level 1 grants piece level 1', async ({ page }) => {
+  test.setTimeout(180_000); // the whole piece plays in real time at 70%
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await page.goto('/?simulate=perfect#/piece/warmup-chorale');
+  await expect(page.getByTestId('full-run-card')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('piece-level')).toHaveText('Not sung through yet');
+  await page.getByTestId('full-1').click();
+  await expect(page.getByTestId('full-info')).toBeVisible();
+  await page.getByTestId('start').click();
+  await expect(page.getByTestId('pass-banner')).toContainText('Piece level 1 reached', { timeout: 150_000 });
+  // Every section was scored within the run, none to fix.
+  await expect(page.getByTestId('full-sections')).toBeVisible();
+  await expect(page.getByTestId('full-section-fix')).toHaveCount(0);
+  await page.goto('/#/piece/warmup-chorale');
+  await expect(page.getByTestId('piece-level')).toHaveText(/Piece level 1/);
+  await expect(page.getByTestId('full-1')).toHaveAttribute('aria-label', /passed/);
+  const full = await page.evaluate(() => {
+    const k = Object.keys(localStorage).find((x) => x.startsWith('sh:progress:warmup-chorale:'));
+    return k ? JSON.parse(localStorage.getItem(k)!).full : null;
+  });
+  expect(full).toMatchObject({ level: 1, attempts: 1 });
+  expect(errors).toEqual([]);
+});
+
 test('a flat simulated singer does not pass level 4', async ({ page }) => {
   await page.goto('/?simulate=flat#/');
   await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
   await page.getByTestId('piece-row').first().click();
-  await page.getByRole('button', { name: /level 4/ }).first().click();
+  await page.getByLabel('Sections').getByRole('button', { name: /level 4/ }).first().click(); // a section, not the full run
   await page.getByTestId('start').click();
   await expect(page.getByTestId('pass-banner')).toBeVisible({ timeout: 90_000 });
   await expect(page.getByTestId('pass-banner')).toContainText('Not yet');
@@ -112,7 +138,7 @@ test('a real-microphone run can be shared as a recording (WAV + run.json)', asyn
   await page.goto('/#/');
   await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
   await page.getByTestId('piece-row').first().click();
-  await page.getByRole('button', { name: /level 1/ }).first().click();
+  await page.getByLabel('Sections').getByRole('button', { name: /level 1/ }).first().click(); // a section, not the full run
   await page.getByTestId('start').click();
   await expect(page.getByTestId('pass-banner')).toBeVisible({ timeout: 90_000 });
   const [dl] = await Promise.all([page.waitForEvent('download'), page.getByTestId('share-recording').click()]);
@@ -140,7 +166,7 @@ test('memorisation: piece map, off-book test with peek, cold start, words in rhy
   await page.goto('/?simulate=perfect#/piece/warmup-chorale');
   await expect(page.getByTestId('piece-map')).toBeVisible({ timeout: 20_000 });
   // Level 5, all hidden, with a peek: shown as a practice run.
-  await page.getByRole('button', { name: /level 5/ }).first().click();
+  await page.getByLabel('Sections').getByRole('button', { name: /level 5/ }).first().click(); // a section, not the full run
   await page.getByRole('button', { name: 'Test: all hidden' }).click();
   await page.getByTestId('start').click();
   await expect(page.getByTestId('peek')).toBeVisible({ timeout: 15_000 });

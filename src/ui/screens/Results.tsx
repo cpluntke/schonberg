@@ -157,7 +157,7 @@ export function Results() {
                 <span className="mono small" style={{ color: x.passed ? 'var(--voice)' : 'var(--accent-text)' }}>{Math.round(x.accuracy * 100)}%</span>
                 {fix ? (
                   <button className="btn small" style={{ minWidth: 112 }} onClick={() => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: x.id, level: lr.level, mode: '2d' })}>
-                    <IconPlay size={14} /> Fix at L{lr.level}
+                    <IconPlay size={14} color="currentColor" /> Fix at L{lr.level}
                   </button>
                 ) : (
                   <span className="tiny" style={{ minWidth: 112, textAlign: 'right', color: x.passed ? 'var(--voice)' : 'var(--muted)' }}>{x.passed ? '✓ passed' : 'below the mark'}</span>

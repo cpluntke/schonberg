@@ -194,6 +194,7 @@ export function pieceLabel(s: PieceStatus): string {
   if (s.concertReady) return 'concert-ready';
   if (s.rehearsalReady) return 'rehearsal-ready';
   if (s.pieceLevel > 0) return `level ${s.pieceLevel} · ${levelName(s.pieceLevel)}`;
+  if (s.toFix.length) return 'sections to fix';
   if (s.multi && s.unconfirmed > 0) return `confirm level ${s.unconfirmed}`;
   return s.pct > 0 ? 'in progress' : 'not started';
 }
@@ -246,9 +247,11 @@ function cycleTarget(statuses: PieceStatus[], toRehearsal: number | null, toConc
     const missing = g.set.filter((st) => st.pieceLevel < g.level).length;
     if (!missing) continue;
     const when = g.days === 0 ? 'today' : g.days === 1 ? 'tomorrow' : `in ${g.days} days`;
-    const what = g.label === 'Rehearsal' && focus ? ` of the rehearsal pieces` : '';
+    const what = g.label === 'Rehearsal' && focus
+      ? `${missing === g.set.length && missing > 1 ? 'the' : missing} rehearsal piece${missing > 1 ? 's' : ''}`
+      : `${missing} piece${missing > 1 ? 's' : ''}`;
     const perDay = g.days > 1 && missing > 1 ? Math.ceil(missing / g.days) : 0;
-    return `${g.label} ${when}: ${missing} piece${missing > 1 ? 's' : ''}${what} not yet sung through at ${g.name}${perDay && perDay < missing ? `, about ${perDay} a day` : ''}.`;
+    return `${g.label} ${when}: ${what} not yet sung through at ${g.name}${perDay && perDay < missing ? `, about ${perDay} a day` : ''}.`;
   }
   return null;
 }

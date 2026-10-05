@@ -137,7 +137,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
         )}
         <span className="small muted">
           {multi
-            ? <>The piece's level is the level you've sung the whole piece at, in one go. Rehearsal-ready = level 3 (Independent), concert-ready = level 4, memorised = level 5 (off book) on two different days.</>
+            ? <>The piece's level = the level you've sung the whole piece at, in one go. Rehearsal-ready = 3, concert-ready = 4, memorised = 5 (off book) on two different days.</>
             : <>Rehearsal-ready = level 3 (Independent). Concert-ready = level 4. Memorised = level 5 (off book) on two different days.</>}
         </span>
         {next && (
@@ -145,7 +145,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
             <IconPlay size={18} /> {next.sectionId === 'all' ? 'Sing it all' : next.kind === 'fix' ? `Fix ${label(next.sectionId)}` : label(next.sectionId)}: level {next.level}
           </button>
         )}
-        {next && <span className="tiny muted" style={{ marginTop: -6 }}>{next.reason}</span>}
+        {next && !(next.kind === 'full' && r.unconfirmed > 0) && <span className="tiny muted" style={{ marginTop: -6 }}>{next.reason}</span>}
         <button className="btn ghost small" onClick={() => setShowHelp(!showHelp)} aria-expanded={showHelp}>
           {showHelp ? 'Hide' : 'How'} the levels work
         </button>
@@ -180,7 +180,8 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
             {LEVELS.map((L) => {
               const l = L.level;
               const fixes = r.toFix.find((f) => f.level === l)?.sectionIds ?? [];
-              const cls = l <= P ? 'lvl-btn done' : l === P + 1 && !fixes.length ? 'lvl-btn next' : 'lvl-btn';
+              // The suggested run: the level every section has reached, else the next piece level.
+              const cls = l <= P ? 'lvl-btn done' : l === (r.unconfirmed || P + 1) && !fixes.length ? 'lvl-btn next' : 'lvl-btn';
               return (
                 <button key={l} className={cls} data-testid={`full-${l}`}
                   aria-label={`Sing it all at level ${l} ${L.name}${l <= P ? ' (passed)' : ''}${fixes.length ? ` (fix ${fixes.length} section${fixes.length > 1 ? 's' : ''} first)` : ''}`}
@@ -199,7 +200,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
               </span>
               <div className="row wrap" style={{ gap: 6 }}>
                 {f.sectionIds.map((id) => (
-                  <button key={id} className="btn small" onClick={() => play(id, f.level)}><IconPlay size={14} /> {label(id)}</button>
+                  <button key={id} className="btn small" onClick={() => play(id, f.level)}><IconPlay size={14} color="currentColor" /> {label(id)}</button>
                 ))}
               </div>
             </div>
@@ -244,7 +245,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
                   {snippet(part!, s.start, s.end) && <span className="small ellipsis" style={{ color: 'var(--accent-text)', fontStyle: 'italic' }}>“{snippet(part!, s.start, s.end)}…”</span>}
                   <span className="tiny muted">
                     {fixAt.has(s.id) ? <strong style={{ color: 'var(--accent-text)' }} data-testid="section-to-fix">To fix at level {fixAt.get(s.id)} · </strong> : null}
-                    {isDue ? 'Due for review' : status === 'new' ? 'Not started' : `Level ${lvl}${sp?.best?.[lvl] != null ? ` · best ${Math.round(sp.best[lvl] * 100)}%` : ''}`}
+                    {isDue ? 'Due for review' : status === 'new' ? (fixAt.has(s.id) ? 'not passed on its own yet' : 'Not started') : `Level ${lvl}${sp?.best?.[lvl] != null ? ` · best ${Math.round(sp.best[lvl] * 100)}%` : ''}`}
                     {lvl === 4 && sp?.offBookDays?.length ? ` · from memory: day ${sp.offBookDays.length} of ${OFF_BOOK_DAYS}` : ''}
                   </span>
                 </div>
