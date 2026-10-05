@@ -2,18 +2,19 @@
 
 import { chosenPartId, singableSections, getPiece, type PieceInfo } from './library';
 import { getProgress, dueForReview, attemptLog, loadCycle, loadProfile, type Cycle } from '../progress/store';
-import { pieceReadiness, nextStep } from '../progress/ladder';
+import { pieceReadiness, nextStep, fullRunDue, type Readiness } from '../progress/ladder';
 import type { Route } from './router';
 
-export interface PieceStatus {
+export interface PieceStatus extends Readiness {
   piece: PieceInfo;
   partId: string;
   partName: string;
-  pct: number;
-  minLevel: number;
-  rehearsalReady: boolean;
-  concertReady: boolean;
+  /** Sections due for review. */
   due: string[];
+  /** The full run is due for review. */
+  fullDue: boolean;
+  /** More than one section: the piece level comes from full runs. */
+  multi: boolean;
   next: ReturnType<typeof nextStep>;
 }
 
@@ -26,23 +27,30 @@ export function pieceStatus(piece: PieceInfo, voice: string): PieceStatus {
   return {
     piece, partId, partName: part?.name ?? '', ...r,
     due: dueForReview(piece.id, partId, sections),
+    fullDue: fullRunDue(sections, prog),
+    multi: sections.length > 1,
     next: nextStep(sections, prog),
   };
 }
 
 /**
  * Today's plan: pieces the next rehearsal works on come first (if they still need work), then
- * reviews, then the piece practised most recently. At most three.
+ * sections to fix after a full run and reviews, then the piece practised most recently. At most three.
  */
+/** Something that can't wait: a section to fix after a full run, or a review. */
+function urgent(s: PieceStatus): boolean {
+  return s.next?.kind === 'fix' || s.next?.kind === 'review' || s.due.length > 0 || s.fullDue;
+}
+
 export function todaysPlan(statuses: PieceStatus[], cycle: Cycle = loadCycle()): PieceStatus[] {
   const lastPractised = new Map<string, number>();
   for (const e of attemptLog()) lastPractised.set(e.pieceId, Math.max(lastPractised.get(e.pieceId) ?? 0, e.at));
   const focusIds = new Set(cycle.focusPieceIds ?? []);
   const ordered = [...statuses].sort((a, b) =>
     (focusIds.has(b.piece.id) && !b.rehearsalReady ? 1 : 0) - (focusIds.has(a.piece.id) && !a.rehearsalReady ? 1 : 0)
-    || (b.due.length ? 1 : 0) - (a.due.length ? 1 : 0)
+    || (urgent(b) ? 1 : 0) - (urgent(a) ? 1 : 0)
     || (lastPractised.get(b.piece.id) ?? 0) - (lastPractised.get(a.piece.id) ?? 0));
-  return ordered.filter((s) => s.next && (!s.concertReady || s.due.length)).slice(0, 3);
+  return ordered.filter((s) => s.next && (!s.concertReady || urgent(s))).slice(0, 3);
 }
 
 /** The run Home's "Next up" starts (null when there's nothing to practise). */

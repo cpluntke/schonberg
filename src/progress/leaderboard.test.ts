@@ -46,8 +46,9 @@ describe('leaderboard', () => {
     recordAttempt('p', 'T', 's1', 1, res(0.5, 999), 30, now - 9 * DAY); // too old for weekly
     const e = computeMyEntry('p', 'T', sections, now);
     expect(e).toMatchObject({ name: 'Me', voice: 'T', pieceId: 'p', weeklyScore: 1100, streak: 2 });
-    expect(e.readiness).toBeCloseTo(2 / 8);
-    expect(e.improved).toBeCloseTo(0.25);
+    // Section levels not confirmed by a full run count half: s0 at level 2 of 4, of two sections.
+    expect(e.readiness).toBeCloseTo(1 / 8);
+    expect(e.improved).toBeCloseTo(0.125);
   });
   it('ranking', () => {
     const a = { ...entry, name: 'A', readiness: 0.5, streak: 10, improved: 0 };

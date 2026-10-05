@@ -43,7 +43,8 @@ async function send(): Promise<void> {
     const bars = getBars(id, partId);
     if (!prog && Object.keys(bars).length === 0) continue;
     const r = pieceReadiness(singableSections(piece, partId), prog);
-    pieces[id] = { readiness: Math.round(r.pct * 100) / 100, level: r.minLevel, bars };
+    // level = the piece level (sung through in one go at that level), not the weakest section.
+    pieces[id] = { readiness: Math.round(r.pct * 100) / 100, level: r.pieceLevel, bars };
   }
   last = Date.now();
   try {

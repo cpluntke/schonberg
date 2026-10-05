@@ -344,6 +344,11 @@ export class PracticeSession {
   /** True when the last finish() came before the end of the section. */
   partial = false;
 
+  /** The run was paused and resumed (not sung in one go). */
+  get resumed(): boolean {
+    return this.plays > 1;
+  }
+
   finish() {
     if (this.phase === 'done') return;
     if (this.endTimer != null) clearTimeout(this.endTimer);

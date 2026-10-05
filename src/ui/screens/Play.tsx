@@ -3,9 +3,9 @@ import type { Route } from '../router';
 import { go, back } from '../router';
 import { getPiece, noteRangeFor, singableSections } from '../library';
 import { useProfile } from '../hooks';
-import { LEVELS, LISTEN, MAX_LEVEL, OFF_BOOK_DAYS, effectiveTolerance, pieceReadiness } from '../../progress/ladder';
+import { LEVELS, LISTEN, MAX_LEVEL, OFF_BOOK_DAYS, effectiveTolerance, fixesBefore, fullRunCounts, pieceReadiness } from '../../progress/ladder';
 import { shareMyProgress } from '../play/shareProgress';
-import { recordAttempt, getProgress, snapshotReadiness, personalBest, practiceDisplay } from '../../progress/store';
+import { recordAttempt, recordFullRun, getProgress, snapshotReadiness, personalBest, practiceDisplay } from '../../progress/store';
 import { keyAtTime } from '../../music/time';
 import { PracticeSession, estimateLatencyMs } from '../play/session';
 import { medianOnsetMs, scoreAligned } from '../../game/align';
@@ -279,14 +279,26 @@ function SingPlay({ route }: { route: PlayRoute }) {
     // Off book only counts when everything was hidden and nothing was peeked at.
     const peekedN = sess?.peeked.size ?? 0;
     const offBookPractice = offBook && (peekedN > 0 || hiddenRef.current.size < sectionMeasures.length);
-    const ladder = realSection && !partial && timingUnsure == null && !offBookPractice && (rateOverride == null || rateOverride >= (spec?.rate ?? 1) - 1e-6);
+    const fullTempo = rateOverride == null || rateOverride >= (spec?.rate ?? 1) - 1e-6;
+    // A run-through of the whole piece earns the piece level (docs/LEVELS.md), but only in one go:
+    // not stopped early, not paused and resumed, at the level's tempo.
+    const isFull = section.id === 'all';
+    const resumed = !!sess?.resumed;
+    const fullCounted = isFull && fullRunCounts({ level, rate, partial, resumed, timingUnsure: timingUnsure != null, offBookPractice }).counted;
+    const sectionLadder = realSection && !partial && timingUnsure == null && !offBookPractice && fullTempo;
     // Practice runs (slower tempo, stopped early) are logged but never change section levels.
-    const recId = ladder || !realSection ? section.id : 'practice';
+    const recId = sectionLadder || !realSection ? section.id : 'practice';
     const durationSec = (section.end - section.start) / rate;
     const prevBest = personalBest(piece.id, part.id, recId, level)?.score ?? null;
-    const rec = recordAttempt(piece.id, part.id, recId, level, r, durationSec, Date.now(), { timingFail: timingFail != null });
+    const secs = singableSections(piece, part.id);
+    const full = isFull
+      ? recordFullRun(piece.id, part.id, level, r, secs, (i) => part.notes[i]?.start,
+        { counted: fullCounted, timingFail: timingFail != null, durationSec })
+      : undefined;
+    const rec = full ?? recordAttempt(piece.id, part.id, recId, level, r, durationSec, Date.now(), { timingFail: timingFail != null });
+    const fixed = full ? undefined : (rec as ReturnType<typeof recordAttempt>).fixed;
+    const ladder = full ? full.counted : sectionLadder;
     if (ladder) {
-      const secs = singableSections(piece, part.id);
       snapshotReadiness(piece.id, part.id, pieceReadiness(secs, getProgress(piece.id, part.id)).pct);
     }
     void shareMyProgress();
@@ -300,8 +312,12 @@ function SingPlay({ route }: { route: PlayRoute }) {
       latencyUsedMs: sess ? Math.round(sess.latencyMs) : undefined,
       timingUnsure,
       offBookDays: rec.offBookDays,
-      notCounted: realSection && !ladder
+      full,
+      fixed,
+      notCounted: (realSection || isFull) && !ladder
         ? (partial ? 'stopped early'
+          : isFull && resumed ? 'you paused and carried on (a run of the whole piece counts only in one go)'
+          : full?.blocked ? `first fix ${full.blocked.map((id) => secs.find((s) => s.id === id)?.label ?? id).join(', ')} on ${full.blocked.length > 1 ? 'their' : 'its'} own at level ${level}`
           : offBookPractice ? (peekedN > 0 ? `you peeked at ${peekedN} bar${peekedN > 1 ? 's' : ''}` : 'some bars were still showing (practice mode)')
           : timingUnsure != null ? `your voice reached the app about ${timingUnsure} ms after the beat, and without the delay check the app can't tell whether that's your timing or your phone and headphones. Do the 10-second delay check in Voice setup`
             : 'slower than the level’s tempo')
@@ -464,6 +480,10 @@ function SingPlay({ route }: { route: PlayRoute }) {
   const vocal = piece.score.parts.filter((p) => p.notes.length > 0 || p.voiceType === 'other');
   const levelInfo = spec ?? null;
   const running = phase === 'running';
+  // A run of the whole piece: the sections still to fix at this level (it can't count until they're done).
+  const isFullRun = section.id === 'all' && !listenOnly;
+  const fullSecs = isFullRun ? singableSections(piece, part.id) : [];
+  const fullFixes = isFullRun ? fixesBefore(fullSecs, getProgress(piece.id, part.id), level) : [];
 
   /** Leave to the piece (or the screen that launched a generated drill), never to a stale Results. */
   function leave() {
@@ -514,6 +534,18 @@ function SingPlay({ route }: { route: PlayRoute }) {
               <span className="eyebrow">{listenOnly ? 'Level 0 · Listen' : `Level ${level} · ${levelInfo?.name}`}</span>
               <strong style={{ fontSize: 18 }}>{section.label}</strong>
               {!cold && <span className="small muted">{listenOnly ? LISTEN.description : levelInfo?.description}</span>}
+              {isFullRun && (fullFixes.length ? (
+                <div className="notice" data-testid="full-locked">
+                  <strong>Fix {fullFixes.length === 1 ? 'this section' : 'these sections'} first:</strong>{' '}
+                  {fullFixes.map((id) => fullSecs.find((x) => x.id === id)?.label ?? id).join(', ')} slipped in your last full run at level {level}.
+                  Pass {fullFixes.length === 1 ? 'it' : 'each'} on {fullFixes.length === 1 ? 'its' : 'their'} own at level {level}; until then this run is practice and won't count.
+                </div>
+              ) : (
+                <span className="small" data-testid="full-info">
+                  Sing the whole piece in one go: pass it and the piece reaches level {level}. Every section is scored too, and each must reach {Math.round((levelInfo?.pass ?? 0.8) * 100)}%.
+                  Stopping or pausing makes it a practice run.
+                </span>
+              ))}
               {!listenOnly && levelInfo && !cold && (
                 <span className="tiny mono muted">
                   {Math.round(rate * 100)}% tempo · ±{tolerance}¢ · pass at {Math.round(levelInfo.pass * 100)}% · start: {levelInfo.cue === 'chord' ? 'chord only' : 'your note'}
@@ -528,7 +560,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
               {offBook && !cold && (
                 <div className="col" style={{ gap: 6 }} data-testid="offbook-mode">
                   {allKnown ? (
-                    <span className="small">You know every bar of this section by heart: this is the real test. Everything is hidden.</span>
+                    <span className="small">You know every bar of this {isFullRun ? 'piece' : 'section'} by heart: this is the real test. Everything is hidden.</span>
                   ) : (
                     <>
                       <div className="chips" role="group" aria-label="Off-book mode">
@@ -544,7 +576,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
                       </span>
                     </>
                   )}
-                  <span className="tiny muted">Hold “Peek” to see the next bars for two seconds. Pass off book on {OFF_BOOK_DAYS} different days and the section is memorised.</span>
+                  <span className="tiny muted">Hold “Peek” to see the next bars for two seconds. Pass off book on {OFF_BOOK_DAYS} different days and the {isFullRun ? 'piece' : 'section'} is memorised.</span>
                 </div>
               )}
               {route.mode === '2d' && !listenOnly && profile.scoreViewNews && display === 'highway' && (
@@ -610,6 +642,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
           <div className="overlay">
             <div className="card">
               <strong style={{ fontSize: 18 }}>Paused</strong>
+              {isFullRun && <span className="small muted">A run of the whole piece counts only in one go: carry on to practise, or restart to sing it through for the level.</span>}
               <button className="btn primary block" onClick={() => { sessionRef.current?.resume(); setPhase('running'); }}><IconPlay size={18} /> Resume</button>
               <button className="btn block" onClick={() => { sessionRef.current?.dispose(); sessionRef.current = null; start(); }}><IconRestart size={18} /> Restart section</button>
               {!listenOnly && <button className="btn block" onClick={() => sessionRef.current?.finish()}>Finish &amp; see results</button>}
