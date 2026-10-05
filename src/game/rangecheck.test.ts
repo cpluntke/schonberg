@@ -107,3 +107,33 @@ describe('range check and vibrato', () => {
     expect(judgePattern(60, vib(60, 90, true)).verdict).not.toBe('good');
   });
 });
+
+describe('range check: octaves', () => {
+  it('a pattern sung an octave down is not credited (A5 pattern sung at A4)', () => {
+    const r = judgePattern(81, sing(69));
+    expect(r.verdict).toBe('missed');
+    expect(r.notes.every((n) => n.verdict === 'missed')).toBe(true);
+    // …nor an octave up (a low pattern sung in the octave above).
+    expect(judgePattern(48, sing(60)).verdict).toBe('missed');
+    // Dropping the octave only for the top note leaves that note unsung.
+    const top = sing(81).map((x, i) => (i >= 74 && i < 111 && x.midi != null ? { ...x, midi: x.midi - 12 } : x));
+    const r2 = judgePattern(81, top);
+    expect(r2.verdict).toBe('shaky');
+    expect(r2.notes.find((n) => n.midi === 85)!.verdict).toBe('missed');
+  });
+
+  it('octave-jump glitches of the tracker in a correct take still pass', () => {
+    // Single frames (and a short burst) an octave off, both directions, in every note.
+    const glitchy = sing(81).map((x, i) => {
+      if (x.midi == null) return x;
+      const k = i % 37;
+      if (k === 10 || k === 23) return { ...x, midi: x.midi - 12 };
+      if (k === 30) return { ...x, midi: x.midi + 12 };
+      if (i >= 50 && i < 54) return { ...x, midi: x.midi - 12 };
+      return x;
+    });
+    const r = judgePattern(81, glitchy);
+    expect(r.verdict).toBe('good');
+    expect(judgePattern(60, sing(60).map((x, i) => (i % 7 === 3 && x.midi != null ? { ...x, midi: x.midi - 12 } : x))).verdict).toBe('good');
+  });
+});

@@ -50,36 +50,46 @@ export function judgePattern(root: number, readings: Reading[], opts: { toleranc
   // Readings arrive in time order: consecutive readings on the same pitch form one sung note. The
   // glide into and out of each note is left out of the pitch and steadiness judgement (it's how
   // anyone moves between notes, and it gets wider high up), as long as enough of the note is left.
-  let run: { pitch: number; c: number[] } | null = null;
+  // Each sung note must be in the pattern's octave: a note sung an octave down (or up) isn't the
+  // note asked for, so it isn't credited. Within a note sung in the right octave, the tracker's
+  // brief octave slips are folded back.
+  let run: { pitch: number; c: number[]; db: number[]; inOctave: number } | null = null;
   const closeRun = () => {
     if (!run) return;
-    const b = bins.get(run.pitch)!;
-    const core = run.c.length >= GLIDE_IN + GLIDE_OUT + 4 ? run.c.slice(GLIDE_IN, run.c.length - GLIDE_OUT) : run.c;
+    const r = run;
+    run = null;
+    if (r.inOctave * 2 < r.c.length) return;
+    const b = bins.get(r.pitch)!;
+    b.c.push(...r.c);
+    b.db.push(...r.db);
+    const core = r.c.length >= GLIDE_IN + GLIDE_OUT + 4 ? r.c.slice(GLIDE_IN, r.c.length - GLIDE_OUT) : r.c;
     b.core.push(...core);
     // Averages over whole vibrato cycles within this sung note (never across two notes, never a
     // half cycle at the end).
     for (let i = 0; i + GROUP <= core.length; i += GROUP) b.groups.push(core.slice(i, i + GROUP).reduce((x, y) => x + y, 0) / GROUP);
     // …and the note's last full cycle, so a drift towards the end isn't cut off.
     if (core.length > GROUP && core.length % GROUP >= 4) b.groups.push(core.slice(-GROUP).reduce((x, y) => x + y, 0) / GROUP);
-    run = null;
   };
   for (const r of readings) {
     if (r.midi === null || !Number.isFinite(r.midi)) { closeRun(); continue; }
-    // Octave slips of the tracker are folded; anything more than a semitone from every pattern
-    // pitch is ignored (glides, other sounds).
+    // Readings are matched to the nearest pattern pitch class (octave slips of the tracker are
+    // folded, see above); anything more than a semitone from every pattern pitch is ignored
+    // (glides, other sounds).
     let best: number | null = null;
     let bestD = Infinity;
+    let bestOct = 0;
     for (const p of pitches) {
       let d = r.midi - p;
-      d -= 12 * Math.round(d / 12);
-      if (Math.abs(d) < Math.abs(bestD)) { bestD = d; best = p; }
+      const oct = Math.round(d / 12);
+      d -= 12 * oct;
+      if (Math.abs(d) < Math.abs(bestD)) { bestD = d; best = p; bestOct = oct; }
     }
     if (best === null || Math.abs(bestD) > 1) { closeRun(); continue; }
     if (run && run.pitch !== best) closeRun();
-    if (!run) run = { pitch: best, c: [] };
+    if (!run) run = { pitch: best, c: [], db: [], inOctave: 0 };
     run.c.push(bestD * 100);
-    bins.get(best)!.c.push(bestD * 100);
-    bins.get(best)!.db.push(20 * Math.log10(Math.max(r.rms, 1e-5)));
+    run.db.push(20 * Math.log10(Math.max(r.rms, 1e-5)));
+    if (bestOct === 0) run.inOctave++;
   }
   closeRun();
   const notes = pitches.map((p) => {
