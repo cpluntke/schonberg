@@ -1,7 +1,7 @@
 // My entry on the choir's leaderboard: posted when Ranks opens on a piece and, so the board doesn't
 // lag behind real practice, after each finished run (at most once a minute per piece).
 
-import { loadProfile } from '../../progress/store';
+import { loadCycle, loadProfile } from '../../progress/store';
 import { computeMyEntry, getLeaderboardBackend, type LeaderboardEntry } from '../../progress/leaderboard';
 import { getPiece, chosenPartId, singableSections, type PieceInfo } from '../library';
 import type { VoiceType } from '../../music/types';
@@ -27,9 +27,9 @@ export async function postBoardEntry(entry: LeaderboardEntry): Promise<void> {
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
 const last = new Map<string, number>();
 
-/** After a run: post this piece's entry soon (computed when sent), at most once a minute. Never throws. */
+/** After a run on a programme piece: post its entry soon (computed when sent), at most once a minute. Never throws. */
 export function postBoardEntrySoon(pieceId: string): void {
-  if (timers.has(pieceId)) return;
+  if (timers.has(pieceId) || !loadCycle().pieceIds.includes(pieceId)) return;
   const wait = Math.max(0, (last.get(pieceId) ?? 0) + MIN_GAP_MS - Date.now());
   timers.set(pieceId, setTimeout(() => {
     timers.delete(pieceId);

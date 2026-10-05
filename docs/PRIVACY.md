@@ -17,7 +17,7 @@ three things that are the singer's own choice. Settings → Privacy shows a shor
 
 ## 0. The choir's leaderboard (every choir member with a name)
 
-- **Sent** when the singer opens Ranks and after counted runs (at most once a minute per piece), to
+- **Sent** when the singer opens Ranks and after each finished run on a programme piece (at most once a minute per piece), to
   `PUT /schonberg/api/choirs/<code>/entries/<name>`: first name, voice part, piece, readiness, weekly
   points, streak and the 7-day readiness gain. There is no opt-out: joining a choir with a code puts
   the singer on its board (leave the choir to come off it).
