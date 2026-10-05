@@ -529,25 +529,25 @@ export function naturalSpace(durBeats: number): number {
   return 1.45 + 1.3 * Math.log2(1 + 2 * durBeats);
 }
 
-const CLEF_W = 3.5;
-const TIME_W = 2.5;
-const keyW = (fifths: number) => (fifths ? Math.abs(fifths) * 0.85 + 0.7 : 0.3);
+export const CLEF_W = 3.5;
+export const TIME_W = 2.5;
+export const keyW = (fifths: number) => (fifths ? Math.abs(fifths) * 0.85 + 0.7 : 0.3);
 /** Naturals needed to cancel `prev` when the key changes to `fifths`. */
 const cancelCount = (fifths: number, prev: number) =>
   Math.sign(prev) === Math.sign(fifths) ? Math.max(0, Math.abs(prev) - Math.abs(fifths)) : Math.abs(prev);
 /** Width of a key change (naturals, then the new signature). */
-const keyChangeW = (fifths: number, prev: number) => {
+export const keyChangeW = (fifths: number, prev: number) => {
   const n = cancelCount(fifths, prev) + Math.abs(fifths);
   return n ? n * 0.85 + 0.7 : 0.3;
 };
-const hasAcc = (e: StaffEvent | undefined) => !!e && (e.accidental != null || !!e.chord?.some((c) => c.accidental != null));
+export const hasAcc = (e: StaffEvent | undefined) => !!e && (e.accidental != null || !!e.chord?.some((c) => c.accidental != null));
 /** Two heads a step apart in a chord: one sits on the other side of the stem. */
-const hasSecond = (e: StaffEvent) => {
+export const hasSecond = (e: StaffEvent) => {
   const st = eventSteps(e).sort((a, b) => a - b);
   for (let i = 1; i < st.length; i++) if (st[i] - st[i - 1] === 1) return true;
   return false;
 };
-const ACC_W = 1.25;
+export const ACC_W = 1.25;
 
 function measureWidths(sm: StaffMeasure, sp: number, textW: (s: string) => number, inside: boolean) {
   const evs = sm.events;
@@ -739,7 +739,7 @@ function treblePath(): Path2D {
 }
 let TREBLE: Path2D | null = null;
 
-function drawTreble(c: Ctx, x: number, gLineY: number, sp: number, color: string, eight: boolean) {
+export function drawTreble(c: Ctx, x: number, gLineY: number, sp: number, color: string, eight: boolean) {
   TREBLE ??= treblePath();
   c.save();
   c.translate(x + 1.0 * sp, gLineY);
@@ -995,7 +995,7 @@ function roundRect(c: Ctx, x: number, y: number, w: number, h: number, r: number
 // ---------------------------------------------------------------------------------------------
 // Drawing
 
-const INK = {
+export const INK = {
   staff: '#5B638F',
   bar: '#7E86B4',
   note: '#E8EBFF',
@@ -1029,6 +1029,8 @@ try {
     fonts.addEventListener?.('loadingdone', bump);
   }
 } catch { /* no font loading API */ }
+/** Bumped when web fonts finish loading (text widths change: lay out again). */
+export const fontGeneration = () => fontGen;
 
 // ---------------------------------------------------------------------------------------------
 // Per-system geometry (static for a layout; y relative to the middle staff line, down = +)
@@ -1085,14 +1087,14 @@ interface TupG {
   x: number;
   dy: number;
 }
-interface SysDraw {
+export interface SysDraw {
   evs: EvG[];
   beams: BeamG[];
   ties: TieG[];
   tups: TupG[];
 }
 
-function buildSysDraw(sys: StaffSystem, layout: StaffLayout, notes: Part['notes']): SysDraw {
+export function buildSysDraw(sys: StaffSystem, layout: StaffLayout, notes: Part['notes']): SysDraw {
   const sp = layout.sp;
   const yOf = (st: number) => -((st - layout.mid) * sp) / 2;
   const headRx = 0.62 * sp;
@@ -1271,7 +1273,7 @@ function buildSysDraw(sys: StaffSystem, layout: StaffLayout, notes: Part['notes'
 // ---------------------------------------------------------------------------------------------
 // Layout cache
 
-interface Cached {
+export interface Cached {
   key: string;
   layout: StaffLayout;
   above: number;
@@ -1284,7 +1286,7 @@ interface Cached {
 }
 let cache: Cached | null = null;
 
-function lyricFontFor(sp: number) {
+export function lyricFontFor(sp: number) {
   return `600 ${Math.round(Math.max(11, Math.min(15, sp * 1.45)))}px "Bricolage Grotesque", system-ui, sans-serif`;
 }
 
@@ -1322,7 +1324,7 @@ function getLayout(c: Ctx, W: number, H: number, s: DrawState): Cached {
   for (let guard = 0; ; guard++) {
     c.font = lyricFontFor(sp);
     const textW = (t: string) => c.measureText(t).width;
-    layout = layoutStaff(s.score, s.part, m0, m1, { width: W, sp, textW, maxBars: W < 520 ? 3 : 4 });
+    layout = layoutStaff(s.score, s.part, m0, m1, { width: W, sp, textW, maxBars: W < 520 ? 3 : W < 860 ? 4 : 6 });
     let worst = Infinity;
     for (const sy of layout.systems) worst = Math.min(worst, sy.squeeze);
     if (worst >= 0.9 || sp <= floor + 1e-6 || guard >= 6) break;
@@ -1339,7 +1341,7 @@ function sysDraw(L: Cached, j: number, s: DrawState): SysDraw {
   return (L.sys[j] ??= buildSysDraw(L.layout.systems[j], L.layout, s.part.notes));
 }
 
-interface SysGeo {
+export interface SysGeo {
   j: number;
   sys: StaffSystem;
   sd: SysDraw;
@@ -1348,7 +1350,7 @@ interface SysGeo {
 }
 
 /** Note being sung at a beat on a system (null in rests). */
-function eventAt(sys: StaffSystem, beat: number): StaffEvent | null {
+export function eventAt(sys: StaffSystem, beat: number): StaffEvent | null {
   for (const m of sys.measures) {
     if (beat < m.sm.startBeat - 1e-6 || beat >= m.sm.endBeat - 1e-6) continue;
     let hit: StaffEvent | null = null;
@@ -1374,12 +1376,17 @@ function nearestHead(ev: StaffEvent, midi: number): { midi: number; step: number
   return best;
 }
 
-interface Vis {
+export interface Vis {
   vis: (i: number) => 'show' | 'letters' | 'none';
   isPast: (i: number) => boolean;
   isNow: (i: number) => boolean;
   inRange: (i: number) => boolean;
+  /** Another voice in the full score: drawn plainly in these colours (no grades, no glow). */
+  plain?: { note: string; lyric: string };
 }
+
+/** Opacity of a note: notes outside your section are faded (not in another voice's plain staff). */
+const alphaOf = (v: Vis, i: number) => (v.plain || v.inRange(i) ? 1 : 0.35);
 
 export function drawStaff2D(c: Ctx, W: number, H: number, s: DrawState) {
   c.fillStyle = COLORS.bg;
@@ -1446,6 +1453,7 @@ export function drawStaff2D(c: Ctx, W: number, H: number, s: DrawState) {
 }
 
 function noteColor(s: DrawState, i: number, v: Vis): string {
+  if (v.plain) return v.plain.note;
   if (!v.inRange(i)) return INK.note;
   if (v.isPast(i)) {
     const g = s.live?.noteGrade(i);
@@ -1456,7 +1464,14 @@ function noteColor(s: DrawState, i: number, v: Vis): string {
 }
 
 function drawSystem(c: Ctx, g: SysGeo, layout: StaffLayout, L: Cached, s: DrawState, v: Vis) {
-  const { sys, sd, top, mid } = g;
+  drawStaffFrame(c, g, layout, s, { barlines: true, numbers: true });
+  drawStaffNotes(c, g, layout, L, s, v);
+}
+
+/** Staff lines, clef, key and time signatures (also changes inside the system), barlines, bar numbers. */
+export function drawStaffFrame(c: Ctx, g: Pick<SysGeo, 'sys' | 'top' | 'mid'>, layout: Pick<StaffLayout, 'sp' | 'clef'>, s: Pick<DrawState, 'score'>,
+  o: { barlines: boolean; numbers: boolean }) {
+  const { sys, top, mid } = g;
   const sp = layout.sp;
   const lw = Math.max(1, Math.round(sp * 0.1));
   // Staff lines.
@@ -1475,16 +1490,10 @@ function drawSystem(c: Ctx, g: SysGeo, layout: StaffLayout, L: Cached, s: DrawSt
   for (let mi = 0; mi < sys.measures.length; mi++) {
     const m = sys.measures[mi];
     const last = mi === sys.measures.length - 1;
-    c.fillStyle = INK.bar;
-    const bx = Math.round(m.x1) - 1;
-    if (m.sm.doubleBar) {
-      const final = last && m.sm.index === s.score.measures.length - 1;
-      c.fillRect(bx - (final ? 0.75 : 0.5) * sp, top, lw, 4 * sp + lw);
-      c.fillRect(bx - (final ? 0.35 * sp : 0), top, final ? 0.4 * sp : lw, 4 * sp + lw);
-    } else c.fillRect(bx, top, lw + 0.5, 4 * sp + lw);
+    if (o.barlines) drawBarline(c, m, last, s.score.measures.length, top, 4 * sp + lw, sp, lw);
     c.fillStyle = INK.barNo;
     const nx = mi === 0 ? sys.clefX : m.x0 - 0.2 * sp;
-    if (m.sm.number !== '0') c.fillText(m.sm.number, nx, top - 1.75 * sp);
+    if (o.numbers && m.sm.number !== '0') c.fillText(m.sm.number, nx, top - 1.75 * sp);
     if (m.changeX != null) {
       let cx = m.changeX;
       if (m.sm.keyChange) {
@@ -1494,7 +1503,24 @@ function drawSystem(c: Ctx, g: SysGeo, layout: StaffLayout, L: Cached, s: DrawSt
       if (m.sm.timeChange) drawTimeSig(c, cx, mid, sp, m.sm.timeSig, INK.clef);
     }
   }
+}
 
+/** Barline at the end of bar `m` from y `top`, `h` long (double / final where the score has them). */
+export function drawBarline(c: Ctx, m: LaidMeasure, last: boolean, nMeasures: number, top: number, h: number, sp: number, lw: number) {
+  c.fillStyle = INK.bar;
+  const bx = Math.round(m.x1) - 1;
+  if (m.sm.doubleBar) {
+    const final = last && m.sm.index === nMeasures - 1;
+    c.fillRect(bx - (final ? 0.75 : 0.5) * sp, top, lw, h);
+    c.fillRect(bx - (final ? 0.35 * sp : 0), top, final ? 0.4 * sp : lw, h);
+  } else c.fillRect(bx, top, lw + 0.5, h);
+}
+
+/** Notes, rests, beams, ties, triplets and lyrics of one staff on one system. */
+export function drawStaffNotes(c: Ctx, g: SysGeo, layout: StaffLayout, L: Cached, s: DrawState, v: Vis) {
+  const { sd, mid } = g;
+  const sp = layout.sp;
+  const lw = Math.max(1, Math.round(sp * 0.1));
   const headRx = 0.62 * sp;
   const stemW = Math.max(1, 0.12 * sp);
   const shown = (e: StaffEvent) => v.vis(e.noteIndex!) === 'show';
@@ -1513,7 +1539,7 @@ function drawSystem(c: Ctx, g: SysGeo, layout: StaffLayout, L: Cached, s: DrawSt
     let col = noteColor(s, b.evs[0].ev.noteIndex!, v);
     for (const e of b.evs) if (noteColor(s, e.ev.noteIndex!, v) !== col) { col = INK.note; break; }
     c.fillStyle = col;
-    c.globalAlpha = b.evs.every((e) => !v.inRange(e.ev.noteIndex!)) ? 0.35 : 1;
+    c.globalAlpha = b.evs.every((e) => alphaOf(v, e.ev.noteIndex!) < 1) ? 0.35 : 1;
     for (let q = 0; q < b.segs.length; q += 4) {
       const xa = b.segs[q], ya = mid + b.segs[q + 1], xb = b.segs[q + 2], yb = mid + b.segs[q + 3];
       c.beginPath();
@@ -1549,7 +1575,7 @@ function drawSystem(c: Ctx, g: SysGeo, layout: StaffLayout, L: Cached, s: DrawSt
       c.globalAlpha = 0.6;
       c.fillRect(h.x + headRx, Math.round(mid + h.dy) - 0.5, Math.max(0, eg.xEnd - h.x - headRx - 0.3 * sp), 1);
     }
-    c.globalAlpha = v.inRange(main) ? 1 : 0.35;
+    c.globalAlpha = alphaOf(v, main);
     // Ledger lines.
     c.fillStyle = INK.staff;
     for (let q = 0; q < eg.ledgers.length; q += 3) c.fillRect(eg.ledgers[q], Math.round(mid + eg.ledgers[q + 2]), eg.ledgers[q + 1] - eg.ledgers[q], lw);
@@ -1588,7 +1614,7 @@ function drawSystem(c: Ctx, g: SysGeo, layout: StaffLayout, L: Cached, s: DrawSt
   for (const t of sd.ties) {
     if (v.vis(t.i) !== 'show') continue;
     c.fillStyle = noteColor(s, t.i, v);
-    c.globalAlpha = v.inRange(t.i) ? 1 : 0.35;
+    c.globalAlpha = alphaOf(v, t.i);
     drawTie(c, t.xa, t.xb, mid + t.dy, t.side, sp);
   }
   c.globalAlpha = 1;
@@ -1607,7 +1633,7 @@ function drawSystem(c: Ctx, g: SysGeo, layout: StaffLayout, L: Cached, s: DrawSt
 }
 
 /** Outlines over the noteheads the voice trace runs through (sung or being sung). */
-function drawOutlines(c: Ctx, g: SysGeo, s: DrawState, v: Vis, sp: number) {
+export function drawOutlines(c: Ctx, g: SysGeo, s: DrawState, v: Vis, sp: number) {
   c.lineWidth = Math.max(1.3, 0.13 * sp);
   for (const eg of g.sd.evs) {
     if (!eg.heads.length || v.vis(eg.ev.noteIndex!) !== 'show') continue;
@@ -1676,7 +1702,7 @@ function drawLyrics(c: Ctx, g: SysGeo, s: DrawState, L: Cached, v: Vis) {
     const text = n.lyric ?? '';
     if (!text) continue;
     const now = v.isNow(i);
-    c.fillStyle = !v.inRange(i) ? INK.lyricPast : now ? COLORS.targetText : v.isPast(i) ? INK.lyricPast : INK.lyric;
+    c.fillStyle = v.plain ? v.plain.lyric : !v.inRange(i) ? INK.lyricPast : now ? COLORS.targetText : v.isPast(i) ? INK.lyricPast : INK.lyric;
     let w: number;
     if (now) {
       const f = L.lyricFont.replace(/^600/, '800');
@@ -1744,7 +1770,7 @@ interface TraceCache {
 }
 const tr: TraceCache = { samples: null, key: '', done: 0, sys: [], x: [], dy: [], col: [], ev: [] };
 
-function updateTrace(s: DrawState, L: Cached) {
+export function updateTrace(s: DrawState, L: Cached) {
   const smp = s.samples;
   const lkey = `${L.key}|${s.tolerance}|${s.range?.join(',')}`;
   if (tr.samples !== smp || tr.key !== lkey || smp.length < tr.done) {
@@ -1832,7 +1858,7 @@ function updateTrace(s: DrawState, L: Cached) {
   }
 }
 
-function drawTrace(c: Ctx, g: SysGeo, s: DrawState, L: Cached, beatNow: number) {
+export function drawTrace(c: Ctx, g: SysGeo, s: DrawState, L: Cached, beatNow: number) {
   const { sys } = g;
   const sp = L.layout.sp;
   const tempos = s.score.tempos;
@@ -1889,7 +1915,7 @@ function drawTrace(c: Ctx, g: SysGeo, s: DrawState, L: Cached, beatNow: number) 
   }
 }
 
-function drawBubble(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: number) {
+export function drawBubble(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: number) {
   const sp = L.layout.sp;
   const last = s.samples[s.samples.length - 1];
   if (!last || last.midi == null || s.pos - last.time >= 0.2) return;
@@ -1986,7 +2012,7 @@ function drawBubble(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: number) {
 
 /** Entry countdown when your next note comes after a rest: beside the playhead's head, on the side
  *  already sung (the notes coming up stay clear). */
-function drawCountdown(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: number, yTop: number) {
+export function drawCountdown(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: number, yTop: number) {
   if (!s.range) return;
   const sp = L.layout.sp;
   const notes = s.part.notes;

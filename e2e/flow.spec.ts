@@ -67,6 +67,41 @@ test('score view: switch display, sing level 1 from sheet music, reach results',
   expect(errors).toEqual([]);
 });
 
+// Sheet music is the default at every level; on a laptop the score view is the full score.
+test('new singer: level 3 opens in score view, a 1280-wide screen shows every voice, a phone one staff', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/?simulate=perfect#/');
+  await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
+  await page.getByTestId('piece-row').first().click();
+  await page.getByRole('button', { name: /level 3/ }).first().click();
+  await expect(page.getByTestId('display-score')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('canvas[data-display="score"]')).toHaveCount(1);
+  await expect(page.getByTestId('staves-toggle')).toBeVisible();
+  await expect(page.getByTestId('howto')).toContainText('full score');
+  await page.getByTestId('start').click();
+  await expect.poll(async () => Number(await page.locator('canvas').getAttribute('data-staves')), { timeout: 10_000 }).toBeGreaterThanOrEqual(4);
+  await expect(page.locator('canvas')).toHaveAttribute('aria-label', 'Full score');
+  const ink = await page.locator('canvas').evaluate((cv: HTMLCanvasElement) => {
+    const d = cv.getContext('2d')!.getImageData(0, 0, cv.width, cv.height).data;
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 450) n++;
+    return n;
+  });
+  expect(ink).toBeGreaterThan(4000);
+
+  // Same singer on a phone: the single staff, no staff choice.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await expect(page.getByTestId('start')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('display-score')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('staves-toggle')).toHaveCount(0);
+  await page.getByTestId('start').click();
+  await expect.poll(async () => page.locator('canvas').getAttribute('data-staves'), { timeout: 10_000 }).toBe('1');
+  expect(errors).toEqual([]);
+});
+
 test('a flat simulated singer does not pass level 4', async ({ page }) => {
   await page.goto('/?simulate=flat#/');
   await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });

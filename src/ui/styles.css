@@ -260,6 +260,17 @@ input[type='range'] { accent-color: var(--accent); width: 100%; }
   .overlay { align-items: flex-start; overflow-y: auto; }
 }
 
+/* Wide screens (laptops, tablets in landscape): the play screen uses the whole width for the full
+   score, with the mixer and the buttons on one line. Phones keep the 560 px column. */
+@media (min-width: 900px) {
+  .app.app-play { max-width: none; }
+  .app-play .play-hud { padding: 8px 16px 4px; }
+  .app-play .lyrics { padding-left: 24px; padding-right: 24px; }
+  .app-play .play-controls { flex-direction: row; align-items: center; padding-left: 16px; padding-right: 16px; }
+  .app-play .play-controls .mixer { flex: 1 1 auto; max-width: 760px; }
+  .app-play .play-controls > .row { flex: 1 1 auto; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
