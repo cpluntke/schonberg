@@ -2,8 +2,8 @@
  {
   "sp": "N",
   "scene": "A",
-  "say": "Welcome to Schönberg Hero. In under two minutes, you'll know how to learn your part for the next concert.",
-  "show": "Welcome to Schönberg Hero. In under two minutes, you'll know how to learn your part for the next concert."
+  "say": "Welcome to Schönberg Hero. In a few minutes, you'll know how to learn your part for the next concert.",
+  "show": "Welcome to Schönberg Hero. In a few minutes, you'll know how to learn your part for the next concert."
  },
  {
   "sp": "N",
@@ -38,8 +38,8 @@
  {
   "sp": "N",
   "scene": "C",
-  "say": "Now the practice screen. At the first levels you sing from the sheet music. The blue line is your voice, drawn at the height you sing. Right on the note means in tune; just under it means flat.",
-  "show": "Now the practice screen. At the first levels you sing from the sheet music. The blue line is your voice, drawn at the height you sing. Right on the note means in tune; just under it means flat."
+  "say": "Now the practice screen. You sing from the sheet music. The blue line is your voice, drawn at the height you sing. Right on the note means in tune; just under it means flat.",
+  "show": "Now the practice screen. You sing from the sheet music. The blue line is your voice, drawn at the height you sing. Right on the note means in tune; just under it means flat."
  },
  {
   "sp": "B",
@@ -50,14 +50,14 @@
  {
   "sp": "N",
   "scene": "C",
-  "say": "Tap Highway. Your notes become bars scrolling toward a line, and you keep the blue line on them. In both views, the little bubble tells you how many cents sharp or flat you are.",
-  "show": "Tap “Highway”. Your notes become bars scrolling toward a line, and you keep the blue line on them. In both views, the little bubble tells you how many cents sharp or flat you are."
+  "say": "Tap Highway. Your notes become bars scrolling toward a line, and you keep the blue line on them. On a laptop, you see the whole choir score, with your line highlighted. In every view, the little bubble tells you how many cents sharp or flat you are.",
+  "show": "Tap “Highway”. Your notes become bars scrolling toward a line, and you keep the blue line on them. On a laptop, you see the whole choir score, with your line highlighted. In every view, the little bubble tells you how many cents sharp or flat you are."
  },
  {
   "sp": "N",
   "scene": "D",
-  "say": "Every piece is cut into short sections, and each section climbs five levels.",
-  "show": "Every piece is cut into short sections, and each section climbs five levels."
+  "say": "Every piece is cut into short sections. You practise them level by level, then sing the whole piece through at that level to earn it.",
+  "show": "Every piece is cut into short sections. You practise them level by level, then sing the whole piece through at that level to earn it."
  },
  {
   "sp": "N",
@@ -74,8 +74,20 @@
  {
   "sp": "N",
   "scene": "D",
-  "say": "Exactly. Every section at three means rehearsal ready. Every section at four means concert ready.",
-  "show": "Exactly. Every section at 3 = rehearsal-ready. Every section at 4 = concert-ready."
+  "say": "Once you've sung the whole piece through at level three, yes. Level four in one go means concert ready. If a section slips in the run, you practise just that bit, then go again.",
+  "show": "Whole piece at level 3 = rehearsal-ready. At level 4 = concert-ready. A section slips? Practise it, then go again."
+ },
+ {
+  "sp": "B",
+  "scene": "D",
+  "say": "Can I skip straight to the whole piece?",
+  "show": "Can I skip straight to the whole piece?"
+ },
+ {
+  "sp": "N",
+  "scene": "D",
+  "say": "Sure. If you know it already, sing it all at any level.",
+  "show": "Sure. If you know it already, sing it all at any level."
  },
  {
   "sp": "B",

@@ -85,7 +85,7 @@ export function Setup() {
       {step === 1 && (
         <>
           <h1 className="hero">Who's singing?</h1>
-          {!apiBase() && !introSeen() && <IntroVideoButton label="New here? Watch the 2-minute intro" className="btn block" />}
+          {!apiBase() && !introSeen() && <IntroVideoButton label="New here? Watch the 2½-minute intro" className="btn block" />}
           <label className="field">
             <span>Your name (shown on the choir leaderboard)</span>
             <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="First name" autoComplete="given-name" maxLength={40} />
@@ -213,7 +213,7 @@ function ChoirStep({ profile, update, onNext }: { profile: Profile; update: (p: 
   return (
     <>
       <h1 className="hero">Your choir</h1>
-      {!introSeen() && <IntroVideoButton label="New here? Watch the 2-minute intro" className="btn block" />}
+      {!introSeen() && <IntroVideoButton label="New here? Watch the 2½-minute intro" className="btn block" />}
       {joined ? (
         <div className="card" data-testid="setup-choir-joined">
           <span className="eyebrow">Joined</span>

@@ -23,6 +23,9 @@ for l in L:
     lines.append({'sp':l['sp'],'scene':l['scene'],'start':round(t,3),'dur':round(d,3),'pause':l.get('pause',0)})
     chunks.append((t,a))
     parts=[p.strip() for p in re.split(r'(?<=[.?!])\s+',l['show']) if p.strip()]
+    # A very short sentence ("Sure.") would flash by: show it together with the next one.
+    for j in range(len(parts)-2,-1,-1):
+        if len(parts[j])<8: parts[j:j+2]=[parts[j]+' '+parts[j+1]]
     n=sum(len(p) for p in parts); t0=t
     for p in parts:
         dd=d*len(p)/n; subs.append([round(t0,3),round(t0+dd,3),l['sp'],p]); t0+=dd
