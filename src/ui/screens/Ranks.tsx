@@ -224,7 +224,7 @@ export function Ranks() {
         {!profile.name && (
           <div className="row">
             <input type="text" aria-label="Your name" placeholder="Your name for the board" value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} maxLength={40}
-              style={{ flex: 1, minHeight: 44, borderRadius: 10, border: '1px solid var(--line)', background: 'var(--surface)', padding: '0 12px' }} />
+              style={{ flex: 1, minWidth: 0, minHeight: 44, borderRadius: 10, border: '1px solid var(--line)', background: 'var(--surface)', padding: '0 12px' }} />
             <button className="btn small" disabled={!nameDraft.trim()} onClick={() => update({ name: nameDraft.trim() })}>Save</button>
           </div>
         )}
