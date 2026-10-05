@@ -44,6 +44,9 @@ export function PlayScreen({ route }: { route: PlayRoute }) {
   return route.words ? <WordsPlay route={route} /> : <SingPlay route={route} />;
 }
 
+/** Why a level-1 run without headphones didn't count (LastResult.notCounted; Results shows its own text). */
+const SPEAKER_PRACTICE = 'level 1 counts with headphones on';
+
 function SingPlay({ route }: { route: PlayRoute }) {
   const [profile, updateProfile] = useProfile();
   const piece = getPiece(route.pieceId);
@@ -93,6 +96,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
     return g;
   });
   const sessionRef = useRef<PracticeSession | null>(null);
+  const headphonesRef = useRef<boolean | undefined>(undefined);
   const { resume, resuming, resumeMsg } = useResume(sessionRef, setPhase, setMicMsg);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -308,7 +312,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
     const resumed = !!sess?.resumed;
     const arcade = route.mode === '3d';
     // Level 1 counts only with headphones on (the answer on the pre-run card); without, it's practice.
-    const headphones = loadProfile().headphones;
+    const headphones = headphonesRef.current;
     const speaker = speakerPractice(level, headphones);
     const fullCounted = isFull && fullRunCounts({ level, rate, partial, resumed, timingUnsure: timingUnsure != null, offBookPractice, arcade, headphones }).counted;
     const sectionLadder = realSection && fullTempo
@@ -332,6 +336,17 @@ function SingPlay({ route }: { route: PlayRoute }) {
     postBoardEntrySoon(piece.id);
     syncProgressSoon();
     suggestAccount(rec.passed);
+    const notCounted = (realSection || isFull) && !ladder
+      ? (partial ? 'stopped early'
+        : isFull && arcade ? 'arcade runs of the whole piece are just for fun'
+        : isFull && resumed ? 'you paused and carried on (a run of the whole piece counts only in one go)'
+        : full?.blocked ? `first fix ${full.blocked.map((id) => secs.find((s) => s.id === id)?.label ?? id).join(', ')} on ${full.blocked.length > 1 ? 'their' : 'its'} own at level ${level}`
+        : offBookPractice ? (peekedN > 0 ? `you peeked at ${peekedN} bar${peekedN > 1 ? 's' : ''}` : 'some bars were still showing (practice mode)')
+        : timingUnsure != null ? `your voice reached the app about ${timingUnsure} ms after the beat, and without the delay check the app can't tell whether that's your timing or your phone and headphones. Do the 10-second delay check in Voice setup`
+        : !fullTempo ? 'slower than the level’s tempo'
+          : speaker ? SPEAKER_PRACTICE
+            : 'slower than the level’s tempo')
+      : undefined;
     setLastResult({
       pieceId: piece.id, partId: part.id, sectionId: section.id, level, mode: route.mode,
       from: section.start, to: section.end, result: r, ladder, prevBest, tolerance, everyNote: !!spec?.everyNote,
@@ -344,18 +359,8 @@ function SingPlay({ route }: { route: PlayRoute }) {
       offBookDays: rec.offBookDays,
       full,
       fixed,
-      ...(speaker ? { speaker: true } : {}),
-      notCounted: (realSection || isFull) && !ladder
-        ? (partial ? 'stopped early'
-          : isFull && arcade ? 'arcade runs of the whole piece are just for fun'
-          : isFull && resumed ? 'you paused and carried on (a run of the whole piece counts only in one go)'
-          : full?.blocked ? `first fix ${full.blocked.map((id) => secs.find((s) => s.id === id)?.label ?? id).join(', ')} on ${full.blocked.length > 1 ? 'their' : 'its'} own at level ${level}`
-          : offBookPractice ? (peekedN > 0 ? `you peeked at ${peekedN} bar${peekedN > 1 ? 's' : ''}` : 'some bars were still showing (practice mode)')
-          : timingUnsure != null ? `your voice reached the app about ${timingUnsure} ms after the beat, and without the delay check the app can't tell whether that's your timing or your phone and headphones. Do the 10-second delay check in Voice setup`
-          : !fullTempo ? 'slower than the level’s tempo'
-            : speaker ? 'level 1 counts with headphones on'
-              : 'slower than the level’s tempo')
-        : undefined,
+      ...(notCounted === SPEAKER_PRACTICE ? { speaker: true } : {}),
+      notCounted,
       passed: rec.passed, prevLevel: rec.prevLevel, newLevel: rec.newLevel,
     });
     trackPlayRun({
@@ -387,6 +392,8 @@ function SingPlay({ route }: { route: PlayRoute }) {
   }
 
   async function startInner() {
+    // The "Headphones on?" answer as the run starts (level 1 counts only with headphones).
+    headphonesRef.current = loadProfile().headphones;
     sessionRef.current?.dispose();
     fxRef.current = newFx();
     const s = makeSession();

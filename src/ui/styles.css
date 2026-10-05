@@ -106,12 +106,13 @@ h2 { margin: 0; font-size: 18px; font-weight: 800; }
   display: grid; gap: 4px; background: var(--surface); border-radius: 12px; padding: 4px;
   grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
 }
+/* Unpressed choices get their own fill and edge, so they read as buttons before one is picked. */
 .seg button {
-  min-height: 44px; border: none; border-radius: 9px; background: transparent; color: var(--text);
+  min-height: 44px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-2); color: var(--text);
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 4px;
   font-weight: 600; font-size: 14px;
 }
-.seg button[aria-pressed='true'] { background: var(--accent); color: var(--accent-ink); font-weight: 800; }
+.seg button[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 800; }
 .seg button .sub { font-size: 10px; opacity: 0.8; font-weight: 600; }
 
 .chips { display: flex; gap: 6px; flex-wrap: wrap; }

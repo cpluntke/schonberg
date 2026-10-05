@@ -92,6 +92,7 @@ test('level 1 asks “Headphones on?”; without them a perfect run is practice'
     /Practice: level 1 counts with headphones on, because through the speaker the app can.t hear every note reliably/, { timeout: 90_000 });
   await expect(page.getByTestId('result-score')).toBeVisible();
   await expect(page.getByTestId('again-headphones')).toBeVisible();
+  await expect(page.getByTestId('grade')).toHaveAttribute('aria-label', /\(practice\)/);
   // Not a pass: the section is still at level 0, and nothing was granted.
   const level = await page.evaluate(() => {
     const k = Object.keys(localStorage).find((x) => x.startsWith('sh:progress:warmup-chorale:'));
@@ -100,6 +101,10 @@ test('level 1 asks “Headphones on?”; without them a perfect run is practice'
     return p ? Object.entries(p.sections as Record<string, { level: number }>).filter(([id]) => id !== 'practice').reduce((a, [, x]) => Math.max(a, x.level), 0) : -1;
   });
   expect(level).toBe(0);
+  // "Sing it again with headphones on" answers Yes for the next run.
+  await page.getByTestId('again-headphones').click();
+  await expect(page.getByTestId('hp-yes')).toHaveAttribute('aria-pressed', 'true');
+  await page.getByTestId('hp-no').click();
   // Next time the card is pre-filled; one tap changes it.
   await page.goto('/?simulate=perfect#/piece/warmup-chorale');
   await page.getByLabel('Sections').getByRole('button', { name: /level 1/ }).first().click();

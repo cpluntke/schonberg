@@ -7,7 +7,7 @@ import { getLastResult, lastRunPiece } from '../play/lastResult';
 import { getPiece, singableSections } from '../library';
 import { go } from '../router';
 import { LEVELS, OFF_BOOK_DAYS, effectiveTolerance, fixesBefore, nextStep, wrongNotes } from '../../progress/ladder';
-import { getProgress, loadProfile } from '../../progress/store';
+import { getProgress, loadProfile, saveProfile } from '../../progress/store';
 import { barRangeLabel } from '../../music/sections';
 import { noteFault } from '../play/noteFault';
 import { IconDown, IconUp, IconClock, IconLoop, IconStar, IconPlay, IconCube } from '../icons';
@@ -84,6 +84,9 @@ export function Results() {
   const avgCents = sungCents.length ? Math.round(sungCents[Math.floor(sungCents.length / 2)]) : null;
   const measureIdx = Object.keys(r.perMeasure).map(Number).sort((a, b) => a - b);
   const mnum = (i: number) => piece.score.measures[i]?.number ?? String(i + 1);
+  // A pickup bar numbered 0 is "Upbeat" (as in section and wrong-note labels): "Up" in the strip.
+  const cellText = (i: number) => (i === 0 && mnum(i) === '0' ? 'Up' : mnum(i));
+  const cellName = (i: number) => (i === 0 && mnum(i) === '0' ? 'Upbeat' : `Bar ${mnum(i)}`);
 
   const playLoop = (m0: number, m1: number, level = Math.max(1, Math.min(lr.level, 2))) => {
     const ms = piece.score.measures;
@@ -105,7 +108,7 @@ export function Results() {
   // A run that failed (or didn't count) on timing isn't an "excellent run".
   // Nor is a level-1 run with a wrong note.
   // Nor a level-1 run through the speaker (practice: "move on to the next level" would be wrong).
-  const speakerRun = !!lr.speaker && !!lr.notCounted && /headphones/.test(lr.notCounted);
+  const speakerRun = !!lr.speaker && !!lr.notCounted;
   const insights = lr.timingFail != null || lr.timingUnsure != null || wrong.length > 0 || speakerRun ? r.insights.filter((i) => i.kind !== 'great') : r.insights;
 
   return (
@@ -172,7 +175,9 @@ export function Results() {
       )}
 
       <div className="row" style={{ gap: 20 }}>
-        <div className="grade-tile" aria-label={`Grade ${letter}`} data-testid="grade">{letter}</div>
+        {/* A practice run (it didn't count) shows its grade muted: not a pass. */}
+        <div className="grade-tile" aria-label={`Grade ${letter}${lr.notCounted ? ' (practice)' : ''}`} data-testid="grade"
+          style={lr.notCounted ? { background: 'var(--surface-2)', color: 'var(--muted)' } : undefined}>{letter}</div>
         <div className="col" style={{ gap: 4 }}>
           <span className="mono" style={{ fontSize: 30, fontWeight: 600 }} data-testid="result-score">{r.score.toLocaleString()}</span>
           <span className="small" style={{ color: 'var(--voice)' }}>
@@ -204,7 +209,7 @@ export function Results() {
                     <IconPlay size={14} color="currentColor" /> Fix at L{lr.level}
                   </button>
                 ) : (
-                  <span className="tiny" style={{ minWidth: 112, textAlign: 'right', color: x.passed ? 'var(--voice)' : 'var(--muted)' }}>{x.passed ? '✓ passed' : 'below the mark'}</span>
+                  <span className="tiny" style={{ minWidth: 112, textAlign: 'right', color: x.passed ? 'var(--voice)' : 'var(--muted)' }}>{x.passed ? (lr.full!.counted ? '✓ passed' : '✓ would pass') : 'below the mark'}</span>
                 )}
               </div>
             );
@@ -230,7 +235,7 @@ export function Results() {
               const v = r.perMeasure[m];
               // Level 1: a bar with a wrong note needs work, whatever its average.
               const bg = wrongBars.has(m) ? '#FF7A45' : v >= 0.85 ? '#4CC9F0' : v >= 0.6 ? '#1D4F63' : '#FF7A45';
-              return <button key={m} aria-label={`Bar ${mnum(m)}: ${Math.round(v * 100)}%`} title={`Bar ${mnum(m)} · ${Math.round(v * 100)}%`} style={{ background: bg, color: bg === '#1D4F63' ? '#EEF0FF' : '#0B0D1A', fontSize: 11, fontWeight: 700, fontFamily: 'var(--mono)' }} onClick={() => playLoop(m - 1, m + 1)}>{mnum(m)}</button>;
+              return <button key={m} aria-label={`${cellName(m)}: ${Math.round(v * 100)}%`} title={`${cellName(m)} · ${Math.round(v * 100)}%`} style={{ background: bg, color: bg === '#1D4F63' ? '#EEF0FF' : '#0B0D1A', fontSize: 11, fontWeight: 700, fontFamily: 'var(--mono)' }} onClick={() => playLoop(m - 1, m + 1)}>{cellText(m)}</button>;
             })}
           </div>
           <div className="row tiny muted" style={{ gap: 14 }}>
@@ -281,7 +286,10 @@ export function Results() {
             </button>
           )
         ) : speakerRun ? (
-          <button className="btn primary block" data-testid="again-headphones" onClick={() => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, level: lr.level, mode: lr.mode })}>
+          <button className="btn primary block" data-testid="again-headphones" onClick={() => {
+            saveProfile({ ...loadProfile(), headphones: true }); // what the button says
+            goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, level: lr.level, mode: lr.mode });
+          }}>
             <IconPlay size={18} /> Sing it again with headphones on
           </button>
         ) : nextFix ? (
@@ -450,6 +458,9 @@ function WordsResults({ lr, words }: { lr: NonNullable<ReturnType<typeof getLast
   const pct = Math.round(res.accuracy * 100);
   const inTime = res.syllables.filter((x) => x.grade === 'perfect' || x.grade === 'good').length;
   const mnum = (i: number) => piece.score.measures[i]?.number ?? String(i + 1);
+  // A pickup bar numbered 0 is "Upbeat" (as in section and wrong-note labels): "Up" in the strip.
+  const cellText = (i: number) => (i === 0 && mnum(i) === '0' ? 'Up' : mnum(i));
+  const cellName = (i: number) => (i === 0 && mnum(i) === '0' ? 'Upbeat' : `Bar ${mnum(i)}`);
   const measureIdx = Object.keys(res.perMeasure).map(Number).sort((a, b) => a - b);
   const nextStage = words.counted && words.stage < 2 && res.accuracy >= WORDS_PASS ? ((words.stage + 1) as WordsStage) : null;
   // The words screen opens at the next step that isn't passed yet.
@@ -497,7 +508,7 @@ function WordsResults({ lr, words }: { lr: NonNullable<ReturnType<typeof getLast
           {measureIdx.map((m) => {
             const v = res.perMeasure[m];
             const bg = v >= 0.85 ? '#4CC9F0' : v >= 0.6 ? '#1D4F63' : '#FF7A45';
-            return <span key={m} aria-label={`Bar ${mnum(m)}: ${Math.round(v * 100)}%`} style={{ background: bg, height: 30, borderRadius: 3, color: bg === '#1D4F63' ? '#EEF0FF' : '#0B0D1A', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--mono)' }}>{mnum(m)}</span>;
+            return <span key={m} aria-label={`${cellName(m)}: ${Math.round(v * 100)}%`} style={{ background: bg, height: 30, borderRadius: 3, color: bg === '#1D4F63' ? '#EEF0FF' : '#0B0D1A', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--mono)' }}>{cellText(m)}</span>;
           })}
         </div>
       )}
