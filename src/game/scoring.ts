@@ -613,7 +613,7 @@ export class LiveScorer {
       // tracker's octave error on "oo", see OCTAVE_UP_HZ).
       else if (unsure === 'short' && grade === 'miss' && shortDev !== null && Math.abs(shortDev) >= CLEAR_OFF_TOL * tolN
         && !(shortDev < SUBHARMONIC_HIGH && shortDev > SUBHARMONIC_LOW)
-        && !(w.lowForOctave && Math.abs(shortDev - 1200) <= tolN)) clearly = 'off';
+        && !(w.lowForOctave && Math.abs(shortDev - 1200) < CLEAR_OFF_TOL * tolN)) clearly = 'off';
     }
     const scoopMed = median(a.scoopDevs);
     // A scoop is a glide INTO the note: the body must end up clearly closer to the target than the

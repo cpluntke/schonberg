@@ -214,6 +214,19 @@ describe('level 1: what the scorer can’t judge reliably', () => {
     expect(noteVerdict(up.notes[4])).toBe('wrong');
   });
 
+  it('a short low note read an octave up and a little sharp is still let off (the tracker, not the singer)', () => {
+    // A bass line below 200 Hz: the tracker's octave error on "oo" can come with the note sung a bit sharp.
+    const low = makePart('B', [[43, 1], [45, 1], [47, 0.1], [48, 0.1], [50, 0.1], [48, 0.1], [47, 1], [45, 1]], 60);
+    const lctx: ScoringContext = { score: makeScore([low], 60), part: low, range: [0, low.notes.length - 1] };
+    for (const cents of [0, 40, 60, 70]) {
+      const r = scoreAttempt(lctx, sampleSinging(low, (n, _t, i) => n.midi + (i === 4 ? 12 + cents / 100 : 0), 0.01), L1);
+      expect(noteVerdict(r.notes[4]), `octave up +${cents}¢`).not.toBe('wrong');
+    }
+    // A clearly wrong note on the same short low note still fails.
+    const r = scoreAttempt(lctx, sampleSinging(low, (n, _t, i) => n.midi + (i === 4 ? 7 : 0), 0.01), L1);
+    expect(noteVerdict(r.notes[4])).toBe('wrong');
+  });
+
   it('a "doo" on every note (a short unvoiced "d" before each vowel) still scores every note', () => {
     // 25 ms without voice at the start of every note (the "d"), the vowel on pitch after it.
     const r = score((i, t) => (t < 0.025 ? null : part.notes[i].midi));
