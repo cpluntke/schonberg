@@ -12,6 +12,7 @@ export interface WordsProgress {
 }
 
 const key = (pieceId: string, partId: string) => `sh:words:${pieceId}:${partId}`;
+export const wordsKey = key;
 const isMap = (v: unknown) => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 export function getWords(pieceId: string, partId: string): Record<string, WordsProgress> {

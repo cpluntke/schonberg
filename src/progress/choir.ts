@@ -18,6 +18,8 @@ export interface ChoirInfo {
   leads: string[];
   /** The first version's shared admin / section-lead passwords can still become personal accounts. */
   legacyLogin?: boolean;
+  /** Singers may make their own member account (an admin can close this). */
+  signupsOpen?: boolean;
 }
 
 export class ChoirApiError extends Error {
@@ -78,8 +80,8 @@ async function call<T>(path: string, init: RequestInit & { auth?: Auth; member?:
   if (!res.ok) {
     // The server ended this session (expired, logged out elsewhere, account removed): forget it here too.
     if (res.status === 401 && auth && 'bearer' in auth && loadSession()?.token === auth.bearer) {
-      logoutNotice = LOGGED_OUT_ELSEWHERE;
-      saveSession(null);
+      const b = body as { reason?: string; error?: string } | null;
+      endSession(b?.reason, b?.error);
     }
     throw new ChoirApiError(res.status, (body as { error?: string } | null)?.error ?? `Server error (${res.status})`);
   }
@@ -197,7 +199,10 @@ export interface SectionView {
 }
 export const fetchSection = (code: string, voice: string, auth: Auth) => call<SectionView>(`/choirs/${enc(code)}/section/${voice}`, { auth });
 
-/** Share my per-bar progress with my section lead (opt-in). */
+/**
+ * Share my per-bar progress with my section lead (opt-in). Logged in to the choir, the entry is the
+ * account's (under its name, from any phone); this phone's anonymous entry moves to it.
+ */
 export function shareProgress(code: string, name: string, voice: string, pieces: Record<string, { readiness: number; level: number; bars: BarMap }>) {
   const body: Record<string, { readiness: number; level: number; bars: Record<string, number> }> = {};
   for (const [id, p] of Object.entries(pieces)) {
@@ -205,17 +210,23 @@ export function shareProgress(code: string, name: string, voice: string, pieces:
     for (const [m, s] of Object.entries(p.bars)) bars[m] = Math.round(s.ema * 100) / 100;
     body[id] = { readiness: p.readiness, level: p.level, bars };
   }
-  return call(`/choirs/${enc(code)}/progress/${enc(name)}`, { method: 'PUT', member: true, ...json({ voice, pieces: body }) });
+  const s = sessionFor(code);
+  return call<{ ok: boolean; name?: string }>(`/choirs/${enc(code)}/progress/${enc(s?.account.name ?? name)}`,
+    { method: 'PUT', member: true, ...(s ? { auth: sessionAuth(s) } : {}), ...json({ voice, pieces: body }) });
 }
-export const withdrawProgress = (code: string, name: string) => call(`/choirs/${enc(code)}/progress/${enc(name)}`, { method: 'DELETE', member: true });
+export function withdrawProgress(code: string, name: string) {
+  const s = sessionFor(code);
+  return call(`/choirs/${enc(code)}/progress/${enc(s?.account.name ?? name)}`, { method: 'DELETE', member: true, ...(s ? { auth: sessionAuth(s) } : {}) });
+}
 
 // ------------------------------------------------------------------ accounts (admins and section leads)
 
-export type Role = 'admin' | 'lead';
+/** admin and lead come from invite links; member = a singer's own account (made with the choir code). */
+export type Role = 'admin' | 'lead' | 'member';
 export interface Account {
   id: string; name: string; role: Role; voices: string[]; createdAt: number; lastLoginAt?: number | null;
   /** How the account was made. */
-  invitedBy?: 'invite' | 'super admin' | 'old password';
+  invitedBy?: 'invite' | 'super admin' | 'old password' | 'sign-up';
 }
 export interface Session { token: string; code: string; choirName: string; account: Account; expiresAt: number }
 export interface InviteInfo {
@@ -228,16 +239,37 @@ export interface People {
   invites: InviteInfo[];
   legacy: { active: boolean; admin: boolean; leads: string[]; until: number | null };
   you: string | null;
+  signupsOpen?: boolean;
+  maxMembers?: number;
 }
 
 // Kept outside the `sh:` keys, so a login never ends up in a backup file someone shares.
 const SESSION_KEY = 'schonberg:session';
 const INVITES_KEY = 'schonberg:inviteLinks';
 const sessionListeners = new Set<() => void>();
-export const LOGGED_OUT_ELSEWHERE = 'You were logged out (password changed or account removed). Log in again.';
-let logoutNotice: string | null = null;
+export const LOGGED_OUT_ELSEWHERE = 'You were logged out. Log in again.';
+/** Why this phone's login ended (kept until the next login, so Home and Settings can say so after a reload). */
+export interface LoggedOut { reason: string; message: string; code: string; name: string }
+const LOGGED_OUT_KEY = 'schonberg:loggedOut';
+function setLoggedOut(v: LoggedOut | null): void {
+  if (v) rawSet(LOGGED_OUT_KEY, JSON.stringify(v));
+  else rawRemove(LOGGED_OUT_KEY);
+}
+export function lastLogout(): LoggedOut | null {
+  try {
+    const v = JSON.parse(rawGet(LOGGED_OUT_KEY) ?? 'null');
+    return v && typeof v.message === 'string' && typeof v.code === 'string' ? v as LoggedOut : null;
+  } catch {
+    return null;
+  }
+}
 /** Why this phone's login ended without the person logging out here (shown until they log in again). */
-export const loggedOutNotice = () => logoutNotice;
+export const loggedOutNotice = () => lastLogout()?.message ?? null;
+/** The singer read why they were logged out. */
+export function dismissLogout(): void {
+  setLoggedOut(null);
+  sessionListeners.forEach((cb) => { try { cb(); } catch { /* ignore */ } });
+}
 export function onSessionChange(cb: () => void): () => void {
   sessionListeners.add(cb);
   return () => { sessionListeners.delete(cb); };
@@ -246,7 +278,7 @@ export function onSessionChange(cb: () => void): () => void {
 const isSession = (v: unknown): v is Session => {
   const s = v as Session | null;
   return !!s && typeof s.token === 'string' && typeof s.code === 'string' && typeof s.expiresAt === 'number'
-    && !!s.account && typeof s.account.name === 'string' && (s.account.role === 'admin' || s.account.role === 'lead') && Array.isArray(s.account.voices);
+    && !!s.account && typeof s.account.name === 'string' && (s.account.role === 'admin' || s.account.role === 'lead' || s.account.role === 'member') && Array.isArray(s.account.voices);
 };
 
 /** This phone's login (an admin's or section lead's session token, never the password). */
@@ -272,10 +304,31 @@ export function sessionFor(code: string | undefined | null): Session | null {
 }
 export const sessionAuth = (s: Session): Auth => ({ bearer: s.token });
 
+/**
+ * The server ended this phone's login. `reason` (from the server): 'expired', 'password', 'replaced',
+ * 'logout' — the singer just logs in again, and sharing and progress sync resume with the account
+ * (until then sharing pauses rather than going anonymous); 'removed' (by an admin) or 'deleted' (by
+ * the singer) — the account is gone, so sharing stops and this phone forgets the account.
+ */
+export function endSession(reason?: string, message?: string): void {
+  const gone = reason === 'removed' || reason === 'deleted';
+  const s = loadSession();
+  setLoggedOut(reason === 'deleted' || !s ? null
+    : { reason: reason || 'expired', message: message || LOGGED_OUT_ELSEWHERE, code: s.code, name: s.account.name });
+  if (gone) {
+    const p = loadProfile();
+    if (p.shareProgress) saveProfile({ ...p, shareProgress: false });
+    // The account this phone's progress went with (src/progress/sync.ts): forgotten.
+    rawRemove('schonberg:syncMeta');
+    rawRemove('schonberg:syncAsk');
+  }
+  saveSession(null);
+}
+
 /** Use a new login; a different one this phone had (maybe another choir) is ended on the server too. */
 function adoptSession(s: Session): void {
   const old = loadSession();
-  logoutNotice = null;
+  setLoggedOut(null);
   saveSession(s);
   if (old && old.token !== s.token) void call('/session', { method: 'DELETE', auth: { bearer: old.token } }).catch(() => {});
 }
@@ -288,7 +341,7 @@ export async function login(code: string, name: string, password: string): Promi
 /** Log out on this phone (the server forgets the session too). */
 export async function logout(): Promise<void> {
   const s = loadSession();
-  logoutNotice = null;
+  setLoggedOut(null);
   saveSession(null);
   if (s) await call('/session', { method: 'DELETE', auth: { bearer: s.token } }).catch(() => {});
 }
@@ -306,7 +359,7 @@ export async function refreshSession(): Promise<Session | null> {
   }
 }
 let lastRefresh = 0;
-export function _resetSessionStateForTests(): void { lastRefresh = 0; logoutNotice = null; }
+export function _resetSessionStateForTests(): void { lastRefresh = 0; setLoggedOut(null); }
 /** refreshSession at most every 20 s (on opening an admin or section screen, and when the app comes back). */
 export function refreshSessionSoon(): void {
   const now = Date.now();
@@ -336,6 +389,22 @@ export async function acceptInvite(token: string, name: string, password: string
   const s = await call<Session>('/invites/accept', { method: 'POST', ...json({ token, name, password }) });
   adoptSession(s);
   return s;
+}
+/** A singer makes their own account in their choir (the choir code is enough, no invite). */
+export async function signUp(code: string, name: string, password: string): Promise<Session> {
+  const s = await call<Session>(`/choirs/${enc(code.toLowerCase())}/members`, { method: 'POST', ...json({ name, password }) });
+  adoptSession(s);
+  return s;
+}
+/** A member deletes their own account and the progress it kept. */
+export async function deleteMyAccount(password: string): Promise<void> {
+  const s = loadSession();
+  if (!s) throw new ChoirApiError(401, 'Log in first');
+  await call('/session/account', { method: 'DELETE', auth: { bearer: s.token }, ...json({ password }) });
+  endSession('deleted');
+  // An anonymous entry this phone shared before the account (if any) goes too.
+  const p = loadProfile();
+  if (p.choirCode && p.name.trim()) void withdrawProgress(p.choirCode, p.name.trim()).catch(() => {});
 }
 /** Turn the first version's shared admin or section-lead password into my own account. */
 export async function claimAccount(code: string, oldPassword: string, name: string, password: string): Promise<Session> {
@@ -381,15 +450,43 @@ export async function resetPerson(code: string, auth: Auth, id: string): Promise
   rememberInvite(r.invite, r.token);
   return r;
 }
+/** Open or close self sign-up of member accounts. */
+export const setSignupsOpen = (code: string, auth: Auth, open: boolean) =>
+  call<People>(`/choirs/${enc(code)}/members/settings`, { method: 'PUT', auth, ...json({ open }) });
+/** Remove the member accounts made since `since` (ms), with their progress (a flood of fake sign-ups). */
+export const removeMembersSince = (code: string, auth: Auth, since: number) =>
+  call<People & { removed: number }>(`/choirs/${enc(code)}/members?since=${since}`, { method: 'DELETE', auth });
 export const retireOldPasswords = (code: string, auth: Auth) => call<People>(`/choirs/${enc(code)}/legacy`, { method: 'DELETE', auth });
 
 // ------------------------------------------------------------------ super admin
 
+/** One choir's storage (scores against the per-choir cap, shared progress, members sharing it). */
+export interface ChoirUsage {
+  scoresBytes: number; progressBytes: number; accountProgressBytes?: number; bytes: number; capBytes: number; pieces: number; maxPieces: number;
+  /** Singers sharing progress with their section lead. */
+  members: number;
+  accounts?: number; memberAccounts?: number; savedProgress?: number;
+  /** All Schönberg data on the server (admins' view). */
+  server?: { totalBytes: number; capBytes: number };
+}
+/** All Schönberg data on the server, and the progress kept with accounts. */
+export interface ServerUsage {
+  totalBytes: number; capBytes: number;
+  accountProgress: { count: number; bytes: number; capBytes: number };
+}
 export interface ChoirSummary {
   code: string; name: string; pieces: number; createdAt: number; hasAdmin: boolean; programme: string | null; leads: string[]; members: number;
   admins: string[]; people: number; invites: number; legacy: boolean;
+  usage?: ChoirUsage;
 }
-export const superList = (pw: string) => call<{ choirs: ChoirSummary[] }>('/super/choirs', { auth: { superAdmin: pw } });
+export const superList = (pw: string) => call<{ choirs: ChoirSummary[]; usage?: ServerUsage }>('/super/choirs', { auth: { superAdmin: pw } });
+export const fetchChoirUsage = (code: string, auth: Auth) => call<ChoirUsage>(`/choirs/${enc(code)}/usage`, { auth });
+/** "740 KB" below 1 MB, else "12.3 MB" (one decimal below 10 MB). */
+export function mb(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
+  const v = bytes / (1024 * 1024);
+  return `${v < 10 ? v.toFixed(1) : Math.round(v)} MB`;
+}
 /** Creates the choir and an invite link for its first admin. */
 export async function superCreate(pw: string, code: string, name: string, adminNote: string): Promise<{ code: string; name: string; token: string; invite: InviteInfo }> {
   const r = await call<{ code: string; name: string; token: string; invite: InviteInfo }>('/super/choirs', { method: 'POST', auth: { superAdmin: pw }, ...json({ code, name, adminNote }) });
@@ -399,6 +496,9 @@ export async function superCreate(pw: string, code: string, name: string, adminN
 export const superRename = (pw: string, code: string, name: string) =>
   call(`/super/choirs/${enc(code)}`, { method: 'PUT', auth: { superAdmin: pw }, ...json({ name }) });
 export const superDelete = (pw: string, code: string) => call(`/super/choirs/${enc(code)}`, { method: 'DELETE', auth: { superAdmin: pw } });
+/** Remove a choir's member accounts nobody used for `days` days (with the progress they kept). */
+export const superPurgeMembers = (pw: string, code: string, days: number, dryRun = false) =>
+  call<{ removed: number; names: string[] }>(`/super/choirs/${enc(code)}/purge-members`, { method: 'POST', auth: { superAdmin: pw }, ...json({ days, dryRun }) });
 
 // ------------------------------------------------------------------ the super-admin password (this tab only)
 

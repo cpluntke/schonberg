@@ -3,6 +3,7 @@ import { _resetAllForTests, exportBackup, loadProfile, saveProfile } from './sto
 import {
   _resetSessionStateForTests, acceptInvite, createInvite, fetchPeople, inviteLink, leaveChoir, loadSession, loggedOutNotice, login, logout,
   LOGGED_OUT_ELSEWHERE, refreshSession, refreshSessionSoon, rememberedInvite, saveSession, sessionFor, superCreate, type Session,
+  signUp, shareProgress, deleteMyAccount, lastLogout, dismissLogout,
 } from './choir';
 import { parseHash, href } from '../ui/router';
 
@@ -124,7 +125,7 @@ describe('choir accounts client', () => {
 
   it('a login ended elsewhere (401) leaves a notice until the next login', async () => {
     saveSession(session());
-    mockFetch((url) => (url.endsWith('/login') ? { body: session({ token: 'tok-new-' + 'y'.repeat(40) }) } : { status: 401, body: { error: 'x', loggedOut: true } }));
+    mockFetch((url) => (url.endsWith('/login') ? { body: session({ token: 'tok-new-' + 'y'.repeat(40) }) } : { status: 401, body: { loggedOut: true } }));
     await expect(fetchPeople('kammerchor', { bearer: session().token })).rejects.toThrow();
     expect(loadSession()).toBeNull();
     expect(loggedOutNotice()).toBe(LOGGED_OUT_ELSEWHERE);
@@ -155,5 +156,82 @@ describe('choir accounts client', () => {
     refreshSessionSoon();
     await new Promise((r) => setTimeout(r, 0));
     expect(calls.filter((c) => c.url === '/schonberg/api/session')).toHaveLength(1);
+  });
+
+  it('members sign up with the choir code (no invite) and their session is kept like any other', async () => {
+    const member = { ...account, id: 'm00000000001', name: 'Anna', role: 'member' as const };
+    mockFetch(() => ({ status: 201, body: { token: 'tok-' + 'm'.repeat(40), code: 'kammerchor', choirName: 'Kammerchor', account: member, expiresAt: Date.now() + 30 * DAY } }));
+    const s = await signUp('Kammerchor', 'Anna', 'password-123');
+    expect(calls[0].url).toBe('/schonberg/api/choirs/kammerchor/members');
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({ name: 'Anna', password: 'password-123' });
+    expect(loadSession()).toMatchObject({ token: s.token, account: { role: 'member' } });
+    expect(exportBackup()).not.toContain(s.token);
+    // Deleting the account forgets the session here too.
+    mockFetch(() => ({ body: { ok: true } }));
+    await deleteMyAccount('password-123');
+    expect(headers(calls[0]).Authorization).toBe(`Bearer ${s.token}`);
+    expect(loadSession()).toBeNull();
+  });
+
+  it('logged in, shared progress goes with the account (its name, the session) and still names this phone', async () => {
+    saveProfile({ ...loadProfile(), choirCode: 'kammerchor' });
+    mockFetch(() => ({ body: { ok: true, name: 'Anna' } }));
+    await shareProgress('kammerchor', 'Anni', 'A', {});
+    expect(calls[0].url).toBe('/schonberg/api/choirs/kammerchor/progress/Anni');
+    expect(headers(calls[0]).Authorization).toBeUndefined();
+    const tokenHeader = headers(calls[0])['X-Member-Token'];
+    expect(tokenHeader).toBeTruthy();
+    saveSession(session({ account: { ...account, id: 'm00000000001', name: 'Anna', role: 'member' } }));
+    await shareProgress('kammerchor', 'Anni', 'A', {});
+    expect(calls[1].url).toBe('/schonberg/api/choirs/kammerchor/progress/Anna');
+    expect(headers(calls[1]).Authorization).toMatch(/^Bearer /);
+    // The phone's token goes along once, so the server can move this phone's anonymous entry to the account.
+    expect(headers(calls[1])['X-Member-Token']).toBe(tokenHeader);
+  });
+
+  it('why a login ended: expired or password changed keep sharing (paused); removed turns it off and forgets the account', async () => {
+    const reasons: [string, string][] = [['expired', 'Your login has expired. Log in again.'], ['password', 'Your password was changed.'], ['removed', 'Your account was removed from this choir.']];
+    for (const [reason, error] of reasons) {
+      saveProfile({ ...loadProfile(), choirCode: 'kammerchor', shareProgress: true });
+      localStorage.setItem('schonberg:syncMeta', JSON.stringify({ account: 'a1b2c3d4e5f6', rev: 3 }));
+      saveSession(session());
+      mockFetch(() => ({ status: 401, body: { error, loggedOut: true, reason } }));
+      expect(await refreshSession()).toBeNull();
+      expect(loadSession()).toBeNull();
+      expect(loggedOutNotice()).toBe(error);
+      const gone = reason === 'removed';
+      expect(loadProfile().shareProgress).toBe(!gone);
+      expect(localStorage.getItem('schonberg:syncMeta') === null).toBe(gone);
+    }
+  });
+
+  it('deleting my account turns sharing off and withdraws an anonymous entry', async () => {
+    saveProfile({ ...loadProfile(), name: 'Anna', choirCode: 'kammerchor', shareProgress: true });
+    saveSession(session({ account: { ...account, role: 'member' } }));
+    mockFetch(() => ({ body: { ok: true } }));
+    await deleteMyAccount('password-123');
+    expect(loadProfile().shareProgress).toBe(false);
+    expect(loadSession()).toBeNull();
+    expect(loggedOutNotice()).toBeNull();
+    await new Promise((r) => setTimeout(r, 0));
+    const w = calls.find((c) => c.url.endsWith('/progress/Anna'))!;
+    expect(w.init.method).toBe('DELETE');
+    expect(headers(w).Authorization).toBeUndefined();
+    expect(headers(w)['X-Member-Token']).toBeTruthy();
+  });
+
+  it('why the login ended is kept (for Home and Settings after a reload) until the next login or dismissal', async () => {
+    saveSession(session());
+    mockFetch((url) => (url.endsWith('/login') ? { body: session({ token: 'tok-new-' + 'z'.repeat(40) }) } : { status: 401, body: { error: 'Your login has expired. Log in again.', loggedOut: true, reason: 'expired' } }));
+    await refreshSession();
+    expect(lastLogout()).toEqual({ reason: 'expired', message: 'Your login has expired. Log in again.', code: 'kammerchor', name: 'Clara' });
+    expect(JSON.parse(localStorage.getItem('schonberg:loggedOut')!).name).toBe('Clara');
+    dismissLogout();
+    expect(lastLogout()).toBeNull();
+    saveSession(session());
+    await refreshSession();
+    expect(lastLogout()).not.toBeNull();
+    await login('kammerchor', 'Clara', 'password-123');
+    expect(lastLogout()).toBeNull();
   });
 });

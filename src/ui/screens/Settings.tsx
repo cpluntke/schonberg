@@ -10,6 +10,7 @@ import { effectiveTolerance } from '../../progress/ladder';
 import { NOTATIONS } from './Setup';
 import { noteLabel } from '../../game/notation';
 import { IntroVideoButton } from '../components/IntroVideo';
+import { AccountSync } from '../components/AccountSync';
 
 export function Settings() {
   const [profile, update] = useProfile();
@@ -209,9 +210,11 @@ export function Settings() {
         <button className="btn small" onClick={() => go({ name: 'diagnostics' })}>Diagnostics &amp; problem report</button>
       </section>
 
+      <AccountSync />
+
       <section className="col" style={{ gap: 8 }}>
-        <h2 className="eyebrow">Backup</h2>
-        <span className="small muted">Your progress lives on this device. Save a backup to move it to another phone (imported scores need to be imported again).</span>
+        <h2 className="eyebrow">Backup file (without a choir account)</h2>
+        <span className="small muted">Without a choir account your progress lives only on this device. A backup file keeps everything, including your full practice history, to move it to another phone yourself (imported scores need to be imported again).</span>
         <div className="row">
           <button className="btn small grow" onClick={download}>Save backup file</button>
           <button className="btn small grow" onClick={() => fileRef.current?.click()}>Restore from file</button>
@@ -228,7 +231,7 @@ export function Settings() {
       </section>
 
       <section className="col small muted" style={{ gap: 4 }}>
-        <span>Schönberg Hero · runs entirely on your device.</span>
+        <span>Schönberg Hero · your practice stays on this device. Only your choir's leaderboard, the progress you share with your section lead and, with a choir account, the progress kept with it (above) reach the choir server.</span>
         <span>Built-in scores: public-domain editions from the PDMX dataset (MuseScore community, CC BY 4.0 dataset) and original study pieces.</span>
       </section>
     </main>

@@ -131,4 +131,12 @@ export async function saveImportedScore(s: Score): Promise<void>;
 export async function loadImportedScores(): Promise<Score[]>;
 export async function deleteImportedScore(id: string): Promise<void>;
 export function exportBackup(): string; export function importBackup(json: string): void;
+// progress/sync.ts  (progress kept with a choir account on the server, ≤ ~8 KB: levels, bests, dates,
+// to-fix lists, off-book days, a 6-bit-per-bar summary, settings, programme; never the attempt log or
+// recordings. Any account syncs: members sign up with the choir code (choir.ts signUp), leads/admins via
+// invites. Start/focus: a revision check picks up other phones' saves; after runs within 10 s, on page
+// hide with keepalive. Merging never lowers anything; a phone with progress under another name asks first.)
+export function buildSnapshot(): { data: ProgressSnapshot; hash: string; bytes: number };
+export function applySnapshot(d: unknown): ApplyResult;
+export function uploadProgress(force?: boolean, auto?: boolean): Promise<…>; export function syncProgressSoon(): void;
 ```
