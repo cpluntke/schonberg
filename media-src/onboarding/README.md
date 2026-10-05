@@ -1,11 +1,11 @@
 # Onboarding video source
 
 `public/media/onboarding.{mp4,webm,jpg}` are rendered from these files: a two-voice dialogue
-(Nora = coach, Ben = singer) over animated app screenshots. Current cut: about 2:26 (146 s),
+(Nora = coach, Ben = singer) over animated app screenshots. Current cut: about 2:29 (149 s),
 scenes A title · B voice setup (choir code, range check, delay) · C practice screen (score
 view with a zoom on a flat note, the Score/Highway toggle, the highway, a laptop showing the full
 choir score, the ± cents bubble in every view) · D sections, the level ladder (5 levels) and
-"Sing it all" (a piece level = the whole piece in one go; a section that slips is "to fix";
+"Sing it all" (level 1 on “doo”, every note right; a piece level = the whole piece in one go; a section that slips is "to fix";
 know it already? sing it all at any level) · E coach notes · F Home · G "try it now" checklist.
 
 1. `script.json`: the dialogue (`say` = spoken text, `show` = subtitle, `scene` = visual group).

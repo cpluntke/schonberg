@@ -1,0 +1,221 @@
+// Level 1 (note-learning, sung on "doo"): every note must be right (docs/LEVELS.md). Notes the
+// scorer can't judge reliably (NoteResult.unsure) are forgiven below "good", unless the tracker
+// clearly heard them wrong (NoteResult.clearly).
+import { beforeEach, describe, expect, it } from 'vitest';
+import { TRACKER_HIGH_HZ, TRACKER_LOW_HZ, scoreAttempt, type ScoringContext } from '../game/scoring';
+import { MAX_HZ, MIN_HZ } from '../audio/pitch';
+import { makePart, makeScore, sampleSinging } from '../game/testutil';
+import type { AttemptResult, Grade, NoteResult, ScoringOptions } from '../game/types';
+import type { Section } from '../music/types';
+import { LEVELS, attemptPasses, levelSpec, noteVerdict, passLabel, sectionChecks, sectionHeld, wrongNotes, nextStep } from './ladder';
+import { _resetAllForTests, getProgress, recordAttempt, recordFullRun } from './store';
+
+const L1: ScoringOptions = { toleranceCents: 50, tuning: 'equal', octaveTolerant: false };
+const GV: Record<Grade, number> = { perfect: 1, good: 0.85, ok: 0.5, miss: 0 };
+
+type N = Partial<NoteResult> & { grade: Grade };
+/** A result with these notes (index = position), accuracy as the app computes it. */
+function result(notes: N[]): AttemptResult {
+  const ns = notes.map((n, index) => ({
+    index, cents: 0, hitRatio: 1, voicedRatio: 1, onsetMs: 20, drift: null, scoop: null, targetOffset: 0, points: 0, ...n,
+  })) as NoteResult[];
+  const accuracy = ns.length ? ns.reduce((a, n) => a + GV[n.grade], 0) / ns.length : 0;
+  return {
+    accuracy, pitch: accuracy, rhythm: 1, score: Math.round(accuracy * 1000), maxCombo: 0,
+    counts: { perfect: 0, good: 0, ok: 0, miss: 0 }, notes: ns, perMeasure: {}, insights: [],
+  };
+}
+const good = (k: number): N[] => Array.from({ length: k }, (_, i) => ({ grade: i % 3 ? 'perfect' : 'good' }));
+
+beforeEach(() => { localStorage.clear(); _resetAllForTests(); });
+
+describe('level 1: the rule', () => {
+  it('level 1 is sung on "doo" and needs every note; the other levels keep their percentage', () => {
+    expect(LEVELS.map((l) => [l.level, l.everyNote, l.doo])).toEqual([[1, true, true], [2, false, false], [3, false, false], [4, false, false], [5, false, false]]);
+    expect(passLabel(levelSpec(1))).toBe('every note right');
+    expect(passLabel(levelSpec(2))).toBe('80%');
+    expect(levelSpec(1).description).toMatch(/doo/);
+    expect(levelSpec(2).description).toMatch(/words/);
+  });
+
+  it('all notes right passes', () => {
+    expect(attemptPasses(1, result(good(12)))).toBe(true);
+    expect(recordAttempt('p', 'S', 's0', 1, result(good(12)))).toMatchObject({ passed: true, newLevel: 1 });
+  });
+
+  it('one flat note fails, however high the accuracy', () => {
+    const r = result([...good(19), { grade: 'miss', cents: -70, hitRatio: 0 }]);
+    expect(r.accuracy).toBeGreaterThan(0.85); // the old 75% rule would pass it
+    expect(attemptPasses(1, r)).toBe(false);
+    expect(wrongNotes(r).map((n) => n.index)).toEqual([19]);
+    expect(recordAttempt('p', 'S', 's0', 1, r)).toMatchObject({ passed: false, newLevel: 0 });
+    // An "ok" note (partly in tune) isn't right either.
+    expect(attemptPasses(1, result([...good(19), { grade: 'ok', cents: -30, hitRatio: 0.4 }]))).toBe(false);
+    // Level 2 keeps its percentage: one weak note in twenty is fine there.
+    expect(attemptPasses(2, r)).toBe(true);
+  });
+
+  it('a short or unreliable note that is "ok" (or an unclear miss) is forgiven', () => {
+    expect(noteVerdict({ grade: 'ok', unsure: 'short' })).toBe('forgiven');
+    expect(noteVerdict({ grade: 'ok', unsure: 'range' })).toBe('forgiven');
+    // Too few readings to say what was sung (no `clearly`): forgiven too.
+    expect(noteVerdict({ grade: 'miss', unsure: 'short' })).toBe('forgiven');
+    expect(noteVerdict({ grade: 'good', unsure: 'short' })).toBe('right');
+    expect(noteVerdict({ grade: 'ok' })).toBe('wrong');
+    expect(attemptPasses(1, result([...good(10), { grade: 'ok', unsure: 'short', cents: 40, hitRatio: 0.4 }]))).toBe(true);
+  });
+
+  it('an exempt note the tracker clearly heard wrong fails', () => {
+    expect(noteVerdict({ grade: 'miss', unsure: 'short', clearly: 'off' })).toBe('wrong');
+    expect(noteVerdict({ grade: 'miss', unsure: 'short', clearly: 'silent' })).toBe('wrong');
+    expect(attemptPasses(1, result([...good(10), { grade: 'miss', unsure: 'short', clearly: 'off', cents: -100, hitRatio: 0 }]))).toBe(false);
+  });
+
+  it('the pass mark stays as a backstop: a run can’t pass on forgiven notes alone', () => {
+    const r = result([...good(4), ...Array.from({ length: 6 }, () => ({ grade: 'miss' as Grade, unsure: 'short' as const }))]);
+    expect(wrongNotes(r)).toEqual([]);
+    expect(attemptPasses(1, r)).toBe(false);
+  });
+});
+
+describe('level 1: what the scorer can’t judge reliably', () => {
+  // Quarter notes at 60 bpm, then a bar of 16ths at 150 bpm-equivalent (0.1 s), then quarters.
+  const part = makePart('A', [[60, 1], [62, 1], [64, 0.1], [65, 0.1], [67, 0.1], [65, 0.1], [64, 1], [62, 1]], 60);
+  const ctx: ScoringContext = { score: makeScore([part], 60), part, range: [0, part.notes.length - 1] };
+  const score = (sing: (i: number, t: number) => number | null, period = 0.01): AttemptResult =>
+    scoreAttempt(ctx, sampleSinging(part, (n, t, i) => sing(i, t), period), L1);
+
+  it('very short notes are flagged "short"; long notes are judged as usual', () => {
+    const r = score((i) => part.notes[i].midi);
+    expect(r.notes.map((n) => n.unsure ?? null)).toEqual([null, null, 'short', 'short', 'short', 'short', null, null]);
+    expect(r.notes.every((n) => n.grade === 'perfect' || n.grade === 'good')).toBe(true);
+    expect(attemptPasses(1, r)).toBe(true);
+  });
+
+  it('a short note sung a semitone off, heard clearly: a clear miss that fails level 1', () => {
+    const r = score((i) => part.notes[i].midi + (i === 4 ? -1 : 0));
+    expect(r.notes[4]).toMatchObject({ grade: 'miss', unsure: 'short', clearly: 'off' });
+    expect(wrongNotes(r).map((n) => n.index)).toEqual([4]);
+    expect(attemptPasses(1, r)).toBe(false);
+  });
+
+  it('a short note read wildly off (a tracker subharmonic, −27 semitones) is not a clear miss', () => {
+    const r = score((i) => part.notes[i].midi + (i === 4 ? -27.2 : 0));
+    expect(r.notes[4]).toMatchObject({ grade: 'miss', unsure: 'short' });
+    expect(r.notes[4].clearly).toBeUndefined();
+    expect(noteVerdict(r.notes[4])).toBe('forgiven');
+  });
+
+  it('a short note with no voice at all is "not sung", not forgiven', () => {
+    const r = score((i) => (i === 3 ? null : part.notes[i].midi));
+    expect(r.notes[3]).toMatchObject({ grade: 'miss', unsure: 'short', clearly: 'silent' });
+    expect(attemptPasses(1, r)).toBe(false);
+  });
+
+  it('a short note the tracker barely caught (one reading) is forgiven', () => {
+    // One reading in the middle of the note, a semitone off: too little to say what was sung.
+    const r = score((i, t) => (i === 5 ? (Math.abs(t - 0.05) < 0.006 ? part.notes[i].midi + 1 : null) : part.notes[i].midi));
+    expect(r.notes[5].unsure).toBe('short');
+    expect(r.notes[5].grade === 'perfect' || r.notes[5].grade === 'good').toBe(false);
+    expect(r.notes[5].clearly).toBeUndefined();
+    expect(noteVerdict(r.notes[5])).toBe('forgiven');
+    expect(attemptPasses(1, r)).toBe(true);
+  });
+
+  it('a long note sung flat is never forgiven', () => {
+    const r = score((i) => part.notes[i].midi + (i === 6 ? -0.7 : 0));
+    expect(r.notes[6].unsure).toBeUndefined();
+    expect(noteVerdict(r.notes[6])).toBe('wrong');
+    expect(attemptPasses(1, r)).toBe(false);
+  });
+
+  it('a written note outside the tracker’s range (60–1400 Hz) is flagged "range"', () => {
+    expect([TRACKER_LOW_HZ, TRACKER_HIGH_HZ]).toEqual([MIN_HZ, MAX_HZ]);
+    const deep = makePart('B', [[33, 1], [45, 1]], 60); // A1 (55 Hz), A2
+    const c: ScoringContext = { score: makeScore([deep], 60), part: deep, range: [0, 1] };
+    const r = scoreAttempt(c, sampleSinging(deep, () => null), L1);
+    expect(r.notes.map((n) => n.unsure ?? null)).toEqual(['range', null]);
+    expect(r.notes.map(noteVerdict)).toEqual(['forgiven', 'wrong']);
+  });
+
+  it('a note tied over the end of the section is judged on the part before the end', () => {
+    // The last note (4 beats) runs 2 s past the section's end at 6 s; playback and listening stop there.
+    const tied = makePart('A', [[60, 2], [62, 2], [64, 4]], 60);
+    const sc = makeScore([tied], 60);
+    const sung = sampleSinging(tied, (n, t) => (n.start + t < 6.1 ? n.midi : null));
+    const whole = scoreAttempt({ score: sc, part: tied, range: [0, 2] }, sung, L1);
+    const cut = scoreAttempt({ score: sc, part: tied, range: [0, 2], end: 6 }, sung, L1);
+    expect(noteVerdict(whole.notes[2])).toBe('wrong'); // judged on all 4 beats, half of which can't be heard
+    expect(noteVerdict(cut.notes[2])).toBe('right');
+    expect(attemptPasses(1, cut)).toBe(true);
+  });
+
+  it('a "doo" on every note (a short unvoiced "d" before each vowel) still scores every note', () => {
+    // 25 ms without voice at the start of every note (the "d"), the vowel on pitch after it.
+    const r = score((i, t) => (t < 0.025 ? null : part.notes[i].midi));
+    expect(r.notes.every((n) => noteVerdict(n) === 'right')).toBe(true);
+    expect(r.notes.slice(0, 2).every((n) => n.onsetMs != null && n.onsetMs < 60)).toBe(true);
+  });
+});
+
+describe('level 1: full runs', () => {
+  // Three 8-second sections, eight notes each (note i starts at second i).
+  const secs: Section[] = [0, 1, 2].map((i) => ({
+    id: `s${i}`, index: i, label: `Bars ${i * 4 + 1}–${i * 4 + 4}`, startMeasure: i * 4, endMeasure: i * 4 + 3, start: i * 8, end: i * 8 + 8,
+  }));
+  const noteStart = (i: number) => (i >= 0 && i < 24 ? i : undefined);
+
+  it('marks exactly the sections with a wrong note as to fix at level 1', () => {
+    const notes: N[] = good(24);
+    notes[3] = { grade: 'miss', cents: -80, hitRatio: 0 }; // s0: a flat long note
+    notes[13] = { grade: 'ok', unsure: 'short', hitRatio: 0.4 }; // s1: a short "ok" note, forgiven
+    notes[20] = { grade: 'miss', unsure: 'short', clearly: 'off', hitRatio: 0 }; // s2: clearly wrong
+    const r = recordFullRun('p', 'S', 1, result(notes), secs, noteStart, { counted: true });
+    expect(r.passed).toBe(false);
+    expect(r.overallPassed).toBe(false);
+    expect(r.toFix).toEqual(['s0', 's2']);
+    expect(r.sections.map((x) => [x.id, x.passed, x.wrong ?? []])).toEqual([['s0', false, [3]], ['s1', true, []], ['s2', false, [20]]]);
+    const prog = getProgress('p', 'S')!;
+    expect(prog.full?.toFix).toEqual({ 1: ['s0', 's2'] });
+    expect(prog.full?.level).toBe(0);
+    // The section that held is credited; the next step is fixing s0 at level 1.
+    expect(prog.sections.s1.level).toBe(1);
+    expect(nextStep(secs, prog)).toMatchObject({ sectionId: 's0', level: 1, kind: 'fix' });
+    expect(nextStep(secs, prog)!.reason).toMatch(/not every note was right/);
+    // s0 passes on its own (every note right): it comes off the list; s2 is still to fix.
+    expect(recordAttempt('p', 'S', 's0', 1, result(good(8))).fixed).toEqual([{ level: 1, remaining: 1 }]);
+    // A section attempt with a wrong note doesn't clear it.
+    expect(recordAttempt('p', 'S', 's2', 1, result([...good(7), { grade: 'miss', cents: 90, hitRatio: 0 }])).passed).toBe(false);
+    expect(getProgress('p', 'S')!.full?.toFix).toEqual({ 1: ['s2'] });
+  });
+
+  it('grants piece level 1 only when every section had every note right, in one go', () => {
+    expect(recordFullRun('p', 'S', 1, result(good(24)), secs, noteStart, { counted: false }).passed).toBe(false);
+    expect(getProgress('p', 'S')!.full?.level ?? 0).toBe(0);
+    const r = recordFullRun('p', 'S', 1, result(good(24)), secs, noteStart, { counted: true });
+    expect(r).toMatchObject({ counted: true, passed: true, newLevel: 1, toFix: [] });
+  });
+
+  it('the short-section slack doesn’t apply at level 1', () => {
+    // A 3-note section with one "ok" note: one weak note of slack holds it at level 2, not at level 1.
+    const short: Section[] = [{ id: 'a', index: 0, label: 'A', startMeasure: 0, endMeasure: 0, start: 0, end: 3 }];
+    const r = result([{ grade: 'perfect' }, { grade: 'ok', hitRatio: 0.4, cents: 20 }, { grade: 'perfect' }]);
+    const st = (i: number) => (i < 3 ? i : undefined);
+    const c2 = sectionChecks(short, st, r, 2).a;
+    const c1 = sectionChecks(short, st, r, 1).a;
+    expect(sectionHeld(2, c2)).toBe(true);
+    expect(c1.checked).toBeCloseTo(r.accuracy);
+    expect(c1.wrong).toEqual([1]);
+    expect(sectionHeld(1, c1)).toBe(false);
+  });
+
+  it('levels already earned are kept: a failed level-1 run never lowers anything', () => {
+    recordFullRun('p', 'S', 2, result(good(24)), secs, noteStart, { counted: true });
+    expect(getProgress('p', 'S')!.full?.level).toBe(2);
+    const notes = good(24);
+    notes[5] = { grade: 'miss', cents: -90, hitRatio: 0 };
+    const r = recordFullRun('p', 'S', 1, result(notes), secs, noteStart, { counted: true });
+    expect(r).toMatchObject({ passed: false, newLevel: 2, prevLevel: 2 });
+    expect(getProgress('p', 'S')!.sections.s0.level).toBe(2);
+  });
+});

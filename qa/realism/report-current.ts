@@ -251,6 +251,9 @@ export function writeCurrentReport(): boolean {
     L.push('');
   }
   if (fast) fastSection(L, fast);
+  const l1 = read('l1-doo');
+  const l1adv = read('l1-doo-adv');
+  if (l1 || l1adv) l1Section(L, l1 ?? [], l1adv);
   writeFileSync(resolve(ROOT, 'docs/qa/realism-current.md'), L.join('\n'));
   return true;
 }
@@ -260,6 +263,37 @@ const fastLost = (r: Any) => r.fast.ok + r.fast.miss;
 const pct1 = (x: number | null | undefined) => (x == null || !Number.isFinite(x) ? '–' : `${(x * 100).toFixed(1)}%`);
 
 /** Section 7: fast notes (cmp-fast.test.ts / fastnotes.ts). */
+/** Level 1 on "doo" with the every-note rule (cmp-l1-doo*.test.ts, qa/realism/l1doo.ts). */
+function l1Section(L: string[], cells: Any[], adv: Any | null): void {
+  L.push('## 8. Level 1 on “doo”: every note right (current app)');
+  L.push('');
+  L.push('Each good voice sings the six sections on the lyrics and on “doo” (a 20–45 ms “d” before every note, vowel “u”) at 70% tempo: calibrated (150 ms) and an uncalibrated phone (true 200 ms, first run). *new* = passes with every note right (ladder.attemptPasses; unreliable notes forgiven unless clearly wrong), *old* = accuracy ≥ 75%. *below good*: notes graded ok/miss, of which *forgiven* by the exemption; *wrong*: notes that failed the run (target · note · grade · cents).');
+  L.push('');
+  const row = (c: Any) => [c.singer, c.doo ? 'doo' : 'lyrics', c.latency, `${c.passes}/${c.runs}`, `${c.oldPasses}/${c.runs}`, pct(c.meanAcc), c.belowGood, c.forgiven,
+    c.wrong.length ? c.wrong.slice(0, 4).map((w: Any) => `${w.target} #${w.index} ${w.grade} ${w.cents ?? '–'}¢`).join('; ') + (c.wrong.length > 4 ? ` …+${c.wrong.length - 4}` : '') : '–',
+    f0(c.medOnsetMs)];
+  const head = ['singer', 'sung on', 'delay', 'new', 'old', 'acc', 'below good', 'forgiven', 'wrong notes', 'median onset ms'];
+  if (cells.length) L.push(table(head, cells.map(row)));
+  L.push('');
+  if (adv?.fast?.length) {
+    L.push('**Fast bars** (Debussy *Yver* 1–23, *Dieu* 1–5, Ravel *Nicolette* 20–45, synthetic 16ths at 104/144 bpm and 8ths at 144 bpm; good singer, calibrated):');
+    L.push('');
+    L.push(table(head, adv.fast.map(row)));
+    L.push('');
+  }
+  if (adv?.adversarial?.length) {
+    L.push('**Singers with wrong notes, on “doo”** (calibrated; runs passing level 1, new vs old rule):');
+    L.push('');
+    const by = new Map<string, Any[]>();
+    for (const r of adv.adversarial) by.set(r.singer, [...(by.get(r.singer) ?? []), r]);
+    L.push(table(['singer', 'new', 'old', 'mean acc', 'wrong / run', 'forgiven'], [...by].map(([s, rs]) => [
+      s, `${rs.filter((r: Any) => r.passed).length}/${rs.length}`, `${rs.filter((r: Any) => r.oldPassed).length}/${rs.length}`, pct(mean(rs.map((r: Any) => r.acc))),
+      f1(mean(rs.map((r: Any) => r.wrong))), rs.reduce((a: number, r: Any) => a + r.forgiven, 0),
+    ])));
+    L.push('');
+  }
+}
+
 function fastSection(L: string[], f: Any): void {
   const base = f.baseRef ? `\`${f.baseRef}\`` : '–';
   L.push('## 7. Fast notes (good singer, measured delay), before → after');

@@ -62,8 +62,8 @@
  {
   "sp": "N",
   "scene": "D",
-  "say": "Level one is slow, with your part playing. Level two, full tempo. Level three, you sing alone against the other voices. Level four, no note names, only the chord to start. Level five is off book: from memory, on two different days.",
-  "show": "Level 1: slow, with your part playing. Level 2: full tempo. Level 3: alone against the other voices. Level 4: no note names, only the chord to start. Level 5: off book, from memory, on two different days."
+  "say": "Level one is slow, on doo, with your part playing, and every note has to be right. Level two, full tempo, with the words. Level three, you sing alone against the other voices. Level four, no note names, only the chord to start. Level five is off book: from memory, on two different days.",
+  "show": "Level 1: slow, on “doo”, with your part playing; every note has to be right. Level 2: full tempo, with the words. Level 3: alone against the other voices. Level 4: no note names, only the chord to start. Level 5: off book, from memory, on two different days."
  },
  {
   "sp": "B",

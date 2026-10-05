@@ -2,7 +2,7 @@
 // Pure functions only: no storage access here.
 import type { Section } from '../music/types';
 import type { PieceProgress, SectionProgress } from './store';
-import type { AttemptResult } from '../game/types';
+import type { AttemptResult, NoteResult } from '../game/types';
 import { GRADE_VALUE } from '../game/scoring';
 
 export type LevelNumber = 1 | 2 | 3 | 4 | 5;
@@ -21,33 +21,75 @@ export interface LevelSpec {
   cue: 'note' | 'chord';
   /** Cents half-width (before the strictness factor). */
   tolerance: number;
-  /** Accuracy needed to pass (0..1). */
+  /**
+   * Accuracy needed to pass (0..1). At an every-note level it is only a backstop (a run can't pass on
+   * forgiven notes alone): there, every note must be right (`everyNote`).
+   */
   pass: number;
+  /**
+   * Every note must be right ("good" or better; notes the scorer can't judge reliably are forgiven
+   * unless clearly wrong, see noteVerdict). Replaces the percentage, and short sections get no slack.
+   */
+  everyNote: boolean;
+  /** Sung on "doo" instead of the words (the words are shown dimmed, for orientation). */
+  doo: boolean;
   description: string;
 }
 
 export const LEVELS: LevelSpec[] = [
   {
-    level: 1, name: 'Note-learning', rate: 0.7, guide: true, showNames: true, cue: 'note', tolerance: 50, pass: 0.75,
-    description: 'Slow tempo (70%) with your part playing and note names shown. Learn the notes.',
+    level: 1, name: 'Note-learning', rate: 0.7, guide: true, showNames: true, cue: 'note', tolerance: 50, pass: 0.75, everyNote: true, doo: true,
+    description: 'Slow tempo (70%), sung on “doo”, with your part playing and note names shown. Learn the notes: every note must be right.',
   },
   {
-    level: 2, name: 'In time', rate: 1.0, guide: true, showNames: true, cue: 'note', tolerance: 35, pass: 0.8,
-    description: 'Full tempo with your part still playing. Lock in rhythm and entries.',
+    level: 2, name: 'In time', rate: 1.0, guide: true, showNames: true, cue: 'note', tolerance: 35, pass: 0.8, everyNote: false, doo: false,
+    description: 'Full tempo, now with the words, your part still playing. Lock in rhythm and entries.',
   },
   {
-    level: 3, name: 'Independent', rate: 1.0, guide: false, showNames: true, cue: 'note', tolerance: 30, pass: 0.8,
+    level: 3, name: 'Independent', rate: 1.0, guide: false, showNames: true, cue: 'note', tolerance: 30, pass: 0.8, everyNote: false, doo: false,
     description: 'Your part is muted: sing against the other voices only. Rehearsal-ready.',
   },
   {
-    level: 4, name: 'Concert-ready', rate: 1.0, guide: false, showNames: false, cue: 'chord', tolerance: 25, pass: 0.85,
+    level: 4, name: 'Concert-ready', rate: 1.0, guide: false, showNames: false, cue: 'chord', tolerance: 25, pass: 0.85, everyNote: false, doo: false,
     description: 'No guide, no note names (lyrics only), starting chord only. Concert-ready.',
   },
   {
-    level: 5, name: 'Off book', rate: 1.0, guide: false, showNames: false, cue: 'chord', tolerance: 25, pass: 0.85,
+    level: 5, name: 'Off book', rate: 1.0, guide: false, showNames: false, cue: 'chord', tolerance: 25, pass: 0.85, everyNote: false, doo: false,
     description: 'From memory: your notes and words fade out as you learn them, while the other voices play. Passed off book on two different days = memorised.',
   },
 ];
+
+/** "every note" or "80%": what a level needs to pass, for the level cards and the pre-run card. */
+export function passLabel(spec: Pick<LevelSpec, 'pass' | 'everyNote'>): string {
+  return spec.everyNote ? 'every note right' : `${Math.round(spec.pass * 100)}%`;
+}
+
+/**
+ * At an every-note level (level 1): was this note right? 'right' = graded "good" or better.
+ * 'forgiven' = below "good", but the scorer can't judge the note reliably (NoteResult.unsure: a very
+ * short note, or a pitch outside the tracker's range) and didn't clearly hear it wrong
+ * (NoteResult.clearly: no voice at all, or a definite pitch clearly off). Else 'wrong'.
+ */
+export function noteVerdict(n: Pick<NoteResult, 'grade' | 'unsure' | 'clearly'>): 'right' | 'forgiven' | 'wrong' {
+  if (n.grade === 'perfect' || n.grade === 'good') return 'right';
+  return n.unsure && !n.clearly ? 'forgiven' : 'wrong';
+}
+
+/** The notes that weren't right (noteVerdict), in score order. */
+export function wrongNotes(result: Pick<AttemptResult, 'notes'>): NoteResult[] {
+  return result.notes.filter((n) => noteVerdict(n) === 'wrong').sort((a, b) => a.index - b.index);
+}
+
+/**
+ * Whether one attempt (a section, or a whole run overall) reaches the level's mark, before any
+ * timing check: the pass mark, and at an every-note level no wrong note.
+ */
+export function attemptPasses(level: number, result: Pick<AttemptResult, 'accuracy' | 'notes'>): boolean {
+  const spec = levelSpec(level);
+  const accuracy = Number.isFinite(result.accuracy) ? result.accuracy : 0;
+  if (accuracy < spec.pass) return false;
+  return !spec.everyNote || result.notes.every((n) => noteVerdict(n) !== 'wrong');
+}
 
 /** The highest level. Concert-ready (4) is the top of readiness; off book (5) is memorisation on top. */
 export const MAX_LEVEL = 5;
@@ -272,24 +314,30 @@ export const SHORT_SECTION_NOTES = 8;
 export const MIN_SECTION_SCORE = 0.5;
 
 /**
- * Each section's result within one run of the whole piece: its accuracy (shown), and the value the
- * pass mark is checked against. Short sections (fewer than SHORT_SECTION_NOTES judged notes) get
- * one note of slack: their weakest note counts as sung well, so a single "ok" can't fail a level.
+ * Each section's result within one run of the whole piece: its accuracy (shown), the value the pass
+ * mark is checked against, and its wrong notes (noteVerdict; counted at every level, decisive only at
+ * an every-note level). Short sections (fewer than SHORT_SECTION_NOTES judged notes) get one note of
+ * slack: their weakest note counts as sung well, so a single "ok" can't fail a level. Not at an
+ * every-note level (`level` 1): there every note counts.
  */
 export function sectionChecks(
   sections: Section[],
   noteStart: (index: number) => number | undefined,
   result: Pick<AttemptResult, 'notes'>,
-): Record<string, { accuracy: number; checked: number; notes: number }> {
+  level?: number,
+): Record<string, { accuracy: number; checked: number; notes: number; wrong: number[] }> {
   const vals = new Map<string, number[]>();
+  const wrong = new Map<string, number[]>();
   for (const n of result.notes) {
     const t = noteStart(n.index);
     if (t == null) continue;
     const sec = sections.find((s) => t >= s.start - 1e-6 && t < s.end - 1e-6);
     if (!sec) continue;
     vals.set(sec.id, [...(vals.get(sec.id) ?? []), GRADE_VALUE[n.grade]]);
+    if (noteVerdict(n) === 'wrong') wrong.set(sec.id, [...(wrong.get(sec.id) ?? []), n.index]);
   }
-  const out: Record<string, { accuracy: number; checked: number; notes: number }> = {};
+  const everyNote = level != null && levelSpec(level).everyNote;
+  const out: Record<string, { accuracy: number; checked: number; notes: number; wrong: number[] }> = {};
   for (const [id, v] of vals) {
     const sum = v.reduce((a, b) => a + b, 0);
     const accuracy = sum / v.length;
@@ -297,11 +345,17 @@ export function sectionChecks(
     // missed note is never forgiven). A one-note section sung "ok" therefore holds; one that's
     // missed doesn't. A section that got no real score in the run (under 50%) never holds.
     const weakest = Math.min(...v);
-    const slack = v.length < SHORT_SECTION_NOTES && weakest > 0 ? (sum - weakest + GRADE_VALUE.good) / v.length : accuracy;
+    const slack = !everyNote && v.length < SHORT_SECTION_NOTES && weakest > 0 ? (sum - weakest + GRADE_VALUE.good) / v.length : accuracy;
     const checked = accuracy < MIN_SECTION_SCORE ? accuracy : Math.max(accuracy, slack);
-    out[id] = { accuracy, checked, notes: v.length };
+    out[id] = { accuracy, checked, notes: v.length, wrong: (wrong.get(id) ?? []).sort((a, b) => a - b) };
   }
   return out;
+}
+
+/** A section held within a full run at `level` (see sectionChecks). */
+export function sectionHeld(level: number, check: { checked: number; wrong: number[] }): boolean {
+  const spec = levelSpec(level);
+  return check.checked >= spec.pass - 1e-9 && (!spec.everyNote || check.wrong.length === 0);
 }
 
 /** The full run is due for review: piece level ≥ 3 and the last passed full run is more than a week old. */
@@ -339,7 +393,7 @@ export function nextStep(sections: Section[], prog: PieceProgress | undefined, n
     const more = fix.sectionIds.length - 1;
     return {
       sectionId: fix.sectionIds[0], level: fix.level, kind: 'fix',
-      reason: `Fix ${label(fix.sectionIds[0])} at level ${fix.level}: it slipped in your full run.${more ? ` ${more} more to fix, then` : ' Then'} sing it all again.`,
+      reason: `Fix ${label(fix.sectionIds[0])} at level ${fix.level}: ${levelSpec(fix.level).everyNote ? 'not every note was right' : 'it slipped'} in your full run.${more ? ` ${more} more to fix, then` : ' Then'} sing it all again.`,
     };
   }
   // 2. Review the whole piece once a week.
@@ -402,7 +456,7 @@ export function nextStep(sections: Section[], prog: PieceProgress | undefined, n
   const target = Math.min(MAX_LEVEL, bestLevel + 1);
   const spec = levelSpec(target);
   const reason = bestLevel === 0
-    ? `Start ${best.label}: learn the notes at ${Math.round(spec.rate * 100)}% tempo.`
+    ? `Start ${best.label}: learn the notes on “doo” at ${Math.round(spec.rate * 100)}% tempo.`
     : target === 5
       ? `Everything is concert-ready. Now learn ${best.label} by heart.`
       : `${best.label} is your weakest section. Take it to ${spec.name}.`;

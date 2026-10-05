@@ -2,13 +2,43 @@
 
 Every piece is cut into short sections, and there are five levels (`src/progress/ladder.ts`):
 
-| Level | Name | Tempo | Your part plays | Note names | Start | Tolerance | Pass |
-|---|---|---|---|---|---|---|---|
-| 1 | Note-learning | 70% | yes | yes | your note | ±50¢ | 75% |
-| 2 | In time | 100% | yes | yes | your note | ±35¢ | 80% |
-| 3 | Independent | 100% | no | yes | your note | ±30¢ | 80% |
-| 4 | Concert-ready | 100% | no | no | chord only | ±25¢ | 85% |
-| 5 | Off book | 100% | no | hidden | chord only | ±25¢ | 85% |
+| Level | Name | Tempo | Sung on | Your part plays | Note names | Start | Tolerance | Pass |
+|---|---|---|---|---|---|---|---|---|
+| 1 | Note-learning | 70% | “doo” | yes | yes | your note | ±50¢ | every note right |
+| 2 | In time | 100% | the words | yes | yes | your note | ±35¢ | 80% |
+| 3 | Independent | 100% | the words | no | yes | your note | ±30¢ | 80% |
+| 4 | Concert-ready | 100% | the words | no | no | chord only | ±25¢ | 85% |
+| 5 | Off book | 100% | the words | no | hidden | chord only | ±25¢ | 85% |
+
+## Level 1: the notes, on “doo”
+
+Level 1 is for learning the notes, so it is sung on **“doo”**: the pre-run card says so, a small
+“on doo” tag sits by the words while you sing, and the words stay on screen, dimmed, for
+orientation. The words come in at level 2. (Words-in-rhythm and the lyrics quiz are separate and
+unchanged.) Nothing in the scoring uses the words: notes are judged on pitch and onset only, and
+“doo” suits the pitch tracker well (a voiced, steady “u”; the short “d” before each note is a gap
+the scorer already allows for, like any consonant).
+
+**Every note must be right** (`LevelSpec.everyNote`): a level-1 attempt passes only when every note
+is graded *good* or *perfect* (±50¢ at 70% tempo, the usual grades, see [SCORING.md](SCORING.md)).
+One flat note fails it, and Results says which: “Bar 5: note 3 was flat (−62¢)”, with a button to
+loop that bar slowly.
+
+- **Notes the app can't judge reliably are let off** (`ladder.noteVerdict`): a note below *good*
+  is forgiven when the scorer flags it as unsure (`NoteResult.unsure`): a **very short note** (its
+  judged part is under 0.15 s of score time, the notes the scorer already grades leniently because
+  the voice rarely settles and the tracker gets only a few readings), or a written pitch **outside
+  the tracker's range** (60–1400 Hz).
+- **…unless the tracker clearly heard it wrong** (`NoteResult.clearly`): a very short note with no
+  voice at all inside it (“not sung”), or one graded *miss* whose own readings were enough to judge
+  it (the same test the scorer uses for fast notes) with their median at least 1.5 tolerances off
+  (75¢ at level 1: a wrong note, not a wobble), but no more than 6 semitones off (further off is
+  the tracker locking onto a fraction of the pitch, not a sung note).
+- The 75% pass mark stays only as a backstop, so a run can't pass on forgiven notes alone. It only
+  matters when many notes are forgiven (good singers in the realism harness never reach it).
+- A note tied over the end of a section is judged on the part before the end, since playback and
+  listening stop there (`ScoringContext.end`; before, such a last note always read as missed).
+- Short sections get **no slack** at level 1 (the “one weak note” rule below is for levels 2–5).
 
 ## Section levels are practice steps
 
@@ -29,6 +59,9 @@ A piece reaches level N only through a **full run-through at level N**, in one g
   average grade of its notes). Sections with fewer than 8 notes get one weak note of slack (it counts as
   "good"), so a single "ok" note can't fail a level; a missed note is never forgiven. A section under 50% in the run never counts as held. The level is granted only when the run passes overall **and every
   section reaches the pass mark**.
+- **At level 1 every note of every section must be right** (as above; no slack). Any section with a
+  note that wasn't right is "to fix at level 1", and piece level 1 is granted only when every
+  section in the run had every note right.
 - A section below the pass mark is **"to fix at level N"**. Until it passes at level N (or higher)
   as a section on its own, a full run at level N can't count: the piece screen greys out that
   level's "Sing it all" button and lists the sections to fix. We chose locking over "you can run it
@@ -64,7 +97,12 @@ one day, the full run from memory again on a later day (day 2 of 2); the full ru
 a level above the piece's ("Level 3 in every section: confirm it with a full run-through"); else the
 weakest section. Home also offers "Know it already? Sing the whole piece at level N".
 
-## Singers who practised before piece levels
+## Singers who practised before piece levels (and before “doo”)
+
+Levels already earned are kept. Level 1 on “doo” with every note right applies to runs from now on:
+section and piece levels reached under the old 75% mark stay as they are, and nothing stored is
+rewritten (a full-run section record only gains the list of its wrong notes). Readiness and the
+leaderboard formula are unchanged.
 
 Their section levels stay as they were. Piece levels come only from full runs, so their pieces start
 at piece level 0. The piece screen says "Level 3 in every section. Confirm it with a full

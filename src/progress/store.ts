@@ -4,7 +4,7 @@
 import { get as idbGet, set as idbSet, del as idbDel, keys as idbKeys } from 'idb-keyval';
 import type { Score, Section, VoiceType } from '../music/types';
 import type { AttemptResult, TuningMode } from '../game/types';
-import { LEVELS, MAX_LEVEL, OFF_BOOK_DAYS, fixesBefore, fixListLocks, isDue, sectionChecks, type Strictness } from './ladder';
+import { MAX_LEVEL, OFF_BOOK_DAYS, attemptPasses, fixesBefore, fixListLocks, isDue, sectionChecks, sectionHeld, type Strictness } from './ladder';
 
 /** Structurally identical to game/notation.ts NotationMode. */
 export type NotationMode = 'letter' | 'fixed' | 'movable' | 'jianpu' | 'pc';
@@ -506,7 +506,8 @@ export function recordAttempt(
   if (lvl === 0) {
     sp.lastPracticed = now;
   } else {
-    passed = accuracy >= LEVELS[lvl - 1].pass && !extra.timingFail;
+    // The level's mark (level 1: every note right, see ladder.attemptPasses).
+    passed = attemptPasses(lvl, { accuracy, notes: result.notes ?? [] }) && !extra.timingFail;
     sp.attempts = (sp.attempts ?? 0) + 1;
     sp.best[lvl] = Math.max(sp.best[lvl] ?? 0, accuracy);
     sp.bestScore = { ...(sp.bestScore ?? {}) };
@@ -536,7 +537,13 @@ export function recordAttempt(
   };
 }
 
-export interface FullRunSection { id: string; accuracy: number; passed: boolean }
+export interface FullRunSection {
+  id: string;
+  accuracy: number;
+  passed: boolean;
+  /** Notes in the section that weren't right (ladder.noteVerdict; indices into the part's notes). */
+  wrong?: number[];
+}
 
 export interface FullRunRecord {
   /** The run counted (in one go, at the level's tempo, nothing pending to fix at this level). */
@@ -559,7 +566,8 @@ export interface FullRunRecord {
 
 /**
  * Record a run-through of the whole piece at `level` (docs/LEVELS.md). The piece level N is granted
- * only when a counted run passes overall AND every section within it reaches the level's pass mark.
+ * only when a counted run passes overall AND every section within it reaches the level's pass mark
+ * (level 1: every note of every section right).
  * Sections below the mark become "to fix at level N" and must pass on their own (recordAttempt)
  * before a full run at N counts again. Sections that passed within the run are credited like a
  * section pass. Level 5 (off book) needs passes on OFF_BOOK_DAYS different days; until then the
@@ -584,15 +592,18 @@ export function recordFullRun(
   const full: FullRunProgress = prog.full ?? { level: 0, best: {}, attempts: 0 };
   full.best ??= {};
   const lvl = Math.max(1, Math.min(MAX_LEVEL, Math.round(level) || 1));
-  const pass = LEVELS[lvl - 1].pass;
   const accuracy = Number.isFinite(result.accuracy) ? result.accuracy : 0;
   const score = Number.isFinite(result.score) ? result.score : 0;
   const prevLevel = full.level ?? 0;
-  const checks = sectionChecks(sections, noteStart, result);
+  const checks = sectionChecks(sections, noteStart, result, lvl);
   const runSections: FullRunSection[] = [...sections].sort((a, b) => a.index - b.index)
     .filter((s) => checks[s.id] != null)
-    .map((s) => ({ id: s.id, accuracy: checks[s.id].accuracy, passed: checks[s.id].checked >= pass - 1e-9 }));
-  const overallPassed = accuracy >= pass && !opts.timingFail;
+    .map((s) => ({
+      id: s.id, accuracy: checks[s.id].accuracy, passed: sectionHeld(lvl, checks[s.id]),
+      ...(checks[s.id].wrong.length ? { wrong: checks[s.id].wrong } : {}),
+    }));
+  // Level 1: every note of the whole run right (each section's wrong notes make it "to fix").
+  const overallPassed = attemptPasses(lvl, { accuracy, notes: result.notes ?? [] }) && !opts.timingFail;
   // Only fixes at the level being worked toward lock the run (ladder.fixTarget).
   const pending = fixesBefore(sections, prog, lvl);
   const blocked = opts.counted && pending.length > 0 ? pending : undefined;

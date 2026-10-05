@@ -171,7 +171,7 @@ function sceneC(t,A){const x=170,y=110,lx=560;
       text('the bubble: + sharp · − flat',lxp,by0+38,SERIF(24),C.muted);ctx.globalAlpha=1}}}
 
 /* D: sections, the level ladder (five levels), and "Sing it all" (the piece's level comes from a run in one go) */
-const LV=[['1','Note-learning','70% tempo · your part plays'],['2','In time','full tempo · your part plays'],['3','Independent','others only'],['4','Concert-ready','no note names · chord only'],['5','Off book','from memory · on two days']];
+const LV=[['1','Note-learning','70% tempo · on “doo” · every note right'],['2','In time','full tempo · words · your part plays'],['3','Independent','others only'],['4','Concert-ready','no note names · chord only'],['5','Off book','from memory · on two days']];
 const LVCOL=[C.cyan,C.cyan,C.orange,C.purple,C2.green];
 const SEGS=['Bars 1–5','Bars 6–13','Bars 14–21','Bars 22–29'];
 function sceneD(t,A){const x=150,y=110,bx=520;
@@ -184,7 +184,7 @@ function sceneD(t,A){const x=150,y=110,bx=520;
   callout(...P(130,42,x,y),560,190,'Sing it all','the whole piece in one go: earns the level',C.orange,c9*at(9,0.55,t));
   // level cards; on line 12 they get compact to make room for the run below
   const k=ramp(12,0,t,0.6),LVH=lerp(72,50,k),LVG=lerp(13,8,k),LVY=lerp(130,108,k),yOf=i=>LVY+i*(LVH+LVG);
-  LV.forEach((l,i)=>{const f=[0.0,0.17,0.27,0.51,0.75][i];const a=A*(lineIdx(t)>10?1:at(10,f,t));
+  LV.forEach((l,i)=>{const f=[0.0,0.28,0.41,0.6,0.78][i];const a=A*(lineIdx(t)>10?1:at(10,f,t));
     if(a<0.01)return;ctx.globalAlpha=a;const yy=yOf(i),bs=lerp(48,34,k);
     const col=LVCOL[i];ctx.fillStyle=C.panel;rr(bx,yy,500,LVH,lerp(16,12,k));ctx.fill();ctx.strokeStyle=col;ctx.lineWidth=2;rr(bx,yy,500,LVH,lerp(16,12,k));ctx.stroke();
     ctx.fillStyle=col;rr(bx+14,yy+(LVH-bs)/2,bs,bs,lerp(12,9,k));ctx.fill();text(l[0],bx+14+bs/2,yy+LVH/2+lerp(11,8,k),DISP(lerp(30,23,k)),C.paper,'center');

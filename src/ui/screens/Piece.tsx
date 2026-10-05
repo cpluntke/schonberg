@@ -5,7 +5,7 @@ import { entryNotes } from '../../game/drills';
 import { useProfile, useStoreVersion } from '../hooks';
 import { go, back } from '../router';
 import { getProgress, dueForReview } from '../../progress/store';
-import { LEVELS, OFF_BOOK_DAYS, pieceReadiness, nextStep, sectionStatus, levelSpec } from '../../progress/ladder';
+import { LEVELS, OFF_BOOK_DAYS, pieceReadiness, nextStep, sectionStatus, levelSpec, passLabel } from '../../progress/ladder';
 import { IconBack, IconEar, IconCube, IconPlay } from '../icons';
 import { voiceName } from './Home';
 import { PieceMap } from '../components/PieceMap';
@@ -152,7 +152,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
                   <strong>{l.name}</strong>
                   <span className="small muted">{l.description}</span>
                   <span className="tiny muted mono">
-                    {Math.round(l.rate * 100)}% tempo · {l.guide ? 'your part plays' : 'others only'} · {l.showNames ? 'note names' : 'lyrics only'} · ±{l.tolerance}¢ · pass {Math.round(l.pass * 100)}%
+                    {Math.round(l.rate * 100)}% tempo · {l.guide ? 'your part plays' : 'others only'} · {l.showNames ? 'note names' : 'lyrics only'}{l.doo ? ' · on “doo”' : ''} · ±{l.tolerance}¢ · pass: {passLabel(l)}
                   </span>
                 </div>
               </div>
@@ -190,7 +190,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
           {r.toFix.map((f) => (
             <div key={f.level} className="col" style={{ gap: 6 }} data-testid="to-fix">
               <span className="small" style={{ color: 'var(--accent-text)' }}>
-                <strong>To fix at level {f.level}</strong> (they slipped in your full run). Pass {f.sectionIds.length > 1 ? 'each' : 'it'} on {f.sectionIds.length > 1 ? 'its' : 'its'} own, then sing it all at level {f.level} again:
+                <strong>To fix at level {f.level}</strong> ({levelSpec(f.level).everyNote ? 'not every note was right in your full run' : 'they slipped in your full run'}). Pass {f.sectionIds.length > 1 ? 'each' : 'it'} on {f.sectionIds.length > 1 ? 'its' : 'its'} own, then sing it all at level {f.level} again:
               </span>
               <div className="row wrap" style={{ gap: 6 }}>
                 {f.sectionIds.map((id) => (

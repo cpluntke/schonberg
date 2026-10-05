@@ -52,6 +52,20 @@ export interface NoteResult {
   points: number;
   /** True when most of the note was sung in tune but in the wrong octave. */
   octave?: boolean;
+  /**
+   * The scorer can't judge this note reliably (absent = it can): 'short' = a very short note (body
+   * under 0.15 s of score time: the voice rarely settles and the tracker gets few readings, so it is
+   * graded leniently), 'range' = the written pitch is outside the pitch tracker's range (60–1400 Hz).
+   * Level 1 forgives such a note below "good" unless `clearly` says it was wrong (docs/LEVELS.md).
+   */
+  unsure?: 'short' | 'range';
+  /**
+   * An unsure note graded below "good" that the tracker still heard clearly wrong: 'silent' = no
+   * voice at all inside the written note; 'off' = graded miss, with enough of the note's own readings
+   * to judge it (shortNoteDev) and their median at least CLEAR_OFF_TOL tolerances off (but within
+   * 6 semitones: further off is the tracker locking onto a fraction of the pitch).
+   */
+  clearly?: 'off' | 'silent';
 }
 
 export type InsightKind =
