@@ -6,7 +6,13 @@ import { loadCycle, loadProfile, rawGet, rawRemove, rawSet, readJSON, saveCycle,
 import type { BarMap } from './bars';
 import type { SharedRange } from './insights';
 
-export interface ChoirPiece { id: string; title: string; composer: string; filename: string; uploadedAt: number; size: number }
+export interface ChoirPiece {
+  id: string; title: string; composer: string; filename: string; uploadedAt: number; size: number;
+  /** Added from the choir library: the piece's library id (also its id on the phone). */
+  libraryId?: string;
+  /** Edition / licence credit (library pieces). */
+  credit?: string;
+}
 export interface ChoirInfo {
   code: string;
   name: string;
@@ -42,6 +48,13 @@ export function apiBase(): string | null {
 
 /** Local id of a choir score (stable across phones). */
 export const choirPieceId = (code: string, serverId: string) => `choir-${code}-${serverId}`;
+const LIBRARY_ID = /^[a-z0-9][a-z0-9-]{1,60}$/;
+/**
+ * Local id of one of the choir's scores: a piece from the choir library keeps its library id (the id
+ * it had when it was built in, so earlier progress on it comes back); an uploaded score gets choirPieceId.
+ */
+export const localPieceId = (code: string, p: Pick<ChoirPiece, 'id' | 'libraryId'>) =>
+  p.libraryId && LIBRARY_ID.test(p.libraryId) ? p.libraryId : choirPieceId(code, p.id);
 
 /** Random id of this phone, so only this phone can update or withdraw the progress it shares. */
 export function memberToken(): string {
@@ -129,7 +142,7 @@ export function leaveChoir(): void {
  * Bring the phone up to date with the choir: download new scores (via `importFile`) and apply the
  * programme when the choir changed it. Returns what happened. Never throws on a bad connection.
  */
-export async function syncChoir(importFile: (name: string, data: ArrayBuffer, meta: { id: string; title: string; composer: string }) => Promise<void>,
+export async function syncChoir(importFile: (name: string, data: ArrayBuffer, meta: { id: string; title: string; composer: string; credit?: string; choir: string }) => Promise<void>,
   hasPiece: (id: string) => boolean,
   /** Pieces the singer imported on this phone: they stay in the cycle when the choir's programme arrives. */
   isOwnPiece: (id: string) => boolean = () => false): Promise<{ ok: boolean; newPieces: number; programme: boolean; error?: string }> {
@@ -146,13 +159,13 @@ export async function syncChoir(importFile: (name: string, data: ArrayBuffer, me
   let failed: string[] = [];
   try { failed = JSON.parse(localStorage.getItem('sh:choirBadScores') ?? '[]'); } catch { /* ignore */ }
   for (const p of info.pieces) {
-    const id = choirPieceId(info.code, p.id);
+    const id = localPieceId(info.code, p);
     // A score that didn't import once isn't downloaded again on every start.
     if (hasPiece(id) || failed.includes(id)) continue;
     try {
       const res = await fetch(`${apiBase()}/choirs/${enc(info.code)}/pieces/${enc(p.id)}/file`);
       if (!res.ok) continue;
-      await importFile(p.filename || `${p.id}.musicxml`, await res.arrayBuffer(), { id, title: p.title, composer: p.composer });
+      await importFile(p.filename || `${p.id}.musicxml`, await res.arrayBuffer(), { id, title: p.title, composer: p.composer, credit: p.credit, choir: info.code });
       newPieces++;
     } catch (e) {
       console.warn('choir score', p.id, e);
@@ -190,6 +203,25 @@ export async function uploadChoirPiece(code: string, auth: Auth, file: File, tit
   return call(`/choirs/${enc(code)}/pieces`, { method: 'POST', auth, body: fd });
 }
 export const deleteChoirPiece = (code: string, auth: Auth, id: string) => call(`/choirs/${enc(code)}/pieces/${enc(id)}`, { method: 'DELETE', auth });
+
+// ------------------------------------------------------------------ the choir library (admins and the super admin)
+
+/** A piece in the choir library (kept on the server, not in the public app). */
+export interface LibraryPiece {
+  id: string; title: string; composer: string; level?: string; description?: string; credit?: string; size: number;
+  /** The choir's score made from it, if the choir has added it. */
+  scoreId: string | null;
+  /** In the choir's published programme. */
+  inProgramme: boolean;
+}
+export const fetchLibrary = (code: string, auth: Auth) => call<{ pieces: LibraryPiece[] }>(`/choirs/${enc(code)}/library`, { auth });
+/**
+ * Add a library piece to the choir's scores (the server copies the file; nothing is uploaded from
+ * here). `programme`: also put it into the published programme. Adding it twice is harmless.
+ */
+export const addLibraryPiece = (code: string, auth: Auth, id: string, programme: boolean) =>
+  call<{ ok: boolean; added: boolean; programme: boolean; piece: ChoirPiece; choir: ChoirInfo }>(
+    `/choirs/${enc(code)}/library/${enc(id)}`, { method: 'POST', auth, ...json({ programme }) });
 
 // ------------------------------------------------------------------ section leads
 

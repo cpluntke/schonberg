@@ -120,7 +120,7 @@ describe('synthetic score', () => {
 
 describe('built-in pieces', () => {
   it('Debussy, Quant j\'ai ouy le tabourin: alto solo', async () => {
-    const s = await load('public/pieces/pd/debussy-tabourin.mxl');
+    const s = await load('library/scores/debussy-tabourin.mxl');
     const solo = s.parts.find((p) => p.name === 'Alto Solo')!;
     const map = buildMemoryMap(s, computeSections(s), solo.id)!;
     const first = map.sections[0].entries[0];
@@ -137,7 +137,7 @@ describe('built-in pieces', () => {
   });
 
   it('Vierne, Kyrie: tenor entries all have a cue and Latin first letters', async () => {
-    const s = await load('public/pieces/pd/vierne-kyrie.mxl');
+    const s = await load('library/scores/vierne-kyrie.mxl');
     const map = buildMemoryMap(s, computeSections(s), 'P3', { notation: 'fixed' })!;
     expect(map.sections[0].sings).toBe(false);
     const entries = map.sections.flatMap((x) => x.entries);

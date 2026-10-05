@@ -25,7 +25,10 @@ export function keyAtTime(score: Score, time: number): KeySig;
 export function tempoAtTime(score: Score, time: number): number;         // bpm
 export function soundingAt(score: Score, time: number, excludePartId?: string): number[]; // midis
 export function beatTimes(score: Score, from: number, to: number): { time: number; downbeat: boolean }[];
-// Built-in pieces: public/pieces/manifest.json → [{ id, file, title, composer, level, description }]
+// Built-in pieces: public/pieces/manifest.json → [{ id, file, title, composer, level, description }] (the Abendlied only)
+// Choir library (admins only, not in the public build): library/index.json → same fields + credit; the server
+// (messiermarathon utils/schonberg_library.py) copies a piece into a choir's scores, keeping its id as libraryId,
+// which phones use as the piece id (progress/choir.ts localPieceId).
 ```
 
 Parser rules: sounding pitch (apply `<transpose>`), merge ties, split a part that has

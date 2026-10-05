@@ -19,7 +19,8 @@ Good morning! Here is what happened between midnight and 7.
   (PR #291, merged and deployed 4 Oct 12:15 UTC). The choir leaderboard runs on that service's disk.
 - **Onboarding video:** a 100-second narrated intro (coach + singer dialogue over the real app), playable from
   Home, voice setup and Settings. Sources are in `media-src/onboarding/`. "Schönberg" is now pronounced with a German "sch".
-- **Next cycle programme** (preset in `public/pieces/cycle.json`): Fauré *Madrigal*, Debussy *Trois chansons*,
+- **Next cycle programme** (preset in `public/pieces/cycle.json`; since 5 Oct gone: the app ships only the Abendlied,
+  and choir admins add these pieces from the choir library in Choir admin): Fauré *Madrigal*, Debussy *Trois chansons*,
   Poulenc *Vinea mea* and *Huit chansons françaises*, Vierne *Kyrie* (Messe solennelle). Weekly rehearsals on Thursdays at 19:30;
   the next one focuses on the Fauré, Debussy no. 2 (*Quand j'ai ouy le tabourin*) and the Vierne.
   - Bundled: Debussy nos. 1–3 and the Vierne *Kyrie* (Hößl edition from CPDL, choir + organ + pedal reduction rather than two organs).

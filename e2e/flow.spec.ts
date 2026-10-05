@@ -1,4 +1,8 @@
 import { test, expect } from '@playwright/test';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
 
 // Full core loop with the synthetic singer (?simulate=perfect): home → piece → level 1 → results.
 test('a perfect simulated singer passes level 1 and levels up', async ({ page }) => {
@@ -103,19 +107,24 @@ test('new singer: level 3 opens in score view, a 1280-wide screen shows every vo
 });
 
 // Off book the full score must not give the part away: no accompaniment (the organ doubles the
-// alto), no words under the other voices.
+// alto), no words under the other voices. The Vierne is in the choir library (not built in), so the
+// singer imports it here as their own score.
 test('off book on a laptop: full score of the voices only', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.setViewportSize({ width: 1280, height: 800 });
-  await page.goto('/?simulate=perfect#/play/vierne-kyrie/P2/all?level=5&from=44&to=70');
+  await page.goto('/#/library');
+  await page.getByLabel('Choose score files').setInputFiles(path.join(here, '..', 'library', 'scores', 'vierne-kyrie.mxl'));
+  await expect(page).toHaveURL(/#\/piece\//, { timeout: 20_000 });
+  const id = decodeURIComponent(page.url().split('#/piece/')[1]);
+  await page.goto(`/?simulate=perfect#/play/${encodeURIComponent(id)}/P2/all?level=5&from=44&to=70`);
   await expect(page.getByTestId('start')).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: 'Test: all hidden' }).click();
   await page.getByTestId('start').click();
   await expect.poll(async () => page.locator('canvas').getAttribute('aria-label'), { timeout: 10_000 }).toBe('Full score: S A T B, your part: alto');
   await expect(page.locator('canvas')).toHaveAttribute('data-staves', '4');
   // The same run at level 3 adds the organ.
-  await page.goto('/?simulate=perfect#/play/vierne-kyrie/P2/all?level=3&from=44&to=70');
+  await page.goto(`/?simulate=perfect#/play/${encodeURIComponent(id)}/P2/all?level=3&from=44&to=70`);
   await page.getByTestId('start').click();
   await expect.poll(async () => page.locator('canvas').getAttribute('aria-label'), { timeout: 10_000 }).toBe('Full score: S A T B + organ, your part: alto');
   expect(errors).toEqual([]);

@@ -40,7 +40,7 @@ describe('which staves', () => {
   });
 
   it('finds your own staff among divisi parts', async () => {
-    const tab = await load('public/pieces/pd/debussy-tabourin.mxl');
+    const tab = await load('library/scores/debussy-tabourin.mxl');
     const st = planStaves(tab, 'P3-2', 'all');
     expect(st.map((x) => x.short)).toEqual(['A solo', 'A1', 'A2', 'T1', 'T2', 'B']);
     expect(st.filter((x) => x.own).map((x) => x.id)).toEqual(['P3-2']);
@@ -50,7 +50,7 @@ describe('which staves', () => {
   });
 
   it('puts organ and pedal on one grand staff (split at middle C) under SATB', async () => {
-    const kyrie = await load('public/pieces/pd/vierne-kyrie.mxl');
+    const kyrie = await load('library/scores/vierne-kyrie.mxl');
     const st = planStaves(kyrie, 'P2', 'all');
     expect(st.map((x) => x.id)).toEqual(['P1', 'P2', 'P3', 'P4', 'acc:up', 'acc:lo']);
     expect(st.slice(4).map((x) => [x.clef, x.name, x.short])).toEqual([['treble', 'Organ', 'Org.'], ['bass', 'Organ', 'Org.']]);
@@ -89,7 +89,7 @@ describe('which staves', () => {
   });
 
   it('practising the Kyrie organ pedal: pedal staff under the organ, outside the voices', async () => {
-    const kyrie = await load('public/pieces/pd/vierne-kyrie.mxl');
+    const kyrie = await load('library/scores/vierne-kyrie.mxl');
     const st = planStaves(kyrie, 'P6', 'all');
     expect(st.map((x) => [x.id, x.short, x.kind, x.acc])).toEqual([
       ['P1', 'S', 'voice', false], ['P2', 'A', 'voice', false], ['P3', 'T', 'voice', false], ['P4', 'B', 'voice', false],

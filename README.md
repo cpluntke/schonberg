@@ -21,9 +21,14 @@ target, movable/fixed solfège and Chinese numbered notation (jianpu), and an at
 ## Features
 
 - **Repertoire:** import your choir's **MusicXML** (`.musicxml`, `.xml`, `.mxl`) or **MIDI**.
-  Parts, divisi voices, lyrics, tempo and key changes are read automatically. Built-in demo
-  pieces: public-domain Debussy, Ravel, Bruckner and Brahms (via the PDMX dataset) plus an
-  original warm-up chorale.
+  Parts, divisi voices, lyrics, tempo and key changes are read automatically. Built in: an
+  original warm-up chorale (the Abendlied).
+- **Choir library:** choir admins (and the super admin) see a library of public-domain pieces in
+  Choir admin: Fauré's *Madrigal* Op. 35, Debussy's *Trois chansons*, Ravel's *Nicolette*, Bruckner's
+  *Locus iste*, Brahms's *Schaffe in mir, Gott* (opening) and Vierne's *Kyrie*. One tap ("Add to our
+  choir") copies the score into the choir's scores on the server and puts it into the programme;
+  members get it with the choir sync. The files live in `library/` (never in the public build; see
+  `library/README.md`).
 - **Coaching ladder:** each piece is split into sections, and each section climbs
   Listen → 1 Note-learning → 2 In time → 3 Independent → 4 Concert-ready → 5 Off book.
   Support is removed step by step: tempo, your part playing along, note names, and the
@@ -71,13 +76,16 @@ synthetic singer replaces the microphone.
 - [docs/architecture.md](docs/architecture.md): module contracts
 - [docs/priorities.md](docs/priorities.md): P0–P3 bug scale used in testing
 - [content/raw/SOURCES.md](content/raw/SOURCES.md): sources and licences of the demo scores
+- [library/README.md](library/README.md): the choir library (admins only): sources, editions and licences
 
-## Licences of demo content
+## Licences of demo and library content
 
-The Debussy, Ravel, Bruckner and Brahms editions (and the Reger, Elgar and Bach files in `content/raw/`) come from the
+The choir library's Debussy, Ravel, Bruckner and Brahms editions (and the Reger, Elgar and Bach files in `content/raw/`) come from the
 [PDMX dataset](https://zenodo.org/records/15571083) (CC BY 4.0), which collects
-MuseScore.com scores marked Public Domain / CC0 by their uploaders. The compositions
-themselves are in the public domain.
+MuseScore.com scores marked Public Domain / CC0 by their uploaders; the Vierne *Kyrie* is Manfred Hößl's
+CPDL edition (#30138). Fauré's *Madrigal* Op. 35 is Robert Kerr's edition for the William Byrd Singers,
+Manchester, licensed CC BY-SA 4.0. The compositions themselves are in the public domain. Each piece's
+credit is shown with it in the app (`library/index.json`, `library/README.md`).
 
 The treble and bass clefs in the score view are outlines from the [Bravura](https://github.com/steinbergmedia/bravura)
 music font (© Steinberg Media Technologies GmbH), used under the SIL Open Font License 1.1

@@ -102,7 +102,7 @@ export function Library() {
         })}
         {!pieces.length && <span className="muted">No pieces yet.</span>}
       </section>
-      <span className="tiny muted">Built-in pieces: public-domain choral works (editions from the PDMX/MuseScore community) and an original warm-up chorale.</span>
+      <span className="tiny muted">Built in: an original warm-up chorale. Your choir's scores, including public-domain pieces your choir admin adds from the choir library, arrive when you join your choir.</span>
     </main>
   );
 }

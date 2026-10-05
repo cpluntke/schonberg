@@ -111,8 +111,8 @@ describe('quiz on real pieces', () => {
   let kyrie: Score;
   let chorale: Score;
   beforeEach(async () => {
-    tabourin ??= await load('public/pieces/pd/debussy-tabourin.mxl');
-    kyrie ??= await load('public/pieces/pd/vierne-kyrie.mxl');
+    tabourin ??= await load('library/scores/debussy-tabourin.mxl');
+    kyrie ??= await load('library/scores/vierne-kyrie.mxl');
     chorale ??= await load('public/pieces/warmup-chorale.musicxml');
   });
 

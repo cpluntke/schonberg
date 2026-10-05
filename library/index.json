@@ -1,7 +1,16 @@
 [
   {
+    "id": "faure-madrigal",
+    "file": "scores/faure-madrigal.mxl",
+    "title": "Madrigal, Op. 35",
+    "composer": "Gabriel Fauré",
+    "level": "medium",
+    "description": "SATB with piano, on a poem by Armand Silvestre: the men accuse, the women answer, then all four parts sing together.",
+    "credit": "Edition: Robert Kerr for the William Byrd Singers (CC BY-SA 4.0); the music is in the public domain"
+  },
+  {
     "id": "bruckner-locus-iste",
-    "file": "pd/bruckner-locus-iste.mxl",
+    "file": "scores/bruckner-locus-iste.mxl",
     "title": "Locus iste, WAB 23",
     "composer": "Anton Bruckner",
     "level": "easy",
@@ -10,7 +19,7 @@
   },
   {
     "id": "debussy-dieu",
-    "file": "pd/debussy-dieu.mxl",
+    "file": "scores/debussy-dieu.mxl",
     "title": "Dieu! qu'il la fait bon regarder!",
     "composer": "Claude Debussy",
     "level": "medium",
@@ -19,7 +28,7 @@
   },
   {
     "id": "debussy-tabourin",
-    "file": "pd/debussy-tabourin.mxl",
+    "file": "scores/debussy-tabourin.mxl",
     "title": "Quant j'ai ouy le tabourin",
     "composer": "Claude Debussy",
     "level": "medium",
@@ -28,7 +37,7 @@
   },
   {
     "id": "brahms-schaffe",
-    "file": "pd/brahms-schaffe.mxl",
+    "file": "scores/brahms-schaffe.mxl",
     "title": "Schaffe in mir, Gott, Op. 29/2 (opening)",
     "composer": "Johannes Brahms",
     "level": "medium",
@@ -37,7 +46,7 @@
   },
   {
     "id": "ravel-nicolette",
-    "file": "pd/ravel-nicolette.mxl",
+    "file": "scores/ravel-nicolette.mxl",
     "title": "Nicolette",
     "composer": "Maurice Ravel",
     "level": "hard",
@@ -46,7 +55,7 @@
   },
   {
     "id": "debussy-yver",
-    "file": "pd/debussy-yver.mxl",
+    "file": "scores/debussy-yver.mxl",
     "title": "Yver, vous n'estes qu'un villain",
     "composer": "Claude Debussy",
     "level": "hard",
@@ -55,7 +64,7 @@
   },
   {
     "id": "vierne-kyrie",
-    "file": "pd/vierne-kyrie.mxl",
+    "file": "scores/vierne-kyrie.mxl",
     "title": "Kyrie (Messe solennelle, Op. 16)",
     "composer": "Louis Vierne",
     "level": "medium",

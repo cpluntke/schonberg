@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useProfile, useStoreVersion, toast } from '../hooks';
 import { back, go } from '../router';
 import { allPieces, syncChoirNow } from '../library';
@@ -8,8 +8,9 @@ import {
   apiBase, cachedChoir, changePassword, choirPieceId, claimAccount, deleteChoirPiece, fetchChoir, joinChoir, leaveChoir, ChoirApiError,
   loadSession, loggedOutNotice, login, logout, onSessionChange, refreshSession, refreshSessionSoon, saveChoirCycle, sessionFor, sessionSecret, superCreate, superDelete,
   superList, superPurgeMembers, superRename, uploadChoirPiece, withdrawProgress, fetchChoirUsage, mb, type Auth, type ChoirInfo, type ChoirSummary, type ChoirUsage,
-  type ServerUsage, type Session,
+  type ServerUsage, type Session, localPieceId, type LibraryPiece,
 } from '../../progress/choir';
+import { LibraryPanel, type ProgrammeDraft } from '../components/ChoirLibrary';
 import { SectionInsights } from '../components/SectionInsights';
 import { fetchSectionInsights, type SectionInsightsView } from '../../progress/insights';
 import { InviteLinkBox, PeoplePanel, roleText, VOICE_NAME, VOICES } from '../components/People';
@@ -307,6 +308,10 @@ export function ChoirAdmin() {
   const token = isAdmin ? session!.token : null;
   useEffect(() => { if (token) setLastAuth({ bearer: token }); }, [token]);
   const [info, setInfo] = useState<ChoirInfo | null>(() => cachedChoir());
+  const [library, setLibrary] = useState<LibraryPiece[] | null>(null);
+  // The programme editor's unpublished changes (null: none), and how to add a piece to them.
+  const draft = useRef<ProgrammeDraft>({ ids: null, add: null });
+  const [, setDraftV] = useState(0);
   // Start from the choir's current state, not from this phone's last sync (another admin may have changed it).
   useEffect(() => {
     if (!code || !apiBase()) return;
@@ -340,9 +345,14 @@ export function ChoirAdmin() {
       ) : (
         <NeedLogin code={code} what="Your changes below are kept: log in again, then publish them." />
       )}
-      <ProgrammeEditor key={`${info?.code}:${info?.cycleUpdatedAt ?? 0}`} code={code} auth={auth} info={info}
+      <ProgrammeEditor key={`${info?.code}:${info?.cycleUpdatedAt ?? 0}`} code={code} auth={auth} info={info} library={library}
+        draft={draft.current} onDraft={() => setDraftV((v) => v + 1)}
         onSaved={(i) => { setInfo(i); void refresh(); }} onConflict={(i) => setInfo(i)} />
       <ScoresEditor code={code} auth={auth} info={info} onChanged={refresh} />
+      {session && (
+        <LibraryPanel code={code} auth={auth} info={info} draft={draft.current} onList={setLibrary}
+          onAdded={(i) => { if (i) setInfo(i); void refresh(); }} />
+      )}
       {session && (
         <div className="card" data-testid="people-editor">
           <strong>People</strong>
@@ -354,7 +364,10 @@ export function ChoirAdmin() {
   );
 }
 
-function ProgrammeEditor({ code, auth, info, onSaved, onConflict }: { code: string; auth: Auth; info: ChoirInfo | null; onSaved: (i: ChoirInfo) => void; onConflict: (i: ChoirInfo) => void }) {
+function ProgrammeEditor({ code, auth, info, library, draft, onDraft, onSaved, onConflict }: {
+  code: string; auth: Auth; info: ChoirInfo | null; library: LibraryPiece[] | null; draft: ProgrammeDraft; onDraft: () => void;
+  onSaved: (i: ChoirInfo) => void; onConflict: (i: ChoirInfo) => void;
+}) {
   // A new programme starts empty (not from this admin's own phone, which may hold private scores).
   const start: Partial<NonNullable<ChoirInfo['cycle']>> = info?.cycle ?? { name: 'This cycle', pieceIds: [] };
   const [name, setName] = useState(start.name ?? 'This cycle');
@@ -366,8 +379,31 @@ function ProgrammeEditor({ code, auth, info, onSaved, onConflict }: { code: stri
   const [concert, setConcert] = useState(start.concertDate ?? '');
   const [wanted, setWanted] = useState<{ title: string; composer: string; note?: string }[]>((start.wanted ?? []).map((w) => ({ ...w, composer: w.composer ?? '' })));
   const [busy, setBusy] = useState(false);
+  // Unpublished changes (the Library adds to them instead of publishing over them).
+  const published = start.pieceIds ?? [];
+  const dirty = JSON.stringify([name, ids, focus, weekday, time, rehearsalDate, concert, wanted])
+    !== JSON.stringify([start.name ?? 'This cycle', published, start.focusPieceIds ?? [], start.rehearsalWeekday ?? -1, start.rehearsalTime ?? '19:30',
+      start.rehearsalDate ?? '', start.concertDate ?? '', (start.wanted ?? []).map((w) => ({ ...w, composer: w.composer ?? '' }))]);
+  useEffect(() => {
+    draft.ids = dirty ? ids : null;
+    draft.add = (id) => setIds((xs) => (xs.includes(id) ? xs : [...xs, id]));
+    onDraft();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dirty, ids]);
+  useEffect(() => () => { draft.ids = null; draft.add = null; }, [draft]);
   // Choose from built-in pieces and the choir's own scores (scores on one phone only can't be shared).
-  const choices = allPieces().filter((p) => p.builtin && !p.id.includes('~') || p.id.startsWith(`choir-${code}-`));
+  const choirIds = new Set((info?.pieces ?? []).map((p) => localPieceId(code, p)));
+  const choices = allPieces().filter((p) => p.builtin && !p.id.includes('~') || p.id.startsWith(`choir-${code}-`) || choirIds.has(p.id));
+  // In the programme but not on this phone: a library piece the choir hasn't added (e.g. a former
+  // built-in piece), or a choir score this phone hasn't downloaded yet.
+  const missing = ids.filter((id) => !choices.some((p) => p.id === id));
+  const missingLabel = (id: string) => {
+    const lib = library?.find((p) => p.id === id);
+    const score = (info?.pieces ?? []).find((p) => localPieceId(code, p) === id);
+    if (score) return { title: score.title || score.filename, note: 'not on this phone yet' };
+    if (lib) return { title: lib.title, note: 'no score yet: add it from the Library below' };
+    return { title: id, note: 'members don’t have this score' };
+  };
   const toggle = (arr: string[], id: string) => (arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]);
   return (
     <div className="card" data-testid="programme-editor">
@@ -383,6 +419,17 @@ function ProgrammeEditor({ code, auth, info, onSaved, onConflict }: { code: stri
                 {p.title}<span className="tiny muted"> · {p.composer}</span>
               </button>
               <button className="chip" aria-pressed={focus.includes(p.id)} disabled={!on} aria-label={`Next rehearsal: ${p.title}`} onClick={() => setFocus(toggle(focus, p.id))}>★</button>
+            </div>
+          );
+        })}
+        {missing.map((id) => {
+          const m = missingLabel(id);
+          return (
+            <div key={id} className="row" style={{ gap: 6 }} data-testid="programme-missing">
+              <button className="chip grow" style={{ textAlign: 'left' }} aria-pressed aria-label={`Remove ${m.title} from the programme`}
+                onClick={() => { setIds(ids.filter((x) => x !== id)); setFocus(focus.filter((x) => x !== id)); }}>
+                {m.title}<span className="tiny muted"> · {m.note}</span>
+              </button>
             </div>
           );
         })}
@@ -579,6 +626,7 @@ export function SuperAdmin() {
   const [form, setForm] = useState({ code: '', name: '', adminNote: '' });
   const [created, setCreated] = useState<{ name: string; code: string; token: string } | null>(null);
   const [open, setOpen] = useState<string | null>(null);
+  const [openLib, setOpenLib] = useState<string | null>(null);
   const load = async (p: string) => {
     try {
       const r = await superList(p);
@@ -654,6 +702,7 @@ export function SuperAdmin() {
           </span>
           <div className="row wrap">
             <button className="btn small" aria-expanded={open === c.code} onClick={() => setOpen(open === c.code ? null : c.code)}>People</button>
+            <button className="btn small" aria-expanded={openLib === c.code} data-testid="super-library" onClick={() => setOpenLib(openLib === c.code ? null : c.code)}>Library</button>
             <button className="btn small" onClick={async () => {
               const name = prompt('New name', c.name);
               if (!name) return;
@@ -681,6 +730,7 @@ export function SuperAdmin() {
             )}
           </div>
           {open === c.code && <PeoplePanel code={c.code} auth={auth} superAdmin onChanged={() => void load(pw)} />}
+          {openLib === c.code && <LibraryPanel code={c.code} auth={auth} embedded onAdded={() => void load(pw)} />}
         </div>
       ))}
       {list && !list.length && <span className="muted">No choirs yet.</span>}
