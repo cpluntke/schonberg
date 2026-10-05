@@ -233,6 +233,24 @@ describe('restoring on a new phone', () => {
     expect(loadCycle().name).toBe('Mine');
   });
 
+  it('progress on a piece this phone no longer has (a former built-in piece) survives saving and merging', () => {
+    // No score for 'debussy-dieu' on either phone: sync never looks at the library.
+    const mine = piece({ pieceId: 'debussy-dieu', partId: 'P2', totalAttempts: 4, sections: { s0: sec({ level: 2, attempts: 4, lastPracticed: T, lastPassed: T }) } });
+    writeJSON(progressKey('debussy-dieu', 'P2'), mine);
+    const { data } = buildSnapshot(T + DAY);
+    expect(Object.keys(data.p)).toContain('debussy-dieu|P2');
+    // The account's copy from another phone knows a further section; this phone's copy merges with it.
+    const other = JSON.parse(JSON.stringify(data)) as ProgressSnapshot;
+    localStorage.clear();
+    _resetAllForTests();
+    writeJSON(progressKey('debussy-dieu', 'P2'), piece({ pieceId: 'debussy-dieu', partId: 'P2', totalAttempts: 1, sections: { s1: sec({ level: 1, attempts: 1, lastPracticed: T }) } }));
+    applySnapshot(other);
+    const merged = getProgress('debussy-dieu', 'P2')!;
+    expect(merged.sections.s0.level).toBe(2);
+    expect(merged.sections.s1.level).toBe(1);
+    expect(Object.keys(buildSnapshot(T + 2 * DAY).data.p)).toContain('debussy-dieu|P2');
+  });
+
   it('rejects damaged copies', () => {
     expect(() => applySnapshot(null)).toThrow(/damaged/);
     expect(() => applySnapshot({ v: 1 })).toThrow(/damaged/);

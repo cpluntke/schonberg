@@ -1,5 +1,5 @@
 // Corpus robustness test: imports every file in src/music/fixtures/corpus/ (W3C MusicXML examples,
-// the LilyPond/Kainhofer MusicXML test suite), content/raw/ and public/pieces/ and checks the
+// the LilyPond/Kainhofer MusicXML test suite), content/raw/, public/pieces/ and library/ and checks the
 // invariants in ./invariants.ts. See src/music/fixtures/corpus/README.md for sources & licences.
 import { describe, expect, it } from 'vitest';
 import { appendFileSync, existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
@@ -9,7 +9,7 @@ import { computeSections } from './sections';
 import { invariantViolations, USER_FACING_ERROR } from './invariants';
 
 const root = resolve(__dirname, '../..');
-const dirs = [resolve(__dirname, 'fixtures/corpus'), resolve(root, 'content/raw'), resolve(root, 'public/pieces')];
+const dirs = [resolve(__dirname, 'fixtures/corpus'), resolve(root, 'content/raw'), resolve(root, 'public/pieces'), resolve(root, 'library')];
 const EXT = /\.(mxl|musicxml|xml|mid|midi)$/i;
 
 function walk(d: string): string[] {

@@ -35,6 +35,8 @@ async function setupChoir(request: APIRequestContext, code: string) {
   expect(r.status()).toBe(201);
   const admin = await (await request.post('./api/invites/accept', { data: { token: (await r.json()).token, name: 'Clara', password: 'password-123' } })).json();
   const auth = { Authorization: `Bearer ${admin.token}` };
+  // The pieces come from the choir library (members' phones get the scores with the choir sync).
+  for (const id of PIECES) expect((await request.post(`./api/choirs/${code}/library/${id}`, { data: {}, headers: auth })).status()).toBe(200);
   expect((await request.put(`./api/choirs/${code}/cycle`, { data: { name: 'Autumn', pieceIds: PIECES, rehearsalWeekday: 3, rehearsalTime: '19:30' }, headers: auth })).status()).toBe(200);
   const inv = await (await request.post(`./api/choirs/${code}/invites`, { data: { role: 'lead', voices: ['A'] }, headers: auth })).json();
   expect((await request.post('./api/invites/accept', { data: { token: inv.token, name: 'Lena', password: 'password-123' } })).status()).toBe(201);

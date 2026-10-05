@@ -34,6 +34,7 @@ export function makePiece(score: Score, extra: Partial<PieceInfo> = {}): PieceIn
     id: score.id,
     title: score.title || 'Untitled',
     composer: score.composer || '',
+    ...(score.credit ? { credit: score.credit } : {}),
     builtin: false,
     score,
     sections: computeSections(score),
@@ -93,36 +94,42 @@ function migrateIds() {
   } catch { /* storage unavailable */ }
 }
 
-interface CyclePreset {
-  id: string;
-  name: string;
-  pieceIds: string[];
-  wanted?: { title: string; composer: string; note?: string }[];
-  titles?: Record<string, { title: string; composer: string }>;
-  rehearsalWeekday?: number;
-  rehearsalTime?: string;
-  focusPieceIds?: string[];
-  concertDate?: string;
-}
+/**
+ * Pieces that were built in until the choir library (`library/`, admins only) took them over. Solo
+ * programmes drop them; the progress stays stored, so it comes back when a choir adds the piece
+ * from its library (same id on the phone).
+ */
+const FORMER_BUILTINS = new Set([
+  'bruckner-locus-iste', 'debussy-dieu', 'debussy-tabourin', 'debussy-yver', 'brahms-schaffe', 'ravel-nicolette', 'vierne-kyrie', 'faure-madrigal',
+]);
+/** The programme preset that used to be seeded from public/pieces/cycle.json. */
+const FORMER_PRESET = { id: 'cycle-autumn-2026', name: 'Fauré · Debussy · Poulenc · Vierne', wanted: ['Vinea mea electa', 'Huit chansons françaises', 'Madrigal, Op. 35'] };
+export const LIBRARY_NOTICE = 'The demo pieces by Bruckner, Debussy, Brahms, Ravel and Vierne are no longer built in: your choir admin can add them to your choir from the choir library. Your practice on them is kept.';
 
-async function loadPreset(base: string): Promise<CyclePreset | null> {
-  try {
-    const r = await fetch(`${base}pieces/cycle.json`);
-    if (!r.ok) return null;
-    const p = await r.json();
-    return p && typeof p.id === 'string' && Array.isArray(p.pieceIds) ? p : null;
-  } catch {
-    return null;
+/** A solo programme (not the choir's) loses the pieces that are no longer built in. */
+function dropFormerBuiltins() {
+  const c = loadCycle();
+  if (c.preset?.startsWith('choir:')) return; // the choir's programme: the choir sync owns it
+  const gone = c.pieceIds.filter((id) => FORMER_BUILTINS.has(id) && !pieces.has(id));
+  const fromPreset = c.preset === FORMER_PRESET.id;
+  if (!gone.length && !fromPreset) return;
+  const next = { ...c, pieceIds: c.pieceIds.filter((id) => !gone.includes(id)), focusPieceIds: (c.focusPieceIds ?? []).filter((id) => !gone.includes(id)) };
+  if (fromPreset) {
+    next.preset = undefined;
+    next.wanted = (c.wanted ?? []).filter((w) => !FORMER_PRESET.wanted.includes(w.title));
+    if (c.name === FORMER_PRESET.name) next.name = 'This cycle';
+  }
+  if (!next.pieceIds.length && pieces.has('warmup-chorale')) next.pieceIds = ['warmup-chorale'];
+  saveCycle(next);
+  if (gone.length) {
+    try { localStorage.setItem('sh:notice', LIBRARY_NOTICE); } catch { /* storage blocked */ }
   }
 }
 
 async function loadAll() {
   migrateIds();
   const base = import.meta.env.BASE_URL || './';
-  const manifest = [
-    ...(await loadManifest(base, 'repertoire.json')),
-    ...(await loadManifest(base, 'manifest.json')),
-  ];
+  const manifest = await loadManifest(base, 'manifest.json');
   if (!manifest.length) loadError = 'Could not load the built-in pieces.';
   await Promise.all(
     manifest.map(async (m) => {
@@ -157,38 +164,13 @@ async function loadAll() {
   } catch (e) {
     console.error(e);
   }
-  // The choir's current programme (public/pieces/cycle.json) replaces the demo cycle once.
-  const preset = await loadPreset(base);
+  dropFormerBuiltins();
   const cycle = loadCycle();
   let seeded = false;
-  let presetApplied: string | null = null;
-  try {
-    seeded = !!localStorage.getItem('sh:cycleSeeded');
-    presetApplied = localStorage.getItem('sh:cyclePreset');
-  } catch { /* storage blocked */ }
-  // A choir's own programme (synced from the server) wins over the built-in preset.
-  const untouched = !cycle.preset?.startsWith('choir:') && (!cycle.pieceIds.length || cycle.name === 'Demo cycle' || cycle.preset != null);
-  if (preset && presetApplied !== preset.id && untouched) {
-    const own = cycle.pieceIds.filter((id) => pieces.get(id) && !pieces.get(id)!.builtin);
-    const ids = preset.pieceIds.filter((id) => pieces.has(id));
-    // Programme pieces we couldn't ship become "import your score" slots.
-    const missing = preset.pieceIds.filter((id) => !pieces.has(id) && preset.titles?.[id]).map((id) => ({ ...preset.titles![id], note: 'import your choir’s score', focus: preset.focusPieceIds?.includes(id) || undefined }));
-    saveCycle({
-      name: preset.name,
-      pieceIds: [...ids, ...own.filter((id) => !ids.includes(id))],
-      wanted: [...(preset.wanted ?? []), ...missing],
-      rehearsalWeekday: preset.rehearsalWeekday,
-      rehearsalTime: preset.rehearsalTime,
-      focusPieceIds: (preset.focusPieceIds ?? []).filter((id) => pieces.has(id)),
-      concertDate: preset.concertDate,
-      preset: preset.id,
-    });
-    try {
-      localStorage.setItem('sh:cyclePreset', preset.id);
-      localStorage.setItem('sh:cycleSeeded', '1');
-    } catch { /* storage blocked */ }
-  } else if (!cycle.pieceIds.length && !seeded) {
-    const preferred = ['warmup-chorale', 'debussy-dieu', 'ravel-nicolette', 'bruckner-locus-iste'].filter((id) => pieces.has(id));
+  try { seeded = !!localStorage.getItem('sh:cycleSeeded'); } catch { /* storage blocked */ }
+  if (!cycle.pieceIds.length && !seeded) {
+    // The default solo programme: the built-in Abendlied.
+    const preferred = ['warmup-chorale'].filter((id) => pieces.has(id));
     cycle.pieceIds = preferred.length ? preferred : [...pieces.values()].filter((p) => p.builtin).slice(0, 4).map((p) => p.id);
     cycle.name = cycle.name === 'This cycle' ? 'Demo cycle' : cycle.name;
     const iso = (days: number) => {
@@ -215,10 +197,16 @@ export function syncChoirNow(): Promise<Awaited<ReturnType<typeof syncChoir>>> {
       score.id = meta.id;
       if (meta.title) score.title = meta.title;
       if (meta.composer) score.composer = meta.composer;
+      if (meta.credit) score.credit = meta.credit;
+      score.choir = meta.choir;
       await saveImportedScore(score);
       pieces.set(score.id, makePiece(score));
       emit();
-    }, (id) => pieces.has(id), (id) => !!pieces.get(id) && !pieces.get(id)!.builtin && !id.startsWith('choir-')).finally(() => { syncing = null; emit(); });
+    }, (id) => pieces.has(id), (id) => {
+      // The singer's own imports stay in the cycle when the choir's programme arrives (not the choir's scores).
+      const p = pieces.get(id);
+      return !!p && !p.builtin && !id.startsWith('choir-') && !p.score.choir;
+    }).finally(() => { syncing = null; emit(); });
   }
   return syncing;
 }

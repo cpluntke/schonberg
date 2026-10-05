@@ -322,9 +322,10 @@ describe('systems and time → x', () => {
   });
 });
 
-describe('built-in pieces', () => {
+describe('built-in and choir-library pieces', () => {
   const dir = resolve(__dirname, '../../../public/pieces');
-  const files = [resolve(dir, 'warmup-chorale.musicxml'), ...readdirSync(resolve(dir, 'pd')).map((f) => resolve(dir, 'pd', f))];
+  const lib = resolve(__dirname, '../../../library/scores');
+  const files = [resolve(dir, 'warmup-chorale.musicxml'), ...readdirSync(lib).map((f) => resolve(lib, f))];
   it('lay out every vocal part on a phone without gaps or overflows', async () => {
     for (const f of files) {
       const buf = readFileSync(f);

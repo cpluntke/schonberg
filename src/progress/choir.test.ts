@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { _resetAllForTests, exportBackup, loadProfile, saveProfile } from './store';
+import { _resetAllForTests, exportBackup, loadCycle, loadProfile, saveProfile } from './store';
 import {
   _resetSessionStateForTests, acceptInvite, createInvite, fetchPeople, inviteLink, leaveChoir, loadSession, loggedOutNotice, login, logout,
   LOGGED_OUT_ELSEWHERE, refreshSession, refreshSessionSoon, rememberedInvite, saveSession, sessionFor, superCreate, type Session,
-  signUp, shareProgress, deleteMyAccount, lastLogout, dismissLogout,
+  signUp, shareProgress, deleteMyAccount, lastLogout, dismissLogout, syncChoir, choirPieceId, localPieceId, fetchLibrary, addLibraryPiece,
 } from './choir';
 import { parseHash, href } from '../ui/router';
 
@@ -233,5 +233,46 @@ describe('choir accounts client', () => {
     expect(lastLogout()).not.toBeNull();
     await login('kammerchor', 'Clara', 'password-123');
     expect(lastLogout()).toBeNull();
+  });
+});
+
+describe('choir library pieces', () => {
+  const info = (pieces: unknown[], cycle: unknown = null) => ({
+    code: 'kammerchor', name: 'Kammerchor', cycle, pieces, updatedAt: 5, cycleUpdatedAt: 5, leads: [],
+  });
+
+  it('a library piece keeps its library id on the phone (so earlier progress comes back); an upload gets the choir id', async () => {
+    saveProfile({ ...loadProfile(), choirCode: 'kammerchor' });
+    mockFetch((url) => (url.endsWith('/file') ? { body: {} } : {
+      body: info([
+        { id: 'aaaaaaaaaaaa', title: 'Madrigal, Op. 35', composer: 'Gabriel Fauré', filename: 'faure-madrigal.mxl', uploadedAt: 1, size: 9, libraryId: 'faure-madrigal', credit: 'Edition: Robert Kerr (CC BY-SA 4.0)' },
+        { id: 'bbbbbbbbbbbb', title: 'Our own', composer: '', filename: 'own.musicxml', uploadedAt: 1, size: 9 },
+        { id: 'cccccccccccc', title: 'Odd', composer: '', filename: 'odd.mxl', uploadedAt: 1, size: 9, libraryId: '../Bad Id' },
+      ], { name: 'Autumn', pieceIds: ['faure-madrigal', 'debussy-dieu'] }),
+    }));
+    const got: { name: string; meta: Record<string, unknown> }[] = [];
+    const r = await syncChoir(async (name, _data, meta) => { got.push({ name, meta }); }, () => false);
+    expect(r).toMatchObject({ ok: true, newPieces: 3, programme: true });
+    expect(got.map((g) => g.meta.id)).toEqual(['faure-madrigal', choirPieceId('kammerchor', 'bbbbbbbbbbbb'), choirPieceId('kammerchor', 'cccccccccccc')]);
+    expect(got[0].meta).toMatchObject({ title: 'Madrigal, Op. 35', credit: 'Edition: Robert Kerr (CC BY-SA 4.0)', choir: 'kammerchor' });
+    expect(calls.filter((c) => c.url.endsWith('/file')).map((c) => c.url)[0]).toBe('/schonberg/api/choirs/kammerchor/pieces/aaaaaaaaaaaa/file');
+    // The programme keeps ids of pieces this phone doesn't have (yet): they light up when the score arrives.
+    expect(loadCycle().pieceIds).toEqual(['faure-madrigal', 'debussy-dieu']);
+    expect(localPieceId('kammerchor', { id: 'bbbbbbbbbbbb' })).toBe('choir-kammerchor-bbbbbbbbbbbb');
+  });
+
+  it('admins list the library and add a piece with one call (bearer or super-admin password)', async () => {
+    mockFetch((url) => (url.endsWith('/library')
+      ? { body: { pieces: [{ id: 'faure-madrigal', title: 'Madrigal, Op. 35', composer: 'Gabriel Fauré', size: 9, scoreId: null, inProgramme: false }] } }
+      : { body: { ok: true, added: true, programme: true, piece: { id: 'aaaaaaaaaaaa' }, choir: info([]) } }));
+    const l = await fetchLibrary('kammerchor', { bearer: 'tok' });
+    expect(l.pieces[0].id).toBe('faure-madrigal');
+    expect(headers(calls[0]).Authorization).toBe('Bearer tok');
+    const r = await addLibraryPiece('kammerchor', { superAdmin: 'pw' }, 'faure-madrigal', true);
+    expect(r.programme).toBe(true);
+    expect(calls[1].url).toBe('/schonberg/api/choirs/kammerchor/library/faure-madrigal');
+    expect(calls[1].init.method).toBe('POST');
+    expect(JSON.parse(calls[1].init.body as string)).toEqual({ programme: true });
+    expect(headers(calls[1])['X-Super-Admin']).toBe('pw');
   });
 });

@@ -74,6 +74,10 @@ export interface Score {
   title: string;
   composer: string;
   source: 'musicxml' | 'midi' | 'builtin';
+  /** Edition / licence credit (scores from the choir library carry one). */
+  credit?: string;
+  /** Code of the choir this score came from (choir scores only). */
+  choir?: string;
   parts: Part[];
   measures: Measure[];
   keys: KeySig[];

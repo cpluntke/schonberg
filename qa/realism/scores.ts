@@ -7,6 +7,7 @@ import type { Part, Score, Section } from '../../src/music/types';
 
 export const REPO_ROOT = resolve(__dirname, '../..');
 const PIECES_DIR = resolve(REPO_ROOT, 'public/pieces');
+const LIBRARY_DIR = resolve(REPO_ROOT, 'library');
 
 interface ManifestEntry { id: string; file: string; title: string; composer?: string; partNames?: string[] }
 
@@ -15,11 +16,11 @@ export interface LoadedPiece { id: string; score: Score; sections: Section[] }
 const cache = new Map<string, Promise<LoadedPiece>>();
 
 function manifest(): ManifestEntry[] {
-  const read = (f: string) => JSON.parse(readFileSync(resolve(PIECES_DIR, f), 'utf8')) as ManifestEntry[];
-  return [...read('repertoire.json'), ...read('manifest.json')];
+  const read = (d: string, f: string) => (JSON.parse(readFileSync(resolve(d, f), 'utf8')) as ManifestEntry[]).map((m) => ({ ...m, file: resolve(d, m.file) }));
+  return [...read(LIBRARY_DIR, 'index.json'), ...read(PIECES_DIR, 'manifest.json')];
 }
 
-/** Load a built-in piece by id (repertoire.json / manifest.json), mirroring library.ts. */
+/** Load a built-in or choir-library piece by id (library/index.json / public/pieces/manifest.json), mirroring library.ts. */
 export function loadPiece(id: string): Promise<LoadedPiece> {
   let p = cache.get(id);
   if (!p) {

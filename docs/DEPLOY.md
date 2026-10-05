@@ -12,8 +12,12 @@ and the next image deploy puts it online. To update later:
 
 ```bash
 scripts/export-messier.sh ../messiermarathon   # build with the right leaderboard URL + copy
-cd ../messiermarathon && git add schonberg_dist && git commit -m "Update Schönberg Hero" && git push
+cd ../messiermarathon && git add schonberg_dist schonberg_library && git commit -m "Update Schönberg Hero" && git push
 ```
+
+The script also copies the choir library (`library/`, scores only choir admins can add) to
+`schonberg_library/`, which Flask never serves as static files. A GET for any library file under
+`/schonberg/` answers 404.
 
 ## Option A: Render (Blueprint)
 

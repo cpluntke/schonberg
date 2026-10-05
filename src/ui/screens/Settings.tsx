@@ -235,7 +235,7 @@ export function Settings() {
 
       <section className="col small muted" style={{ gap: 4 }}>
         <span>Schönberg Hero · your practice stays on this device. Only your choir's leaderboard, the progress you share with your section lead, with a choir account the progress kept with it (above), and, if switched on, the anonymous daily usage totals (Privacy) reach the choir server.</span>
-        <span>Built-in scores: public-domain editions from the PDMX dataset (MuseScore community, CC BY 4.0 dataset) and original study pieces.</span>
+        <span>Built-in score: an original warm-up chorale. Scores from your choir's library show their edition and licence in the Library.</span>
       </section>
     </main>
   );
