@@ -53,6 +53,15 @@ export interface SingerProfile {
   releaseMs: Range2;
   /** Share of wrong notes (±1–2 semitones), exactly round(share·N) notes per take. */
   wrongNoteProb: number;
+  /** Exactly this many wrong notes per take (on top of wrongNoteProb), each off by `wrongByCents` (default ±1–2 semitones). */
+  wrongCount?: number;
+  wrongByCents?: number;
+  /**
+   * Sing every note on "doo" (level 1) instead of the lyrics: a short "d" (voice off, a soft burst)
+   * before every note and the vowel "u" throughout. Uses `dooConsonantMs` for the "d".
+   */
+  doo?: boolean;
+  dooConsonantMs?: Range2;
   /** Adversarial: sing each note's pitch one note late (note k gets note k−1's pitch). */
   noteBehind?: boolean;
   /** Adversarial: in legato, the pitch only starts moving this long after the vowel onset. */
@@ -186,6 +195,11 @@ export const SINGERS = {
   slowTransitions: { ...base, name: 'slow transitions (fn 3–4 Hz)', transition: { fnHz: [3, 4], zeta: [0.6, 0.75] } } as SingerProfile,
 };
 
+/** The same singer on "doo" (level 1): a "d" of 20–45 ms before every note, vowel "u". */
+export function onDoo(p: SingerProfile): SingerProfile {
+  return { ...p, name: `${p.name} on doo`, doo: true, dooConsonantMs: [20, 45] };
+}
+
 /** The idealised singer used by the earlier synthetic tests (for ablations). */
 export function idealised(p: SingerProfile): SingerProfile {
   return {
@@ -273,14 +287,14 @@ export function renderSinger(o: RenderOptions): RenderedTake {
   let vowel = perf.fork('vowel').next() * 5 | 0;
   // Wrong notes: exactly round(p·N) of the notes (random choice), so every take is equally bad.
   const wrongSet = new Set<number>();
-  if (P.wrongNoteProb > 0) {
+  if (P.wrongNoteProb > 0 || P.wrongCount) {
     const idx = Array.from({ length: rb - ra + 1 }, (_, k) => ra + k);
     const wr = perf.fork('wrong');
     for (let k = idx.length - 1; k > 0; k--) {
       const j = Math.floor(wr.next() * (k + 1));
       [idx[k], idx[j]] = [idx[j], idx[k]];
     }
-    idx.slice(0, Math.round(P.wrongNoteProb * idx.length)).forEach((k) => wrongSet.add(k));
+    idx.slice(0, Math.round(P.wrongNoteProb * idx.length) + (P.wrongCount ?? 0)).forEach((k) => wrongSet.add(k));
   }
   for (let i = ra; i <= rb; i++) {
     const n: ScoreNote = ns[i];
@@ -291,13 +305,14 @@ export function renderSinger(o: RenderOptions): RenderedTake {
     const prevPlan = notes[notes.length - 1];
     if (prevPlan) onset = Math.max(onset, prevPlan.vowelSec + 0.5 * (prevPlan.endSec - prevPlan.vowelSec), prevPlan.vowelSec + 0.04);
     const lyricConsonant = n.lyric ? startsWithConsonant(n.lyric) : false;
-    const cons = P.consonants && (hasLyrics ? lyricConsonant : afterRest || perf.chance(0.5));
-    const consDur = cons ? Math.min(perf.range(P.consonantMs) / 1000, 0.45 * n.dur / o.rate) : 0;
+    const cons = P.consonants && (P.doo || (hasLyrics ? lyricConsonant : afterRest || perf.chance(0.5)));
+    const consDur = cons ? Math.min(perf.range(P.doo ? P.dooConsonantMs ?? [20, 45] : P.consonantMs) / 1000, 0.45 * n.dur / o.rate) : 0;
     const consonantSec = cons ? onset - P.consonantLead * consDur : null;
     const vowelSec = cons ? onset + (1 - P.consonantLead) * consDur : onset;
-    if (n.lyric || !hasLyrics) vowel = (vowel + 1) % 5;
+    if (P.doo) vowel = 4; // "u"
+    else if (n.lyric || !hasLyrics) vowel = (vowel + 1) % 5;
     const wrong = wrongSet.has(i);
-    const wrongBy = wrong ? perf.pick([-2, -1, 1, 2]) : 0;
+    const wrongBy = wrong ? (P.wrongByCents != null ? P.wrongByCents / 100 : perf.pick([-2, -1, 1, 2])) : 0;
     const sungMidi = P.noteBehind && i > ra ? ns[i - 1].midi : n.midi;
     const targetMidi = sungMidi + wrongBy + perf.normal(P.biasCents, P.noteSdCents) / 100;
     let cmdSec = afterRest ? vowelSec : cons ? consonantSec! + 0.5 * consDur : vowelSec - perf.uniform(0, 0.03);

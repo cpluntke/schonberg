@@ -20,6 +20,7 @@ import { hashSeed } from './prng';
 import type { RenderedTake } from './singer';
 import { PITCH_CURRENT, PITCH_HEAD, trackOffline, type PitchImpl, type TrackReading } from './tracker';
 import { REPO_ROOT } from './scores';
+import { attemptPasses } from '../../src/progress/ladder';
 
 /**
  * The end-of-run policy of src/ui/screens/Play.tsx and src/ui/play/session.ts, read from the source
@@ -251,7 +252,8 @@ export function runSession(spec: PipelineSpec, setup: RunSetup, profile: Profile
     }
   }
   if (medOnset === null) medOnset = curAlign.medianOnsetMs(result, rate, part);
-  const passed = result.accuracy >= L.pass && timingFailMs === null;
+  // The current app's mark (level 1: every note right, ladder.attemptPasses); the baseline app's was accuracy only.
+  const passed = (after ? attemptPasses(level, result) : result.accuracy >= L.pass) && timingFailMs === null;
 
   // The live cents bubble (drawn from the session's samples).
   const avail = readings.map((r) => r.centreSec + N / 2 / take.sampleRate);

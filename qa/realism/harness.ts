@@ -141,7 +141,7 @@ export async function scorePcm(pcm: Float32Array, sc: Sidecar, o: ScoreOptions =
   if (!range) throw new Error('No notes in the section');
   const readings = o.samples ? [] : trackOffline(pcm, sc.sampleRate, { untilSec: o.untilSec, windowN: sc.windowN, ...o.track });
   const samples = o.samples ?? readingsToSamples(readings, sc);
-  const ctx: ScoringContext = { score: piece.score, part, range };
+  const ctx: ScoringContext = { score: piece.score, part, range, end: sc.to };
   const opts: ScoringOptions = { toleranceCents: sc.toleranceCents, tuning: sc.tuning, octaveTolerant: sc.octaveTolerant };
   const result = scorer(ctx, samples, opts);
   const out: Scored = {
@@ -224,7 +224,7 @@ export async function scoreRecordingApp(wavPath: string, sidecar: Sidecar | stri
   };
   const profile = sc.calibrated ? measured(sc.latencyMs) : { latencyMs: sc.latencyMs };
   return runSession(AFTER, {
-    take, part, ctx: { score: piece.score, part, range }, from: sc.from, to: sc.to, level: sc.level ?? 1, microSeed: 1, windowN: sc.windowN,
+    take, part, ctx: { score: piece.score, part, range, end: sc.to }, from: sc.from, to: sc.to, level: sc.level ?? 1, microSeed: 1, windowN: sc.windowN,
     scoring: { toleranceCents: sc.toleranceCents, tuning: sc.tuning, octaveTolerant: sc.octaveTolerant },
   }, profile);
 }

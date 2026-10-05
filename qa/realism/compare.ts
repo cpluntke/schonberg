@@ -58,7 +58,7 @@ export async function render(r: RenderSpec): Promise<RunSetup> {
     performanceSeed: hashSeed('perf', r.performanceSeed, r.target.id, r.level),
     microSeed: hashSeed('micro', r.microSeed, r.target.id, r.level),
   });
-  const ctx: ScoringContext = { score: piece.score, part, range };
+  const ctx: ScoringContext = { score: piece.score, part, range, end: sec.end };
   return { take, part, ctx, from: sec.start, to: sec.end, level: r.level, microSeed: r.microSeed };
 }
 

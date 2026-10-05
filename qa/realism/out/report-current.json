@@ -1,10 +1,19 @@
 {
  "meta": {
-  "head": "5bd2a68",
+  "head": "dec6845",
   "dirty": [
-   "src/audio/pitch.ts",
-   "src/game/align.ts",
-   "src/game/scoring.ts"
+   "rc/game/scoring.ts",
+   "src/game/types.ts",
+   "src/progress/ladder.ts",
+   "src/progress/store.ts",
+   "src/ui/play/highway2d.ts",
+   "src/ui/play/lastResult.ts",
+   "src/ui/play/session.ts",
+   "src/ui/play/staff2d.ts",
+   "src/ui/screens/Piece.tsx",
+   "src/ui/screens/Play.tsx",
+   "src/ui/screens/Results.tsx",
+   "src/ui/styles.css"
   ],
   "policy": [
    "LATE_FAIL_MS=250",
@@ -564,7 +573,7 @@
         "rhythm": 0.8880317460317455,
         "accuracy": 0.9523809523809523,
         "letter": "S",
-        "passed": true,
+        "passed": false,
         "timingFailMs": null,
         "alignedMs": 130,
         "match": 0.7444344505308106,
@@ -677,7 +686,7 @@
         "rhythm": 0.8046984126984122,
         "accuracy": 0.9523809523809523,
         "letter": "S",
-        "passed": true,
+        "passed": false,
         "timingFailMs": null,
         "alignedMs": 140,
         "match": 0.7303450809091786,
@@ -2900,7 +2909,7 @@
         "rhythm": 0.9354999999999972,
         "accuracy": 0.9761904761904762,
         "letter": "S",
-        "passed": true,
+        "passed": false,
         "timingFailMs": null,
         "alignedMs": 140,
         "match": 0.7790920196633415,
@@ -3013,7 +3022,7 @@
         "rhythm": 0.8514444444444417,
         "accuracy": 0.9761904761904762,
         "letter": "S",
-        "passed": true,
+        "passed": false,
         "timingFailMs": null,
         "alignedMs": 150,
         "match": 0.7568765861787669,
@@ -3361,7 +3370,7 @@
         "rhythm": 0.9883437500000001,
         "accuracy": 0.928125,
         "letter": "A",
-        "passed": true,
+        "passed": false,
         "timingFailMs": null,
         "alignedMs": 0,
         "match": 0.7666841527921229,
@@ -3475,7 +3484,7 @@
         "rhythm": 0.9883437500000001,
         "accuracy": 0.928125,
         "letter": "A",
-        "passed": true,
+        "passed": false,
         "timingFailMs": null,
         "alignedMs": 0,
         "match": 0.7666841527921229,
@@ -5211,7 +5220,7 @@
         "rhythm": 0.9239444444444422,
         "accuracy": 0.9761904761904762,
         "letter": "S",
-        "passed": true,
+        "passed": false,
         "timingFailMs": null,
         "alignedMs": 140,
         "match": 0.526472048549074,
@@ -5252,7 +5261,7 @@
         "rhythm": 0.839888888888885,
         "accuracy": 0.9726190476190476,
         "letter": "S",
-        "passed": true,
+        "passed": false,
         "timingFailMs": null,
         "alignedMs": 140,
         "match": 0.5054571699009212,
@@ -19042,7 +19051,7 @@
        "rhythm": 1,
        "accuracy": 0.7687499999999999,
        "letter": "B",
-       "passed": true,
+       "passed": false,
        "timingFailMs": null,
        "alignedMs": 0,
        "match": 0.39648347655304617,
@@ -19390,7 +19399,7 @@
        "rhythm": 1,
        "accuracy": 0.75,
        "letter": "B",
-       "passed": true,
+       "passed": false,
        "timingFailMs": null,
        "alignedMs": 0,
        "match": 0.3930916239959767,
@@ -19426,7 +19435,7 @@
        "rhythm": 1,
        "accuracy": 0.8208333333333333,
        "letter": "B",
-       "passed": true,
+       "passed": false,
        "timingFailMs": null,
        "alignedMs": 0,
        "match": 0.4057342597275709,
@@ -19793,7 +19802,7 @@
        "rhythm": 1,
        "accuracy": 0.7833333333333331,
        "letter": "B",
-       "passed": true,
+       "passed": false,
        "timingFailMs": null,
        "alignedMs": 0,
        "match": 0.3751778670583757,
@@ -20144,7 +20153,7 @@
        "rhythm": 0.9523809523809523,
        "accuracy": 0.7690476190476188,
        "letter": "B",
-       "passed": true,
+       "passed": false,
        "timingFailMs": null,
        "alignedMs": 0,
        "match": 0.33191220359301404,
@@ -20216,7 +20225,7 @@
        "rhythm": 0.9994682539682539,
        "accuracy": 0.8238095238095237,
        "letter": "B",
-       "passed": true,
+       "passed": false,
        "timingFailMs": null,
        "alignedMs": 0,
        "match": 0.3403557282494088,
@@ -23601,7 +23610,7 @@
        "rhythm": 0.7357152777777776,
        "accuracy": 0.8562500000000001,
        "letter": "A",
-       "passed": true,
+       "passed": false,
        "timingFailMs": null,
        "alignedMs": 80,
        "match": 0.6344470327683085,
@@ -24739,7 +24748,7 @@
        "rhythm": 0.8565793650793646,
        "accuracy": 0.9523809523809523,
        "letter": "S",
-       "passed": true,
+       "passed": false,
        "timingFailMs": null,
        "alignedMs": 140,
        "match": 0.7498131606866414,
@@ -27884,7 +27893,7 @@
     "rhythm": 0.87915873015873,
     "accuracy": 0.8023809523809524,
     "letter": "B",
-    "passed": true,
+    "passed": false,
     "timingFailMs": null,
     "alignedMs": 0,
     "match": 0.6125604527212832,
@@ -28050,7 +28059,7 @@
     "rhythm": 0.9982083333333334,
     "accuracy": 0.9791666666666666,
     "letter": "S",
-    "passed": true,
+    "passed": false,
     "timingFailMs": null,
     "alignedMs": 0,
     "match": 0.33084499930544703,
@@ -28547,7 +28556,7 @@
     "rhythm": 0.9523809523809523,
     "accuracy": 0.9452380952380953,
     "letter": "A",
-    "passed": true,
+    "passed": false,
     "timingFailMs": null,
     "alignedMs": 0,
     "match": 0.4673081130777253,
@@ -30947,9 +30956,9 @@
     "level": 1,
     "seed": 1,
     "before": {
-     "acc": 0.985064935064935,
-     "plainAcc": 0.985064935064935,
-     "passed": true,
+     "acc": 0.987012987012987,
+     "plainAcc": 0.987012987012987,
+     "passed": false,
      "alignedMs": 0,
      "fast": {
       "perfect": 0,
@@ -30960,8 +30969,8 @@
      "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.987012987012987,
-     "plainAcc": 0.987012987012987,
+     "acc": 1,
+     "plainAcc": 1,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -30978,9 +30987,9 @@
     "level": 1,
     "seed": 2,
     "before": {
-     "acc": 0.972077922077922,
-     "plainAcc": 0.972077922077922,
-     "passed": true,
+     "acc": 0.987012987012987,
+     "plainAcc": 0.987012987012987,
+     "passed": false,
      "alignedMs": 0,
      "fast": {
       "perfect": 0,
@@ -30991,8 +31000,8 @@
      "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.974025974025974,
-     "plainAcc": 0.974025974025974,
+     "acc": 1,
+     "plainAcc": 1,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -31022,8 +31031,8 @@
      "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.9772727272727273,
-     "plainAcc": 0.9772727272727273,
+     "acc": 0.9902597402597403,
+     "plainAcc": 0.9902597402597403,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -31053,8 +31062,8 @@
      "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.9811688311688314,
-     "plainAcc": 0.9681818181818184,
+     "acc": 0.9941558441558443,
+     "plainAcc": 0.9811688311688314,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -31084,8 +31093,8 @@
      "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.9792207792207793,
-     "plainAcc": 0.9792207792207793,
+     "acc": 0.9922077922077923,
+     "plainAcc": 0.9922077922077923,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -31115,8 +31124,8 @@
      "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.9792207792207793,
-     "plainAcc": 0.9792207792207793,
+     "acc": 0.9922077922077923,
+     "plainAcc": 0.9922077922077923,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -31133,8 +31142,8 @@
     "level": 1,
     "seed": 1,
     "before": {
-     "acc": 0.9968750000000001,
-     "plainAcc": 0.9968750000000001,
+     "acc": 1,
+     "plainAcc": 1,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -31164,8 +31173,8 @@
     "level": 1,
     "seed": 2,
     "before": {
-     "acc": 0.9968750000000001,
-     "plainAcc": 0.9968750000000001,
+     "acc": 1,
+     "plainAcc": 1,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -31505,8 +31514,8 @@
     "level": 1,
     "seed": 1,
     "before": {
-     "acc": 0.9921875,
-     "plainAcc": 0.9921875,
+     "acc": 1,
+     "plainAcc": 1,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -31518,8 +31527,8 @@
      "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.9984375,
-     "plainAcc": 0.9984375,
+     "acc": 1,
+     "plainAcc": 1,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -31536,8 +31545,8 @@
     "level": 1,
     "seed": 2,
     "before": {
-     "acc": 0.9968750000000001,
-     "plainAcc": 0.9968750000000001,
+     "acc": 1,
+     "plainAcc": 1,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -31549,8 +31558,8 @@
      "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.9984375,
-     "plainAcc": 0.9984375,
+     "acc": 1,
+     "plainAcc": 1,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -31691,8 +31700,8 @@
     "level": 1,
     "seed": 1,
     "before": {
-     "acc": 0.9765625,
-     "plainAcc": 0.9765625,
+     "acc": 0.99375,
+     "plainAcc": 0.99375,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -31722,8 +31731,8 @@
     "level": 1,
     "seed": 2,
     "before": {
-     "acc": 0.9671875,
-     "plainAcc": 0.9671875,
+     "acc": 1,
+     "plainAcc": 1,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -31908,8 +31917,8 @@
     "level": 1,
     "seed": 2,
     "before": {
-     "acc": 0.9984375,
-     "plainAcc": 0.9984375,
+     "acc": 0.9953125000000002,
+     "plainAcc": 0.9953125000000002,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -31921,8 +31930,8 @@
      "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.9968750000000001,
-     "plainAcc": 0.9968750000000001,
+     "acc": 1,
+     "plainAcc": 1,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -32063,8 +32072,8 @@
     "level": 1,
     "seed": 1,
     "before": {
-     "acc": 0.9921875,
-     "plainAcc": 0.9921875,
+     "acc": 0.9968749999999998,
+     "plainAcc": 0.9968749999999998,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -32077,7 +32086,7 @@
     },
     "after": {
      "acc": 1,
-     "plainAcc": 0.9984375,
+     "plainAcc": 1,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -32094,8 +32103,8 @@
     "level": 1,
     "seed": 2,
     "before": {
-     "acc": 0.9828125000000001,
-     "plainAcc": 0.9828125000000001,
+     "acc": 0.9953124999999999,
+     "plainAcc": 0.9953124999999999,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -32107,8 +32116,8 @@
      "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.9953124999999999,
-     "plainAcc": 0.9953124999999999,
+     "acc": 1,
+     "plainAcc": 1,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -32249,8 +32258,8 @@
     "level": 1,
     "seed": 1,
     "before": {
-     "acc": 0.9609375,
-     "plainAcc": 0.9609375,
+     "acc": 0.990625,
+     "plainAcc": 0.990625,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -32262,8 +32271,8 @@
      "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.9984375,
-     "plainAcc": 0.9984375,
+     "acc": 0.9953125000000002,
+     "plainAcc": 0.9968750000000001,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -32280,8 +32289,8 @@
     "level": 1,
     "seed": 2,
     "before": {
-     "acc": 0.9624999999999999,
-     "plainAcc": 0.9624999999999999,
+     "acc": 0.99375,
+     "plainAcc": 0.99375,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -32293,8 +32302,8 @@
      "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.9968750000000001,
-     "plainAcc": 0.9968750000000001,
+     "acc": 1,
+     "plainAcc": 0.9984375,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -32435,8 +32444,8 @@
     "level": 1,
     "seed": 1,
     "before": {
-     "acc": 0.9984375,
-     "plainAcc": 0.9984375,
+     "acc": 0.990625,
+     "plainAcc": 0.990625,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -32466,8 +32475,8 @@
     "level": 1,
     "seed": 2,
     "before": {
-     "acc": 0.9848958333333333,
-     "plainAcc": 0.9833333333333334,
+     "acc": 0.9953125000000002,
+     "plainAcc": 0.9953125000000002,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -32479,8 +32488,8 @@
      "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.9953125000000002,
-     "plainAcc": 0.99375,
+     "acc": 0.9984375,
+     "plainAcc": 0.9984375,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -32621,8 +32630,8 @@
     "level": 1,
     "seed": 1,
     "before": {
-     "acc": 0.9859375,
-     "plainAcc": 0.9859375,
+     "acc": 0.99375,
+     "plainAcc": 0.99375,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -32634,8 +32643,8 @@
      "liveFastMiss": 0
     },
     "after": {
-     "acc": 1,
-     "plainAcc": 1,
+     "acc": 0.9984375,
+     "plainAcc": 0.9984375,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -32652,8 +32661,8 @@
     "level": 1,
     "seed": 2,
     "before": {
-     "acc": 0.9749999999999996,
-     "plainAcc": 0.9749999999999996,
+     "acc": 0.990625,
+     "plainAcc": 0.990625,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -32665,7 +32674,7 @@
      "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.9984375,
+     "acc": 0.9968750000000001,
      "plainAcc": 0.9984375,
      "passed": true,
      "alignedMs": 0,
@@ -33024,8 +33033,8 @@
     "level": 1,
     "seed": 2,
     "before": {
-     "acc": 0.9968750000000001,
-     "plainAcc": 0.9968750000000001,
+     "acc": 1,
+     "plainAcc": 1,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -33365,30 +33374,30 @@
     "level": 1,
     "seed": 1,
     "before": {
-     "acc": 0.9473958333333331,
-     "plainAcc": 0.9473958333333331,
+     "acc": 0.9796875000000002,
+     "plainAcc": 0.9796875000000002,
      "passed": true,
      "alignedMs": 0,
      "fast": {
-      "perfect": 68,
-      "good": 27,
+      "perfect": 83,
+      "good": 13,
       "ok": 0,
-      "miss": 1
+      "miss": 0
      },
-     "liveFastMiss": 1
+     "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.9864583333333333,
-     "plainAcc": 0.9864583333333333,
+     "acc": 0.9953125000000002,
+     "plainAcc": 0.9953125000000002,
      "passed": true,
      "alignedMs": 0,
      "fast": {
       "perfect": 93,
-      "good": 2,
+      "good": 3,
       "ok": 0,
-      "miss": 1
+      "miss": 0
      },
-     "liveFastMiss": 1
+     "liveFastMiss": 0
     }
    },
    {
@@ -33396,26 +33405,26 @@
     "level": 1,
     "seed": 2,
     "before": {
-     "acc": 0.8968749999999996,
-     "plainAcc": 0.8968749999999996,
+     "acc": 0.984375,
+     "plainAcc": 0.984375,
      "passed": true,
      "alignedMs": 0,
      "fast": {
-      "perfect": 47,
-      "good": 46,
+      "perfect": 86,
+      "good": 10,
       "ok": 0,
-      "miss": 3
+      "miss": 0
      },
-     "liveFastMiss": 3
+     "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.9874999999999999,
-     "plainAcc": 0.9874999999999999,
+     "acc": 0.99375,
+     "plainAcc": 0.99375,
      "passed": true,
      "alignedMs": 0,
      "fast": {
-      "perfect": 88,
-      "good": 8,
+      "perfect": 92,
+      "good": 4,
       "ok": 0,
       "miss": 0
      },
@@ -33551,21 +33560,21 @@
     "level": 1,
     "seed": 1,
     "before": {
-     "acc": 0.9770833333333332,
-     "plainAcc": 0.9770833333333332,
+     "acc": 0.9718749999999999,
+     "plainAcc": 0.9718749999999999,
      "passed": true,
      "alignedMs": 0,
      "fast": {
-      "perfect": 87,
-      "good": 8,
+      "perfect": 78,
+      "good": 18,
       "ok": 0,
-      "miss": 1
+      "miss": 0
      },
-     "liveFastMiss": 1
+     "liveFastMiss": 0
     },
     "after": {
      "acc": 0.9953125000000002,
-     "plainAcc": 0.9953125000000002,
+     "plainAcc": 0.99375,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -33582,30 +33591,30 @@
     "level": 1,
     "seed": 2,
     "before": {
-     "acc": 0.9578125000000002,
-     "plainAcc": 0.9578125000000002,
+     "acc": 0.9734374999999998,
+     "plainAcc": 0.9734374999999998,
      "passed": true,
      "alignedMs": 0,
      "fast": {
-      "perfect": 86,
-      "good": 7,
+      "perfect": 79,
+      "good": 17,
       "ok": 0,
-      "miss": 3
+      "miss": 0
      },
-     "liveFastMiss": 3
+     "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.9609375,
-     "plainAcc": 0.9609375,
+     "acc": 0.9953125000000002,
+     "plainAcc": 0.9953125000000002,
      "passed": true,
      "alignedMs": 0,
      "fast": {
-      "perfect": 88,
-      "good": 5,
+      "perfect": 93,
+      "good": 3,
       "ok": 0,
-      "miss": 3
+      "miss": 0
      },
-     "liveFastMiss": 3
+     "liveFastMiss": 0
     }
    },
    {
@@ -33737,26 +33746,26 @@
     "level": 1,
     "seed": 1,
     "before": {
-     "acc": 0.9671874999999998,
-     "plainAcc": 0.9671874999999998,
+     "acc": 0.9828125,
+     "plainAcc": 0.9828125,
      "passed": true,
      "alignedMs": 0,
      "fast": {
-      "perfect": 75,
-      "good": 21,
+      "perfect": 85,
+      "good": 11,
       "ok": 0,
       "miss": 0
      },
      "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.990625,
-     "plainAcc": 0.990625,
+     "acc": 0.9968750000000001,
+     "plainAcc": 0.9968750000000001,
      "passed": true,
      "alignedMs": 0,
      "fast": {
-      "perfect": 90,
-      "good": 6,
+      "perfect": 94,
+      "good": 2,
       "ok": 0,
       "miss": 0
      },
@@ -33768,30 +33777,30 @@
     "level": 1,
     "seed": 2,
     "before": {
-     "acc": 0.9583333333333334,
-     "plainAcc": 0.9494791666666668,
+     "acc": 0.9765625,
+     "plainAcc": 0.9765625,
      "passed": true,
      "alignedMs": 0,
      "fast": {
-      "perfect": 75,
-      "good": 20,
+      "perfect": 81,
+      "good": 15,
       "ok": 0,
-      "miss": 1
+      "miss": 0
      },
-     "liveFastMiss": 2
+     "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.9864583333333333,
-     "plainAcc": 0.9760416666666667,
+     "acc": 0.9937499999999999,
+     "plainAcc": 0.9937499999999999,
      "passed": true,
      "alignedMs": 0,
      "fast": {
-      "perfect": 93,
-      "good": 2,
+      "perfect": 92,
+      "good": 4,
       "ok": 0,
-      "miss": 1
+      "miss": 0
      },
-     "liveFastMiss": 2
+     "liveFastMiss": 0
     }
    },
    {
@@ -33924,16 +33933,15 @@
     "0.15–0.25 s": {
      "notes": 3078,
      "tracker smear (window, reverb, smoother)": 9,
-     "singer not settled (glide)": 3,
-     "no readings: consonant / silence": 1
+     "singer not settled (glide)": 3
     },
     "<0.15 s": {
      "notes": 4032,
-     "arrival never reached": 40,
-     "no readings: tracker gated (unclear)": 26,
-     "singer not settled (glide)": 147,
-     "tracker smear (window, reverb, smoother)": 120,
-     "no readings: consonant / silence": 2
+     "arrival never reached": 39,
+     "no readings: tracker gated (unclear)": 24,
+     "singer not settled (glide)": 146,
+     "tracker smear (window, reverb, smoother)": 116,
+     "no readings: consonant / silence": 1
     }
    },
    "after": {
@@ -33944,8 +33952,8 @@
     },
     "<0.15 s": {
      "notes": 4032,
-     "tracker smear (window, reverb, smoother)": 77,
-     "too few readings in the note to judge it": 38,
+     "tracker smear (window, reverb, smoother)": 73,
+     "too few readings in the note to judge it": 37,
      "singer not settled (glide)": 61,
      "no readings: consonant / silence": 1,
      "only transition readings in the note": 5
@@ -34144,8 +34152,8 @@
     "passage": "ravel-nicolette A b20-45",
     "level": 1,
     "before": {
-     "acc": 0.5824675324675325,
-     "plainAcc": 0.5824675324675325,
+     "acc": 0.5844155844155844,
+     "plainAcc": 0.5844155844155844,
      "passed": false,
      "alignedMs": 0,
      "fast": {
@@ -34157,8 +34165,8 @@
      "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.5844155844155844,
-     "plainAcc": 0.5844155844155844,
+     "acc": 0.5974025974025974,
+     "plainAcc": 0.5974025974025974,
      "passed": false,
      "alignedMs": 0,
      "fast": {
@@ -34188,8 +34196,8 @@
      "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.5805194805194805,
-     "plainAcc": 0.5805194805194805,
+     "acc": 0.5935064935064935,
+     "plainAcc": 0.5935064935064935,
      "passed": false,
      "alignedMs": 0,
      "fast": {
@@ -34219,8 +34227,8 @@
      "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.5707792207792208,
-     "plainAcc": 0.5707792207792208,
+     "acc": 0.5818181818181819,
+     "plainAcc": 0.5818181818181819,
      "passed": false,
      "alignedMs": 0,
      "fast": {
@@ -34237,8 +34245,8 @@
     "passage": "synth 104bpm 16ths ta",
     "level": 1,
     "before": {
-     "acc": 0.5989583333333335,
-     "plainAcc": 0.5989583333333335,
+     "acc": 0.5979166666666668,
+     "plainAcc": 0.5979166666666668,
      "passed": false,
      "alignedMs": 0,
      "fast": {
@@ -34250,8 +34258,8 @@
      "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.6026041666666667,
-     "plainAcc": 0.6026041666666667,
+     "acc": 0.5963541666666667,
+     "plainAcc": 0.5963541666666667,
      "passed": false,
      "alignedMs": 0,
      "fast": {
@@ -34423,26 +34431,26 @@
     "passage": "synth 144bpm 16ths ta",
     "level": 1,
     "before": {
-     "acc": 0.5776041666666668,
-     "plainAcc": 0.5776041666666668,
+     "acc": 0.5947916666666667,
+     "plainAcc": 0.5932291666666667,
      "passed": false,
      "alignedMs": 0,
      "fast": {
-      "perfect": 41,
-      "good": 17,
+      "perfect": 52,
+      "good": 6,
       "ok": 0,
       "miss": 38
      },
      "liveFastMiss": 38
     },
     "after": {
-     "acc": 0.5963541666666667,
-     "plainAcc": 0.5963541666666667,
+     "acc": 0.6010416666666667,
+     "plainAcc": 0.6026041666666667,
      "passed": false,
      "alignedMs": 0,
      "fast": {
-      "perfect": 53,
-      "good": 5,
+      "perfect": 56,
+      "good": 2,
       "ok": 0,
       "miss": 38
      },
@@ -34516,30 +34524,30 @@
     "passage": "synth 144bpm 16ths a",
     "level": 1,
     "before": {
-     "acc": 0.5885416666666667,
-     "plainAcc": 0.5869791666666667,
+     "acc": 0.5750000000000001,
+     "plainAcc": 0.5750000000000001,
      "passed": false,
      "alignedMs": 0,
      "fast": {
-      "perfect": 48,
-      "good": 10,
+      "perfect": 45,
+      "good": 12,
       "ok": 0,
-      "miss": 38
+      "miss": 39
      },
-     "liveFastMiss": 38
+     "liveFastMiss": 39
     },
     "after": {
-     "acc": 0.5963541666666667,
-     "plainAcc": 0.5979166666666668,
+     "acc": 0.584375,
+     "plainAcc": 0.584375,
      "passed": false,
      "alignedMs": 0,
      "fast": {
-      "perfect": 53,
-      "good": 5,
+      "perfect": 51,
+      "good": 6,
       "ok": 0,
-      "miss": 38
+      "miss": 39
      },
-     "liveFastMiss": 38
+     "liveFastMiss": 39
     }
    },
    {
@@ -34609,9 +34617,9 @@
     "passage": "debussy-yver A b1-23",
     "level": 1,
     "before": {
-     "acc": 0.7725000000000009,
-     "plainAcc": 0.7618750000000009,
-     "passed": true,
+     "acc": 0.7937500000000008,
+     "plainAcc": 0.7937500000000008,
+     "passed": false,
      "alignedMs": 0,
      "fast": {
       "perfect": 0,
@@ -34622,9 +34630,9 @@
      "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.7706250000000009,
-     "plainAcc": 0.7600000000000009,
-     "passed": true,
+     "acc": 0.7850000000000008,
+     "plainAcc": 0.7850000000000008,
+     "passed": false,
      "alignedMs": 0,
      "fast": {
       "perfect": 0,
@@ -34702,9 +34710,9 @@
     "passage": "debussy-dieu A b1-5",
     "level": 1,
     "before": {
-     "acc": 0.80625,
-     "plainAcc": 0.80625,
-     "passed": true,
+     "acc": 0.8145833333333333,
+     "plainAcc": 0.8145833333333333,
+     "passed": false,
      "alignedMs": 0,
      "fast": {
       "perfect": 0,
@@ -34715,9 +34723,9 @@
      "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.7645833333333333,
-     "plainAcc": 0.7645833333333333,
-     "passed": true,
+     "acc": 0.7791666666666667,
+     "plainAcc": 0.7791666666666667,
+     "passed": false,
      "alignedMs": 0,
      "fast": {
       "perfect": 0,
@@ -34795,9 +34803,9 @@
     "passage": "ravel-nicolette A b20-45",
     "level": 1,
     "before": {
-     "acc": 0.7694805194805202,
-     "plainAcc": 0.7694805194805202,
-     "passed": true,
+     "acc": 0.7584415584415592,
+     "plainAcc": 0.7584415584415592,
+     "passed": false,
      "alignedMs": 0,
      "fast": {
       "perfect": 0,
@@ -34808,9 +34816,9 @@
      "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.7694805194805202,
-     "plainAcc": 0.7694805194805202,
-     "passed": true,
+     "acc": 0.7233766233766241,
+     "plainAcc": 0.7233766233766241,
+     "passed": false,
      "alignedMs": 0,
      "fast": {
       "perfect": 0,
@@ -34890,7 +34898,7 @@
     "before": {
      "acc": 0.7765624999999999,
      "plainAcc": 0.7765624999999999,
-     "passed": true,
+     "passed": false,
      "alignedMs": 0,
      "fast": {
       "perfect": 0,
@@ -34901,9 +34909,9 @@
      "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.7739583333333333,
-     "plainAcc": 0.7739583333333333,
-     "passed": true,
+     "acc": 0.7427083333333334,
+     "plainAcc": 0.7411458333333335,
+     "passed": false,
      "alignedMs": 0,
      "fast": {
       "perfect": 0,
@@ -34981,9 +34989,9 @@
     "passage": "synth 144bpm 8ths ta",
     "level": 1,
     "before": {
-     "acc": 0.827083333333334,
-     "plainAcc": 0.827083333333334,
-     "passed": true,
+     "acc": 0.8000000000000007,
+     "plainAcc": 0.8000000000000007,
+     "passed": false,
      "alignedMs": 0,
      "fast": {
       "perfect": 0,
@@ -34994,8 +35002,8 @@
      "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.8093750000000006,
-     "plainAcc": 0.8093750000000006,
+     "acc": 0.8031250000000006,
+     "plainAcc": 0.8031250000000006,
      "passed": true,
      "alignedMs": 0,
      "fast": {
@@ -35074,30 +35082,30 @@
     "passage": "synth 144bpm 16ths ta",
     "level": 1,
     "before": {
-     "acc": 0.7546875000000002,
-     "plainAcc": 0.7546875000000002,
-     "passed": true,
+     "acc": 0.7947916666666667,
+     "plainAcc": 0.7947916666666667,
+     "passed": false,
      "alignedMs": 0,
      "fast": {
-      "perfect": 7,
-      "good": 77,
+      "perfect": 10,
+      "good": 78,
       "ok": 0,
-      "miss": 12
+      "miss": 8
      },
-     "liveFastMiss": 12
+     "liveFastMiss": 8
     },
     "after": {
-     "acc": 0.7656249999999999,
-     "plainAcc": 0.7656249999999999,
+     "acc": 0.7833333333333333,
+     "plainAcc": 0.7833333333333333,
      "passed": true,
      "alignedMs": 0,
      "fast": {
       "perfect": 14,
-      "good": 70,
+      "good": 72,
       "ok": 0,
-      "miss": 12
+      "miss": 10
      },
-     "liveFastMiss": 12
+     "liveFastMiss": 10
     }
    },
    {
@@ -35167,30 +35175,30 @@
     "passage": "synth 144bpm 16ths a",
     "level": 1,
     "before": {
-     "acc": 0.7390625000000002,
-     "plainAcc": 0.7390625000000002,
+     "acc": 0.7312500000000002,
+     "plainAcc": 0.7312500000000002,
      "passed": false,
      "alignedMs": 0,
      "fast": {
-      "perfect": 14,
-      "good": 67,
+      "perfect": 9,
+      "good": 72,
       "ok": 0,
       "miss": 15
      },
      "liveFastMiss": 15
     },
     "after": {
-     "acc": 0.7135416666666671,
-     "plainAcc": 0.7135416666666671,
+     "acc": 0.7640625,
+     "plainAcc": 0.7625000000000001,
      "passed": false,
      "alignedMs": 0,
      "fast": {
-      "perfect": 9,
-      "good": 70,
+      "perfect": 13,
+      "good": 71,
       "ok": 0,
-      "miss": 17
+      "miss": 12
      },
-     "liveFastMiss": 17
+     "liveFastMiss": 12
     }
    },
    {
@@ -35539,8 +35547,8 @@
     "passage": "synth 104bpm 16ths ta",
     "level": 1,
     "before": {
-     "acc": 0.08177083333333333,
-     "plainAcc": 0.08177083333333333,
+     "acc": 0.09218749999999999,
+     "plainAcc": 0.09218749999999999,
      "passed": false,
      "alignedMs": 0,
      "fast": {
@@ -35552,8 +35560,8 @@
      "liveFastMiss": 0
     },
     "after": {
-     "acc": 0.08177083333333333,
-     "plainAcc": 0.08177083333333333,
+     "acc": 0.08333333333333333,
+     "plainAcc": 0.08333333333333333,
      "passed": false,
      "alignedMs": 0,
      "fast": {
@@ -35831,17 +35839,17 @@
      "liveFastMiss": 88
     },
     "after": {
-     "acc": 0.09375,
-     "plainAcc": 0.09375,
+     "acc": 0.08333333333333333,
+     "plainAcc": 0.08333333333333333,
      "passed": false,
      "alignedMs": 0,
      "fast": {
-      "perfect": 9,
+      "perfect": 8,
       "good": 0,
       "ok": 0,
-      "miss": 87
+      "miss": 88
      },
-     "liveFastMiss": 87
+     "liveFastMiss": 88
     }
    },
    {

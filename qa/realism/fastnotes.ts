@@ -14,7 +14,7 @@ import { makePart, makeScore } from '../../src/game/testutil';
 import { CLARITY_GATE, RMS_GATE } from '../../src/audio/pitch';
 import { levelSetup, oracleSamples } from './harness';
 import { AFTER, UNCALIBRATED, afterScorerView, measured, runSession, type PipelineSpec, type Profile, type SessionOutcome } from './pipeline';
-import { SINGERS } from './singer';
+import { SINGERS, onDoo } from './singer';
 import { gitVariant } from './variants';
 import { hashSeed } from './prng';
 import { barSpan, findPart, loadPiece, noteRangeFor } from './scores';
@@ -84,7 +84,7 @@ export function renderTake(passage: FastPassage, singer: SingerProfile, level: n
 
 /** Score a rendered take with a pipeline (default: the delay was measured and is exact). */
 export function scoreTake(passage: FastPassage, take: RenderedTake, level: number, seed: number, spec: PipelineSpec = AFTER, profile: Profile = measured(take.trueLatencyMs)): RenderedRun {
-  const ctx: ScoringContext = { score: passage.score, part: passage.part, range: passage.range };
+  const ctx: ScoringContext = { score: passage.score, part: passage.part, range: passage.range, end: passage.to };
   const outcome = runSession(spec, { take, part: passage.part, ctx, from: passage.from, to: passage.to, level, microSeed: seed }, profile);
   return { passage, level, take, outcome };
 }
@@ -137,7 +137,7 @@ export function diagnose(run: RenderedRun, mod: ScoringModule = curScoring): { n
   const rate = take.rate;
   const tol = tolOf(level);
   const opts = { toleranceCents: tol, tuning: 'equal' as const, octaveTolerant: false };
-  const ctx: ScoringContext = { score: passage.score, part: passage.part, range: passage.range };
+  const ctx: ScoringContext = { score: passage.score, part: passage.part, range: passage.range, end: passage.to };
   const lag = (outcome.alignedMs / 1000) * rate;
   const view = afterScorerView(passage.part, outcome.samples).map((s) => ({ ...s, time: s.time - lag }));
   const ls = new mod.LiveScorer(ctx, opts);
@@ -296,7 +296,8 @@ export async function fastExperiment(o: { seeds?: number[] } = {}): Promise<Fast
   for (const p of goodPassages) {
     for (const level of [1, 2, 4]) {
       for (const seed of seeds) {
-        const take = renderTake(p, SINGERS.goodChoir, level, seed);
+        // Level 1 is sung on "doo" (docs/LEVELS.md).
+        const take = renderTake(p, level === 1 ? onDoo(SINGERS.goodChoir) : SINGERS.goodChoir, level, seed);
         const ra = scoreTake(p, take, level, seed, AFTER);
         const da = diagnose(ra);
         report.mismatches += da.mismatches;
@@ -315,7 +316,7 @@ export async function fastExperiment(o: { seeds?: number[] } = {}): Promise<Fast
   for (const singer of [SINGERS.wrongNotes, SINGERS.flat40, SINGERS.oneBehind]) {
     for (const p of advPassages) {
       for (const level of [1, 2, 4]) {
-        const take = renderTake(p, singer, level, seeds[0]);
+        const take = renderTake(p, level === 1 ? onDoo(singer) : singer, level, seeds[0]);
         const ra = scoreTake(p, take, level, seeds[0], AFTER);
         const rb = before ? scoreTake(p, take, level, seeds[0], before) : null;
         report.adversarial.push({ singer: singer.name, passage: p.id, level, before: rb && fastRun(rb), after: fastRun(ra) });
