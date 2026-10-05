@@ -94,10 +94,13 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
       const out = synthBus(ctx);
       const t0 = ctx.currentTime + 0.25;
       notes.forEach((m, k) => scheduleVoice(ctx, out, m, t0 + k * NOTE_SEC, NOTE_SEC * 0.9, { timbre: 'guide' }));
-      const respStart = t0 + PATTERN.length * NOTE_SEC + 0.55;
+      // A breath after the pattern, then a click on your first note and soft ticks on the others
+      // so the answer keeps the pattern's pace (clicks aren't pitched, the tracker ignores them).
+      const respStart = t0 + PATTERN.length * NOTE_SEC + 1.0;
       scheduleClick(ctx, out, respStart - 0.02, true, 0.35);
+      for (let k = 1; k < PATTERN.length; k++) scheduleClick(ctx, out, respStart + k * NOTE_SEC - 0.02, false, 0.12);
       const lat = (profile.latencyMs || estimateLatencyMs()) / 1000;
-      const respEnd = respStart + PATTERN.length * NOTE_SEC + 0.6;
+      const respEnd = respStart + PATTERN.length * NOTE_SEC + 0.8;
       const readings: { midi: number | null; rms: number }[] = [];
       const off = tracker.onPitch((p) => {
         const t = p.ctxTime - lat;

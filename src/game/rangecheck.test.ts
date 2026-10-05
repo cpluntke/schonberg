@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { PATTERN, judgePattern, shouldStop, summarize } from './rangecheck';
 
-/** Readings of a sung-back pattern: 20 readings per note, with a little vibrato and an offset. */
+/** Readings of a sung-back pattern: 37 readings (0.75 s) per note, with a little vibrato and an offset. */
 function sing(root: number, opts: { cents?: number; wobble?: number; skip?: number[]; db?: number; drift?: number } = {}) {
   const out: { midi: number | null; rms: number }[] = [];
   PATTERN.forEach((x, k) => {
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 37; i++) {
       const skip = opts.skip?.includes(x);
       // drift: the pitch slides across each note (an unsteady voice), in cents per reading.
-      const d = (opts.drift ?? 0) * (i - 10);
+      const d = (opts.drift ?? 0) * (i - 18);
       out.push({ midi: skip ? null : root + x + ((opts.cents ?? 0) + d + (opts.wobble ?? 10) * Math.sin(i + k)) / 100, rms: 10 ** ((opts.db ?? -20) / 20) });
     }
   });
@@ -24,7 +24,7 @@ describe('range check', () => {
   });
   it('flat or wobbly is shaky; a top note not reached is shaky, nothing sung is missed', () => {
     expect(judgePattern(60, sing(60, { cents: -70 })).verdict).toBe('shaky');
-    expect(judgePattern(60, sing(60, { drift: 8 })).verdict).toBe('shaky');
+    expect(judgePattern(60, sing(60, { drift: 4 })).verdict).toBe('shaky');
     expect(judgePattern(72, sing(72, { skip: [4] })).verdict).toBe('shaky');
     expect(judgePattern(60, [{ midi: null, rms: 0.001 }]).verdict).toBe('missed');
   });
@@ -35,10 +35,36 @@ describe('range check', () => {
     expect(shouldStop([good, bad, bad])).toBe(true);
   });
   it('keeps the steady range, reports the reach', () => {
-    const rounds = [judgePattern(57, sing(57)), judgePattern(59, sing(59)), judgePattern(61, sing(61, { drift: 8 })), judgePattern(55, sing(55))];
+    const rounds = [judgePattern(57, sing(57)), judgePattern(59, sing(59)), judgePattern(61, sing(61, { drift: 4 })), judgePattern(55, sing(55))];
     const s = summarize(rounds);
     expect(s.steady).toEqual({ lo: 55, hi: 63 });
     expect(s.reach).toEqual({ lo: 55, hi: 65 });
+  });
+});
+
+describe('range check: the glide between notes', () => {
+  /** A singer who slides ~120 ms into each note (wider high up) and holds it steadily. */
+  const glide = (root: number, slide: number) => {
+    const out: { midi: number | null; rms: number }[] = [];
+    let prev = root - 2;
+    PATTERN.forEach((x) => {
+      const target = root + x;
+      for (let i = 0; i < 37; i++) { // 0.75 s per note
+        const into = i < 6 ? (prev - target) * (1 - i / 6) + (i < 6 ? slide / 100 * (1 - i / 6) : 0) : 0;
+        out.push({ midi: target + into + 0.08 * Math.sin(i * 1.7), rms: 0.1 });
+      }
+      prev = target;
+    });
+    return out;
+  };
+  it('the slide into each note does not make a held note unsteady', () => {
+    expect(judgePattern(72, glide(72, 60)).verdict).toBe('good');
+    expect(judgePattern(60, glide(60, 30)).verdict).toBe('good');
+  });
+  it('a pitch that drifts through the whole note is still unsteady', () => {
+    const drift: { midi: number | null; rms: number }[] = [];
+    PATTERN.forEach((x) => { for (let i = 0; i < 37; i++) drift.push({ midi: 72 + x + (i - 18) * 0.04, rms: 0.1 }); });
+    expect(judgePattern(72, drift).verdict).toBe('shaky');
   });
 });
 
