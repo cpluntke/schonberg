@@ -59,7 +59,7 @@ export interface SessionConfig {
   /** Keep a recording of the run (memory only) so it can be shared as a reference recording. */
   record?: boolean;
   /** Testing / demo: synthesise the singer instead of using the mic. */
-  simulate?: 'perfect' | 'flat' | 'sloppy' | null;
+  simulate?: 'perfect' | 'flat' | 'sloppy' | 'oneflat' | null;
 }
 
 export type SessionPhase = 'idle' | 'countin' | 'playing' | 'paused' | 'done';
@@ -133,7 +133,7 @@ export class PracticeSession {
       else this.partGains[p.id] = p.voiceType === 'other' ? 0.55 : 0.7;
     }
     if (cfg.range && !cfg.listenOnly) {
-      const ctx: ScoringContext = { score: cfg.score, part: cfg.part, range: cfg.range };
+      const ctx: ScoringContext = { score: cfg.score, part: cfg.part, range: cfg.range, end: cfg.to };
       this.live = new LiveScorer(ctx, cfg.scoring);
     }
   }
@@ -263,9 +263,11 @@ export class PracticeSession {
     return idx >= 0 && t < ns[idx].start + ns[idx].dur ? ns[idx].midi : null;
   }
 
-  private startSimulation(kind: 'perfect' | 'flat' | 'sloppy') {
+  private startSimulation(kind: 'perfect' | 'flat' | 'sloppy' | 'oneflat') {
     if (this.simTimer != null) return;
     const notes = this.cfg.part.notes;
+    // 'oneflat': the third note of the run (the section's, or the whole piece's) 70¢ flat.
+    const flatIdx = (this.cfg.range?.[0] ?? 0) + 2;
     let k = 0;
     this.simTimer = window.setInterval(() => {
       if (this.phase !== 'playing' && this.phase !== 'countin') return;
@@ -277,7 +279,7 @@ export class PracticeSession {
       let midi: number | null = null;
       if (inNote) {
         const vib = 0.25 * Math.sin(2 * Math.PI * 5.5 * t);
-        const off = kind === 'flat' ? -0.35 : kind === 'sloppy' ? (Math.sin(k * 1.7) > 0.3 ? 0.9 : 0.1) : 0;
+        const off = kind === 'flat' ? -0.35 : kind === 'sloppy' ? (Math.sin(k * 1.7) > 0.3 ? 0.9 : 0.1) : kind === 'oneflat' && k === flatIdx ? -0.7 : 0;
         midi = n.midi + vib + off;
       }
       const s: PitchSample = { time: t, midi, clarity: midi == null ? 0.3 : 0.97, rms: midi == null ? 0.002 : 0.1 };
@@ -444,7 +446,7 @@ export class PracticeSession {
         // Only notes that were completely sung and whose sound has reached us (mic lags by the latency).
         if (n.start + n.dur <= pos - (this.latencyMs / 1000) * this.cfg.rate + 0.05) last = i;
       }
-      result = last < a ? null : scoreAttempt({ score: this.cfg.score, part: this.cfg.part, range: [a, last] }, this.samples, this.cfg.scoring);
+      result = last < a ? null : scoreAttempt({ score: this.cfg.score, part: this.cfg.part, range: [a, last], end: this.cfg.to }, this.samples, this.cfg.scoring);
     }
     this.onDone(result);
   }

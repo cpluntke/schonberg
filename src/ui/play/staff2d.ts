@@ -1674,7 +1674,13 @@ export function drawStaffNotes(c: Ctx, g: SysGeo, layout: StaffLayout, L: Cached
     c.textAlign = 'left';
   }
 
-  drawLyrics(c, g, s, L, v);
+  // Level 1 is sung on "doo": the words stay for orientation, dimmed.
+  if (s.dimLyrics && !v.plain) {
+    c.save();
+    c.globalAlpha *= DIM_LYRICS;
+    drawLyrics(c, g, s, L, v);
+    c.restore();
+  } else drawLyrics(c, g, s, L, v);
   if (L.nameOff != null && L.nameFont && !v.plain) drawNames(c, g, s, L, v);
 }
 
@@ -1749,6 +1755,9 @@ function textWidth(c: Ctx, L: Cached, font: string, t: string): number {
   }
   return w;
 }
+
+/** Opacity of the words while they are only for orientation (level 1, sung on "doo"). */
+export const DIM_LYRICS = 0.45;
 
 function drawLyrics(c: Ctx, g: SysGeo, s: DrawState, L: Cached, v: Vis) {
   const sp = L.layout.sp;

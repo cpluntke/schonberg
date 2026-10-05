@@ -190,6 +190,12 @@ input[type='range'] { accent-color: var(--accent); width: 100%; }
 .lyrics .done { color: var(--voice); }
 .lyrics .now { color: var(--accent); font-weight: 800; }
 .lyrics .next { color: var(--muted); }
+/* Level 1 is sung on "doo": a small tag, the words dimmed (for orientation only). */
+.lyrics.doo .done, .lyrics.doo .now, .lyrics.doo .next { opacity: 0.45; }
+.lyrics .doo-tag {
+  display: inline-block; margin-right: 8px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--voice-deep);
+  color: var(--voice); font-size: 12px; font-weight: 700; vertical-align: 3px; opacity: 1;
+}
 .play-controls { padding: 10px 12px calc(14px + var(--safe-bottom)); display: flex; flex-direction: column; gap: 10px; }
 .mixer { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
 .mixer button {

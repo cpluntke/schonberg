@@ -3,7 +3,7 @@ import type { Route } from '../router';
 import { go, back } from '../router';
 import { getPiece, noteRangeFor, singableSections } from '../library';
 import { useProfile, useWide } from '../hooks';
-import { LEVELS, LISTEN, MAX_LEVEL, OFF_BOOK_DAYS, effectiveTolerance, fixesBefore, fullRunCounts, pieceReadiness } from '../../progress/ladder';
+import { LEVELS, LISTEN, MAX_LEVEL, OFF_BOOK_DAYS, effectiveTolerance, fixesBefore, fullRunCounts, passLabel, pieceReadiness } from '../../progress/ladder';
 import { shareMyProgress } from '../play/shareProgress';
 import { postBoardEntrySoon } from '../play/boardEntry';
 import { syncProgressSoon, suggestAccount } from '../../progress/sync';
@@ -155,6 +155,8 @@ function SingPlay({ route }: { route: PlayRoute }) {
   }
   const tolerance = spec ? effectiveTolerance(level, profile.strictness) : 50;
   const showNames = spec ? spec.showNames : true;
+  // Level 1 is sung on "doo": the words stay on screen, dimmed, for orientation.
+  const doo = !!spec?.doo;
   const notation = profile.notation as NotationMode;
   // 2D practice: sheet music or the note highway (the arcade is always 3D).
   const display = route.mode === '3d' ? 'highway' : practiceDisplay(profile, level);
@@ -232,7 +234,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
     if (sess) {
       const idx = r.notes.map((n) => n.index);
       const al = scoreAligned(
-        { score: piece.score, part, range: [Math.min(...idx), Math.max(...idx)] },
+        { score: piece.score, part, range: [Math.min(...idx), Math.max(...idx)], end: sess.cfg.to },
         sess.samples, sess.cfg.scoring,
         {
           rate: sess.cfg.rate, latencyMs: sess.latencyMs, calibrated, liftSubharmonics: !sess.cfg.scoring.octaveTolerant,
@@ -328,7 +330,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
     suggestAccount(rec.passed);
     setLastResult({
       pieceId: piece.id, partId: part.id, sectionId: section.id, level, mode: route.mode,
-      from: section.start, to: section.end, result: r, ladder, prevBest,
+      from: section.start, to: section.end, result: r, ladder, prevBest, tolerance,
       latencyAdjusted,
       alignedMs,
       suggestDelayCheck,
@@ -432,6 +434,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
         lo, hi, from: section.start, to: section.end,
         beatSec: s ? s.beatSec(Math.max(0, pos)) : 60 / tempoAt(piece.score.tempos, Math.max(0, pos)),
         staves,
+        dimLyrics: doo,
         hide: offBook ? (i: number) => {
           // Cold start: nothing of your part before the entry either (it would give the pitch away).
           if (cold && range && i < range[0]) return 'none';
@@ -476,7 +479,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [piece, part, section, route.mode, notation, showNames, rate, tolerance, offBook, cold, display, staves]);
+  }, [piece, part, section, route.mode, notation, showNames, rate, tolerance, offBook, cold, display, staves, doo]);
 
   // Seen once a run starts with it on screen (switching display before Start shows the other one's).
   useEffect(() => {
@@ -568,6 +571,11 @@ function SingPlay({ route }: { route: PlayRoute }) {
               <span className="eyebrow">{listenOnly ? 'Level 0 · Listen' : `Level ${level} · ${levelInfo?.name}`}</span>
               <strong style={{ fontSize: 18 }}>{section.label}</strong>
               {!cold && <span className="small muted">{listenOnly ? LISTEN.description : levelInfo?.description}</span>}
+              {doo && !listenOnly && (
+                <div className="notice info small" data-testid="doo-note">
+                  <strong>Sing every note on “doo”.</strong> The words are shown faintly; you sing them from level 2.
+                </div>
+              )}
               {isFullRun && (fullFixes.length ? (
                 <div className="notice" data-testid="full-locked">
                   <strong>Fix {fullFixes.length === 1 ? 'this section' : 'these sections'} first:</strong>{' '}
@@ -576,13 +584,14 @@ function SingPlay({ route }: { route: PlayRoute }) {
                 </div>
               ) : (
                 <span className="small" data-testid="full-info">
-                  Sing the whole piece in one go: pass it and the piece reaches level {level}. Every section is scored too, and each must reach {Math.round((levelInfo?.pass ?? 0.8) * 100)}%.
+                  Sing the whole piece in one go: pass it and the piece reaches level {level}. Every section is scored too,{' '}
+                  {levelInfo?.everyNote ? 'and every note in it must be right.' : `and each must reach ${Math.round((levelInfo?.pass ?? 0.8) * 100)}%.`}
                   Stopping or pausing makes it a practice run.
                 </span>
               ))}
               {!listenOnly && levelInfo && !cold && (
                 <span className="tiny mono muted">
-                  {Math.round(rate * 100)}% tempo · ±{tolerance}¢ · pass at {Math.round(levelInfo.pass * 100)}% · start: {levelInfo.cue === 'chord' ? 'chord only' : 'your note'}
+                  {Math.round(rate * 100)}% tempo · ±{tolerance}¢ · pass: {passLabel(levelInfo)} · start: {levelInfo.cue === 'chord' ? 'chord only' : 'your note'}
                 </span>
               )}
               {cold && (
@@ -710,7 +719,8 @@ function SingPlay({ route }: { route: PlayRoute }) {
         )}
       </div>
 
-      <div className="lyrics" aria-live="off">
+      <div className={doo ? 'lyrics doo' : 'lyrics'} aria-live="off">
+        {doo && <span className="doo-tag" data-testid="doo-label">on “doo”</span>}
         <span className="done">{lyric.done}</span><span className="now">{lyric.now}</span><span className="next">{lyric.next}</span>
       </div>
 
@@ -758,13 +768,16 @@ function SingPlay({ route }: { route: PlayRoute }) {
   );
 }
 
-/** `?simulate=perfect|flat|sloppy` (or localStorage sh:simulate) replaces the mic with a synthetic singer. */
-export function simulateMode(): 'perfect' | 'flat' | 'sloppy' | null {
+/**
+ * `?simulate=perfect|flat|sloppy|oneflat` (or localStorage sh:simulate) replaces the mic with a
+ * synthetic singer ('oneflat': perfect except one note 70¢ flat).
+ */
+export function simulateMode(): 'perfect' | 'flat' | 'sloppy' | 'oneflat' | null {
   let v: string | null = null;
   try {
     v = new URLSearchParams(location.search).get('simulate') ?? localStorage.getItem('sh:simulate');
   } catch { /* ignore */ }
-  return v === 'perfect' || v === 'flat' || v === 'sloppy' ? v : null;
+  return v === 'perfect' || v === 'flat' || v === 'sloppy' || v === 'oneflat' ? v : null;
 }
 
 /** Cold start lead-in: two bars of the others before the bar containing `from` (none at the very start). */

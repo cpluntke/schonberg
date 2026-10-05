@@ -32,6 +32,8 @@ export interface DrawState {
   hide?: (i: number) => 'show' | 'letters' | 'none';
   /** Score view on a wide screen: your staff only, all voices, or all voices + accompaniment. */
   staves?: 'mine' | 'voices' | 'all';
+  /** The words are only for orientation (level 1 is sung on "doo"): draw them dimmed. */
+  dimLyrics?: boolean;
 }
 
 /** First letter of the word a syllable starts ("" for a syllable inside a word). */
@@ -249,6 +251,8 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
       c.stroke();
     }
     if (n.lyric) {
+      c.save();
+      if (s.dimLyrics) c.globalAlpha *= 0.45;
       c.font = `800 ${bh >= 22 ? 12 : 10}px "Bricolage Grotesque", sans-serif`;
       c.textBaseline = 'middle';
       const tw = c.measureText(n.lyric).width;
@@ -259,6 +263,7 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
         c.fillStyle = COLORS.targetText;
         c.fillText(n.lyric, nx, ny + bh + 8);
       }
+      c.restore();
     }
   }
 

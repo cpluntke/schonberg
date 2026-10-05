@@ -16,7 +16,7 @@ phones, real voices and real headphones are the unknowns. This plan finds the pr
 
 > **Schönberg Hero:** our part-learning app. Open the link on your phone, then *Share → Add to Home Screen*.
 > 1. Do the 2-minute voice setup with **wired headphones** if you have them; it measures the delay.
-> 2. Each piece is split into sections. Climb each section from level 1 (slow, your part plays) to
+> 2. Each piece is split into sections. Climb each section from level 1 (slow, on “doo”, your part plays, every note right) to
 >    level 3 (alone) before rehearsal, and to level 4 (no note names, chord only) before the concert.
 > 3. Home tells you what to do today.
 > 4. If anything is odd, open Settings → Diagnostics → *Copy diagnostics report* and send it to me.

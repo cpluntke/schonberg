@@ -12,6 +12,11 @@ export interface ScoringContext {
   part: Part;
   /** Inclusive indices into part.notes. */
   range: [number, number];
+  /**
+   * Score time where the run ends (the section's end). A note tied over it is judged on the part
+   * before it: the player stops there, and the app stops listening soon after. Default: no end.
+   */
+  end?: number;
 }
 
 export const DEFAULT_ONSET_GRACE = 0.08;
@@ -65,6 +70,17 @@ export const TRANSITION_MAX = 0.15;
 export const RELEASE_MAX = 0.12;
 /** Gaps in the voiced readings shorter than this inside a note (tracker dropouts, an inner consonant) aren't penalised. */
 const DROPOUT_MAX = 0.1;
+/**
+ * The pitch tracker's range in Hz (src/audio/pitch.ts MIN_HZ / MAX_HZ): a written note outside it
+ * can't be heard reliably (NoteResult.unsure = 'range'). Kept here so scoring stays free of audio code.
+ */
+export const TRACKER_LOW_HZ = 60;
+export const TRACKER_HIGH_HZ = 1400;
+/**
+ * A note the scorer can't judge reliably, graded below "good", still counts as clearly wrong when its
+ * own readings put it this many tolerances (or more) off: the tracker heard a definite wrong pitch.
+ */
+export const CLEAR_OFF_TOL = 1.5;
 
 export const GRADE_POINTS: Record<Grade, number> = { perfect: 100, good: 70, ok: 40, miss: 0 };
 export const GRADE_VALUE: Record<Grade, number> = { perfect: 1, good: 0.85, ok: 0.5, miss: 0 };
@@ -185,6 +201,8 @@ interface NoteWindow {
   tolExtra: number;
   /** Very short note (body < SHORT_BODY): also judged on all its readings from the written start to end. */
   short: boolean;
+  /** Written pitch outside the tracker's range (TRACKER_LOW_HZ…TRACKER_HIGH_HZ). */
+  outOfRange: boolean;
   /** The note can be finalized once samples are past this time. */
   doneAt: number;
 }
@@ -232,7 +250,10 @@ function noteWindows(ctx: ScoringContext, opts: ScoringOptions): NoteWindow[] {
   const out: NoteWindow[] = [];
   const graceOpt = opts.onsetGrace ?? DEFAULT_ONSET_GRACE;
   for (let i = Math.max(0, a); i <= Math.min(b, notes.length - 1); i++) {
-    const note = notes[i];
+    const written = notes[i];
+    // A note tied over the end of the run: only the part before the end can be sung and heard.
+    const cut = ctx.end != null && written.start + written.dur > ctx.end + 1e-6 && ctx.end > written.start;
+    const note = cut ? { ...written, dur: Math.max(1e-3, ctx.end! - written.start) } : written;
     // Short notes: allow a larger share for the attack (detection lag + consonant).
     const grace = Math.min(graceOpt, (note.dur < 0.3 ? 0.4 : 0.3) * note.dur);
     const tail = Math.min(TAIL, 0.2 * note.dur);
@@ -250,9 +271,10 @@ function noteWindows(ctx: ScoringContext, opts: ScoringOptions): NoteWindow[] {
     // amount, so singing either what the (tempered) backing plays or the pure interval is fine.
     const half = targetOffset / 2;
     const short = bodyEnd - bodyStart < SHORT_BODY;
+    const hz = 440 * Math.pow(2, (note.midi - 69) / 12);
     out.push({
       index: i, note, target: note.midi + half / 100, targetOffset, start: note.start, bodyStart, bodyEnd, legatoFrom, legatoTo, tolExtra: Math.abs(half),
-      short, doneAt: short ? note.start + note.dur : bodyEnd,
+      short, outOfRange: hz < TRACKER_LOW_HZ || hz > TRACKER_HIGH_HZ, doneAt: short ? note.start + note.dur : bodyEnd,
     });
   }
   return out;
@@ -526,6 +548,17 @@ export class LiveScorer {
       const third = Math.floor(sm.length / 3);
       drift = median(sm.slice(-third))! - median(sm.slice(0, third))!;
     }
+    // Notes the scorer can't judge reliably (see NoteResult.unsure): a written pitch outside the
+    // tracker's range, or a very short note (the voice rarely settles; few readings). Below "good",
+    // say whether the tracker still clearly heard it wrong: no voice at all inside the note, or a
+    // definite pitch (enough of its own readings, see shortNoteDev) clearly off.
+    const unsure: NoteResult['unsure'] = w.outOfRange ? 'range' : w.short ? 'short' : undefined;
+    let clearly: NoteResult['clearly'];
+    if (unsure === 'short' && GRADE_RANK[grade] < GRADE_RANK.good) {
+      if (a.nT.length === 0 && a.nBreaks > 0) clearly = 'silent';
+      // (A reading more than SHORT_FAR off is the tracker locking onto a fraction of the pitch, not a sung note.)
+      else if (grade === 'miss' && shortDev !== null && Math.abs(shortDev) >= CLEAR_OFF_TOL * tolN && Math.abs(shortDev) <= SHORT_FAR) clearly = 'off';
+    }
     const scoopMed = median(a.scoopDevs);
     // A scoop is a glide INTO the note: the body must end up clearly closer to the target than the
     // start was (a note sung steadily wrong is not a scoop).
@@ -547,6 +580,7 @@ export class LiveScorer {
     a.final = {
       index: w.index, grade, cents, hitRatio, voicedRatio, onsetMs: a.onsetMs, drift, scoop,
       targetOffset: w.targetOffset, points, ...(octave ? { octave: true } : {}),
+      ...(unsure ? { unsure } : {}), ...(clearly ? { clearly } : {}),
     };
   }
 }

@@ -36,6 +36,16 @@ For every note in your part:
   - *OK*: ≥35% in tune.
   - Otherwise *miss*.
   - Accuracy is the average over notes (perfect 1, good 0.85, OK 0.5). The letter grade comes from accuracy.
+- **Notes tied over the end of a section** are judged on the part before the end: playback stops
+  there, and the app stops listening shortly after.
+- **Level 1: every note right.** Level 1 (sung on “doo”) passes only when every note is *good* or
+  better. A note the scorer can't judge reliably is let off below *good*: a very short note (as
+  above), or a written pitch outside the detector's 60–1400 Hz. It still counts as wrong when the
+  detector clearly heard it wrong: no voice at all inside a very short note, or a *miss* whose own
+  readings were enough to judge it with their median at least 1.5 × the tolerance (and at most 6
+  semitones) off. Each note
+  result carries this as `unsure` (`'short'` / `'range'`) and `clearly` (`'silent'` / `'off'`); see
+  [LEVELS.md](LEVELS.md).
 - **Sections within a full run.** A run of the whole piece also scores each section (the average grade of its notes). The piece level needs the run *and* every section at the level's pass mark; see [LEVELS.md](LEVELS.md).
 - **Rhythm.** When each note starts: the first sustained (≥60 ms) sound that is closer to this note than to the previous one. This is judged separately from pitch.
 

@@ -31,6 +31,7 @@ target, movable/fixed solfège and Chinese numbered notation (jianpu), and an at
   `library/README.md`).
 - **Coaching ladder:** each piece is split into sections, and each section climbs
   Listen → 1 Note-learning → 2 In time → 3 Independent → 4 Concert-ready → 5 Off book.
+  Level 1 is sung slowly on “doo” and needs every note right; the words come in at level 2.
   Support is removed step by step: tempo, your part playing along, note names, and the
   starting pitch. Section levels are practice steps: a **piece** reaches a level only when you
   sing it all through at that level in one go, with every section holding (docs/LEVELS.md).

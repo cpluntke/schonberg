@@ -27,6 +27,31 @@ test('a perfect simulated singer passes level 1 and levels up', async ({ page })
   expect(errors).toEqual([]);
 });
 
+// Level 1 is sung on "doo" and needs every note right: one note 70¢ flat fails it, and Results names
+// the bar and the note, with a loop to drill it (docs/LEVELS.md).
+test('level 1 on “doo”: one flat note fails it, and Results says which', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await page.goto('/?simulate=oneflat#/piece/warmup-chorale');
+  await page.getByLabel('Sections').getByRole('button', { name: /level 1/ }).first().click();
+  await expect(page.getByTestId('doo-note')).toContainText('doo');
+  await expect(page.getByText(/pass: every note right/)).toBeVisible();
+  await page.getByTestId('start').click();
+  await expect(page.getByTestId('doo-label')).toBeVisible();
+  await expect(page.getByTestId('pass-banner')).toContainText(/one note wasn’t right/, { timeout: 90_000 });
+  await expect(page.getByTestId('wrong-bar')).toHaveCount(1);
+  await expect(page.getByTestId('wrong-bar')).toContainText(/Bar \d+:.*note \d+.*was flat \(−\d+¢\)/);
+  await expect(page.getByTestId('wrong-bar').getByRole('button', { name: /Loop bar \d+ slowly/ })).toBeVisible();
+  // The section didn't pass: still level 0.
+  const level = await page.evaluate(() => {
+    const k = Object.keys(localStorage).find((x) => x.startsWith('sh:progress:warmup-chorale:'));
+    const p = k ? JSON.parse(localStorage.getItem(k)!) : null;
+    return p ? Object.values(p.sections as Record<string, { level: number }>)[0]?.level ?? 0 : 0;
+  });
+  expect(level).toBe(0);
+  expect(errors).toEqual([]);
+});
+
 // Score view (sheet music): suggested at level 1, switchable before Start, remembered, and a run
 // through it reaches the results.
 test('score view: switch display, sing level 1 from sheet music, reach results', async ({ page }) => {
