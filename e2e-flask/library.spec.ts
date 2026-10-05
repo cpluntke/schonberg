@@ -168,3 +168,35 @@ test('a choir from before the library keeps its former built-in piece: the serve
   await expect(mem.page.getByTestId('piece-row').filter({ hasText: 'Dieu! qu' })).toBeVisible({ timeout: 30_000 });
   expect(mem.errors).toEqual([]);
 });
+
+test('the programme editor lists the library pieces: one tap adds the score and includes it, publishing sends it', async ({ browser, request }) => {
+  test.setTimeout(180_000);
+  const code = `plb${Date.now() % 100000}`;
+  const r = await request.post('./api/super/choirs', { data: { code, name: 'Programme Library' }, headers: { 'X-Super-Admin': SUPER } });
+  expect(r.status()).toBe(201);
+  await request.post('./api/invites/accept', { data: { token: (await r.json()).token, name: 'Clara', password: 'password-123' } });
+  const adm = await phone(browser, 'S');
+  await join(adm.page, code);
+  await adm.page.getByTestId('login-name').fill('Clara');
+  await adm.page.getByTestId('login-password').fill('password-123');
+  await adm.page.getByTestId('login').click();
+  await expect(adm.page.getByTestId('account-name')).toHaveText('Clara');
+  await adm.page.goto('./#/choiradmin');
+  const editor = adm.page.getByTestId('programme-editor');
+  // Every library piece is offered right in the programme's piece list, the Madrigal included.
+  await expect(editor.getByTestId('programme-library')).toHaveCount(8);
+  await expect(editor.getByTestId('programme-library').filter({ hasText: 'Madrigal, Op. 35' })).toContainText('Gabriel Fauré');
+  await shoot(adm.page, 'programme-library', 'programme-editor');
+  await editor.getByTestId('programme-library').filter({ hasText: 'Madrigal, Op. 35' }).getByRole('button').click();
+  // Its score is in the choir now (not yet in the published programme), and it is included in the draft.
+  await expect(editor.getByTestId('programme-library')).toHaveCount(7);
+  await expect(editor.getByRole('button', { name: /Madrigal, Op\. 35/ }).first()).toHaveAttribute('aria-pressed', 'true');
+  let info = await (await request.get(`./api/choirs/${code}`)).json();
+  expect(info.pieces.map((p: { libraryId?: string }) => p.libraryId)).toEqual(['faure-madrigal']);
+  expect(info.cycle?.pieceIds ?? []).toEqual([]);
+  await adm.page.getByRole('button', { name: 'Publish to the choir' }).click();
+  await expect.poll(async () => ((await (await request.get(`./api/choirs/${code}`)).json()).cycle?.pieceIds ?? [])).toEqual(['faure-madrigal']);
+  info = await (await request.get(`./api/choirs/${code}`)).json();
+  expect(info.pieces).toHaveLength(1);
+  expect(adm.errors).toEqual([]);
+});

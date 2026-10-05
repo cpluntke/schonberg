@@ -261,6 +261,55 @@ describe('choir library pieces', () => {
     expect(localPieceId('kammerchor', { id: 'bbbbbbbbbbbb' })).toBe('choir-kammerchor-bbbbbbbbbbbb');
   });
 
+  it('a score whose download fails is tried again next time; one that can\'t be read waits a day', async () => {
+    saveProfile({ ...loadProfile(), choirCode: 'kammerchor' });
+    const pieces = [
+      { id: 'aaaaaaaaaaaa', title: 'Madrigal, Op. 35', composer: 'Gabriel Fauré', filename: 'faure-madrigal.mxl', uploadedAt: 1, size: 9, libraryId: 'faure-madrigal' },
+      { id: 'bbbbbbbbbbbb', title: 'Broken', composer: '', filename: 'broken.musicxml', uploadedAt: 1, size: 9 },
+    ];
+    let offline = true;
+    calls = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit = {}) => {
+      calls.push({ url, init });
+      if (url.endsWith('/file') && offline) throw new TypeError('Failed to fetch');
+      return new Response(JSON.stringify(url.endsWith('/file') ? {} : info(pieces, { name: 'Autumn', pieceIds: ['faure-madrigal'] })), { status: 200 });
+    }));
+    const imported: string[] = [];
+    const importer = async (_name: string, _data: ArrayBuffer, meta: { id: string }) => {
+      if (meta.id.endsWith('bbbbbbbbbbbb')) throw new Error('not a score');
+      imported.push(meta.id);
+    };
+    // Offline mid-sync (or the page reloading): nothing is imported and nothing is remembered as bad.
+    expect((await syncChoir(importer, (id) => imported.includes(id))).newPieces).toBe(0);
+    expect(JSON.parse(localStorage.getItem('sh:choirBadScores') ?? '[]')).toEqual([]);
+    // Back online: the Madrigal arrives; the unreadable score is set aside (not fetched on every start).
+    offline = false;
+    expect((await syncChoir(importer, (id) => imported.includes(id))).newPieces).toBe(1);
+    expect(imported).toEqual(['faure-madrigal']);
+    const fetchedBroken = () => calls.filter((c) => c.url.endsWith('/pieces/bbbbbbbbbbbb/file')).length;
+    const before = fetchedBroken();
+    await syncChoir(importer, (id) => imported.includes(id));
+    expect(fetchedBroken()).toBe(before);
+    // A day later it is tried again.
+    const now = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(now + DAY + 1);
+    await syncChoir(importer, (id) => imported.includes(id));
+    expect(fetchedBroken()).toBe(before + 1);
+    vi.restoreAllMocks();
+  });
+
+  it('an older phone\'s list of bad scores (bare ids, kept even after a network error) is forgotten', async () => {
+    saveProfile({ ...loadProfile(), choirCode: 'kammerchor' });
+    localStorage.setItem('sh:choirBadScores', JSON.stringify(['faure-madrigal']));
+    mockFetch((url) => (url.endsWith('/file') ? { body: {} } : {
+      body: info([{ id: 'aaaaaaaaaaaa', title: 'Madrigal, Op. 35', composer: 'Gabriel Fauré', filename: 'faure-madrigal.mxl', uploadedAt: 1, size: 9, libraryId: 'faure-madrigal' }],
+        { name: 'Autumn', pieceIds: ['faure-madrigal'] }),
+    }));
+    const got: string[] = [];
+    expect((await syncChoir(async (_n, _d, meta) => { got.push(meta.id); }, () => false)).newPieces).toBe(1);
+    expect(got).toEqual(['faure-madrigal']);
+  });
+
   it('admins list the library and add a piece with one call (bearer or super-admin password)', async () => {
     mockFetch((url) => (url.endsWith('/library')
       ? { body: { pieces: [{ id: 'faure-madrigal', title: 'Madrigal, Op. 35', composer: 'Gabriel Fauré', size: 9, scoreId: null, inProgramme: false }] } }

@@ -156,23 +156,38 @@ export async function syncChoir(importFile: (name: string, data: ArrayBuffer, me
   }
   writeJSON(CACHE, info);
   let newPieces = 0;
-  let failed: string[] = [];
-  try { failed = JSON.parse(localStorage.getItem('sh:choirBadScores') ?? '[]'); } catch { /* ignore */ }
+  // Scores that downloaded but couldn't be read: not downloaded again on every start, but retried
+  // after a day (the app may have learned to read them). A failed download (offline, the page
+  // reloading mid-way) is never remembered: the next sync simply tries again.
+  const RETRY_MS = 86_400_000;
+  let failed: { id: string; at: number }[] = [];
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem('sh:choirBadScores') ?? '[]');
+    // (older versions stored bare ids, also after a mere network error: forget those)
+    failed = Array.isArray(raw) ? raw.filter((x): x is { id: string; at: number } => !!x && typeof x.id === 'string' && typeof x.at === 'number') : [];
+  } catch { /* ignore */ }
+  failed = failed.filter((f) => Date.now() - f.at < RETRY_MS);
   for (const p of info.pieces) {
     const id = localPieceId(info.code, p);
-    // A score that didn't import once isn't downloaded again on every start.
-    if (hasPiece(id) || failed.includes(id)) continue;
+    if (hasPiece(id) || failed.some((f) => f.id === id)) continue;
+    let data: ArrayBuffer;
     try {
       const res = await fetch(`${apiBase()}/choirs/${enc(info.code)}/pieces/${enc(p.id)}/file`);
       if (!res.ok) continue;
-      await importFile(p.filename || `${p.id}.musicxml`, await res.arrayBuffer(), { id, title: p.title, composer: p.composer, credit: p.credit, choir: info.code });
+      data = await res.arrayBuffer();
+    } catch (e) {
+      console.warn('choir score download', p.id, e);
+      continue;
+    }
+    try {
+      await importFile(p.filename || `${p.id}.musicxml`, data, { id, title: p.title, composer: p.composer, credit: p.credit, choir: info.code });
       newPieces++;
     } catch (e) {
       console.warn('choir score', p.id, e);
-      failed = [...failed, id].slice(-50);
-      try { localStorage.setItem('sh:choirBadScores', JSON.stringify(failed)); } catch { /* ignore */ }
+      failed = [...failed, { id, at: Date.now() }].slice(-50);
     }
   }
+  try { localStorage.setItem('sh:choirBadScores', JSON.stringify(failed)); } catch { /* ignore */ }
   // The programme: applied when the choir published a new version (local tweaks last until then).
   let programme = false;
   const stamp = `${info.code}:${info.cycleUpdatedAt ?? info.updatedAt}`;

@@ -8,7 +8,7 @@ import {
   apiBase, cachedChoir, changePassword, choirPieceId, claimAccount, deleteChoirPiece, fetchChoir, joinChoir, leaveChoir, ChoirApiError,
   loadSession, loggedOutNotice, login, logout, onSessionChange, refreshSession, refreshSessionSoon, saveChoirCycle, sessionFor, sessionSecret, superCreate, superDelete,
   superList, superPurgeMembers, superRename, uploadChoirPiece, withdrawProgress, fetchChoirUsage, mb, type Auth, type ChoirInfo, type ChoirSummary, type ChoirUsage,
-  type ServerUsage, type Session, localPieceId, type LibraryPiece,
+  type ServerUsage, type Session, localPieceId, type LibraryPiece, addLibraryPiece,
 } from '../../progress/choir';
 import { LibraryPanel, type ProgrammeDraft } from '../components/ChoirLibrary';
 import { SectionInsights } from '../components/SectionInsights';
@@ -359,6 +359,7 @@ export function ChoirAdmin() {
       )}
       <ProgrammeEditor key={`${info?.code}:${info?.cycleUpdatedAt ?? 0}`} code={code} auth={auth} info={info} library={library}
         draft={draft.current} onDraft={() => setDraftV((v) => v + 1)}
+        onLibraryAdded={(i) => { if (i) setInfo(i); void refresh(); }}
         onSaved={(i) => { setInfo(i); void refresh(); }} onConflict={(i) => setInfo(i)} />
       <ScoresEditor code={code} auth={auth} info={info} onChanged={refresh} />
       {session && (
@@ -376,9 +377,9 @@ export function ChoirAdmin() {
   );
 }
 
-function ProgrammeEditor({ code, auth, info, library, draft, onDraft, onSaved, onConflict }: {
+function ProgrammeEditor({ code, auth, info, library, draft, onDraft, onSaved, onConflict, onLibraryAdded }: {
   code: string; auth: Auth; info: ChoirInfo | null; library: LibraryPiece[] | null; draft: ProgrammeDraft; onDraft: () => void;
-  onSaved: (i: ChoirInfo) => void; onConflict: (i: ChoirInfo) => void;
+  onSaved: (i: ChoirInfo) => void; onConflict: (i: ChoirInfo) => void; onLibraryAdded: (i: ChoirInfo | null) => void;
 }) {
   // A new programme starts empty (not from this admin's own phone, which may hold private scores).
   const start: Partial<NonNullable<ChoirInfo['cycle']>> = info?.cycle ?? { name: 'This cycle', pieceIds: [] };
@@ -411,10 +412,25 @@ function ProgrammeEditor({ code, auth, info, library, draft, onDraft, onSaved, o
   // itself when it serves the choir (a former built-in piece), so that one is missing only when the
   // choir's storage is full.
   const missing = ids.filter((id) => !choices.some((p) => p.id === id));
+  // Library pieces the programme can take straight away: tapping one copies its score into the choir
+  // (on the server) and includes it here; publishing sends it to the members.
+  const fromLibrary = (library ?? []).filter((l) => !choices.some((p) => p.id === l.id) && !ids.includes(l.id));
+  const [adding, setAdding] = useState<string | null>(null);
+  const includeFromLibrary = async (l: LibraryPiece) => {
+    setAdding(l.id);
+    try {
+      if (!l.scoreId) onLibraryAdded((await addLibraryPiece(code, auth, l.id, false)).choir ?? null);
+      setIds((xs) => (xs.includes(l.id) ? xs : [...xs, l.id]));
+    } catch (e) {
+      toast((e as Error).message);
+    } finally {
+      setAdding(null);
+    }
+  };
   const missingLabel = (id: string) => {
     const lib = library?.find((p) => p.id === id);
     const score = (info?.pieces ?? []).find((p) => localPieceId(code, p) === id);
-    if (score) return { title: score.title || score.filename, note: 'not on this phone yet' };
+    if (score) return { title: score.title || score.filename, note: score.libraryId ? 'from the library: on its way to this phone' : 'not on this phone yet' };
     if (lib) return { title: lib.title, note: 'members don’t have this score yet: is the choir’s storage full?' };
     return { title: id, note: 'members don’t have this score' };
   };
@@ -447,6 +463,15 @@ function ProgrammeEditor({ code, auth, info, library, draft, onDraft, onSaved, o
             </div>
           );
         })}
+        {fromLibrary.length > 0 && <span className="tiny muted" style={{ marginTop: 6 }}>From the library (tap to add to the choir and include)</span>}
+        {fromLibrary.map((l) => (
+          <div key={l.id} className="row" style={{ gap: 6 }} data-testid="programme-library">
+            <button className="chip grow" style={{ textAlign: 'left' }} aria-pressed={false} disabled={adding !== null}
+              onClick={() => void includeFromLibrary(l)}>
+              {adding === l.id ? 'Adding… ' : ''}{l.title}{l.composer && <span className="tiny muted"> · {l.composer}</span>}
+            </button>
+          </div>
+        ))}
       </div>
       <div className="row wrap">
         <label className="field grow"><span>Rehearsals</span>
