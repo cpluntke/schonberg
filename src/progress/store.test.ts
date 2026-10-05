@@ -331,6 +331,35 @@ describe('piece levels from full runs (docs/LEVELS.md)', () => {
     expect(getProgress('p', 'S')!.full?.toFix).toBeUndefined();
   });
 
+  it('a beginner’s failed high-level run never locks or leads, even when some sections held', async () => {
+    const { recordFullRun } = await import('./store');
+    const { nextStep, fixesBefore } = await import('./ladder');
+    const miss8: G[] = Array(8).fill('miss');
+    const perfect8: G[] = Array(8).fill('perfect');
+    // Two sections at level 4: one perfect, one all missed (50% overall).
+    const two = secs.slice(0, 2);
+    recordFullRun('p', 'S', 4, run([...perfect8, ...miss8]), two, noteStart, counted);
+    let prog = getProgress('p', 'S')!;
+    expect(prog.sections.s0.level).toBe(4); // the section that held is credited…
+    expect(fixesBefore(two, prog, 4)).toEqual([]); // …but its own credit doesn't make the list lock
+    expect(nextStep(two, prog)).toMatchObject({ sectionId: 's1', level: 1, kind: 'section' });
+    // Three sections at level 3, two held, overall 67%: no lock either.
+    _resetAllForTests(); localStorage.clear();
+    recordFullRun('p', 'S', 3, run([...perfect8, ...perfect8, ...miss8]), secs, noteStart, counted);
+    prog = getProgress('p', 'S')!;
+    expect(fixesBefore(secs, prog, 3)).toEqual([]);
+    expect(nextStep(secs, prog)?.kind).toBe('section');
+  });
+
+  it('a section with no real score is never credited, slack or not', async () => {
+    const { recordFullRun } = await import('./store');
+    // s2 has a single missed note.
+    const one = (i: number) => (i < 16 ? i : i === 16 ? 17 : undefined);
+    const r = recordFullRun('p', 'S', 3, run([...good8, ...good8, 'miss']), secs, one, counted);
+    expect(r.sections[2]).toMatchObject({ id: 's2', accuracy: 0, passed: false });
+    expect(getProgress('p', 'S')!.sections.s2).toBeUndefined();
+  });
+
   it('a new singer failing a run far above their level gets no lock and keeps their Next up', async () => {
     const { recordFullRun } = await import('./store');
     const { nextStep, fixesBefore } = await import('./ladder');

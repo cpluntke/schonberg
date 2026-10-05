@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { Section } from '../music/types';
 import {
   LEVELS, LISTEN, levelSpec, strictnessFactor, effectiveTolerance, pieceReadiness, nextStep,
-  sectionStatus, targetForDate, pieceLevel, sectionAccuracies, fullRunCounts, fullRunDue, fixesBefore, fixTarget, sectionChecks,
+  sectionStatus, targetForDate, pieceLevel, sectionAccuracies, fullRunCounts, fullRunDue, fixesBefore, fixTarget, sectionChecks, fixListLocks,
 } from './ladder';
 import type { FullRunProgress, PieceProgress, SectionProgress } from './store';
 
@@ -103,8 +103,8 @@ describe('ladder', () => {
     // Once the singer works toward level 3, the list counts again.
     const later = withFull(prog([3, 3, 3, 3]), { level: 2, toFix: { 3: ['s1'] } });
     expect(nextStep(secs, later, NOW)).toMatchObject({ sectionId: 's1', level: 3, kind: 'fix' });
-    // A run that mostly held (one section of four slipped, the rest at that level) is a real fix list.
-    const skip = withFull(prog([3, 0, 3, 3]), { level: 0, toFix: { 3: ['s1'] } });
+    // A run that held at that level (recorded as locking) is a real fix list.
+    const skip = withFull(prog([3, 0, 3, 3]), { level: 0, toFix: { 3: ['s1'] }, toFixLocks: { 3: true } });
     expect(fixesBefore(secs, skip, 3)).toEqual(['s1']);
     expect(nextStep(secs, skip, NOW)).toMatchObject({ sectionId: 's1', level: 3, kind: 'fix' });
   });
@@ -112,18 +112,38 @@ describe('ladder', () => {
     const p = withFull(prog([4, 4, 4, 4], { s0: { offBookDays: ['2026-10-03'] } }), { level: 4, offBookDays: ['2026-10-03'] });
     expect(nextStep(secs, p, NOW)).toMatchObject({ sectionId: 'all', level: 5, kind: 'full', reason: expect.stringMatching(/day 2 of 2/) });
   });
-  it('sectionChecks: short sections get one weak note of slack', () => {
-    const starts = [0, 1, 9, 10, 11, 12, 13, 14, 15, 16];
+  it('sectionChecks: short sections get one weak note of slack (as "good"), never a pass without a real score', () => {
+    const starts = [0, 1, 9, 10, 11, 12, 13, 14, 15, 16, 25];
     const res = { notes: [
-      { index: 0, grade: 'perfect' }, { index: 1, grade: 'ok' }, // s0: 2 notes, 0.75 → checked 1
-      ...[2, 3, 4, 5, 6, 7, 8].map((index) => ({ index, grade: 'perfect' })), { index: 9, grade: 'ok' }, // s1 8 notes (9..16 → s1 and s2)
+      { index: 0, grade: 'perfect' }, { index: 1, grade: 'ok' }, // s0: 2 notes, 0.75 → checked (1 + 0.85) / 2
+      ...[2, 3, 4, 5, 6, 7, 8].map((index) => ({ index, grade: 'perfect' })), // s1: 7 notes
+      { index: 9, grade: 'ok' }, // s2: a single note, no slack
+      { index: 10, grade: 'miss' }, // s3: a single missed note
     ] } as never;
     const c = sectionChecks(secs, (i) => starts[i], res);
     expect(c.s0.accuracy).toBeCloseTo(0.75);
-    expect(c.s0.checked).toBe(1);
+    expect(c.s0.checked).toBeCloseTo(0.925);
     expect(c.s1.notes).toBe(7);
-    expect(c.s2.checked).toBe(1);
+    expect(c.s2.checked).toBe(0.5);
+    expect(c.s3.checked).toBe(0);
+    const two = sectionChecks(secs, (i) => [0, 1][i], { notes: [{ index: 0, grade: 'miss' }, { index: 1, grade: 'ok' }] } as never);
+    expect(two.s0.checked).toBe(0.25); // under 50%: no slack
     expect(fullRunCounts({ level: 3, rate: 1, partial: false, resumed: false, timingUnsure: false, offBookPractice: false, arcade: true }).why).toBe('arcade');
+  });
+  it('fixListLocks: only a run that held at the level locks it', () => {
+    const before = (l: number[]) => Object.fromEntries(l.map((x, i) => [`s${i}`, x]));
+    // Passed overall, one section slipped (experienced singer straight to level 3).
+    expect(fixListLocks({ level: 3, accuracy: 0.84, overallPassed: true, sections: 4, slipped: ['s1'], levelsBefore: before([0, 0, 0, 0]) })).toBe(true);
+    // Beginner: 2 sections at level 4, one perfect, one missed (50%).
+    expect(fixListLocks({ level: 4, accuracy: 0.5, overallPassed: false, sections: 2, slipped: ['s1'], levelsBefore: before([0, 0]) })).toBe(false);
+    // Near miss, but the other sections weren't at the level before the run.
+    expect(fixListLocks({ level: 3, accuracy: 0.75, overallPassed: false, sections: 4, slipped: ['s1', 's2'], levelsBefore: before([0, 0, 0, 0]) })).toBe(false);
+    // Near miss with the others already at the level: locks.
+    expect(fixListLocks({ level: 3, accuracy: 0.75, overallPassed: false, sections: 4, slipped: ['s1'], levelsBefore: before([3, 1, 3, 4]) })).toBe(true);
+    // Far off: no.
+    expect(fixListLocks({ level: 3, accuracy: 0.6, overallPassed: false, sections: 4, slipped: ['s1'], levelsBefore: before([3, 1, 3, 4]) })).toBe(false);
+    // More than half slipped: no.
+    expect(fixListLocks({ level: 3, accuracy: 0.81, overallPassed: true, sections: 4, slipped: ['s0', 's1', 's2'], levelsBefore: before([0, 0, 0, 0]) })).toBe(false);
   });
   it('sectionAccuracies: each section scored within one run', () => {
     const starts = [0, 2, 9, 10, 17, 40];

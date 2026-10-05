@@ -26,8 +26,8 @@ A piece reaches level N only through a **full run-through at level N**, in one g
   level's tempo, e.g. the level-1 tempo slider below 70%, is practice too, and so is a level-5 run
   with bars still showing or a peek. Arcade runs of the whole piece are just for fun and never count.)
 - **Every section is scored within the run** (the same measure as the run's accuracy: the
-  average grade of its notes). Sections with fewer than 8 notes get one weak note of slack, so a
-  single "ok" note can't fail a level. The level is granted only when the run passes overall **and every
+  average grade of its notes). Sections with 2–7 notes get one weak note of slack (it counts as
+  "good"), so a single "ok" note can't fail a level. A section under 50% in the run never counts as held. The level is granted only when the run passes overall **and every
   section reaches the pass mark**.
 - A section below the pass mark is **"to fix at level N"**. Until it passes at level N (or higher)
   as a section on its own, a full run at level N can't count: the piece screen greys out that
@@ -35,8 +35,9 @@ A piece reaches level N only through a **full run-through at level N**, in one g
   but it won't count" because it makes the next step obvious, and nobody sings a five-minute run
   for nothing. A full run at another level stays open.
 - Fix lists only lock and lead Next up for the level you're working toward (the next piece level, or
-  the level every section has reached), or when the run mostly held (at most half the sections slipped
-  and the others are at that level). A new singer who tries level 5 and slips everywhere just sees the
+  the level every section has reached), or when the run held at its level: at most half the sections
+  slipped and either the run passed overall, or it came within 10 points of the pass mark while every
+  other section had passed that level before the run. A new singer who tries level 5 and slips everywhere just sees the
   slips as information ("practise them at level 5 when you get there"); Next up stays level 1.
 - Sections that held within a counted run are credited as section passes at that level (so an
   experienced singer who sings it all at level 3 straight away also has every section at 3).
@@ -53,7 +54,7 @@ A piece with only one section has nothing to run through on top: its section lev
   concert-ready: the piece level counts fully, section levels above it count half. So practice
   shows, and confirming it with a full run gives the jump.
 - Leaderboard entries carry `v: 2` (this formula). Entries from older app versions have no `v` and
-  are shown greyed on Ranks; Ranks explains the recalculation once.
+  are shown greyed and ranked after current ones on Ranks; Ranks explains the recalculation once.
 
 ## Next up
 

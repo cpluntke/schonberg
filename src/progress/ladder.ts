@@ -164,9 +164,8 @@ export function fixTarget(sections: Section[], prog: PieceProgress | undefined):
 /**
  * Pending "to fix" sections per level (only sections of this part), lowest level first. `active`
  * (locks the full run at that level, leads Next up): the level is at most fixTarget, or the run
- * mostly held there (at most half the sections slipped and all the others are at that level), as
- * when an experienced singer goes straight to level 3 and one section slips. A run far above the
- * singer's level that mostly failed is information only.
+ * that made the list held at that level (FullRunProgress.toFixLocks, decided when it was recorded:
+ * see fixListLocks). A beginner's failed run far above their level is information only.
  */
 export function pendingFixes(sections: Section[], prog: PieceProgress | undefined): { level: number; sectionIds: string[]; active: boolean }[] {
   const tf = prog?.full?.toFix;
@@ -177,8 +176,7 @@ export function pendingFixes(sections: Section[], prog: PieceProgress | undefine
   for (const k of Object.keys(tf).map(Number).filter((l) => l >= 1 && l <= MAX_LEVEL).sort((a, b) => a - b)) {
     const ids = order.filter((id) => (tf[k] ?? []).includes(id));
     if (!ids.length) continue;
-    const heldElsewhere = ids.length * 2 <= sections.length && sections.every((s) => ids.includes(s.id) || levelOf(prog, s.id) >= k);
-    out.push({ level: k, sectionIds: ids, active: k <= target || heldElsewhere });
+    out.push({ level: k, sectionIds: ids, active: k <= target || prog?.full?.toFixLocks?.[k] === true });
   }
   return out;
 }
@@ -250,8 +248,28 @@ export function sectionAccuracies(
   return out;
 }
 
+/**
+ * Whether a full run's fix list at `level` locks that level (and leads Next up) even above the level
+ * the singer is working toward. Only for a run that held there: at most half the sections slipped,
+ * and either the run passed overall (an experienced singer going straight to level 3, one section
+ * slipping), or it came within 10 points of the pass mark while every other section had already
+ * passed that level before the run. Never for a beginner's failed run far above their level.
+ */
+export function fixListLocks(o: {
+  level: number; accuracy: number; overallPassed: boolean; sections: number; slipped: string[];
+  /** Section levels before the run. */
+  levelsBefore: Record<string, number>;
+}): boolean {
+  if (!o.slipped.length || o.slipped.length * 2 > o.sections) return false;
+  if (o.overallPassed) return true;
+  const others = Object.entries(o.levelsBefore).filter(([id]) => !o.slipped.includes(id));
+  return o.accuracy >= levelSpec(o.level).pass - 0.1 && others.length > 0 && others.every(([, l]) => l >= o.level);
+}
+
 /** Fewer judged notes than this in a section: one weak note shouldn't decide a whole level. */
 export const SHORT_SECTION_NOTES = 8;
+/** A section scoring under this within a run never counts as held, slack or not. */
+export const MIN_SECTION_SCORE = 0.5;
 
 /**
  * Each section's result within one run of the whole piece: its accuracy (shown), and the value the
@@ -275,7 +293,10 @@ export function sectionChecks(
   for (const [id, v] of vals) {
     const sum = v.reduce((a, b) => a + b, 0);
     const accuracy = sum / v.length;
-    const checked = v.length < SHORT_SECTION_NOTES ? (sum - Math.min(...v) + 1) / v.length : accuracy;
+    // Slack from two notes up: the weakest note counts as "good". A section that got no real
+    // score in the run (under 50%) is never checked as held.
+    const slack = v.length >= 2 && v.length < SHORT_SECTION_NOTES ? (sum - Math.min(...v) + GRADE_VALUE.good) / v.length : accuracy;
+    const checked = accuracy < MIN_SECTION_SCORE ? accuracy : Math.max(accuracy, slack);
     out[id] = { accuracy, checked, notes: v.length };
   }
   return out;

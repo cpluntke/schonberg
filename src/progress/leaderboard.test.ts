@@ -56,6 +56,10 @@ describe('leaderboard', () => {
     expect(mine.v).toBe(2);
     expect(decodeShareCode(encodeShareCode(mine))?.v).toBe(2);
     expect(decodeShareCode(encodeShareCode(entry))?.v).toBeUndefined();
+    // Older entries rank after current ones, whatever their (old-formula) readiness.
+    const oldHigh = { ...entry, name: 'Old', readiness: 0.9 };
+    const newLow = { ...entry, name: 'New', readiness: 0.3, v: 2 };
+    expect(rankEntries([oldHigh, newLow], 'readiness').map((e) => e.name)).toEqual(['New', 'Old']);
   });
   it('ranking', () => {
     const a = { ...entry, name: 'A', readiness: 0.5, streak: 10, improved: 0 };

@@ -4,7 +4,7 @@
 import { get as idbGet, set as idbSet, del as idbDel, keys as idbKeys } from 'idb-keyval';
 import type { Score, Section, VoiceType } from '../music/types';
 import type { AttemptResult, TuningMode } from '../game/types';
-import { LEVELS, MAX_LEVEL, OFF_BOOK_DAYS, fixesBefore, isDue, sectionChecks, type Strictness } from './ladder';
+import { LEVELS, MAX_LEVEL, OFF_BOOK_DAYS, fixesBefore, fixListLocks, isDue, sectionChecks, type Strictness } from './ladder';
 
 /** Structurally identical to game/notation.ts NotationMode. */
 export type NotationMode = 'letter' | 'fixed' | 'movable' | 'jianpu' | 'pc';
@@ -102,6 +102,8 @@ export interface FullRunProgress {
    * full run at that level can't count.
    */
   toFix?: Record<number, string[]>;
+  /** level → the run that made that to-fix list held there, so the list locks even above the level being worked toward. */
+  toFixLocks?: Record<number, boolean>;
 }
 
 export interface PieceProgress {
@@ -340,10 +342,11 @@ function clearFix(full: FullRunProgress | undefined, sectionId: string, level: n
     if (k > level || !ids.includes(sectionId)) continue;
     const rest = ids.filter((x) => x !== sectionId);
     if (rest.length) full.toFix[k] = rest;
-    else delete full.toFix[k];
+    else { delete full.toFix[k]; if (full.toFixLocks) delete full.toFixLocks[k]; }
     out.push({ level: k, remaining: rest.length });
   }
   if (!Object.keys(full.toFix).length) delete full.toFix;
+  if (full.toFixLocks && !Object.keys(full.toFixLocks).length) delete full.toFixLocks;
   return out;
 }
 
@@ -489,6 +492,8 @@ export function recordFullRun(
   let passed = false;
   let toFix = pending;
   full.lastPracticed = now;
+  const levelsBefore: Record<string, number> = {};
+  for (const s of sections) levelsBefore[s.id] = prog.sections[s.id]?.level ?? 0;
   if (counted) {
     full.attempts = (full.attempts ?? 0) + 1;
     full.best[lvl] = Math.max(full.best[lvl] ?? 0, accuracy);
@@ -506,8 +511,12 @@ export function recordFullRun(
     }
     toFix = runSections.filter((rs) => !rs.passed).map((rs) => rs.id);
     full.toFix = { ...(full.toFix ?? {}) };
+    full.toFixLocks = { ...(full.toFixLocks ?? {}) };
     if (toFix.length) full.toFix[lvl] = toFix;
     else delete full.toFix[lvl];
+    if (toFix.length && fixListLocks({ level: lvl, accuracy, overallPassed, sections: runSections.length, slipped: toFix, levelsBefore })) {
+      full.toFixLocks[lvl] = true;
+    } else delete full.toFixLocks[lvl];
     passed = overallPassed && toFix.length === 0 && runSections.length > 0;
     if (passed) {
       let reach = lvl;
@@ -518,9 +527,10 @@ export function recordFullRun(
       full.level = Math.max(prevLevel, reach);
       if (lvl >= prevLevel) full.lastPassed = now;
       // A pass at this level settles what was left to fix below it.
-      for (const k of Object.keys(full.toFix).map(Number)) if (k < lvl) delete full.toFix[k];
+      for (const k of Object.keys(full.toFix).map(Number)) if (k < lvl) { delete full.toFix[k]; delete full.toFixLocks[k]; }
     }
     if (!Object.keys(full.toFix).length) delete full.toFix;
+    if (!Object.keys(full.toFixLocks).length) delete full.toFixLocks;
   }
   prog.full = full;
   prog.totalAttempts = (prog.totalAttempts ?? 0) + 1;

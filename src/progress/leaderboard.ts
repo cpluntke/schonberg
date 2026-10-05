@@ -80,7 +80,9 @@ export function computeMyEntry(
 export function rankEntries(entries: LeaderboardEntry[], by: RankBy): LeaderboardEntry[] {
   const key = (e: LeaderboardEntry) =>
     by === 'readiness' ? e.readiness : by === 'streak' ? e.streak : by === 'improved' ? e.improved : e.weeklyScore;
-  return [...entries].sort((a, b) => key(b) - key(a) || b.readiness - a.readiness || a.name.localeCompare(b.name));
+  // Entries from older app versions (readiness by an older formula) rank after current ones.
+  const old = (e: LeaderboardEntry) => (e.v === READINESS_VERSION ? 0 : 1);
+  return [...entries].sort((a, b) => old(a) - old(b) || key(b) - key(a) || b.readiness - a.readiness || a.name.localeCompare(b.name));
 }
 
 // ---------------------------------------------------------------- validation
