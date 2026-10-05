@@ -32,6 +32,7 @@ import { drawScoreView } from '../play/fullscore2d';
 import { defaultShow, hasOtherStaves, isFullScore } from '../play/fullscore';
 import { drawArcade, lanesFor, newFx } from '../play/arcade3d';
 import { setLastResult } from '../play/lastResult';
+import { useResume } from '../play/useResume';
 import { IconBack, IconPause, IconPlay, IconRestart, IconStop } from '../icons';
 import type { AttemptResult } from '../../game/types';
 import type { NotationMode } from '../../game/notation';
@@ -91,6 +92,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
     return g;
   });
   const sessionRef = useRef<PracticeSession | null>(null);
+  const { resume, resuming, resumeMsg } = useResume(sessionRef, setPhase, setMicMsg);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const fxRef = useRef(newFx());
@@ -556,6 +558,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
 
       <div className="play-canvas-wrap" ref={wrapRef}>
         <canvas ref={canvasRef} aria-label={display === 'score' ? undefined : route.mode === '3d' ? 'Arcade' : 'Note highway'} role="img" data-display={display} />
+        <div className="sr-only" aria-live="polite" data-testid="countin-live">{hud.count > 0 && running ? String(hud.count) : ''}</div>
         {hud.count > 0 && running && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
             <span style={{ fontSize: 96, fontWeight: 800, color: 'var(--accent)', textShadow: '0 0 24px #FF7A45' }}>{hud.count}</span>
@@ -690,7 +693,8 @@ function SingPlay({ route }: { route: PlayRoute }) {
             <div className="card">
               <strong style={{ fontSize: 18 }}>Paused</strong>
               {isFullRun && <span className="small muted">A run of the whole piece counts only in one go: carry on to practise, or restart to sing it through for the level.</span>}
-              <button className="btn primary block" onClick={() => { sessionRef.current?.resume(); setPhase('running'); }}><IconPlay size={18} /> Resume</button>
+              {resumeMsg && <span className="small" role="status">{resumeMsg}</span>}
+              <button className="btn primary block" autoFocus disabled={resuming} onClick={() => { void resume(); }}><IconPlay size={18} /> {resuming ? 'Resuming…' : 'Resume'}</button>
               <button className="btn block" onClick={() => { sessionRef.current?.dispose(); sessionRef.current = null; start(); }}><IconRestart size={18} /> {isFullRun ? 'Restart' : 'Restart section'}</button>
               {!listenOnly && <button className="btn block" onClick={() => sessionRef.current?.finish()}>Finish &amp; see results</button>}
               <button className="btn ghost block" onClick={() => { sessionRef.current?.dispose(); leave(); }}>Quit</button>
@@ -748,7 +752,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
               <button className="big-play" aria-label="Pause" onClick={() => { sessionRef.current?.pause(); setPhase('paused'); }}><IconPause /></button>
             </>
           ) : (
-            <button className="big-play" aria-label="Start" onClick={() => (phase === 'paused' ? (sessionRef.current?.resume(), setPhase('running')) : start())}><IconPlay /></button>
+            <button className="big-play" aria-label="Start" onClick={() => (phase === 'paused' ? void resume() : start())}><IconPlay /></button>
           )}
         </div>
       </div>

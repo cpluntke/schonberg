@@ -6,6 +6,7 @@ import { useProfile } from '../hooks';
 import { PracticeSession } from '../play/session';
 import { track, trackRun } from '../../progress/metrics';
 import { setLastResult } from '../play/lastResult';
+import { useResume } from '../play/useResume';
 import { lyricLine, simulateMode } from './Play';
 import { wordInitial } from '../play/highway2d';
 import { IconBack, IconPause, IconPlay, IconRestart, IconStop } from '../icons';
@@ -48,6 +49,7 @@ export function WordsPlay({ route }: { route: PlayRoute }) {
   const [micMsg, setMicMsg] = useState('');
   const [lyricIdx, setLyricIdx] = useState(-1);
   const sessionRef = useRef<PracticeSession | null>(null);
+  const { resume, resuming, resumeMsg } = useResume(sessionRef, setPhase, setMicMsg);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef(stage);
@@ -231,7 +233,8 @@ export function WordsPlay({ route }: { route: PlayRoute }) {
           <div className="overlay">
             <div className="card">
               <strong style={{ fontSize: 18 }}>Paused</strong>
-              <button className="btn primary block" onClick={() => { sessionRef.current?.resume(); setPhase('running'); }}><IconPlay size={18} /> Resume</button>
+              {resumeMsg && <span className="small" role="status">{resumeMsg}</span>}
+              <button className="btn primary block" autoFocus disabled={resuming} onClick={() => { void resume(); }}><IconPlay size={18} /> {resuming ? 'Resuming…' : 'Resume'}</button>
               <button className="btn block" onClick={() => sessionRef.current?.finish()}>Finish &amp; see results</button>
               <button className="btn ghost block" onClick={leave}>Quit</button>
             </div>
@@ -260,7 +263,7 @@ export function WordsPlay({ route }: { route: PlayRoute }) {
               <button className="big-play" aria-label="Pause" onClick={() => { sessionRef.current?.pause(); setPhase('paused'); }}><IconPause /></button>
             </>
           ) : (
-            <button className="big-play" aria-label="Start" disabled={!syl.length} onClick={() => (phase === 'paused' ? (sessionRef.current?.resume(), setPhase('running')) : start())}><IconPlay /></button>
+            <button className="big-play" aria-label="Start" disabled={!syl.length} onClick={() => (phase === 'paused' ? void resume() : start())}><IconPlay /></button>
           )}
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { detectPitch, gatePitch, hzToMidi, midiToHz, median, PitchSmoother, FrameDelay } from './pitch';
 
 function rng(seed: number) {
@@ -179,5 +179,27 @@ describe('fixSubharmonic', () => {
     expect(fixSubharmonic(45, 69)).toBe(69); // ×¼
     expect(fixSubharmonic(52, 69)).toBe(52); // not a subharmonic of the due note
     expect(fixSubharmonic(50, null)).toBe(50); // rest: untouched
+  });
+});
+
+describe('PitchTracker.create', () => {
+  it('stops the microphone and says why when the audio graph cannot be built', async () => {
+    const { PitchTracker, MicError } = await import('./pitch');
+    const stop = vi.fn();
+    const stream = { getTracks: () => [{ stop }], getAudioTracks: () => [{ stop }] } as unknown as MediaStream;
+    const md = { getUserMedia: vi.fn(async () => stream) };
+    Object.defineProperty(navigator, 'mediaDevices', { value: md, configurable: true });
+    const secure = Object.getOwnPropertyDescriptor(window, 'isSecureContext');
+    Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true });
+    try {
+      const ctx = { createMediaStreamSource: () => { throw new Error('context interrupted'); } } as unknown as AudioContext;
+      const err = await PitchTracker.create(ctx).catch((e) => e);
+      expect(err).toBeInstanceOf(MicError);
+      expect(err.code).toBe('setup');
+      expect(stop).toHaveBeenCalled();
+    } finally {
+      if (secure) Object.defineProperty(window, 'isSecureContext', secure);
+      delete (navigator as unknown as { mediaDevices?: unknown }).mediaDevices;
+    }
   });
 });

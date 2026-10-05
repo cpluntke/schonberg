@@ -19,7 +19,8 @@ export interface RawPitch {
   rms: number;
 }
 
-export type MicErrorCode = 'denied' | 'unavailable' | 'insecure';
+/** 'setup': the mic opened but the audio graph around it couldn't be built (e.g. a closed/interrupted context). */
+export type MicErrorCode = 'denied' | 'unavailable' | 'insecure' | 'setup';
 
 export class MicError extends Error {
   readonly code: MicErrorCode;
@@ -243,17 +244,28 @@ export class PitchTracker {
 
   static async create(ctx: AudioContext, opts: { deviceId?: string } = {}): Promise<PitchTracker> {
     const stream = await openMic(opts.deviceId);
-    const source = ctx.createMediaStreamSource(stream);
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = FFT_SIZE;
-    analyser.smoothingTimeConstant = 0;
-    // Safari only pulls audio through nodes that reach the destination: route via a muted gain.
-    const sink = ctx.createGain();
-    sink.gain.value = 0;
-    source.connect(analyser);
-    analyser.connect(sink);
-    sink.connect(ctx.destination);
-    return new PitchTracker(ctx, stream, source, analyser, sink);
+    const nodes: AudioNode[] = [];
+    try {
+      const source = ctx.createMediaStreamSource(stream);
+      nodes.push(source);
+      const analyser = ctx.createAnalyser();
+      nodes.push(analyser);
+      analyser.fftSize = FFT_SIZE;
+      analyser.smoothingTimeConstant = 0;
+      // Safari only pulls audio through nodes that reach the destination: route via a muted gain.
+      const sink = ctx.createGain();
+      nodes.push(sink);
+      sink.gain.value = 0;
+      source.connect(analyser);
+      analyser.connect(sink);
+      sink.connect(ctx.destination);
+      return new PitchTracker(ctx, stream, source, analyser, sink);
+    } catch (e) {
+      // Don't leave the microphone on (each retry would open another stream).
+      for (const n of nodes) { try { n.disconnect(); } catch { /* ignore */ } }
+      for (const t of stream.getTracks()) { try { t.stop(); } catch { /* ignore */ } }
+      throw new MicError('setup', (e as Error)?.message || 'Audio setup failed');
+    }
   }
 
   /** The microphone node (for recording a run). */

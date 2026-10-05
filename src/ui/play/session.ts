@@ -64,6 +64,26 @@ export interface SessionConfig {
 
 export type SessionPhase = 'idle' | 'countin' | 'playing' | 'paused' | 'done';
 
+/**
+ * Outcome of PracticeSession.resume(): 'ok' = playing again; 'mic' = the microphone couldn't be
+ * reopened (micError says why); 'audio' = the sound didn't start (context still suspended or
+ * interrupted, e.g. during a call): the session stays paused, try again; 'stale' = superseded by a
+ * later pause/resume or the session was closed.
+ */
+export type ResumeResult = 'ok' | 'mic' | 'audio' | 'stale';
+
+/** How long a resume waits for the audio context to start (iOS can leave resume() pending while 'interrupted'). */
+export const RESUME_TIMEOUT_MS = 3000;
+
+/** Mic error text for the singer. */
+export function micErrorMessage(e: unknown): string {
+  const code = (e as { code?: string } | null)?.code;
+  return code === 'denied' ? 'Microphone access was blocked. Allow it in your browser settings to be scored.'
+    : code === 'insecure' ? 'The microphone needs a secure (https) connection.'
+      : code === 'setup' ? 'The microphone opened, but the app couldn\'t listen to it. Close other apps using audio, then try again.'
+        : 'No microphone found.';
+}
+
 export class PracticeSession {
   readonly cfg: SessionConfig;
   readonly player: ScorePlayer;
@@ -83,6 +103,8 @@ export class PracticeSession {
   latencyMs: number;
   private disposed = false;
   private endTimer: number | null = null;
+  /** The playback reached its end (finish follows after the mic latency). */
+  private ended = false;
   private resumeToken = 0;
   private onStateChange: (() => void) | null = null;
   /** Called when the audio system interrupts playback (phone call, Siri, other app). */
@@ -138,11 +160,7 @@ export class PracticeSession {
       try {
         this.tracker = await getTracker();
       } catch (e) {
-        const err = e as { code?: string; message?: string };
-        this.micError =
-          err.code === 'denied' ? 'Microphone access was blocked. Allow it in your browser settings to be scored.'
-            : err.code === 'insecure' ? 'The microphone needs a secure (https) connection.'
-              : 'No microphone found.';
+        this.micError = micErrorMessage(e);
         throw e;
       }
       if (this.disposed) return; // the singer left while the permission prompt was open
@@ -160,8 +178,10 @@ export class PracticeSession {
 
   private play(from: number, countIn: boolean) {
     this.plays++;
+    this.ended = false;
     this.unsubEnd?.();
     this.unsubEnd = this.player.onEnded(() => {
+      this.ended = true;
       // The singer's last notes reach us one round-trip latency later: keep listening briefly.
       if (this.cfg.listenOnly) return this.finish();
       this.endTimer = window.setTimeout(() => this.finish(), Math.min(700, this.latencyMs + 120));
@@ -218,7 +238,14 @@ export class PracticeSession {
     const s: PitchSample = { time: t, midi: p.midi, clarity: p.clarity, rms: p.rms };
     const shown = p.midi != null && !this.cfg.scoring.octaveTolerant ? { ...s, midi: fixSubharmonic(p.midi, this.noteDueAt(t)) } : s;
     this.latest = shown;
-    if (t < this.minTime) return;
+    this.keep(s, shown);
+  }
+
+  /** Store a sample (in time order: drawing and scoring binary-search the samples by time). */
+  private keep(s: PitchSample, shown: PitchSample) {
+    if (s.time < this.minTime) return;
+    const last = this.samples[this.samples.length - 1];
+    if (last && s.time < last.time) return;
     this.samples.push(s);
     this.live?.push(shown);
   }
@@ -255,9 +282,7 @@ export class PracticeSession {
       }
       const s: PitchSample = { time: t, midi, clarity: midi == null ? 0.3 : 0.97, rms: midi == null ? 0.002 : 0.1 };
       this.latest = s;
-      if (t < this.minTime) return;
-      this.samples.push(s);
-      this.live?.push(s);
+      this.keep(s, s);
     }, 20);
   }
 
@@ -291,7 +316,17 @@ export class PracticeSession {
   pause() {
     this.resumeToken++;
     if (this.phase !== 'playing' && this.phase !== 'countin') return;
-    this.resumeFrom = Math.max(this.cfg.from, Math.min(this.player.position, this.cfg.to));
+    // The run already ended (only the last notes' latency was being waited for): finish on resume.
+    if (this.endTimer != null) {
+      clearTimeout(this.endTimer);
+      this.endTimer = null;
+    }
+    const pos = this.player.position;
+    // During a (resumed run's) count-in the music hasn't reached the resume point yet: keep it, so
+    // no bar is sung twice and sample times keep increasing.
+    if (!(this.phase === 'countin' && pos < this.resumeFrom)) {
+      this.resumeFrom = Math.max(this.cfg.from, Math.min(pos, this.cfg.to));
+    }
     // A pause counts as breaking the run only once the singer's first note has started (pausing
     // during the count-in or the opening rest just starts again).
     if (this.resumeFrom > this.firstNoteTime() + 1e-3) this.pausedMidRun = true;
@@ -305,27 +340,49 @@ export class PracticeSession {
     this.releaseWakeLock();
   }
 
-  async resume() {
-    if (this.phase !== 'paused') return;
+  /**
+   * Carry on after a pause. Resolves 'ok' only once playback has started again; on failure the
+   * session stays paused (or reports the mic error) so the screen can say so.
+   */
+  async resume(): Promise<ResumeResult> {
+    if (this.phase !== 'paused') return 'stale';
     const token = ++this.resumeToken;
-    await unlockAudio(); // iOS suspends the context when the app is backgrounded
-    if (token !== this.resumeToken || this.phase !== 'paused' || this.disposed) return;
+    const stale = () => token !== this.resumeToken || this.phase !== 'paused' || this.disposed;
+    // iOS suspends the context when the app is backgrounded; resume() can hang while 'interrupted'.
+    const ctx = getAudioContext();
+    let timer: number | undefined;
+    await Promise.race([
+      unlockAudio().catch(() => {}),
+      new Promise<void>((res) => { timer = window.setTimeout(res, RESUME_TIMEOUT_MS); }),
+    ]);
+    clearTimeout(timer);
+    if (stale()) return 'stale';
+    if (ctx.state !== 'running') return 'audio';
     // The mic may have been released or lost while paused (backgrounded, headset change): reopen it.
     if (this.tracker && !this.tracker.alive && !this.cfg.simulate) {
       this.unsubPitch?.();
+      this.unsubPitch = null;
       try {
         this.tracker = await getTracker();
-      } catch {
-        this.micError = 'The microphone could not be reopened.';
-        return;
+      } catch (e) {
+        if (stale()) return 'stale';
+        this.micError = (e as { code?: string })?.code === 'denied' ? micErrorMessage(e) : 'The microphone could not be reopened.';
+        return 'mic';
       }
-      if (token !== this.resumeToken || this.phase !== 'paused' || this.disposed) return;
+      if (stale()) return 'stale';
       this.tracker.configureFor(this.cfg.lowestMidi ?? null);
       this.unsubPitch = this.tracker.onPitch((p) => this.onPitch(p));
+    }
+    if (this.ended) {
+      // Paused while waiting for the last notes: nothing left to play, finish now.
+      this.phase = 'playing';
+      this.endTimer = window.setTimeout(() => this.finish(), 0);
+      return 'ok';
     }
     this.minTime = this.resumeFrom - 0.02;
     this.play(this.resumeFrom, true);
     this.requestWakeLock();
+    return 'ok';
   }
 
   private async requestWakeLock() {

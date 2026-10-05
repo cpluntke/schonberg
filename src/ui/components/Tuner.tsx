@@ -52,7 +52,9 @@ export function Tuner({ notation, onReading, autoStart = false }: {
     } catch (e) {
       const code = (e as { code?: string }).code;
       setErr(code === 'denied' ? 'Microphone access was blocked. Allow it in the browser’s site settings, then try again.'
-        : code === 'insecure' ? 'The microphone only works over https.' : 'No microphone could be opened.');
+        : code === 'insecure' ? 'The microphone only works over https.'
+          : code === 'setup' ? 'The microphone opened, but the app couldn’t listen to it. Close other apps using audio, then try again.'
+            : 'No microphone could be opened.');
       setState('error');
     }
   }
