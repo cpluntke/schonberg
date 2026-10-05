@@ -88,7 +88,7 @@ export function App() {
       case 'choiradmin': body = <ChoirAdmin />; break;
       case 'section': body = <SectionLead />; break;
       case 'superadmin': body = <SuperAdmin />; break;
-      case 'invite': body = <InviteScreen token={route.token} />; break;
+      case 'invite': body = <InviteScreen key={route.token ?? 'invite'} token={route.token} />; break;
     }
   }
 

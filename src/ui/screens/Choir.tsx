@@ -7,7 +7,7 @@ import { loadCycle } from '../../progress/store';
 import { WEEKDAYS } from '../../progress/rehearsal';
 import {
   apiBase, cachedChoir, changePassword, choirPieceId, claimAccount, deleteChoirPiece, fetchChoir, fetchSection, joinChoir, leaveChoir, ChoirApiError,
-  loadSession, login, logout, onSessionChange, refreshSession, saveChoirCycle, sessionAuth, sessionFor, sessionSecret, superCreate, superDelete,
+  loadSession, loggedOutNotice, login, logout, onSessionChange, refreshSession, refreshSessionSoon, saveChoirCycle, sessionFor, sessionSecret, superCreate, superDelete,
   superList, superRename, uploadChoirPiece, withdrawProgress, type Auth, type ChoirInfo, type ChoirSummary, type SectionView, type Session,
 } from '../../progress/choir';
 import { PieceMap } from '../components/PieceMap';
@@ -33,10 +33,23 @@ function Offline() {
 }
 
 /** This phone's admin / section-lead login (re-renders when it changes). */
-export function useSession(): Session | null {
+export function useSession(refresh = false): Session | null {
   const [, setV] = useState(0);
   useEffect(() => onSessionChange(() => setV((x) => x + 1)), []);
+  // Screens that depend on the role pick up an admin's changes (role, voices, removal) on opening.
+  useEffect(() => { if (refresh) refreshSessionSoon(); }, [refresh]);
   return loadSession();
+}
+
+/** A "Log out" link with a full-size tap target. */
+function LogoutLink({ onClick = () => void logout() }: { onClick?: () => void }) {
+  return <button className="linklike" style={{ minHeight: 44 }} data-testid="logout-link" onClick={onClick}>Log out</button>;
+}
+
+/** Shown when this phone's login ended elsewhere (password changed, account removed or reset). */
+function LoggedOutNotice() {
+  const n = loggedOutNotice();
+  return n ? <div className="notice" role="alert" data-testid="logged-out-notice">{n}</div> : null;
 }
 
 /** Join form, also used in the first-run setup. */
@@ -138,6 +151,7 @@ function AccountCard({ choir }: { choir: ChoirInfo }) {
     return (
       <div className="card flat" data-testid="account-card">
         <strong>Admins and section leads</strong>
+        <LoggedOutNotice />
         <span className="small muted">Log in with your own name and password. No account yet? Ask your choir admin for an invite link.</span>
         <LoginForm code={choir.code} legacy={!!choir.legacyLogin} />
       </div>
@@ -207,7 +221,7 @@ function ClaimForm({ code, onCancel }: { code: string; onCancel: () => void }) {
       setErr('');
       try { await claimAccount(code, old, name.trim(), pw); toast('Your account is ready: log in with your name from now on'); } catch (e2) { setErr((e2 as Error).message); } finally { setBusy(false); }
     }}>
-      <span className="small muted">Admins and section leads now have their own accounts. Enter the shared password you used so far, then choose your name and a new password of your own.</span>
+      <span className="small muted">Admins and section leads now have their own accounts. Enter the shared password you used so far, then choose your name and a new password of your own. Each old password works once: whoever uses it first gets the account; everyone else needs an invite link from an admin.</span>
       <label className="field"><span>Old shared password</span>
         <input type="password" value={old} onChange={(e) => setOld(e.target.value)} autoComplete="off" />
       </label>
@@ -249,6 +263,7 @@ function NeedLogin({ code, what }: { code: string; what: string }) {
   const choir = cachedChoir();
   return (
     <div className="card">
+      <LoggedOutNotice />
       <span className="small muted">{what}</span>
       <LoginForm code={code} legacy={!!choir?.legacyLogin} />
     </div>
@@ -282,9 +297,15 @@ function Gate({ label, onSubmit, children }: { label: string; onSubmit: (pw: str
 export function ChoirAdmin() {
   const [profile] = useProfile();
   useStoreVersion();
-  useSession();
+  useSession(true);
   const code = profile.choirCode;
   const session = sessionFor(code);
+  const isAdmin = session?.account.role === 'admin';
+  // The last admin login on this screen: if it ends elsewhere, the editors stay (with their unsaved
+  // changes) until the person logs in again and publishes.
+  const [lastAuth, setLastAuth] = useState<Auth | null>(null);
+  const token = isAdmin ? session!.token : null;
+  useEffect(() => { if (token) setLastAuth({ bearer: token }); }, [token]);
   const [info, setInfo] = useState<ChoirInfo | null>(() => cachedChoir());
   // Start from the choir's current state, not from this phone's last sync (another admin may have changed it).
   useEffect(() => {
@@ -295,17 +316,17 @@ export function ChoirAdmin() {
   }, [code]);
   if (!apiBase()) return <main className="screen"><Top title="Choir admin" /><Offline /></main>;
   if (!code) return <main className="screen"><Top title="Choir admin" /><div className="notice">Join your choir first (Settings → Your choir).</div></main>;
-  if (!session || session.account.role !== 'admin') {
+  const auth: Auth | null = token ? { bearer: token } : !session ? lastAuth : null;
+  if (!auth) {
     return (
       <main className="screen">
         <Top title="Choir admin" />
         {session
-          ? <div className="notice">You're logged in as {session.account.name}, a section lead. Only choir admins can change the programme, the scores and the people. <button className="linklike" onClick={() => void logout()}>Log out</button></div>
+          ? <div className="notice">You're logged in as {session.account.name}, a section lead. Only choir admins can change the programme, the scores and the people. <LogoutLink /></div>
           : <NeedLogin code={code} what="For whoever looks after the choir's programme, scores and section leads. Log in with your own account." />}
       </main>
     );
   }
-  const auth = sessionAuth(session);
   const refresh = async () => {
     const r = await syncChoirNow();
     setInfo(cachedChoir());
@@ -314,15 +335,21 @@ export function ChoirAdmin() {
   return (
     <main className="screen">
       <Top title="Choir admin" />
-      <span className="small muted">{info?.name ?? code} · {session.account.name} · <button className="linklike" onClick={() => void logout()}>Log out</button></span>
+      {session ? (
+        <span className="small muted">{info?.name ?? code} · {session.account.name} · <LogoutLink /></span>
+      ) : (
+        <NeedLogin code={code} what="Your changes below are kept: log in again, then publish them." />
+      )}
       <ProgrammeEditor key={`${info?.code}:${info?.cycleUpdatedAt ?? 0}`} code={code} auth={auth} info={info}
         onSaved={(i) => { setInfo(i); void refresh(); }} onConflict={(i) => setInfo(i)} />
       <ScoresEditor code={code} auth={auth} info={info} onChanged={refresh} />
-      <div className="card" data-testid="people-editor">
-        <strong>People</strong>
-        <PeoplePanel code={code} auth={auth} />
-        <button className="btn small ghost" onClick={() => go({ name: 'section' })}>See the sections</button>
-      </div>
+      {session && (
+        <div className="card" data-testid="people-editor">
+          <strong>People</strong>
+          <PeoplePanel code={code} auth={auth} />
+          <button className="btn small ghost" onClick={() => go({ name: 'section' })}>See the sections</button>
+        </div>
+      )}
     </main>
   );
 }
@@ -474,7 +501,7 @@ function ScoresEditor({ code, auth, info, onChanged }: { code: string; auth: Aut
 
 export function SectionLead() {
   const [profile] = useProfile();
-  useSession();
+  useSession(true);
   const code = profile.choirCode;
   const session = sessionFor(code);
   const admin = session?.account.role === 'admin';
@@ -508,7 +535,7 @@ export function SectionLead() {
   return (
     <main className="screen">
       <Top title="Your section" />
-      <span className="small muted">{session.account.name} · {admin ? 'as choir admin you see every section' : roleText('lead', session.account.voices)} · <button className="linklike" onClick={() => void logout()}>Log out</button></span>
+      <span className="small muted">{session.account.name} · {admin ? 'as choir admin you see every section' : roleText('lead', session.account.voices)} · <LogoutLink /></span>
       {mine.length > 1 && (
         <div className="chips" role="group" aria-label="Section">
           {mine.map((v) => <button key={v} className="chip" aria-pressed={shown === v} onClick={() => setPicked(v)}>{VOICE_NAME[v]}</button>)}
@@ -613,7 +640,7 @@ export function SuperAdmin() {
   return (
     <main className="screen">
       <Top title="Super admin" />
-      <span className="small muted"><button className="linklike" onClick={() => { sessionSecret('super', null); setPw(null); }}>Log out</button></span>
+      <span className="small muted"><LogoutLink onClick={() => { sessionSecret('super', null); setPw(null); }} /></span>
       {err && <div className="notice" role="alert">{err}</div>}
       {created ? (
         <div className="card" data-testid="choir-created">
@@ -663,7 +690,7 @@ export function SuperAdmin() {
               try { await superDelete(pw, c.code); await load(pw); } catch (e) { toast((e as Error).message); }
             }}>Delete</button>
           </div>
-          {open === c.code && <PeoplePanel code={c.code} auth={auth} superAdmin />}
+          {open === c.code && <PeoplePanel code={c.code} auth={auth} superAdmin onChanged={() => void load(pw)} />}
         </div>
       ))}
       {list && !list.length && <span className="muted">No choirs yet.</span>}

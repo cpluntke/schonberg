@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { _resetAllForTests, exportBackup, loadProfile, saveProfile } from './store';
 import {
-  acceptInvite, createInvite, fetchPeople, inviteLink, leaveChoir, loadSession, login, logout, refreshSession, rememberedInvite,
-  saveSession, sessionFor, superCreate, type Session,
+  _resetSessionStateForTests, acceptInvite, createInvite, fetchPeople, inviteLink, leaveChoir, loadSession, loggedOutNotice, login, logout,
+  LOGGED_OUT_ELSEWHERE, refreshSession, refreshSessionSoon, rememberedInvite, saveSession, sessionFor, superCreate, type Session,
 } from './choir';
 import { parseHash, href } from '../ui/router';
 
@@ -25,6 +25,7 @@ const headers = (c: Call) => (c.init.headers ?? {}) as Record<string, string>;
 beforeEach(() => {
   localStorage.clear();
   _resetAllForTests();
+  _resetSessionStateForTests();
   vi.stubEnv('VITE_CHOIR_URL', '/schonberg/api');
 });
 afterEach(() => {
@@ -119,5 +120,40 @@ describe('choir accounts client', () => {
     expect(parseHash('#/invite/abc_DEF-123')).toEqual({ name: 'invite', token: 'abc_DEF-123' });
     expect(parseHash('#/invite')).toEqual({ name: 'invite' });
     expect(href({ name: 'invite', token: 'abc' })).toBe('#/invite/abc');
+  });
+
+  it('a login ended elsewhere (401) leaves a notice until the next login', async () => {
+    saveSession(session());
+    mockFetch((url) => (url.endsWith('/login') ? { body: session({ token: 'tok-new-' + 'y'.repeat(40) }) } : { status: 401, body: { error: 'x', loggedOut: true } }));
+    await expect(fetchPeople('kammerchor', { bearer: session().token })).rejects.toThrow();
+    expect(loadSession()).toBeNull();
+    expect(loggedOutNotice()).toBe(LOGGED_OUT_ELSEWHERE);
+    await login('kammerchor', 'Clara', 'password-123');
+    expect(loggedOutNotice()).toBeNull();
+    // a 401 for a token that isn't this phone's current login changes nothing
+    await expect(fetchPeople('kammerchor', { bearer: 'some-other-token-0123456789' })).rejects.toThrow();
+    expect(loadSession()).not.toBeNull();
+    expect(loggedOutNotice()).toBeNull();
+  });
+
+  it('a new login (e.g. another choir) ends the previous one on the server', async () => {
+    const old = session({ code: 'otherchoir', token: 'tok-old-' + 'z'.repeat(40) });
+    saveSession(old);
+    mockFetch((url) => (url.endsWith('/invites/accept') ? { status: 201, body: session() } : { body: { ok: true } }));
+    await acceptInvite('invite-token-0123456789abcdef', 'Clara', 'password-123');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(loadSession()?.code).toBe('kammerchor');
+    const del = calls.find((c) => c.url === '/schonberg/api/session' && c.init.method === 'DELETE');
+    expect(del && headers(del).Authorization).toBe(`Bearer ${old.token}`);
+  });
+
+  it('refreshSessionSoon asks the server at most every 20 s', async () => {
+    saveSession(session());
+    const { token: _t, ...fresh } = session();
+    mockFetch(() => ({ body: fresh }));
+    refreshSessionSoon();
+    refreshSessionSoon();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(calls.filter((c) => c.url === '/schonberg/api/session')).toHaveLength(1);
   });
 });

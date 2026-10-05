@@ -6,7 +6,7 @@ import { useProfile } from '../hooks';
 import { go } from '../router';
 import { syncChoirNow } from '../library';
 import { IconBack } from '../icons';
-import { acceptInvite, apiBase, ChoirApiError, joinChoir, leaveChoir, lookupInvite, type InviteInfo, type Session } from '../../progress/choir';
+import { acceptInvite, apiBase, ChoirApiError, joinChoir, leaveChoir, loadSession, lookupInvite, type InviteInfo, type Session } from '../../progress/choir';
 import { loadProfile } from '../../progress/store';
 import { roleText, voicesText } from '../components/People';
 
@@ -98,6 +98,10 @@ export function InviteScreen({ token: fromUrl }: { token?: string }) {
       {top}
       <form className="card" data-testid="invite-form" onSubmit={async (e) => {
         e.preventDefault();
+        // Already logged in on this phone (as someone else): ask before replacing that login.
+        const cur = loadSession();
+        const same = cur && reset && cur.code === info.code && cur.account.name === inv.accountName;
+        if (cur && !same && !confirm(`You're logged in as ${cur.account.name} (${cur.choirName}). Continue as the new account? ${cur.account.name} is logged out on this phone.`)) return;
         setBusy(true);
         setPwError('');
         try {

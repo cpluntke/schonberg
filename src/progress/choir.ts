@@ -77,7 +77,10 @@ async function call<T>(path: string, init: RequestInit & { auth?: Auth; member?:
   try { body = await res.json(); } catch { /* not json */ }
   if (!res.ok) {
     // The server ended this session (expired, logged out elsewhere, account removed): forget it here too.
-    if (res.status === 401 && auth && 'bearer' in auth && loadSession()?.token === auth.bearer) saveSession(null);
+    if (res.status === 401 && auth && 'bearer' in auth && loadSession()?.token === auth.bearer) {
+      logoutNotice = LOGGED_OUT_ELSEWHERE;
+      saveSession(null);
+    }
     throw new ChoirApiError(res.status, (body as { error?: string } | null)?.error ?? `Server error (${res.status})`);
   }
   return body as T;
@@ -209,7 +212,11 @@ export const withdrawProgress = (code: string, name: string) => call(`/choirs/${
 // ------------------------------------------------------------------ accounts (admins and section leads)
 
 export type Role = 'admin' | 'lead';
-export interface Account { id: string; name: string; role: Role; voices: string[]; createdAt: number; lastLoginAt?: number | null }
+export interface Account {
+  id: string; name: string; role: Role; voices: string[]; createdAt: number; lastLoginAt?: number | null;
+  /** How the account was made. */
+  invitedBy?: 'invite' | 'super admin' | 'old password';
+}
 export interface Session { token: string; code: string; choirName: string; account: Account; expiresAt: number }
 export interface InviteInfo {
   id: string; role: Role; voices: string[]; note: string; createdAt: number; expiresAt: number; by: string;
@@ -227,6 +234,10 @@ export interface People {
 const SESSION_KEY = 'schonberg:session';
 const INVITES_KEY = 'schonberg:inviteLinks';
 const sessionListeners = new Set<() => void>();
+export const LOGGED_OUT_ELSEWHERE = 'You were logged out (password changed or account removed). Log in again.';
+let logoutNotice: string | null = null;
+/** Why this phone's login ended without the person logging out here (shown until they log in again). */
+export const loggedOutNotice = () => logoutNotice;
 export function onSessionChange(cb: () => void): () => void {
   sessionListeners.add(cb);
   return () => { sessionListeners.delete(cb); };
@@ -261,14 +272,23 @@ export function sessionFor(code: string | undefined | null): Session | null {
 }
 export const sessionAuth = (s: Session): Auth => ({ bearer: s.token });
 
+/** Use a new login; a different one this phone had (maybe another choir) is ended on the server too. */
+function adoptSession(s: Session): void {
+  const old = loadSession();
+  logoutNotice = null;
+  saveSession(s);
+  if (old && old.token !== s.token) void call('/session', { method: 'DELETE', auth: { bearer: old.token } }).catch(() => {});
+}
+
 export async function login(code: string, name: string, password: string): Promise<Session> {
   const s = await call<Session>(`/choirs/${enc(code.toLowerCase())}/login`, { method: 'POST', ...json({ name, password }) });
-  saveSession(s);
+  adoptSession(s);
   return s;
 }
 /** Log out on this phone (the server forgets the session too). */
 export async function logout(): Promise<void> {
   const s = loadSession();
+  logoutNotice = null;
   saveSession(null);
   if (s) await call('/session', { method: 'DELETE', auth: { bearer: s.token } }).catch(() => {});
 }
@@ -285,6 +305,20 @@ export async function refreshSession(): Promise<Session | null> {
     return e instanceof ChoirApiError && e.status === 401 ? null : s;
   }
 }
+let lastRefresh = 0;
+export function _resetSessionStateForTests(): void { lastRefresh = 0; logoutNotice = null; }
+/** refreshSession at most every 20 s (on opening an admin or section screen, and when the app comes back). */
+export function refreshSessionSoon(): void {
+  const now = Date.now();
+  if (!loadSession() || now - lastRefresh < 20_000) return;
+  lastRefresh = now;
+  void refreshSession();
+}
+if (typeof document !== 'undefined' && typeof window !== 'undefined') {
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshSessionSoon(); });
+  window.addEventListener('focus', () => refreshSessionSoon());
+}
+
 export function changePassword(password: string, newPassword: string): Promise<unknown> {
   const s = loadSession();
   if (!s) return Promise.reject(new ChoirApiError(401, 'Log in first'));
@@ -300,13 +334,13 @@ export const lookupInvite = (token: string) =>
   call<{ code: string; choirName: string; invite: InviteInfo }>('/invites/lookup', { method: 'POST', ...json({ token }) });
 export async function acceptInvite(token: string, name: string, password: string): Promise<Session> {
   const s = await call<Session>('/invites/accept', { method: 'POST', ...json({ token, name, password }) });
-  saveSession(s);
+  adoptSession(s);
   return s;
 }
 /** Turn the first version's shared admin or section-lead password into my own account. */
 export async function claimAccount(code: string, oldPassword: string, name: string, password: string): Promise<Session> {
   const s = await call<Session>(`/choirs/${enc(code.toLowerCase())}/claim`, { method: 'POST', ...json({ oldPassword, name, password }) });
-  saveSession(s);
+  adoptSession(s);
   return s;
 }
 

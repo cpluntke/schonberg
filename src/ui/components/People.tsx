@@ -60,7 +60,7 @@ function inviteText(inv: InviteInfo): string {
 }
 
 /** The "People" section: admins, section leads by voice, open invites. */
-export function PeoplePanel({ code, auth, superAdmin = false }: { code: string; auth: Auth; superAdmin?: boolean }) {
+export function PeoplePanel({ code, auth, superAdmin = false, onChanged }: { code: string; auth: Auth; superAdmin?: boolean; onChanged?: () => void }) {
   const [people, setPeople] = useState<People | null>(null);
   const [err, setErr] = useState('');
   const [fresh, setFresh] = useState<{ token: string; title: string } | null>(null);
@@ -76,6 +76,7 @@ export function PeoplePanel({ code, auth, superAdmin = false }: { code: string; 
       const p = await f();
       if (p) setPeople(p);
       else await load();
+      onChanged?.();
     } catch (e) {
       toast((e as Error).message);
     } finally {
@@ -91,18 +92,26 @@ export function PeoplePanel({ code, auth, superAdmin = false }: { code: string; 
   if (err && !people) return <div className="notice" role="alert">{err}</div>;
   if (!people) return <span className="muted small">Loading people…</span>;
   const admins = people.accounts.filter((a) => a.role === 'admin');
+  const legacyLeads = VOICES.filter((v) => people.legacy.leads.includes(v));
   const leads = people.accounts.filter((a) => a.role === 'lead');
   const person = (a: Account) => (
     <div key={a.id} className="col" style={{ gap: 4, padding: '6px 0', borderBottom: '1px solid var(--surface-2)' }} data-testid="person">
       <div className="row" style={{ gap: 6 }}>
         <span className="grow" style={{ overflowWrap: 'anywhere' }}>
           <strong>{a.name}</strong>{a.id === people.you && <span className="tiny muted"> (you)</span>}
-          <span className="tiny muted" style={{ display: 'block' }}>{a.lastLoginAt ? `last login ${day(a.lastLoginAt)}` : 'never logged in'}</span>
+          <span className="tiny muted" style={{ display: 'block' }}>
+            {a.lastLoginAt ? `last login ${day(a.lastLoginAt)}` : 'never logged in'}{a.invitedBy === 'old password' ? ' · joined with the old shared password' : ''}
+          </span>
         </span>
         <button className="btn small ghost" disabled={busy} onClick={() => run(async () => {
           const r = await resetPerson(code, auth, a.id);
           setFresh({ token: r.token, title: `New-password link for ${a.name}` });
         })}>New link</button>
+        {a.role === 'lead' && (
+          <button className="btn small ghost" disabled={busy} onClick={() => {
+            if (confirm(`Make ${a.name} a choir admin? Admins can change the programme, the scores and the people.`)) void run(() => updatePerson(code, auth, a.id, { role: 'admin' }));
+          }}>Make admin</button>
+        )}
         {a.id !== people.you && (
           <button className="btn small ghost danger" disabled={busy} onClick={() => {
             if (confirm(`Remove ${a.name}'s account? They can no longer log in.`)) void run(() => removePerson(code, auth, a.id));
@@ -114,8 +123,11 @@ export function PeoplePanel({ code, auth, superAdmin = false }: { code: string; 
           {VOICES.map((v) => {
             const on = a.voices.includes(v);
             return (
-              <button key={v} className="chip" aria-pressed={on} disabled={busy || (on && a.voices.length === 1)}
-                onClick={() => run(() => updatePerson(code, auth, a.id, { voices: on ? a.voices.filter((x) => x !== v) : [...a.voices, v] }))}>
+              <button key={v} className="chip" aria-pressed={on} disabled={busy}
+                onClick={() => {
+                  if (on && a.voices.length === 1) { toast('A section lead needs at least one voice part: add the other one first'); return; }
+                  void run(() => updatePerson(code, auth, a.id, { voices: on ? a.voices.filter((x) => x !== v) : [...a.voices, v] }));
+                }}>
                 {VOICE_NAME[v]}
               </button>
             );
@@ -130,9 +142,9 @@ export function PeoplePanel({ code, auth, superAdmin = false }: { code: string; 
       {people.legacy.active && (
         <div className="notice col" style={{ gap: 6 }}>
           <span className="small">
-            The old shared {people.legacy.admin ? 'admin password' : ''}{people.legacy.admin && people.legacy.leads.length ? ' and ' : ''}
-            {people.legacy.leads.length ? `section-lead passwords (${voicesText(people.legacy.leads)})` : ''} can still be turned into personal accounts
-            {people.legacy.until ? ` until ${day(people.legacy.until)}` : ''}. Turn them off once everyone who needs one has an account.
+            Not yet used: the old shared {people.legacy.admin ? 'admin password' : ''}{people.legacy.admin && legacyLeads.length ? ' and the ' : ''}
+            {legacyLeads.length ? `section-lead password${legacyLeads.length > 1 ? 's' : ''} of the ${voicesText(legacyLeads)}` : ''}. Each works once, for one
+            personal account{people.legacy.until ? `, until ${day(people.legacy.until)}` : ''}. Turn them off if nobody needs them any more.
           </span>
           <button className="btn small" disabled={busy} onClick={() => {
             if (confirm('Turn the old shared passwords off for good?')) void run(() => retireOldPasswords(code, auth));
