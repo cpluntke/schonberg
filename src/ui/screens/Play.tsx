@@ -724,14 +724,15 @@ function SingPlay({ route }: { route: PlayRoute }) {
                 disabled={me && !canToggleOwn}
                 title={me && !canToggleOwn ? 'At this level you sing without your part' : undefined}
                 onClick={() => togglePart(p.id)}>
-                {shortName(p.name)}{me ? ' · you' : ''}{on ? '' : ' (off)'}
+                {shortName(p.name)}{me ? <span className="you"> · you</span> : ''}{on ? '' : ' (off)'}
               </button>
             );
           })}
         </div>
-        <div className="row">
-          <button className="btn small" disabled={!running} onClick={() => { sessionRef.current?.dispose(); sessionRef.current = null; start(); }}>
-            <IconRestart size={16} /> Restart
+        {/* With Peek too, Restart and Finish show only their icons on a phone (Pause always fits). */}
+        <div className={`row play-actions${offBook && running && hiddenRef.current.size > 0 ? ' compact' : ''}`}>
+          <button className="btn small" aria-label="Restart" disabled={!running} onClick={() => { sessionRef.current?.dispose(); sessionRef.current = null; start(); }}>
+            <IconRestart size={16} /> <span className="lbl">Restart</span>
           </button>
           <div className="grow" />
           {offBook && running && hiddenRef.current.size > 0 && (
@@ -744,7 +745,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
           )}
           {running ? (
             <>
-              {!listenOnly && <button className="btn small" onClick={() => sessionRef.current?.finish()}><IconStop size={14} color="#EEF0FF" /> Finish</button>}
+              {!listenOnly && <button className="btn small" aria-label="Finish" onClick={() => sessionRef.current?.finish()}><IconStop size={14} color="#EEF0FF" /> <span className="lbl">Finish</span></button>}
               <button className="big-play" aria-label="Pause" onClick={() => { sessionRef.current?.pause(); setPhase('paused'); }}><IconPause /></button>
             </>
           ) : (
@@ -811,7 +812,15 @@ export function lyricLine(notes: { lyric?: string; syllabic?: string }[], idx: n
   if (now && done && !(nowNote?.syllabic === 'middle' || nowNote?.syllabic === 'end')) now = ' ' + now;
   let next = joinSyl(nextNotes);
   if (next && nextNotes.find((n) => n.lyric) && !['middle', 'end'].includes(nextNotes.find((n) => n.lyric)!.syllabic ?? '')) next = ' ' + next;
-  return { done: done.slice(-28), now, next };
+  return { done: tailWords(done, 28), now, next };
+}
+
+/** The end of `text`, at most about `max` characters, starting at a word (never "ald steht"). */
+function tailWords(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const cut = text.length - max;
+  const sp = text.indexOf(' ', cut - 1);
+  return sp < 0 ? text.slice(cut) : text.slice(sp + 1);
 }
 
 function emptyResult(): AttemptResult {

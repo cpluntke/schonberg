@@ -197,6 +197,20 @@ input[type='range'] { accent-color: var(--accent); width: 100%; }
 }
 .mixer button[aria-pressed='false'] { color: var(--muted); background: transparent; border-style: dashed; text-decoration: line-through; }
 .mixer button.me { border: 2px solid var(--voice); color: var(--voice); background: var(--voice-bg); }
+.mixer button { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* Restart · (Peek) · Finish · Pause: Pause never leaves the screen. */
+.play-actions { gap: 8px; min-width: 0; }
+.play-actions > .btn { flex: none; }
+@media (max-width: 440px) {
+  .play-actions.compact .lbl { display: none; }
+  .play-actions.compact > .btn { padding: 0 12px; }
+}
+@media (max-width: 340px) {
+  .play-actions .lbl { display: none; }
+  .mixer button .you { display: none; }
+  .play-actions .big-play { width: 52px; height: 52px; }
+  .mixer button { font-size: 12px; }
+}
 .big-play {
   width: 60px; height: 60px; border-radius: 30px; border: none; background: var(--accent); display: flex; align-items: center; justify-content: center; flex: none;
 }
@@ -256,6 +270,8 @@ input[type='range'] { accent-color: var(--accent); width: 100%; }
   .play-controls { flex-direction: row; align-items: center; padding-top: 4px; padding-bottom: calc(6px + var(--safe-bottom)); }
   .play-controls .mixer { flex: 1 1 auto; }
   .play-controls > .row { flex: none; }
+  .play-actions .lbl { display: none; }
+  .mixer button .you { display: none; }
   .lyrics { font-size: 16px; padding-top: 4px; min-height: 26px; }
   .big-play { width: 48px; height: 48px; }
   .play-hud { padding-top: 2px; padding-bottom: 0; }
