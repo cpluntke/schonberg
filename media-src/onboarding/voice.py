@@ -5,15 +5,23 @@ k=Kokoro('/tmp/kokoro/kokoro-v1.0.onnx','/tmp/kokoro/voices-v1.0.bin')
 from kokoro_onnx.tokenizer import Tokenizer
 tok=Tokenizer()
 L=json.load(open('script.json')); V={'N':'af_heart','B':'am_michael'}
-PHONEMES={'Schönberg':'ʃˈɜːnbɛɹk','do re mi':'dˈoʊ ɹˈɛ mˈiː'}
+PHONEMES={'Schönberg':'ʃˈɜːnbɛɹk','do re mi':'dˈoʊ ɹˈɛ mˈiː','doo':'dˈuː'}
+# Whole words/phrases only ("doo" must not catch "door"); longest first ("do re mi" before "doo").
+PH_RE=re.compile('|'.join(r'(?<!\w)'+re.escape(w)+r'(?!\w)' for w in sorted(PHONEMES,key=len,reverse=True)))
 SR=24000; t=0.9; chunks=[]; lines=[]; subs=[]; prev=None
 for l in L:
     # Pronunciation fixes via phoneme overrides (the English voice misreads these):
     # "Schönberg": no ø in English, so the closest vowel (ʃˈɜːn-) and a German-style ending (-bɛɹk);
-    # "do re mi": solfège "doh, reh, mee", not "doo, ree, my".
-    hit = next((w for w in PHONEMES if w in l['say']), None)
-    if hit:
-        ph = (' ' + PHONEMES[hit] + ' ').join(tok.phonemize(x, lang='en-us').strip() for x in l['say'].split(hit)).strip()
+    # "do re mi": solfège "doh, reh, mee", not "doo, ree, my";
+    # "doo": the level-1 syllable, /duː/ (pinned, so it never turns into "do" or "dough").
+    if PH_RE.search(l['say']):
+        bits = PH_RE.split(l['say']); hits = PH_RE.findall(l['say'])
+        ph = bits[0] and tok.phonemize(bits[0], lang='en-us').strip()
+        for w, rest in zip(hits, bits[1:]):
+            r = tok.phonemize(rest, lang='en-us').strip() if rest.strip() else ''
+            # No space before punctuation ("on doo, with" → "dˈuː, wɪð"), so the pause stays natural.
+            ph = (ph + ' ' if ph else '') + PHONEMES[w] + ('' if not r or r[0] in ',.;:!?' else ' ') + r
+        ph = ph.strip()
         print('phonemes:', ph)
         a,sr=k.create(ph,voice=V[l['sp']],speed=0.97 if l['sp']=='N' else 1.0,lang='en-us',is_phonemes=True)
     else:
