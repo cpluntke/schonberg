@@ -49,7 +49,8 @@ export function Ranks() {
       try {
         // Only post named entries, and only to a real (server) board — posting to the local
         // store would bump the store version and re-run this effect in a loop.
-        if (me && profile.leaderboardOptIn && profile.name && backend.kind === 'http') await backend.put(choir, me);
+        // Every choir member with a name is on the choir's board (part of joining the choir).
+        if (me && profile.choirCode && profile.name && backend.kind === 'http') await backend.put(choir, me);
         const list = await backend.list(choir, pieceId);
         const everything = await backend.list(choir);
         if (alive) { setEntries(list); setAllEntries(everything); setErr(null); }
@@ -59,7 +60,7 @@ export function Ranks() {
     })();
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pieceId, choir, profile.leaderboardOptIn, profile.name, refresh]);
+  }, [pieceId, choir, profile.choirCode, profile.name, refresh]);
 
   const others = entries.filter((e) => !(me && e.name === me.name && e.pieceId === me.pieceId));
   const all = me ? [...others, { ...me, name: me.name }] : others;
@@ -210,14 +211,12 @@ export function Ranks() {
         <strong>Compare with your choir</strong>
         {backend.kind === 'http' ? (
           <>
-            <span className="small muted">Join your choir's board with the code your director shares. Only your name, voice and these numbers are sent.</span>
+            <span className="small muted">Join your choir's board with the code your director shares. Everyone in the choir is on it: your name, voice and these numbers are shown to the choir (nothing else is sent).</span>
             <div className="row">
               <input type="text" aria-label="Choir code" value={codeDraft} onChange={(e) => setCodeDraft(e.target.value)} placeholder="choir code"
                 style={{ flex: 1, minHeight: 44, borderRadius: 10, border: '1px solid var(--line)', background: 'var(--surface)', padding: '0 12px' }} />
               <button className="btn small" disabled={!CODE_RE.test(codeDraft)} onClick={() => update({ choirCode: codeDraft.toLowerCase(), leaderboardOptIn: true })}>Join</button>
             </div>
-            <label className="toggle-row"><span>Post my results</span>
-              <input type="checkbox" checked={profile.leaderboardOptIn} onChange={(e) => update({ leaderboardOptIn: e.target.checked })} /></label>
           </>
         ) : (
           <span className="small muted">No leaderboard server is configured, so rankings travel as codes. Share yours in the choir chat and paste theirs below.</span>

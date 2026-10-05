@@ -133,7 +133,9 @@ export function Setup() {
             </div>
             <span className="tiny muted">Your own scores can be imported later in the Library.</span>
           </div>
-          <button className="btn primary block" style={{ marginTop: 'auto' }} onClick={() => setStep(2)}>Continue</button>
+          {profile.choirCode && !name.trim() && <span className="small" role="status" style={{ color: 'var(--accent-text)' }}>Your choir's leaderboard needs your first name.</span>}
+          <button className="btn primary block" style={{ marginTop: 'auto' }} disabled={!!profile.choirCode && !name.trim()}
+            onClick={() => { update({ name: name.trim() }); setStep(2); }}>Continue</button>
         </>
       )}
 
@@ -231,7 +233,7 @@ function ChoirStep({ profile, update, onNext }: { profile: Profile; update: (p: 
         </div>
       ) : (
         <div className="card">
-          <span className="muted">Got a code from your choir? It brings in your choir's programme, its scores and its leaderboard (where your first name and progress are shown to the choir).</span>
+          <span className="muted">Got a code from your choir? It brings in your choir's programme and its scores, and puts you on the choir's leaderboard: everyone in the choir sees your first name, voice and progress.</span>
           <JoinChoir onJoined={() => update({})} />
         </div>
       )}
