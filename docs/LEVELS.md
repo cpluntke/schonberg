@@ -53,8 +53,9 @@ slowly; that bar shows as “needs work” in the bar strip, and the grade lette
   (“not sung”; for both kinds, so a note out of the tracker's range must still be sung), or a very
   short note graded *miss* whose own readings were enough to judge
   it (the same test the scorer uses for fast notes) with their median at least 1.5 tolerances off
-  (75¢ at level 1: a wrong note, not a wobble), up to 6 semitones or an octave off (further off is
-  the tracker locking onto a fraction of the pitch, not a sung note).
+  (75¢ at level 1: a wrong note, not a wobble), however far off, except 18–46 semitones low (the
+  tracker locking onto a fraction of the pitch, not a sung note) or an octave up on a note under
+  200 Hz (the tracker's octave error on “oo”).
 - The 75% pass mark stays only as a backstop, so a run can't pass on forgiven notes alone. It only
   matters when many notes are forgiven (good singers in the realism harness never reach it).
 - A note tied over the end of a section is judged on the part before the end, since playback and

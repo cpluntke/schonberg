@@ -1,9 +1,12 @@
 {
  "meta": {
-  "head": "8de78c7",
+  "head": "8c0d8a7",
   "dirty": [
-   "src/game/align.ts",
-   "src/ui/screens/Play.tsx"
+   "rc/game/scoring.ts",
+   "src/game/types.ts",
+   "src/ui/screens/Play.tsx",
+   "src/ui/screens/Results.tsx",
+   "src/ui/styles.css"
   ],
   "policy": [
    "LATE_FAIL_MS=250",

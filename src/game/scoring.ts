@@ -608,11 +608,12 @@ export class LiveScorer {
     let clearly: NoteResult['clearly'];
     if (unsure && GRADE_RANK[grade] < GRADE_RANK.good) {
       if (a.inNote > 0 && a.loudInNote === 0) clearly = 'silent';
-      // Off by a wrong note (up to SHORT_FAR) or by an octave is sung; further off is the tracker
-      // locking onto a fraction of the pitch. (An octave up on a low note may be the tracker too:
-      // see OCTAVE_UP_HZ.)
+      // Any clear miss is sung, except readings in the subharmonic band (SUBHARMONIC_LOW…HIGH: the
+      // tracker locking onto a third, a quarter … of the pitch) and an octave up on a low note (the
+      // tracker's octave error on "oo", see OCTAVE_UP_HZ).
       else if (unsure === 'short' && grade === 'miss' && shortDev !== null && Math.abs(shortDev) >= CLEAR_OFF_TOL * tolN
-        && (Math.abs(shortDev) <= SHORT_FAR || Math.abs(shortDev + 1200) <= tolN || (!w.lowForOctave && Math.abs(shortDev - 1200) <= tolN))) clearly = 'off';
+        && !(shortDev < SUBHARMONIC_HIGH && shortDev > SUBHARMONIC_LOW)
+        && !(w.lowForOctave && Math.abs(shortDev - 1200) <= tolN)) clearly = 'off';
     }
     const scoopMed = median(a.scoopDevs);
     // A scoop is a glide INTO the note: the body must end up clearly closer to the target than the

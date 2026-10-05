@@ -55,9 +55,9 @@ For every note in your part:
   above), or a written pitch outside the detector's 60–1400 Hz. It still counts as wrong when it was
   clearly wrong: **no sound at all** inside the note (no pitched reading, and every reading below the
   detector's level gate; this applies to both kinds), or, for a very short note, a *miss* whose own
-  readings were enough to judge it with their median at least 1.5 × the tolerance off, up to 6
-  semitones or an octave (an octave up on a note under 200 Hz excepted, see below); further off is
-  the detector, not a sung note. A note outside the detector's range that was sung (there is sound, but no pitch
+  readings were enough to judge it with their median at least 1.5 × the tolerance off, however far,
+  except 18–46 semitones low (the detector locking onto a third, a quarter … of the pitch, not a
+  sung note) and an octave up on a note under 200 Hz (see below). A note outside the detector's range that was sung (there is sound, but no pitch
   the detector can read) is let off. Two more detector errors are let off at level 1:
   - **Low notes read an octave up** (`'octave'`): below 200 Hz a sung “oo” can put its strongest
     partial at twice the pitch, and the detector then reads some or all of the note an octave up. If

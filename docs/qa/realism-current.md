@@ -1,9 +1,9 @@
 # Realism: before / after the scoring fixes
 
-Generated 2026-10-05T13:42:36.790Z by `npx vitest run --config vitest.realism.config.ts` (files `qa/realism/cmp-*.test.ts`). The same rendered takes are scored by both pipelines:
+Generated 2026-10-05T15:00:44.549Z by `npx vitest run --config vitest.realism.config.ts` (files `qa/realism/cmp-*.test.ts`). The same rendered takes are scored by both pipelines:
 
 - **before** = baseline app (frozen `qa/realism/baseline/`, as in `docs/qa/realism-baseline.md`): N=2048 window, `scoreAttempt`, onset-based delay learning that re-scores the same run, pass = accuracy only, and an uncalibrated estimate of 80 ms.
-- **after** = current app at `8de78c7` plus uncommitted changes in `src/game/align.ts`, `src/ui/screens/Play.tsx`. The analysis window comes from `windowFor(part.low)` (1024 for these alto parts). Then `scoreAttempt` → `scoreAligned`, two-run delay learning and the Android estimate of 130 ms. Play.tsx/session policy detected from the source: LATE_FAIL_MS=250; GUIDE_LEARN_MAX_ABOVE=150; timing gate: measured; liftSubharmonics: true; scoreAligned everyNote: true; session stores raw samples.
+- **after** = current app at `8c0d8a7` plus uncommitted changes in `rc/game/scoring.ts`, `src/game/types.ts`, `src/ui/screens/Play.tsx`, `src/ui/screens/Results.tsx`, `src/ui/styles.css`. The analysis window comes from `windowFor(part.low)` (1024 for these alto parts). Then `scoreAttempt` → `scoreAligned`, two-run delay learning and the Android estimate of 130 ms. Play.tsx/session policy detected from the source: LATE_FAIL_MS=250; GUIDE_LEARN_MAX_ABOVE=150; timing gate: measured; liftSubharmonics: true; scoreAligned everyNote: true; session stores raw samples.
 - **after (80 ms estimate)** = the current app with the old 80 ms estimate (an iPhone-like device). It separates the estimate change from the rest.
 
 Run cells: `grade accuracy%` (✗ = run failed), `al±N` = the voice was shifted N ms for intonation, `→N ms` = the stored delay changed to N, `TF` = failed by the timing gate (median entry in ms), `[…]` = timing/wrong-note tips. Sequences are 3 consecutive runs (new performance each run) on a phone whose stored delay carries over.
@@ -464,7 +464,7 @@ Each good voice sings the six sections on the lyrics and on “doo” (a 20–45
 | slow transitions (fn 3–4 Hz) | lyrics | uncal200 | 16/18 | 18/18 | 99% | 3 | 0 | dieu-6-13 #58 ok -8¢; tabourin-solo-9-16 #17 miss 8¢; tabourin-solo-9-16 #22 miss 11¢ | 91 |
 | slow transitions (fn 3–4 Hz) | doo | cal | 18/18 | 18/18 | 100% | 0 | 0 | – | 46 |
 | slow transitions (fn 3–4 Hz) | doo | uncal200 | 18/18 | 18/18 | 100% | 0 | 0 | – | 94 |
-| good choir singer | doo, phone speaker | cal | 11/30 | 27/30 | 88% | 93 | 32 | warmup-upbeat-6 #13 miss -1210¢; warmup-upbeat-6 #15 miss -1191¢; warmup-upbeat-6 #17 miss -1187¢; warmup-upbeat-6 #19 miss -1188¢ …+57 | 23 |
+| good choir singer | doo, phone speaker | cal | 10/30 | 27/30 | 88% | 93 | 31 | warmup-upbeat-6 #13 miss -1210¢; warmup-upbeat-6 #15 miss -1191¢; warmup-upbeat-6 #17 miss -1187¢; warmup-upbeat-6 #19 miss -1188¢ …+58 | 23 |
 | good choir singer | doo, phone speaker | uncal200 | 8/30 | 26/30 | 87% | 98 | 42 | warmup-upbeat-6 #10 miss -1198¢; warmup-upbeat-6 #12 miss -1180¢; warmup-upbeat-6 #13 miss -21¢; warmup-upbeat-6 #14 miss -1182¢ …+52 | 74 |
 | operatic vibrato | doo, phone speaker | cal | 7/18 | 16/18 | 89% | 54 | 28 | warmup-upbeat-6 #15 miss -1197¢; warmup-upbeat-6 #19 miss -1185¢; warmup-upbeat-6 #10 miss -1150¢; warmup-upbeat-6 #13 miss -1185¢ …+22 | 28 |
 | operatic vibrato | doo, phone speaker | uncal200 | 7/18 | 15/18 | 89% | 50 | 22 | warmup-upbeat-6 #15 miss -1202¢; warmup-upbeat-6 #16 miss 0¢; warmup-upbeat-6 #17 miss -86¢; warmup-upbeat-6 #19 miss -1198¢ …+24 | 76 |

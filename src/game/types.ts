@@ -73,8 +73,9 @@ export interface NoteResult {
    * An unsure note graded below "good" that was still clearly wrong: 'silent' = no sound at all
    * inside the written note (no voiced reading, every reading below the silence level; either kind
    * of unsure note); 'off' = a very short note graded miss, with enough of its own readings to judge
-   * it (shortNoteDev) and their median at least CLEAR_OFF_TOL tolerances off (but within 6
-   * semitones: further off is the tracker locking onto a fraction of the pitch).
+   * it (shortNoteDev) and their median at least CLEAR_OFF_TOL tolerances off, except in the
+   * subharmonic band (18–46 semitones low: the tracker locking onto a fraction of the pitch) or an
+   * octave up on a note under 200 Hz (the tracker's octave error on "oo").
    */
   clearly?: 'off' | 'silent';
 }

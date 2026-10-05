@@ -197,6 +197,14 @@ describe('level 1: what the scorer can’t judge reliably', () => {
     expect(noteVerdict(sub.notes[1])).toBe('forgiven');
   });
 
+  it('a very short note sung a fifth, a sixth or more than an octave off is a clear miss', () => {
+    for (const off of [7, -7, 9, -9, 11, -11, 13]) {
+      const r = score((i) => part.notes[i].midi + (i === 4 ? off : 0));
+      expect(r.notes[4], `${off} semitones`).toMatchObject({ grade: 'miss', unsure: 'short', clearly: 'off' });
+      expect(noteVerdict(r.notes[4]), `${off} semitones`).toBe('wrong');
+    }
+  });
+
   it('a very short note sung an octave low is a clear miss (an octave is sung; deeper is the tracker)', () => {
     const r = score((i) => part.notes[i].midi + (i === 4 ? -12 : 0));
     expect(r.notes[4]).toMatchObject({ grade: 'miss', unsure: 'short', clearly: 'off' });
