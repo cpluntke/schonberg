@@ -2,11 +2,13 @@
 // readable), several bars per system, your own staff highlighted and the only one with your voice
 // drawn on it. Narrow screens (phones) get the single-staff view (staff2d.ts) unchanged.
 import type { KeySig, Part } from '../../music/types';
+import type { NotationMode } from '../../game/notation';
 import { beatToTime, timeToBeat } from '../../music/time';
 import { COLORS, type DrawState } from './highway2d';
 import {
   INK, buildSysDraw, drawBarline, drawBubble, drawCountdown, drawOutlines, drawStaff2D, drawStaffFrame, drawStaffNotes,
-  drawTrace, fontGeneration, lyricFontFor, measureSpan, middleStep, spell, systemAt, updateTrace, xAtBeat,
+  drawTrace, fontGeneration, lyricFontFor, measureSpan, middleStep, nameFontFor, nameMeasure, namesOn, spell, systemAt,
+  textRows, updateTrace, xAtBeat,
   type Cached, type StaffLayout, type SysGeo, type Vis,
 } from './staff2d';
 import { doublings, layoutFullScore, planStaves, type FullLayout, type StaffShow, type StaffSpec } from './fullscore';
@@ -79,7 +81,7 @@ let noFit: string | null = null;
 const isTriplet = (d: number) => Math.abs(d * 3 - Math.round(d * 3)) < 0.02 && Math.abs(d * 4 - Math.round(d * 4)) > 0.02;
 
 /** Vertical room of a staff (staff spaces), from the notes of the section. */
-function extents(spec: StaffSpec, key: KeySig, from: number, to: number, lyrics: boolean, first: boolean) {
+function extents(spec: StaffSpec, key: KeySig, from: number, to: number, lyrics: boolean, first: boolean, names: NotationMode | null = null) {
   const mid = middleStep(spec.clef);
   let lo = mid - 4;
   let hi = mid + 4;
@@ -96,9 +98,10 @@ function extents(spec: StaffSpec, key: KeySig, from: number, to: number, lyrics:
   if (tup) above = Math.max(above + 1.6, 3.4);
   if (first) above = Math.max(above, 2.7); // bar numbers
   const noteBelow = ((mid - 4) - lo) / 2;
-  const lyricOff = Math.max(2.9, noteBelow + 2.4);
-  const below = lyrics ? lyricOff + 1.0 : Math.max(1.5, noteBelow + 1.5);
-  return { above, below, lyricOff };
+  // Your staff with note names: their row under it (sized for a typical full-score staff space).
+  const { nameOff, lyricOff } = textRows(noteBelow, SP_GOOD, { min: 2.9, pad: 2.4, names: !!names, notation: names ?? 'letter' });
+  const below = lyrics ? lyricOff + 1.0 : nameOff != null ? nameOff + 1.0 : Math.max(1.5, noteBelow + 1.5);
+  return { above, below, lyricOff, nameOff };
 }
 
 /** Off book, other voices' words would be your words: none, and no accompaniment (it doubles you). */
@@ -112,7 +115,8 @@ function stripLyrics(p: Part): Part {
 
 function getFull(c: Ctx, W: number, H: number, s: DrawState, show: StaffShow): FullCache | null {
   const offBook = !!s.hide;
-  const key = `${s.score.id}|${s.part.id}|${s.part.notes.length}|${s.from}|${s.to}|${W}|${H}|${fontGeneration()}|${show}|${offBook}`;
+  const names = namesOn(s) ? s.notation : null;
+  const key = `${s.score.id}|${s.part.id}|${s.part.notes.length}|${s.from}|${s.to}|${W}|${H}|${fontGeneration()}|${show}|${offBook}|${names ?? '-'}`;
   if (full && full.key === key) return full;
   if (noFit === key) return null;
   const [m0, m1] = measureSpan(s.score, s.from, s.to);
@@ -128,7 +132,7 @@ function getFull(c: Ctx, W: number, H: number, s: DrawState, show: StaffShow): F
     const specs = planStaves(s.score, s.part.id, sh);
     if (specs.length < 2 || !specs.some((x) => x.own)) return null;
     const lyr = specs.map((x) => x.hasLyrics && (x.own || (lyrics === 'all' && !offBook)));
-    const ex = specs.map((x, i) => extents(x, key0, s.from, s.to, lyr[i], i === 0));
+    const ex = specs.map((x, i) => extents(x, key0, s.from, s.to, lyr[i], i === 0, x.own ? names : null));
     const U = ex.reduce((a, e) => a + e.above + 4 + e.below, 0);
     return { specs, ex, lyr, n, sp: Math.min(SP_MAX, avail / (n * (U + SYS_GAP))), lyrics, show: sh };
   };
@@ -164,7 +168,9 @@ function getFull(c: Ctx, W: number, H: number, s: DrawState, show: StaffShow): F
   for (let guard = 0; ; guard++) {
     c.font = lyricFontFor(sp);
     const textW = (t: string) => c.measureText(t).width;
-    F = layoutFullScore(s.score, specs, m0, m1, { width: W, sp, textW, lyricIds, left, maxBars: 12, overlap: pick.n === 1 });
+    const own = specs.find((x) => x.own);
+    const nm = names && own ? { id: own.id, w: nameMeasure(c, nameFontFor(sp), names) } : undefined;
+    F = layoutFullScore(s.score, specs, m0, m1, { width: W, sp, textW, lyricIds, names: nm, left, maxBars: 12, overlap: pick.n === 1 });
     let worst = Infinity;
     for (const sy of F.staves[0]?.systems ?? []) worst = Math.min(worst, sy.squeeze);
     if (worst >= 0.85 || sp <= SP_MIN + 1e-6 || guard >= 4) break;
@@ -177,6 +183,7 @@ function getFull(c: Ctx, W: number, H: number, s: DrawState, show: StaffShow): F
     const layout: StaffLayout = { clef: fs.clef, mid: fs.mid, sp, systems: fs.systems, minStep: fs.minStep, maxStep: fs.maxStep };
     const L: Cached = {
       key, layout, above: e.above, below: e.below, band: 0, lyricFont: lyricFontFor(sp), lyricOff: e.lyricOff, sys: [], textW: new Map(),
+      nameOff: e.nameOff, nameFont: e.nameOff != null ? nameFontFor(sp) : undefined,
     };
     // Off book: notes doubling yours (unison or octave, same onset) are drawn only once yours show.
     const dbl = offBook && !fs.spec.own ? doublings(s.part, fs.spec.part) : null;

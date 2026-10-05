@@ -3,8 +3,8 @@
 // aligned across all staves. Pure layout (unit-tested); fullscore2d.ts draws it.
 import type { Part, Score, ScoreNote, VoiceType } from '../../music/types';
 import {
-  ACC_W, CLEF_W, TIME_W, breakSystems, buildMeasures, clefFor, eventSteps, hasAcc, hasSecond, keyChangeW, keyW,
-  middleStep, naturalSpace, type Clef, type LaidEvent, type LaidMeasure, type StaffMeasure, type StaffSystem,
+  ACC_W, CLEF_W, NAME_GAP, TIME_W, breakSystems, buildMeasures, clefFor, eventSteps, hasAcc, hasSecond, keyChangeW, keyW,
+  middleStep, nameWidths, naturalSpace, type Clef, type NameW, type LaidEvent, type LaidMeasure, type StaffMeasure, type StaffSystem,
 } from './staff2d';
 
 /** Which staves the score view shows on a wide screen. */
@@ -184,6 +184,8 @@ export interface FullOpts {
   textW: (s: string) => number;
   /** Staves whose lyrics are printed (their syllables take room). */
   lyricIds: Set<string>;
+  /** Note names under one staff (your own): its id and the names' widths. */
+  names?: { id: string; w: NameW };
   maxBars?: number;
   /** x of the staff lines' start (room for names and brackets to its left). */
   left: number;
@@ -237,7 +239,8 @@ function onsetIndex(onsets: number[], t: number): number {
  * column is the most any note sounding through it asks for (its natural space, in proportion to
  * the part of it that falls there); then lyrics and accidentals push columns apart where needed.
  */
-function jointWidth(bars: StaffMeasure[], lyricOn: boolean[], sp: number, textW: (s: string) => number, inside: boolean): JointWidth {
+function jointWidth(bars: StaffMeasure[], lyricOn: boolean[], sp: number, textW: (s: string) => number, inside: boolean,
+  nameOn: (NameW | undefined)[] = []): JointWidth {
   const sm0 = bars[0];
   let changeW = 0;
   if (inside && sm0.keyChange) changeW += keyChangeW(sm0.key.fifths, sm0.prevFifths) * sp;
@@ -260,8 +263,9 @@ function jointWidth(bars: StaffMeasure[], lyricOn: boolean[], sp: number, textW:
   bars.forEach((sm, si) => {
     const evs = sm.events;
     const lw = lyricOn[si] ? evs.map((e) => (e.lyric ? textW(e.lyric) : 0)) : evs.map(() => 0);
+    const nw = nameWidths(sm, nameOn[si]);
     if (evs[0]?.measureRest) anyRest = true;
-    else lead = Math.max(lead, 1.3 * sp + (hasAcc(evs[0]) ? ACC_W * sp : 0), lw[0] / 2 + 0.4 * sp);
+    else lead = Math.max(lead, 1.3 * sp + (hasAcc(evs[0]) ? ACC_W * sp : 0), lw[0] / 2 + 0.4 * sp, nw[0] / 2 + 0.4 * sp);
     for (let j = 0; j < evs.length; j++) {
       const e = evs[j];
       if (e.measureRest) continue;
@@ -280,7 +284,11 @@ function jointWidth(bars: StaffMeasure[], lyricOn: boolean[], sp: number, textW:
       const hyph = e.syllabic === 'begin' || e.syllabic === 'middle';
       if (j + 1 < evs.length) {
         if (lw[j] || lw[j + 1]) cons.push([i0, onsetIndex(onsets, evs[j + 1].start), lw[j] / 2 + lw[j + 1] / 2 + (hyph ? 1.4 : 0.6) * sp]);
-      } else if (lw[j]) cons.push([i0, n, lw[j] / 2 + 0.5 * sp + (hyph ? 0.6 * sp : 0)]);
+        if (nw[j] || nw[j + 1]) cons.push([i0, onsetIndex(onsets, evs[j + 1].start), nw[j] / 2 + nw[j + 1] / 2 + NAME_GAP * sp]);
+      } else {
+        if (lw[j]) cons.push([i0, n, lw[j] / 2 + 0.5 * sp + (hyph ? 0.6 * sp : 0)]);
+        if (nw[j]) cons.push([i0, n, nw[j] / 2 + 0.5 * sp]);
+      }
     }
   });
   if (lead === 0) lead = 2.2 * sp;
@@ -328,13 +336,14 @@ export function layoutFullScore(score: Score, staves: StaffSpec[], m0: number, m
   const maxBars = o.maxBars ?? 8;
   const sms = staves.map((st) => buildMeasures(score, st.part, m0, m1, st.clef));
   const lyricOn = staves.map((st) => o.lyricIds.has(st.id));
+  const nameOn = staves.map((st) => (o.names && o.names.id === st.id ? o.names.w : undefined));
   const nBars = Math.max(0, m1 - m0 + 1);
   const barsAt = (k: number) => sms.map((x) => x[k]);
   const inner: JointWidth[] = [];
   const opening: JointWidth[] = [];
   for (let k = 0; k < nBars; k++) {
-    inner.push(jointWidth(barsAt(k), lyricOn, sp, o.textW, true));
-    opening.push(jointWidth(barsAt(k), lyricOn, sp, o.textW, false));
+    inner.push(jointWidth(barsAt(k), lyricOn, sp, o.textW, true, nameOn));
+    opening.push(jointWidth(barsAt(k), lyricOn, sp, o.textW, false, nameOn));
   }
   const ref = sms[0] ?? [];
   const prefixW = (k: number) => {
