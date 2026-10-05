@@ -58,6 +58,7 @@ test('member: level 1 on phone A, account, phone B gets it; lead sees one entry;
   await expect(pa.getByText('Repertoire')).toBeVisible({ timeout: 30_000 });
   await pa.getByTestId('piece-row').first().click();
   await pa.getByLabel('Sections').getByRole('button', { name: /level 1/ }).first().click();
+  await pa.getByTestId('hp-yes').click(); // level 1 counts with headphones on
   await pa.getByTestId('start').click();
   await expect(pa.getByTestId('pass-banner')).toContainText(/level 1 reached|Passed/, { timeout: 120_000 });
   // The run also updated her entry on the choir's leaderboard (without opening Ranks).

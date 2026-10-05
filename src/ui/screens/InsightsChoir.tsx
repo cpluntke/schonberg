@@ -3,8 +3,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useProfile } from '../hooks';
-import { back, go } from '../router';
-import { IconBack } from '../icons';
+import { go } from '../router';
 import { getPiece } from '../library';
 import { loadCycle } from '../../progress/store';
 import { apiBase, sessionFor } from '../../progress/choir';
@@ -29,15 +28,6 @@ export function neediest(cols: Record<string, PieceAgg | undefined>): string | n
     if (s < score) { score = s; best = v; }
   }
   return best != null && score < 0.75 ? best : null;
-}
-
-function Top() {
-  return (
-    <div className="topbar">
-      <button className="icon-btn" aria-label="Back" onClick={() => back({ name: 'choiradmin' })}><IconBack /></button>
-      <h1>Sections</h1>
-    </div>
-  );
 }
 
 function Cell({ p, minGroup }: { p: PieceAgg | undefined; minGroup: number }) {
@@ -77,24 +67,23 @@ export function ChoirInsights() {
   }, [token, code]);
   const ids = useMemo(() => (view ? orderedPieceIds([...new Set(VOICE_ORDER.flatMap((v) => Object.keys(view.sections[v]?.pieces ?? {})))]) : []), [view]);
   const programme = loadCycle().pieceIds;
-  if (!apiBase() || !code) return <main className="screen"><Top /><div className="notice">Join your choir first (Settings → Your choir).</div></main>;
+  if (!apiBase() || !code) return <><div className="notice">Join your choir first (Settings → Your choir).</div></>;
   if (!token) {
     return (
-      <main className="screen"><Top />
+      <>
         <div className="notice">Only choir admins see every section. Log in as an admin under Settings → Your choir.</div>
-      </main>
+      </>
     );
   }
-  if (err) return <main className="screen"><Top /><div className="notice" role="alert">{err}</div></main>;
-  if (!view) return <main className="screen"><Top /><span className="muted">Loading…</span></main>;
+  if (err) return <><div className="notice" role="alert">{err}</div></>;
+  if (!view) return <><span className="muted">Loading…</span></>;
   const needs = ids.map((id) => {
     const v = neediest(Object.fromEntries(VOICE_ORDER.map((x) => [x, view.sections[x]?.pieces[id]])));
     return v ? { id, v, p: view.sections[v].pieces[id] } : null;
   }).filter((x): x is { id: string; v: string; p: PieceAgg } => !!x);
   const sharing = VOICE_ORDER.reduce((a, v) => a + (view.sections[v]?.sharing ?? 0), 0);
   return (
-    <main className="screen">
-      <Top />
+    <>
       <span className="small muted">{session?.account.name} · progress shown per section, never per singer · sections with fewer than {view.minGroup} singers sharing a piece show counts only</span>
       <div className="card flat" data-testid="choir-summary">
         <strong>{sharing} singer{sharing === 1 ? '' : 's'} sharing · {VOICE_ORDER.map((v) => `${SHORT[v]} ${view.sections[v]?.sharing ?? 0}`).join(' · ')}</strong>
@@ -173,6 +162,6 @@ export function ChoirInsights() {
         ))}
       </div>
       <button className="btn small ghost" onClick={() => go({ name: 'section' })}>One section in detail (bar map)</button>
-    </main>
+    </>
   );
 }

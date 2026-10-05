@@ -34,3 +34,4 @@ export const IconPause = ({ size = 22, color = '#0B0D1A' }: P) => (
 export const IconStop = ({ size = 22, color = '#0B0D1A' }: P) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill={color} aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
 );
+export const IconShield = (p: P) => <S {...p}><path d="M12 3l8 3v6c0 4.5-3.4 7.8-8 9-4.6-1.2-8-4.5-8-9V6z" /><path d="M9 12l2 2 4-4" /></S>;

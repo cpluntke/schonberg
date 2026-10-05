@@ -72,7 +72,10 @@ export function memberToken(): string {
   }
 }
 
-/** How a request proves who sends it: a logged-in account's session, or the super-admin password. */
+/**
+ * How a request proves who sends it: a session (an account's, or the super admin's: both are bearer
+ * tokens), or the super-admin password itself (no longer sent by this app, kept for the API).
+ */
 export type Auth = { bearer: string } | { superAdmin: string };
 
 async function call<T>(path: string, init: RequestInit & { auth?: Auth; member?: boolean } = {}): Promise<T> {
@@ -97,6 +100,8 @@ async function call<T>(path: string, init: RequestInit & { auth?: Auth; member?:
       const b = body as { reason?: string; error?: string } | null;
       endSession(b?.reason, b?.error);
     }
+    // The super-admin login ended (expired, logged out, the password was changed): ask for the password again.
+    if (res.status === 401 && auth && 'bearer' in auth && loadSuperSession()?.token === auth.bearer) endSuperSession();
     throw new ChoirApiError(res.status, (body as { error?: string } | null)?.error ?? `Server error (${res.status})`);
   }
   return body as T;
@@ -528,7 +533,7 @@ export interface ChoirSummary {
   admins: string[]; people: number; invites: number; legacy: boolean;
   usage?: ChoirUsage;
 }
-export const superList = (pw: string) => call<{ choirs: ChoirSummary[]; usage?: ServerUsage }>('/super/choirs', { auth: { superAdmin: pw } });
+export const superList = (auth: Auth) => call<{ choirs: ChoirSummary[]; usage?: ServerUsage }>('/super/choirs', { auth });
 export const fetchChoirUsage = (code: string, auth: Auth) => call<ChoirUsage>(`/choirs/${enc(code)}/usage`, { auth });
 /** "740 KB" below 1 MB, else "12.3 MB" (one decimal below 10 MB). */
 export function mb(bytes: number): string {
@@ -537,26 +542,111 @@ export function mb(bytes: number): string {
   return `${v < 10 ? v.toFixed(1) : Math.round(v)} MB`;
 }
 /** Creates the choir and an invite link for its first admin. */
-export async function superCreate(pw: string, code: string, name: string, adminNote: string): Promise<{ code: string; name: string; token: string; invite: InviteInfo }> {
-  const r = await call<{ code: string; name: string; token: string; invite: InviteInfo }>('/super/choirs', { method: 'POST', auth: { superAdmin: pw }, ...json({ code, name, adminNote }) });
+export async function superCreate(auth: Auth, code: string, name: string, adminNote: string): Promise<{ code: string; name: string; token: string; invite: InviteInfo }> {
+  const r = await call<{ code: string; name: string; token: string; invite: InviteInfo }>('/super/choirs', { method: 'POST', auth, ...json({ code, name, adminNote }) });
   rememberInvite(r.invite, r.token);
   return r;
 }
-export const superRename = (pw: string, code: string, name: string) =>
-  call(`/super/choirs/${enc(code)}`, { method: 'PUT', auth: { superAdmin: pw }, ...json({ name }) });
-export const superDelete = (pw: string, code: string) => call(`/super/choirs/${enc(code)}`, { method: 'DELETE', auth: { superAdmin: pw } });
+export const superRename = (auth: Auth, code: string, name: string) =>
+  call(`/super/choirs/${enc(code)}`, { method: 'PUT', auth, ...json({ name }) });
+export const superDelete = (auth: Auth, code: string) => call(`/super/choirs/${enc(code)}`, { method: 'DELETE', auth });
 /** Remove a choir's member accounts nobody used for `days` days (with the progress they kept). */
-export const superPurgeMembers = (pw: string, code: string, days: number, dryRun = false) =>
-  call<{ removed: number; names: string[] }>(`/super/choirs/${enc(code)}/purge-members`, { method: 'POST', auth: { superAdmin: pw }, ...json({ days, dryRun }) });
+export const superPurgeMembers = (auth: Auth, code: string, days: number, dryRun = false) =>
+  call<{ removed: number; names: string[] }>(`/super/choirs/${enc(code)}/purge-members`, { method: 'POST', auth, ...json({ days, dryRun }) });
 
-// ------------------------------------------------------------------ the super-admin password (this tab only)
+// ------------------------------------------------------------------ the super admin's login
 
-export function sessionSecret(key: 'super', value?: string | null): string | null {
+/**
+ * The super admin's session on this phone: a token from POST /super/login (the password itself is
+ * never kept). Stored outside the `sh:` keys, so it is never in a backup file, and never part of the
+ * progress kept with an account (src/progress/sync.ts sends only practice data).
+ */
+export interface SuperSession { token: string; expiresAt: number }
+const SUPER_KEY = 'schonberg:superSession';
+let superEnded: string | null = null;
+
+export function loadSuperSession(): SuperSession | null {
   try {
-    if (value === null) sessionStorage.removeItem(`sh:pw:${key}`);
-    else if (value !== undefined) sessionStorage.setItem(`sh:pw:${key}`, value);
-    return sessionStorage.getItem(`sh:pw:${key}`);
+    const s = JSON.parse(rawGet(SUPER_KEY) ?? 'null') as SuperSession | null;
+    return s && typeof s.token === 'string' && typeof s.expiresAt === 'number' && s.expiresAt > Date.now() ? s : null;
   } catch {
     return null;
   }
+}
+function saveSuperSession(s: SuperSession | null): void {
+  if (s) rawSet(SUPER_KEY, JSON.stringify(s));
+  else rawRemove(SUPER_KEY);
+  sessionListeners.forEach((cb) => { try { cb(); } catch { /* ignore */ } });
+}
+/** The super admin's session as request auth, or null. */
+export function superAuth(): Auth | null {
+  const s = loadSuperSession();
+  return s ? { bearer: s.token } : null;
+}
+/** Why the super-admin login ended without logging out here (shown above the password prompt). */
+export const superLoggedOutNotice = () => superEnded;
+/** The server no longer accepts this phone's super-admin login: forget it (the password prompt shows again). */
+export function endSuperSession(message = 'Your super-admin login has ended. Log in again.'): void {
+  if (!loadSuperSession()) return;
+  superEnded = message;
+  saveSuperSession(null);
+}
+export async function superLogin(password: string): Promise<SuperSession> {
+  const r = await call<SuperSession>('/super/login', { method: 'POST', ...json({ password }) });
+  const old = loadSuperSession();
+  superEnded = null;
+  saveSuperSession({ token: r.token, expiresAt: r.expiresAt });
+  if (old && old.token !== r.token) void call('/super/session', { method: 'DELETE', auth: { bearer: old.token } }).catch(() => {});
+  return r;
+}
+/** Log out of super admin on this phone (the server forgets the session too). */
+export async function superLogout(): Promise<void> {
+  const s = loadSuperSession();
+  superEnded = null;
+  saveSuperSession(null);
+  if (s) await call('/super/session', { method: 'DELETE', auth: { bearer: s.token } }).catch(() => {});
+}
+/** Is the super-admin login still valid? (Renews it; a rejected one is forgotten.) */
+export async function refreshSuperSession(): Promise<SuperSession | null> {
+  const s = loadSuperSession();
+  if (!s) return null;
+  try {
+    const r = await call<{ expiresAt: number }>('/super/session', { auth: { bearer: s.token } });
+    if (loadSuperSession()?.token === s.token && r.expiresAt !== s.expiresAt) saveSuperSession({ ...s, expiresAt: r.expiresAt });
+    return loadSuperSession();
+  } catch (e) {
+    return e instanceof ChoirApiError && e.status === 401 ? null : s;
+  }
+}
+let lastSuperRefresh = 0;
+/** refreshSuperSession at most every 20 s (on start, on opening the admin screen, when the app comes back). */
+export function refreshSuperSessionSoon(): void {
+  const now = Date.now();
+  if (!loadSuperSession() || !apiBase() || now - lastSuperRefresh < 20_000) return;
+  lastSuperRefresh = now;
+  void refreshSuperSession();
+}
+export function _resetSuperStateForTests(): void { lastSuperRefresh = 0; superEnded = null; }
+// The first versions kept the super-admin password itself for the browser tab: no longer.
+try { if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('sh:pw:super'); } catch { /* storage blocked */ }
+
+// ------------------------------------------------------------------ who may open the Admin tab
+
+export type AdminTab = 'choir' | 'sections' | 'choirs' | 'usage';
+/**
+ * This phone's staff logins: a choir admin's or section lead's session for the current choir, and/or
+ * the super admin's. Members and singers without an account have none (and see no Admin tab).
+ */
+export interface Staff { admin: boolean; lead: boolean; superAdmin: boolean; tabs: AdminTab[]; label: 'Admin' | 'Section' | null }
+export function staffRoles(choirCode: string | undefined | null): Staff {
+  const s = sessionFor(choirCode);
+  const admin = s?.account.role === 'admin';
+  const lead = s?.account.role === 'lead';
+  const superAdmin = !!loadSuperSession();
+  const tabs: AdminTab[] = [
+    ...(admin ? ['choir' as const] : []),
+    ...(admin || lead ? ['sections' as const] : []),
+    ...(superAdmin ? ['choirs' as const, 'usage' as const] : []),
+  ];
+  return { admin, lead, superAdmin, tabs, label: admin || superAdmin ? 'Admin' : lead ? 'Section' : null };
 }

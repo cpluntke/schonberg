@@ -6,9 +6,9 @@ import { IconBack } from '../icons';
 import { WEEKDAYS } from '../../progress/rehearsal';
 import {
   apiBase, cachedChoir, changePassword, choirPieceId, claimAccount, deleteChoirPiece, fetchChoir, joinChoir, leaveChoir, ChoirApiError,
-  loadSession, loggedOutNotice, login, logout, onSessionChange, refreshSession, refreshSessionSoon, saveChoirCycle, sessionFor, sessionSecret, superCreate, superDelete,
+  loadSession, loggedOutNotice, login, logout, onSessionChange, refreshSession, refreshSessionSoon, saveChoirCycle, sessionFor, superCreate, superDelete,
   superList, superPurgeMembers, superRename, uploadChoirPiece, withdrawProgress, fetchChoirUsage, mb, type Auth, type ChoirInfo, type ChoirSummary, type ChoirUsage,
-  type ServerUsage, type Session, localPieceId, type LibraryPiece, addLibraryPiece,
+  type ServerUsage, type Session, localPieceId, type LibraryPiece, addLibraryPiece, loadSuperSession, superLogin, superLogout, superLoggedOutNotice,
 } from '../../progress/choir';
 import { LibraryPanel, type ProgrammeDraft } from '../components/ChoirLibrary';
 import { SectionInsights } from '../components/SectionInsights';
@@ -329,19 +329,18 @@ export function ChoirAdmin() {
     fetchChoir(code).then((i) => { if (alive) setInfo(i); }).catch(() => { /* keep the cached copy */ });
     return () => { alive = false; };
   }, [code]);
-  if (!apiBase()) return <main className="screen"><Top title="Choir admin" /><Offline /></main>;
-  if (!code) return <main className="screen"><Top title="Choir admin" /><div className="notice">Join your choir first (Settings → Your choir).</div></main>;
+  if (!apiBase()) return <><Offline /></>;
+  if (!code) return <><div className="notice">Join your choir first (Settings → Your choir).</div></>;
   const auth: Auth | null = token ? { bearer: token } : !session ? lastAuth : null;
   if (!auth) {
     return (
-      <main className="screen">
-        <Top title="Choir admin" />
+      <>
         {session?.account.role === 'member'
           ? <StaffOnly name={session.account.name} />
           : session
           ? <div className="notice">You're logged in as {session.account.name}, a section lead. Only choir admins can change the programme, the scores and the people. <LogoutLink /></div>
           : <NeedLogin code={code} what="For whoever looks after the choir's programme, scores and section leads. Log in with your own account." />}
-      </main>
+      </>
     );
   }
   const refresh = async () => {
@@ -350,8 +349,7 @@ export function ChoirAdmin() {
     return r;
   };
   return (
-    <main className="screen">
-      <Top title="Choir admin" />
+    <>
       {session ? (
         <span className="small muted">{info?.name ?? code} · {session.account.name} · <LogoutLink /></span>
       ) : (
@@ -373,7 +371,7 @@ export function ChoirAdmin() {
           <button className="btn small ghost" onClick={() => go({ name: 'choirinsights' })}>See the sections</button>
         </div>
       )}
-    </main>
+    </>
   );
 }
 
@@ -623,22 +621,21 @@ export function SectionLead() {
       .catch((e) => { if (alive) setErr((e as Error).message); });
     return () => { alive = false; };
   }, [token, code, shown]);
-  if (!apiBase()) return <main className="screen"><Top title="Your section" /><Offline /></main>;
-  if (!code) return <main className="screen"><Top title="Your section" /><div className="notice">Join your choir first (Settings → Your choir).</div></main>;
+  if (!apiBase()) return <><Offline /></>;
+  if (!code) return <><div className="notice">Join your choir first (Settings → Your choir).</div></>;
   if (!session || session.account.role === 'member') {
     return (
-      <main className="screen">
-        <Top title="Your section" />
+      <>
         {session
           ? <StaffOnly name={session.account.name} />
           : <NeedLogin code={code} what="Section leads see which bars their section finds hard. Log in with the account you made from your invite link." />}
-      </main>
+      </>
     );
   }
   return (
-    <main className="screen">
-      <Top title="Your section" />
+    <>
       <span className="small muted">{session.account.name} · {admin ? 'as choir admin you see every section' : roleText('lead', session.account.voices)} · <LogoutLink /></span>
+      {admin && <button className="btn small ghost" style={{ alignSelf: 'flex-start' }} data-testid="all-sections" onClick={() => go({ name: 'choirinsights' })}>← All sections side by side</button>}
       {mine.length > 1 && (
         <div className="chips" role="group" aria-label="Section">
           {mine.map((v) => <button key={v} className="chip" aria-pressed={shown === v} onClick={() => setPicked(v)}>{VOICE_NAME[v]}</button>)}
@@ -653,14 +650,16 @@ export function SectionLead() {
       ) : (
         <SectionInsights view={view} />
       )}
-    </main>
+    </>
   );
 }
 
 // ------------------------------------------------------------------ super admin
 
 export function SuperAdmin() {
-  const [pw, setPw] = useState<string | null>(() => sessionSecret('super'));
+  useSession(); // re-renders when the super-admin login starts or ends
+  const sup = loadSuperSession();
+  const token = sup?.token ?? null;
   const [list, setList] = useState<ChoirSummary[] | null>(null);
   const [usage, setUsage] = useState<ServerUsage | null>(null);
   const [err, setErr] = useState('');
@@ -668,33 +667,34 @@ export function SuperAdmin() {
   const [created, setCreated] = useState<{ name: string; code: string; token: string } | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [openLib, setOpenLib] = useState<string | null>(null);
-  const load = async (p: string) => {
+  const load = async (a: Auth) => {
     try {
-      const r = await superList(p);
+      const r = await superList(a);
       setList(r.choirs);
       setUsage(r.usage ?? null);
       setErr('');
     } catch (e) { setErr((e as Error).message); }
   };
-  useEffect(() => { if (pw) void load(pw); }, [pw]);
-  if (!apiBase()) return <main className="screen"><Top title="Super admin" /><Offline /></main>;
-  if (!pw) {
+  useEffect(() => { if (token) void load({ bearer: token }); else { setList(null); setUsage(null); setErr(''); } }, [token]);
+  if (!apiBase()) return <><Offline /></>;
+  if (!token) {
+    const ended = superLoggedOutNotice();
     return (
-      <main className="screen">
-        <Top title="Super admin" />
-        <Gate label="Super-admin password" onSubmit={async (p) => { await superList(p); sessionSecret('super', p); setPw(p); }}>
-          <span className="small muted">Creates choirs and invites their admins. The password is set on the server.</span>
+      <>
+        {ended && <div className="notice" role="alert" data-testid="super-logged-out">{ended}</div>}
+        <Gate label="Super-admin password" onSubmit={async (p) => { await superLogin(p); }}>
+          <span className="small muted">Creates choirs and invites their admins. The password is set on the server; this phone stays logged in for 30 days (or until you log out).</span>
         </Gate>
-      </main>
+      </>
     );
   }
-  const auth: Auth = { superAdmin: pw };
+  const auth: Auth = { bearer: token };
+  const reload = () => load(auth);
   return (
-    <main className="screen">
-      <Top title="Super admin" />
-      <div className="row wrap" style={{ gap: 8 }}>
+    <>
+      <div className="row wrap" style={{ gap: 8, alignItems: 'center' }}>
         <button className="btn small" data-testid="open-usage" onClick={() => go({ name: 'usage' })}>Usage insights</button>
-        <LogoutLink onClick={() => { sessionSecret('super', null); setPw(null); }} />
+        <button className="linklike" style={{ minHeight: 44 }} data-testid="super-logout" onClick={() => void superLogout()}>Log out of super admin</button>
       </div>
       {err && <div className="notice" role="alert">{err}</div>}
       {created ? (
@@ -710,10 +710,10 @@ export function SuperAdmin() {
         <form className="card" data-testid="create-choir" onSubmit={async (e) => {
           e.preventDefault();
           try {
-            const r = await superCreate(pw, form.code.trim(), form.name.trim(), form.adminNote.trim());
+            const r = await superCreate(auth, form.code.trim(), form.name.trim(), form.adminNote.trim());
             setCreated({ name: r.name, code: r.code, token: r.token });
             setForm({ code: '', name: '', adminNote: '' });
-            await load(pw);
+            await reload();
           } catch (e2) { toast((e2 as Error).message); }
         }}>
           <strong>New choir</strong>
@@ -747,11 +747,11 @@ export function SuperAdmin() {
             <button className="btn small" onClick={async () => {
               const name = prompt('New name', c.name);
               if (!name) return;
-              try { await superRename(pw, c.code, name); await load(pw); } catch (e) { toast((e as Error).message); }
+              try { await superRename(auth, c.code, name); await reload(); } catch (e) { toast((e as Error).message); }
             }}>Rename</button>
             <button className="btn small ghost" onClick={async () => {
               if (prompt(`Type the code “${c.code}” to delete this choir and its scores`) !== c.code) return;
-              try { await superDelete(pw, c.code); await load(pw); } catch (e) { toast((e as Error).message); }
+              try { await superDelete(auth, c.code); await reload(); } catch (e) { toast((e as Error).message); }
             }}>Delete</button>
             {!!c.usage?.memberAccounts && (
               <button className="btn small ghost" onClick={async () => {
@@ -759,23 +759,23 @@ export function SuperAdmin() {
                 if (!d) return;
                 try {
                   // A preview first: who would go.
-                  const p = await superPurgeMembers(pw, c.code, d, true);
+                  const p = await superPurgeMembers(auth, c.code, d, true);
                   if (!p.names.length) { toast(`Every member used their account in the last ${d} days`); return; }
                   const list = p.names.slice(0, 20).join(', ') + (p.names.length > 20 ? `, and ${p.names.length - 20} more` : '');
                   if (!confirm(`Remove ${p.names.length} member account${p.names.length === 1 ? '' : 's'} not used for ${d} days, with their progress?\n\n${list}`)) return;
-                  const r = await superPurgeMembers(pw, c.code, d);
+                  const r = await superPurgeMembers(auth, c.code, d);
                   toast(`${r.removed} member account${r.removed === 1 ? '' : 's'} removed`);
-                  await load(pw);
+                  await reload();
                 } catch (e) { toast((e as Error).message); }
               }}>Remove inactive members</button>
             )}
           </div>
-          {open === c.code && <PeoplePanel code={c.code} auth={auth} superAdmin onChanged={() => void load(pw)} />}
-          {openLib === c.code && <LibraryPanel code={c.code} auth={auth} embedded onAdded={() => void load(pw)} />}
+          {open === c.code && <PeoplePanel code={c.code} auth={auth} superAdmin onChanged={() => void reload()} />}
+          {openLib === c.code && <LibraryPanel code={c.code} auth={auth} embedded onAdded={() => void reload()} />}
         </div>
       ))}
       {list && !list.length && <span className="muted">No choirs yet.</span>}
-    </main>
+    </>
   );
 }
 

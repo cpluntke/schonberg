@@ -59,7 +59,7 @@ Purpose: to see how the app is used and where it fails, so it can be improved.
   Content-Length), 8 days per request, 10 distinct error hashes per install and day (200 per day file),
   30 requests an hour per client address (IPv6: /64), 3000 an hour in all, and the metrics folder is
   capped at 20 MB (then 507). Summaries older than 7 days are refused.
-- **Who sees it**: only the super admin (Choir → super admin → Usage insights), as charts and a CSV of
+- **Who sees it**: only the super admin (Admin → Usage), as charts and a CSV of
   daily totals.
 
 ## 2. Sharing progress with the choir (off by default, switch in Settings → Your choir)

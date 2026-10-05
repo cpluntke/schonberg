@@ -3,7 +3,7 @@ import { releaseTracker } from './play/session';
 import { useRoute, go, type Route } from './router';
 import { useLibrary } from './library';
 import { useToast } from './hooks';
-import { IconHome, IconMusic, IconRanks, IconSliders } from './icons';
+import { IconHome, IconMusic, IconRanks, IconShield, IconSliders } from './icons';
 import { Home } from './screens/Home';
 import { Library } from './screens/Library';
 import { PieceScreen } from './screens/Piece';
@@ -18,15 +18,15 @@ import './generated';
 import { Diagnostics } from './screens/Diagnostics';
 import { LyricsQuiz } from './screens/LyricsQuiz';
 import { MemoryMap } from './screens/MemoryMap';
-import { ChoirScreen, ChoirAdmin, SectionLead, SuperAdmin } from './screens/Choir';
+import { ChoirScreen } from './screens/Choir';
+import { AdminScreen, ADMIN_ROUTES, adminHome, useStaff } from './screens/Admin';
 import { InviteScreen } from './screens/Invite';
-import { ChoirInsights } from './screens/InsightsChoir';
-import { UsageInsights } from './screens/InsightsUsage';
 import { startUsageStats } from './usage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { UpdatePrompt } from './components/UpdatePrompt';
 import { StorageFullNotice } from './components/StorageFullNotice';
 import { flushProgress, onAccountConfirmed, syncProgressSoon } from '../progress/sync';
+import { refreshSuperSessionSoon } from '../progress/choir';
 import { shareMyProgress } from './play/shareProgress';
 
 const TABS: { name: Route['name']; label: string; icon: React.ReactNode }[] = [
@@ -40,6 +40,7 @@ export function App() {
   const route = useRoute();
   const lib = useLibrary();
   const toast = useToast();
+  const staff = useStaff();
   // Release the microphone after a while away from the screens that use it (privacy + battery).
   // Not too eagerly: iOS may ask for permission again every time the mic is reopened, and singers
   // hop between Results, the piece and the next run.
@@ -64,7 +65,9 @@ export function App() {
   // changed (at most once a minute). A new login also moves this phone's shared progress to the account.
   useEffect(() => {
     syncProgressSoon();
-    const onBack = () => { if (!document.hidden) syncProgressSoon(); else flushProgress(); };
+    // A super-admin login the server no longer accepts: its Admin tab goes (checked at most every 20 s).
+    refreshSuperSessionSoon();
+    const onBack = () => { if (!document.hidden) { syncProgressSoon(); refreshSuperSessionSoon(); } else flushProgress(); };
     document.addEventListener('visibilitychange', onBack);
     window.addEventListener('focus', onBack);
     window.addEventListener('pagehide', flushProgress);
@@ -84,7 +87,8 @@ export function App() {
     }, 60);
     return () => clearTimeout(t);
   }, [route, lib.ready]);
-  const showNav = ['home', 'library', 'ranks', 'settings', 'piece', 'expert'].includes(route.name);
+  const isAdmin = ADMIN_ROUTES.includes(route.name);
+  const showNav = ['home', 'library', 'ranks', 'settings', 'piece', 'expert'].includes(route.name) || isAdmin;
 
   let body: React.ReactNode;
   if (!lib.ready && route.name !== 'setup' && route.name !== 'tuner') {
@@ -105,11 +109,11 @@ export function App() {
       case 'lyrics': body = <LyricsQuiz key={route.pieceId + route.partId} pieceId={route.pieceId} partId={route.partId} />; break;
       case 'memorymap': body = <MemoryMap key={route.pieceId + route.partId} pieceId={route.pieceId} partId={route.partId} />; break;
       case 'choir': body = <ChoirScreen />; break;
-      case 'choiradmin': body = <ChoirAdmin />; break;
-      case 'section': body = <SectionLead />; break;
-      case 'superadmin': body = <SuperAdmin />; break;
-      case 'choirinsights': body = <ChoirInsights />; break;
-      case 'usage': body = <UsageInsights />; break;
+      case 'choiradmin':
+      case 'section':
+      case 'superadmin':
+      case 'choirinsights':
+      case 'usage': body = <AdminScreen route={route} />; break;
       case 'invite': body = <InviteScreen key={route.token ?? 'invite'} token={route.token} />; break;
     }
   }
@@ -128,6 +132,13 @@ export function App() {
                 {t.label}
               </button>
             ))}
+            {/* Only with a staff login on this phone: "Section" for a section lead, else "Admin". */}
+            {staff.label && (
+              <button aria-current={isAdmin ? 'page' : undefined} data-testid="nav-admin" onClick={() => go(adminHome(staff))}>
+                <IconShield />
+                {staff.label}
+              </button>
+            )}
           </div>
         </nav>
       )}

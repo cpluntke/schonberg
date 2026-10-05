@@ -4,7 +4,11 @@ import {
   _resetSessionStateForTests, acceptInvite, createInvite, fetchPeople, inviteLink, leaveChoir, loadSession, loggedOutNotice, login, logout,
   LOGGED_OUT_ELSEWHERE, refreshSession, refreshSessionSoon, rememberedInvite, saveSession, sessionFor, superCreate, type Session,
   signUp, shareProgress, deleteMyAccount, lastLogout, dismissLogout, syncChoir, choirPieceId, localPieceId, fetchLibrary, addLibraryPiece,
+  superLogin, superLogout, loadSuperSession, superAuth, superList, superLoggedOutNotice, refreshSuperSession, refreshSuperSessionSoon,
+  _resetSuperStateForTests, staffRoles, onSessionChange,
 } from './choir';
+import { buildSnapshot } from './sync';
+import { fetchMetrics } from './insights';
 import { parseHash, href } from '../ui/router';
 
 const DAY = 86_400_000;
@@ -27,6 +31,7 @@ beforeEach(() => {
   localStorage.clear();
   _resetAllForTests();
   _resetSessionStateForTests();
+  _resetSuperStateForTests();
   vi.stubEnv('VITE_CHOIR_URL', '/schonberg/api');
 });
 afterEach(() => {
@@ -100,7 +105,7 @@ describe('choir accounts client', () => {
     expect(rememberedInvite('i1i1i1i1i1i1')).toBe('tok-invite-0123456789abc');
     expect(rememberedInvite('unknown')).toBeNull();
     mockFetch(() => ({ status: 201, body: { code: 'neu', name: 'Neu', token: 'tok-admin-0123456789abcd', invite: { ...inv, id: 'i2i2i2i2i2i2', expiresAt: Date.now() - 1 } } }));
-    await superCreate('super-pw', 'neu', 'Neu', 'Clara');
+    await superCreate({ superAdmin: 'super-pw' }, 'neu', 'Neu', 'Clara');
     expect(headers(calls[0])['X-Super-Admin']).toBe('super-pw');
     expect(headers(calls[0]).Authorization).toBeUndefined();
     expect(rememberedInvite('i2i2i2i2i2i2')).toBeNull();
@@ -323,5 +328,108 @@ describe('choir library pieces', () => {
     expect(calls[1].init.method).toBe('POST');
     expect(JSON.parse(calls[1].init.body as string)).toEqual({ programme: true });
     expect(headers(calls[1])['X-Super-Admin']).toBe('pw');
+  });
+});
+
+describe('super-admin login', () => {
+  const SUPER_TOKEN = 'super-' + 'y'.repeat(40);
+  const loginReply = () => ({ body: { token: SUPER_TOKEN, expiresAt: Date.now() + 30 * DAY } });
+
+  it('logs in once with the password; keeps only the token, sent as a bearer token on super calls', async () => {
+    mockFetch((url) => (url.endsWith('/super/login') ? loginReply() : { body: { choirs: [] } }));
+    let changed = 0;
+    const off = onSessionChange(() => { changed++; });
+    await superLogin('super-secret-pw');
+    off();
+    expect(changed).toBe(1);
+    expect(calls[0].url).toBe('/schonberg/api/super/login');
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({ password: 'super-secret-pw' });
+    expect(loadSuperSession()?.token).toBe(SUPER_TOKEN);
+    expect(JSON.stringify(localStorage)).not.toContain('super-secret-pw');
+    expect(JSON.stringify(sessionStorage)).not.toContain('super-secret-pw');
+    await superList(superAuth()!);
+    expect(headers(calls[1]).Authorization).toBe(`Bearer ${SUPER_TOKEN}`);
+    expect(headers(calls[1])['X-Super-Admin']).toBeUndefined();
+    await fetchMetrics(superAuth()!, 7);
+    expect(headers(calls[2]).Authorization).toBe(`Bearer ${SUPER_TOKEN}`);
+  });
+
+  it('is never in a backup file or in the progress kept with an account', async () => {
+    mockFetch(() => loginReply());
+    await superLogin('super-secret-pw');
+    saveSession(session());
+    expect(exportBackup()).not.toContain(SUPER_TOKEN);
+    expect(JSON.stringify(buildSnapshot().data)).not.toContain(SUPER_TOKEN);
+  });
+
+  it('a wrong password keeps nothing', async () => {
+    mockFetch(() => ({ status: 403, body: { error: 'Wrong super-admin password' } }));
+    await expect(superLogin('nope')).rejects.toThrow('Wrong super-admin password');
+    expect(loadSuperSession()).toBeNull();
+    expect(superAuth()).toBeNull();
+  });
+
+  it('logout clears the phone first, then revokes the session on the server', async () => {
+    mockFetch(() => loginReply());
+    await superLogin('super-secret-pw');
+    mockFetch(() => ({ body: { ok: true } }));
+    const p = superLogout();
+    expect(loadSuperSession()).toBeNull();
+    await p;
+    expect(calls[0].url).toBe('/schonberg/api/super/session');
+    expect(calls[0].init.method).toBe('DELETE');
+    expect(headers(calls[0]).Authorization).toBe(`Bearer ${SUPER_TOKEN}`);
+    expect(superLoggedOutNotice()).toBeNull();
+  });
+
+  it('a session the server rejects (401: expired, password changed) is forgotten, with a notice', async () => {
+    mockFetch(() => loginReply());
+    await superLogin('super-secret-pw');
+    mockFetch(() => ({ status: 401, body: { error: 'Your super-admin login has ended. Log in again.', superLoggedOut: true } }));
+    await expect(superList(superAuth()!)).rejects.toThrow('ended');
+    expect(loadSuperSession()).toBeNull();
+    expect(superLoggedOutNotice()).toContain('Log in again');
+    // the account session (another token) is untouched by it
+    saveSession(session());
+    mockFetch(() => loginReply());
+    await superLogin('super-secret-pw');
+    mockFetch(() => ({ status: 401, body: { error: 'ended', superLoggedOut: true } }));
+    await expect(fetchMetrics(superAuth()!, 7)).rejects.toThrow();
+    expect(loadSuperSession()).toBeNull();
+    expect(loadSession()?.token).toBe(session().token);
+  });
+
+  it('refreshSuperSession renews the end date; refreshSuperSessionSoon asks at most every 20 s', async () => {
+    mockFetch(() => loginReply());
+    await superLogin('super-secret-pw');
+    const later = Date.now() + 33 * DAY;
+    mockFetch(() => ({ body: { ok: true, expiresAt: later } }));
+    expect((await refreshSuperSession())?.expiresAt).toBe(later);
+    refreshSuperSessionSoon();
+    refreshSuperSessionSoon();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(calls.filter((c) => c.url.endsWith('/super/session')).length).toBe(2);
+  });
+
+  it('staff roles: the Admin tab and its sub-tabs by login', async () => {
+    expect(staffRoles('kammerchor')).toMatchObject({ tabs: [], label: null });
+    saveSession(session({ account: { ...account, role: 'member' } }));
+    expect(staffRoles('kammerchor')).toMatchObject({ tabs: [], label: null });
+    saveSession(session({ account: { ...account, role: 'lead', voices: ['A', 'T'] } }));
+    expect(staffRoles('kammerchor')).toMatchObject({ tabs: ['sections'], label: 'Section' });
+    expect(staffRoles('otherchoir')).toMatchObject({ tabs: [], label: null }); // a login for another choir
+    saveSession(session());
+    expect(staffRoles('kammerchor')).toMatchObject({ tabs: ['choir', 'sections'], label: 'Admin' });
+    mockFetch(() => loginReply());
+    await superLogin('super-secret-pw');
+    expect(staffRoles('kammerchor')).toMatchObject({ tabs: ['choir', 'sections', 'choirs', 'usage'], label: 'Admin' });
+    saveSession(session({ account: { ...account, role: 'lead', voices: ['A'] } }));
+    expect(staffRoles('kammerchor')).toMatchObject({ tabs: ['sections', 'choirs', 'usage'], label: 'Admin' });
+    saveSession(null);
+    expect(staffRoles(undefined)).toMatchObject({ tabs: ['choirs', 'usage'], label: 'Admin' });
+  });
+
+  it('old staff hash routes still open (they now land in the Admin tab)', () => {
+    for (const r of ['choiradmin', 'section', 'choirinsights', 'superadmin', 'usage']) expect(parseHash(`#/${r}`)).toEqual({ name: r });
   });
 });

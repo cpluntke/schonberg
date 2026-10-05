@@ -1,24 +1,15 @@
 // Super admin: anonymous usage statistics (daily totals only; docs/PRIVACY.md), to improve the app.
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { back, go } from '../router';
-import { IconBack } from '../icons';
-import { apiBase, sessionSecret } from '../../progress/choir';
+import { go } from '../router';
+import { apiBase, loadSuperSession } from '../../progress/choir';
+import { useSession } from './Choir';
 import { fetchMetrics, metricsCsv, sumKeys, type MetricsDay } from '../../progress/insights';
 import { BarList, Sparkline } from '../components/InsightCharts';
 
 const RANGES = [7, 30, 90] as const;
 const pct = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 100)}%` : '–');
 const int = (v: number) => (v >= 10_000 ? `${Math.round(v / 1000)}k` : String(Math.round(v)));
-
-function Top() {
-  return (
-    <div className="topbar">
-      <button className="icon-btn" aria-label="Back" onClick={() => back({ name: 'superadmin' })}><IconBack /></button>
-      <h1>Usage insights</h1>
-    </div>
-  );
-}
 
 function Section({ title, note, children, id }: { title: string; note?: string; children: React.ReactNode; id?: string }) {
   return (
@@ -53,25 +44,26 @@ const DUR: [string, string][] = [['xs', 'Short notes (< ¼ s)'], ['s', '¼–0.6
 const LAT = ['0', '50', '100', '150', '200', '300'];
 
 export function UsageInsights() {
-  const pw = sessionSecret('super');
+  useSession(); // re-renders when the super-admin login starts or ends
+  const token = loadSuperSession()?.token ?? null;
   const [n, setN] = useState<number>(30);
   const [days, setDays] = useState<MetricsDay[] | null>(null);
   const [err, setErr] = useState('');
   useEffect(() => {
-    if (!pw) return;
+    if (!token) return;
     let alive = true;
     setErr('');
-    fetchMetrics(pw, n).then((r) => { if (alive) setDays(r.days); }).catch((e) => { if (alive) setErr((e as Error).message); });
+    fetchMetrics({ bearer: token }, n).then((r) => { if (alive) setDays(r.days); }).catch((e) => { if (alive) setErr((e as Error).message); });
     return () => { alive = false; };
-  }, [pw, n]);
+  }, [token, n]);
   const stats = useMemo(() => (days ? summarise(days) : null), [days]);
-  if (!apiBase()) return <main className="screen"><Top /><div className="notice">Needs the online version of the app.</div></main>;
-  if (!pw) {
+  if (!apiBase()) return <><div className="notice">Needs the online version of the app.</div></>;
+  if (!token) {
     return (
-      <main className="screen"><Top />
+      <>
         <div className="notice">Log in as super admin first.</div>
         <button className="btn" onClick={() => go({ name: 'superadmin' })}>Super admin</button>
-      </main>
+      </>
     );
   }
   const csv = () => {
@@ -83,8 +75,7 @@ export function UsageInsights() {
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   };
   return (
-    <main className="screen">
-      <Top />
+    <>
       <span className="small muted">Anonymous daily totals only: no names, no accounts, no recordings. Phones send each day's summary when the app is next opened, so the last days fill in over a week.</span>
       <div className="row wrap" style={{ gap: 8 }}>
         <div className="seg" role="group" aria-label="Date range" style={{ flex: 1 }}>
@@ -178,7 +169,7 @@ export function UsageInsights() {
           </Section>
         </>
       )}
-    </main>
+    </>
   );
 }
 

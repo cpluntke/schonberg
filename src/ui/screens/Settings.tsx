@@ -5,7 +5,8 @@ import { nextRehearsal, WEEKDAYS } from '../../progress/rehearsal';
 import { getPiece } from '../library';
 import { go } from '../router';
 import { loadCycle, saveCycle, exportBackup, importBackup } from '../../progress/store';
-import { cachedChoir } from '../../progress/choir';
+import { cachedChoir, loadSuperSession, superLogout } from '../../progress/choir';
+import { useSession } from './Choir';
 import { effectiveTolerance } from '../../progress/ladder';
 import { NOTATIONS } from './Setup';
 import { noteLabel } from '../../game/notation';
@@ -17,6 +18,7 @@ export function Settings() {
   const [profile, update] = useProfile();
   const wide = useWide();
   useStoreVersion();
+  useSession(); // the super-admin login below
   const cycle = loadCycle();
   const [backupText, setBackupText] = useState('');
   // The delay field while typing ('' when cleared), so it never shows "0120".
@@ -250,6 +252,19 @@ export function Settings() {
         <span>Schönberg Hero · your practice stays on this device. Only your choir's leaderboard, the progress you share with your section lead, with a choir account the progress kept with it (above), and, if switched on, the anonymous daily usage totals (Privacy) reach the choir server.</span>
         <span>Built-in score: an original warm-up chorale. Scores from your choir's library show their edition and licence in the Library.</span>
       </section>
+
+      {/* For whoever runs the choir server: small, out of the singers' way. */}
+      <div className="row wrap tiny muted" style={{ justifyContent: 'center', gap: 4 }} data-testid="settings-super">
+        {loadSuperSession() ? (
+          <>
+            <span>Logged in as super admin ·</span>
+            <button className="linklike tiny" style={{ minHeight: 44 }} data-testid="settings-super-logout"
+              onClick={() => { void superLogout().then(() => toast('Logged out of super admin')); }}>Log out of super admin</button>
+          </>
+        ) : (
+          <button className="linklike tiny muted" style={{ minHeight: 44 }} data-testid="settings-super-link" onClick={() => go({ name: 'superadmin' })}>Super admin</button>
+        )}
+      </div>
     </main>
   );
 }

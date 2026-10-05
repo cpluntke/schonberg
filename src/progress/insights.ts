@@ -4,7 +4,7 @@
 // Also the super admin's anonymous usage statistics (utils/schonberg_metrics.py).
 
 import type { Profile } from './store';
-import { apiBase, ChoirApiError, endSession, loadSession, type Auth } from './choir';
+import { apiBase, ChoirApiError, endSession, endSuperSession, loadSession, loadSuperSession, type Auth } from './choir';
 
 export const VOICE_ORDER = ['S', 'A', 'T', 'B'] as const;
 
@@ -48,6 +48,7 @@ async function get<T>(path: string, auth: Auth): Promise<T> {
   if (!res.ok) {
     // The server ended this session (expired, logged out elsewhere, account removed): forget it here too.
     if (res.status === 401 && 'bearer' in auth && loadSession()?.token === auth.bearer) endSession();
+    if (res.status === 401 && 'bearer' in auth && loadSuperSession()?.token === auth.bearer) endSuperSession();
     throw new ChoirApiError(res.status, (body as { error?: string } | null)?.error ?? `Server error (${res.status})`);
   }
   return body as T;
@@ -107,7 +108,7 @@ export interface MetricsDay {
   live?: boolean;
 }
 export interface MetricsView { days: MetricsDay[]; today: string; acceptDays: number }
-export const fetchMetrics = (pw: string, days: number) => get<MetricsView>(`/super/metrics?days=${days}`, { superAdmin: pw });
+export const fetchMetrics = (auth: Auth, days: number) => get<MetricsView>(`/super/metrics?days=${days}`, auth);
 
 /** Sum of the counters whose key matches. */
 export function sumKeys(days: MetricsDay[], match: (k: string) => boolean, field: 'c' | 'u' | 'tech' = 'c'): number {

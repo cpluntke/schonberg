@@ -29,6 +29,11 @@ target, movable/fixed solfège and Chinese numbered notation (jianpu), and an at
   choir") copies the score into the choir's scores on the server and puts it into the programme;
   members get it with the choir sync. The files live in `library/` (never in the public build; see
   `library/README.md`).
+- **Admin tab:** a phone with a staff login gets one more bottom tab ("Section" for a section lead,
+  "Admin" for a choir admin or the super admin), with a sub-tab per role: Choir (programme, scores,
+  library, people), Sections (each section's progress, hardest bars, voice ranges), Choirs and Usage
+  (super admin). Members never see it. The super admin logs in once at `#/superadmin` (or Settings →
+  Super admin) and stays logged in on that phone for 30 days.
 - **Coaching ladder:** each piece is split into sections, and each section climbs
   Listen → 1 Note-learning → 2 In time → 3 Independent → 4 Concert-ready → 5 Off book.
   Level 1 is sung slowly on “doo” and needs every note right; the words come in at level 2.

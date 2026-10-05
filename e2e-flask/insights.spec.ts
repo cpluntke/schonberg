@@ -161,6 +161,7 @@ test('lead sees aggregates and ranges; admin sees S|A|T|B; usage reaches the sup
   await expect(phone.getByText('Repertoire')).toBeVisible({ timeout: 30_000 });
   await phone.getByTestId('piece-row').first().click();
   await phone.getByLabel('Sections').getByRole('button', { name: /level 1/ }).first().click();
+  await phone.getByTestId('hp-yes').click(); // level 1 counts with headphones on
   await phone.getByTestId('start').click();
   await expect(phone.getByTestId('pass-banner')).toContainText(/level 1 reached|Passed/, { timeout: 120_000 });
   const today = await phone.evaluate(() => JSON.parse(localStorage.getItem('shm:usage')!));
