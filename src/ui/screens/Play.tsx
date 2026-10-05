@@ -22,6 +22,8 @@ const LATE_FAIL_MS = 250;
 const GENERATED_SECTIONS = new Set(['all', 'drill', 'entries', 'cold']);
 /** Singing along with the guide, a run can only teach a delay this far above the device estimate. */
 const GUIDE_LEARN_MAX_ABOVE = 150;
+import { trackPlayRun } from '../usage';
+import { track } from '../../progress/metrics';
 import { setLastRun } from '../play/runExport';
 import { getBars, knownByHeart, provenOffBook, recordBars } from '../../progress/bars';
 import { drawHighway2D, pitchWindow, wordInitial, type DrawState } from '../play/highway2d';
@@ -206,6 +208,8 @@ function SingPlay({ route }: { route: PlayRoute }) {
     if (!r || listenOnly) {
       if (listenOnly) {
         recordAttempt(piece.id, part.id, section.id, 0, emptyResult(), section.end - section.start);
+        trackPlayRun({ pieceId: piece.id, part, sectionId: section.id, level: 0, mode: route.mode, listenOnly: true, realSection: false, ladder: false,
+          passed: false, rate, durationSec: (section.end - section.start) / rate, display, fullScore });
         setListened(true);
       }
       return;
@@ -340,6 +344,11 @@ function SingPlay({ route }: { route: PlayRoute }) {
         : undefined,
       passed: rec.passed, prevLevel: rec.prevLevel, newLevel: rec.newLevel,
     });
+    trackPlayRun({
+      pieceId: piece.id, part, sectionId: section.id, level, mode: route.mode, listenOnly: false, realSection, ladder, passed: rec.passed,
+      rate, durationSec, display, fullScore, result: r, full, suggestDelayCheck, timingUnsure, timingFail, alignedMs,
+      latencyUsedMs: sess ? Math.round(sess.latencyMs) : undefined, latencySource: profile.latencySource,
+    });
     // After the first real practice run, ask the browser to keep our data (Safari may otherwise
     // evict site storage after weeks of non-use).
     try {
@@ -376,6 +385,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
     } catch (e) {
       console.error(e);
       setMicMsg(s.micError ?? 'Could not start audio.');
+      track('err.mic');
       setPhase('micError');
     }
   }

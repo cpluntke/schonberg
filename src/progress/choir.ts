@@ -4,6 +4,7 @@
 
 import { loadCycle, loadProfile, rawGet, rawRemove, rawSet, readJSON, saveCycle, saveProfile, writeJSON, type Cycle } from './store';
 import type { BarMap } from './bars';
+import type { SharedRange } from './insights';
 
 export interface ChoirPiece { id: string; title: string; composer: string; filename: string; uploadedAt: number; size: number }
 export interface ChoirInfo {
@@ -203,7 +204,8 @@ export const fetchSection = (code: string, voice: string, auth: Auth) => call<Se
  * Share my per-bar progress with my section lead (opt-in). Logged in to the choir, the entry is the
  * account's (under its name, from any phone); this phone's anonymous entry moves to it.
  */
-export function shareProgress(code: string, name: string, voice: string, pieces: Record<string, { readiness: number; level: number; bars: BarMap }>) {
+export function shareProgress(code: string, name: string, voice: string, pieces: Record<string, { readiness: number; level: number; bars: BarMap }>,
+  range?: SharedRange) {
   const body: Record<string, { readiness: number; level: number; bars: Record<string, number> }> = {};
   for (const [id, p] of Object.entries(pieces)) {
     const bars: Record<string, number> = {};
@@ -212,7 +214,7 @@ export function shareProgress(code: string, name: string, voice: string, pieces:
   }
   const s = sessionFor(code);
   return call<{ ok: boolean; name?: string }>(`/choirs/${enc(code)}/progress/${enc(s?.account.name ?? name)}`,
-    { method: 'PUT', member: true, ...(s ? { auth: sessionAuth(s) } : {}), ...json({ voice, pieces: body }) });
+    { method: 'PUT', member: true, ...(s ? { auth: sessionAuth(s) } : {}), ...json({ voice, pieces: body, ...(range ? { range } : {}) }) });
 }
 export function withdrawProgress(code: string, name: string) {
   const s = sessionFor(code);

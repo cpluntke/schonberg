@@ -4,6 +4,7 @@ import { go, back } from '../router';
 import { getPiece, noteRangeFor } from '../library';
 import { useProfile } from '../hooks';
 import { PracticeSession } from '../play/session';
+import { track, trackRun } from '../../progress/metrics';
 import { setLastResult } from '../play/lastResult';
 import { lyricLine, simulateMode } from './Play';
 import { wordInitial } from '../play/highway2d';
@@ -92,6 +93,7 @@ export function WordsPlay({ route }: { route: PlayRoute }) {
       from: section.start, to: section.end, result, passed: rec.passed, prevLevel: 0, newLevel: 0, ladder: false,
       words: { stage: stageRef.current, result: res, counted, newStage: rec.newStage, calibrated },
     });
+    trackRun({ kind: 'words', level: 0, passed: rec.passed, counted, seconds: (section.end - section.start) / rate });
     go({ name: 'results' }, true);
   }
 
@@ -110,6 +112,7 @@ export function WordsPlay({ route }: { route: PlayRoute }) {
     } catch (e) {
       console.error(e);
       setMicMsg(sessionRef.current?.micError ?? 'Could not start audio.');
+      track('err.mic');
       setPhase('micError');
     } finally {
       startingRef.current = false;

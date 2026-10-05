@@ -5,6 +5,7 @@ import { go } from '../router';
 import { loadCycle, saveCycle, fillWantedSlot } from '../../progress/store';
 import { importScoreFile } from '../../music/import';
 import { IconPlus, IconTrash, IconCheck } from '../icons';
+import { track } from '../../progress/metrics';
 
 export function Library() {
   useStoreVersion();
@@ -32,6 +33,7 @@ export function Library() {
         if (files.length === 1) go({ name: 'piece', pieceId: p.id });
       } catch (e) {
         console.error(e);
+        track('err.import');
         const msg = (e as Error).message || '';
         const friendly = f.size === 0 ? 'the file is empty.'
           : /no notes/i.test(msg) ? 'no notes were found in it.'

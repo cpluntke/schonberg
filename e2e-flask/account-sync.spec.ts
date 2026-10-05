@@ -32,7 +32,8 @@ async function setupChoir(request: APIRequestContext, code: string) {
   return { admin: admin.token as string, lead: lead.token as string };
 }
 const section = async (request: APIRequestContext, code: string, lead: string) =>
-  (await (await request.get(`./api/choirs/${code}/section/A`, { headers: { Authorization: `Bearer ${lead}` } })).json()) as { members: { name: string; pieces: Record<string, { level: number }> }[] };
+  // The lead sees progress only aggregated; names only next to voice ranges (one row per sharing singer).
+  (await (await request.get(`./api/choirs/${code}/insights/A`, { headers: { Authorization: `Bearer ${lead}` } })).json()) as { sharing: number; ranges: { name: string }[] };
 
 test('member: level 1 on phone A, account, phone B gets it; lead sees one entry; admin removes her', async ({ browser, request }) => {
   test.setTimeout(240_000);
@@ -51,7 +52,7 @@ test('member: level 1 on phone A, account, phone B gets it; lead sees one entry;
   await pa.getByTestId('join-choir').click();
   await expect(pa.getByTestId('choir-card')).toBeVisible();
   await pa.getByLabel(/Share my progress with my section lead/).check();
-  await expect.poll(async () => (await section(request, code, lead)).members.map((m) => m.name), { timeout: 15_000 }).toEqual(['Anna']);
+  await expect.poll(async () => (await section(request, code, lead)).ranges.map((m) => m.name), { timeout: 15_000 }).toEqual(['Anna']);
 
   await pa.goto('./?simulate=perfect#/');
   await expect(pa.getByText('Repertoire')).toBeVisible({ timeout: 30_000 });
@@ -93,7 +94,8 @@ test('member: level 1 on phone A, account, phone B gets it; lead sees one entry;
     }, { timeout: 15_000 }).toEqual(['Anna:account']);
   }
   const view = await section(request, code, lead);
-  expect(view.members.map((m) => m.name)).toEqual(['Anna']);
+  expect(view.ranges.map((m) => m.name)).toEqual(['Anna']);
+  expect(view.sharing).toBe(1);
 
   // ---- phone B: a fresh browser logs in and gets her progress
   const b = await browser.newContext();
@@ -128,7 +130,7 @@ test('member: level 1 on phone A, account, phone B gets it; lead sees one entry;
   for (let i = 0; i < 2; i++) { await pb.reload(); await pb.waitForTimeout(1500); await pa.reload(); await pa.waitForTimeout(1500); }
   expect(await rev()).toBe(r0);
   // The lead still sees one entry.
-  expect((await section(request, code, lead)).members.map((m) => m.name)).toEqual(['Anna']);
+  expect((await section(request, code, lead)).ranges.map((m) => m.name)).toEqual(['Anna']);
 
   // ---- the admin removes her (People, on a laptop)
   const c = await browser.newContext({ viewport: { width: 390, height: 844 } });
@@ -152,7 +154,7 @@ test('member: level 1 on phone A, account, phone B gets it; lead sees one entry;
   if (dataDir) {
     expect(fs.existsSync(path.join(dataDir, 'schonberg_member_progress', code)) ? fs.readdirSync(path.join(dataDir, 'schonberg_member_progress', code)) : []).toEqual([]);
   }
-  expect((await section(request, code, lead)).members).toEqual([]);
+  expect((await section(request, code, lead)).ranges).toEqual([]);
   // Phone B is logged out on its next sync, keeps its local progress, and doesn't share again.
   await pb.reload();
   await expect.poll(async () => pb.evaluate(() => localStorage.getItem('schonberg:session')), { timeout: 20_000 }).toBeNull();
@@ -165,7 +167,7 @@ test('member: level 1 on phone A, account, phone B gets it; lead sees one entry;
   await shot(pb, '8-phone-b-account-removed.png');
   expect((await progressOf(pb))[pkey].sections[sid].level).toBe(1);
   await pb.waitForTimeout(1500);
-  expect((await section(request, code, lead)).members).toEqual([]);
+  expect((await section(request, code, lead)).ranges).toEqual([]);
   expect(errors).toEqual([]);
   await request.delete(`./api/super/choirs/${code}`, { headers: { 'X-Super-Admin': SUPER } });
   await a.close(); await b.close(); await c.close();

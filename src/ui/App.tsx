@@ -20,6 +20,9 @@ import { LyricsQuiz } from './screens/LyricsQuiz';
 import { MemoryMap } from './screens/MemoryMap';
 import { ChoirScreen, ChoirAdmin, SectionLead, SuperAdmin } from './screens/Choir';
 import { InviteScreen } from './screens/Invite';
+import { ChoirInsights } from './screens/InsightsChoir';
+import { UsageInsights } from './screens/InsightsUsage';
+import { startUsageStats } from './usage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { UpdatePrompt } from './components/UpdatePrompt';
 import { flushProgress, onAccountConfirmed, syncProgressSoon } from '../progress/sync';
@@ -54,6 +57,8 @@ export function App() {
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);
   }, []);
+  // Anonymous usage statistics (Settings → Send anonymous usage statistics): daily totals, sent at most once a day.
+  useEffect(() => { startUsageStats(); }, []);
   // Progress kept with the choir account: on start and whenever the app comes back, if something
   // changed (at most once a minute). A new login also moves this phone's shared progress to the account.
   useEffect(() => {
@@ -102,6 +107,8 @@ export function App() {
       case 'choiradmin': body = <ChoirAdmin />; break;
       case 'section': body = <SectionLead />; break;
       case 'superadmin': body = <SuperAdmin />; break;
+      case 'choirinsights': body = <ChoirInsights />; break;
+      case 'usage': body = <UsageInsights />; break;
       case 'invite': body = <InviteScreen key={route.token ?? 'invite'} token={route.token} />; break;
     }
   }

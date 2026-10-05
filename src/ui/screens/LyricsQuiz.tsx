@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { getPiece, useLibrary } from '../library';
 import { back } from '../router';
 import { IconBack, IconCheck, IconRestart } from '../icons';
+import { track } from '../../progress/metrics';
 import {
   lyricLines, makeQuiz, hasLyrics, loadQuizStats, recordAnswer, recordRound, type QuizQuestion, type QuizKind,
 } from '../../game/lyrics';
@@ -52,6 +53,7 @@ function Shell({ title, sub, onBack, children }: { title: string; sub?: string; 
 }
 
 export function LyricsQuiz({ pieceId, partId }: { pieceId: string; partId: string }) {
+  useEffect(() => { track('feat.lyrics'); }, []);
   const lib = useLibrary();
   const piece = getPiece(pieceId);
   const part = piece?.score.parts.find((p) => p.id === partId);
