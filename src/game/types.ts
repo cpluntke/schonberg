@@ -63,9 +63,9 @@ export interface NoteResult {
    * graded leniently), 'range' = the written pitch is outside the pitch tracker's range (60–1400 Hz),
    * 'octave' = a low note (under 200 Hz) read partly or wholly an octave up that is right once those
    * readings are folded down (the tracker's octave error on "oo"; never folded downward),
-   * 'tracker' = a note right once a minority of wild readings (more than 6 semitones from it and from
-   * both neighbours: the tracker locking onto a fraction of the pitch) are replaced by the reading
-   * before them.
+   * 'tracker' = a note right once a minority of subharmonic readings (18–46 semitones under it and
+   * more than 6 semitones from both neighbours: the tracker locking onto a fraction of the pitch)
+   * are replaced by the reading before them.
    * Level 1 forgives such a note below "good" unless `clearly` says it was wrong (docs/LEVELS.md).
    */
   unsure?: 'short' | 'range' | 'octave' | 'tracker';

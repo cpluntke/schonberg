@@ -93,6 +93,13 @@ export const SILENCE_RMS = 0.005;
  * readings an octave up are folded down. Only upward: an octave low is never folded.
  */
 export const OCTAVE_UP_HZ = 200;
+/**
+ * Readings this far under the note (cents) are the tracker locking onto a fraction of the pitch
+ * (×⅓ ≈ −1902, ×¼ = −2400, ×⅕ ≈ −2786 … ×1/14 ≈ −4569), never a sung pitch: a minority of them is
+ * let off at level 1 (NoteResult.unsure 'tracker').
+ */
+export const SUBHARMONIC_HIGH = -1800;
+export const SUBHARMONIC_LOW = -4600;
 
 export const GRADE_POINTS: Record<Grade, number> = { perfect: 100, good: 70, ok: 40, miss: 0 };
 export const GRADE_VALUE: Record<Grade, number> = { perfect: 1, good: 0.85, ok: 0.5, miss: 0 };
@@ -582,12 +589,14 @@ export class LiveScorer {
     const foldUp = (d: number) => (d > 600 && d < 1800 ? d - 1200 : d);
     const octaveUp = w.lowForOctave && !this.opts.octaveTolerant && GRADE_RANK[grade] < GRADE_RANK.good
       && jD.some((d) => d > 600 && d < 1800) && hitOf(jD.map(foldUp)) >= 0.6;
-    // A note with a minority of readings far from it and from both neighbours (more than SHORT_FAR:
-    // the tracker locking onto a fraction of the pitch, as dropped for very short notes) that is
-    // right once those readings are replaced by the reading before them: a tracker error.
+    // A note with a minority of readings deep under it and far from both neighbours (the tracker
+    // locking onto a fraction of the pitch) that is right once those readings are replaced by the
+    // reading before them: a tracker error.
     const farFrom = (d: number, other: number | null) => Math.abs(d - 100 * ((other ?? w.note.midi) - w.target)) > SHORT_FAR;
-    // (Not an octave below: a voice can drop the octave, so those readings always count.)
-    const isFar = (d: number) => Math.abs(d) > SHORT_FAR && Math.abs(d + 1200) > tolN && farFrom(d, w.legatoFrom) && farFrom(d, w.legatoTo);
+    // Only the subharmonic band (an octave and a fifth to almost four octaves low, SUBHARMONIC_LOW…
+    // SUBHARMONIC_HIGH): a voice can drop an octave or sing a fifth or a sixth off, so readings there
+    // always count; nothing sung lands 19–46 semitones under the note.
+    const isFar = (d: number) => d < SUBHARMONIC_HIGH && d > SUBHARMONIC_LOW && farFrom(d, w.legatoFrom) && farFrom(d, w.legatoTo);
     const nFar = jD.filter(isFar).length;
     let slip = false;
     if (!w.short && !octaveUp && GRADE_RANK[grade] < GRADE_RANK.good && nFar > 0 && 2 * nFar < jD.length) {
@@ -599,8 +608,11 @@ export class LiveScorer {
     let clearly: NoteResult['clearly'];
     if (unsure && GRADE_RANK[grade] < GRADE_RANK.good) {
       if (a.inNote > 0 && a.loudInNote === 0) clearly = 'silent';
-      // (A reading more than SHORT_FAR off is the tracker locking onto a fraction of the pitch, not a sung note.)
-      else if (unsure === 'short' && grade === 'miss' && shortDev !== null && Math.abs(shortDev) >= CLEAR_OFF_TOL * tolN && Math.abs(shortDev) <= SHORT_FAR) clearly = 'off';
+      // Off by a wrong note (up to SHORT_FAR) or by an octave is sung; further off is the tracker
+      // locking onto a fraction of the pitch. (An octave up on a low note may be the tracker too:
+      // see OCTAVE_UP_HZ.)
+      else if (unsure === 'short' && grade === 'miss' && shortDev !== null && Math.abs(shortDev) >= CLEAR_OFF_TOL * tolN
+        && (Math.abs(shortDev) <= SHORT_FAR || Math.abs(shortDev + 1200) <= tolN || (!w.lowForOctave && Math.abs(shortDev - 1200) <= tolN))) clearly = 'off';
     }
     const scoopMed = median(a.scoopDevs);
     // A scoop is a glide INTO the note: the body must end up clearly closer to the target than the

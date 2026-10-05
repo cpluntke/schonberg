@@ -30,14 +30,14 @@ slowly; that bar shows as “needs work” in the bar strip, and the grade lette
   judged part is under 0.15 s of score time, the notes the scorer already grades leniently because
   the voice rarely settles and the tracker gets only a few readings), or a written pitch **outside
   the tracker's range** (60–1400 Hz), or a note the tracker misread: a **low note (under 200 Hz)
-  read partly or wholly an octave up** on “oo”, or a note with **a few wild readings** (more than
-  6 semitones off, not an octave below), when the note is right once those readings are folded down
+  read partly or wholly an octave up** on “oo”, or a note with **a few subharmonic readings** (18–46
+  semitones under it, where no voice sings), when the note is right once those readings are folded down
   or replaced (see [SCORING.md](SCORING.md); never an octave low).
 - **…unless it was clearly wrong** (`NoteResult.clearly`): **no sound at all** inside the note
   (“not sung”; for both kinds, so a note out of the tracker's range must still be sung), or a very
   short note graded *miss* whose own readings were enough to judge
   it (the same test the scorer uses for fast notes) with their median at least 1.5 tolerances off
-  (75¢ at level 1: a wrong note, not a wobble), but no more than 6 semitones off (further off is
+  (75¢ at level 1: a wrong note, not a wobble), up to 6 semitones or an octave off (further off is
   the tracker locking onto a fraction of the pitch, not a sung note).
 - The 75% pass mark stays only as a backstop, so a run can't pass on forgiven notes alone. It only
   matters when many notes are forgiven (good singers in the realism harness never reach it).

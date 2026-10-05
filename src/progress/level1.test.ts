@@ -181,6 +181,31 @@ describe('level 1: what the scorer can’t judge reliably', () => {
     expect(noteVerdict(hr.notes[1])).toBe('wrong');
   });
 
+  it('only subharmonic readings (19–46 semitones low) count as tracker errors, not a fifth or a sixth off', () => {
+    // A2 → A4 → A2 at 60 bpm, the A4 held 2 s; its last 40% sung off, or a burst read deep under it.
+    const p = makePart('S', [[57, 1], [69, 2], [57, 1]], 60);
+    const pc: ScoringContext = { score: makeScore([p], 60), part: p, range: [0, 2] };
+    const take = (f: (t: number) => number) => scoreAttempt(pc, sampleSinging(p, (n, t, i) => n.midi + (i === 1 ? f(t) : 0)), L1);
+    for (const off of [-7, 7, 9, -9]) {
+      const r = take((t) => (t > 1.2 ? off : 0));
+      expect(noteVerdict(r.notes[1]), `last 40% ${off} semitones off`).toBe('wrong');
+      expect(r.notes[1].unsure).toBeUndefined();
+    }
+    // −19 semitones (×⅓) in bursts, a third of the readings: the tracker, let off.
+    const sub = take((t) => (Math.floor(t / 0.1) % 3 === 1 ? -19.02 : 0));
+    expect(sub.notes[1].unsure).toBe('tracker');
+    expect(noteVerdict(sub.notes[1])).toBe('forgiven');
+  });
+
+  it('a very short note sung an octave low is a clear miss (an octave is sung; deeper is the tracker)', () => {
+    const r = score((i) => part.notes[i].midi + (i === 4 ? -12 : 0));
+    expect(r.notes[4]).toMatchObject({ grade: 'miss', unsure: 'short', clearly: 'off' });
+    expect(noteVerdict(r.notes[4])).toBe('wrong');
+    // An octave up on a written note above 200 Hz: also sung, also wrong.
+    const up = score((i) => part.notes[i].midi + (i === 4 ? 12 : 0));
+    expect(noteVerdict(up.notes[4])).toBe('wrong');
+  });
+
   it('a "doo" on every note (a short unvoiced "d" before each vowel) still scores every note', () => {
     // 25 ms without voice at the start of every note (the "d"), the vowel on pitch after it.
     const r = score((i, t) => (t < 0.025 ? null : part.notes[i].midi));

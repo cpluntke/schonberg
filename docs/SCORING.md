@@ -43,8 +43,9 @@ For every note in your part:
   above), or a written pitch outside the detector's 60–1400 Hz. It still counts as wrong when it was
   clearly wrong: **no sound at all** inside the note (no pitched reading, and every reading below the
   detector's level gate; this applies to both kinds), or, for a very short note, a *miss* whose own
-  readings were enough to judge it with their median at least 1.5 × the tolerance (and at most 6
-  semitones) off. A note outside the detector's range that was sung (there is sound, but no pitch
+  readings were enough to judge it with their median at least 1.5 × the tolerance off, up to 6
+  semitones or an octave (an octave up on a note under 200 Hz excepted, see below); further off is
+  the detector, not a sung note. A note outside the detector's range that was sung (there is sound, but no pitch
   the detector can read) is let off. Two more detector errors are let off at level 1:
   - **Low notes read an octave up** (`'octave'`): below 200 Hz a sung “oo” can put its strongest
     partial at twice the pitch, and the detector then reads some or all of the note an octave up. If
@@ -52,11 +53,12 @@ For every note in your part:
     or read an octave **low** still fails, and so does a wrong note. Trade-off: a bass who really
     sings a low note an octave up is let off too (only at level 1; the levels above judge by
     percentage and grade such a note as missed).
-  - **Wild readings** (`'tracker'`): a minority of readings more than 6 semitones from the note and
-    from both neighbours (the detector locking onto a fraction of the pitch, e.g. on a high soprano
-    note with a wide vibrato), not counting readings an octave below. If the note is *good* once
-    each is replaced by the reading before it, it is let off. Each note
-  result carries this as `unsure` (`'short'` / `'range'`) and `clearly` (`'silent'` / `'off'`); see
+  - **Subharmonic readings** (`'tracker'`): a minority of readings 18–46 semitones under the note
+    and more than 6 semitones from both neighbours (the detector locking onto a third, a quarter … of
+    the pitch, e.g. on a high soprano note with a wide vibrato). If the note is *good* once each is
+    replaced by the reading before it, it is let off. Nothing a voice sings lands there; readings an
+    octave below, a fifth or a sixth off, or anything above the note always count. Each note
+  result carries this as `unsure` (`'short'` / `'range'` / `'octave'` / `'tracker'`) and `clearly` (`'silent'` / `'off'`); see
   [LEVELS.md](LEVELS.md).
 - **Sections within a full run.** A run of the whole piece also scores each section (the average grade of its notes). The piece level needs the run *and* every section at the level's pass mark; see [LEVELS.md](LEVELS.md).
 - **Rhythm.** When each note starts: the first sustained (≥60 ms) sound that is closer to this note than to the previous one. This is judged separately from pitch.
