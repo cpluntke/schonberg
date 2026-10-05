@@ -649,7 +649,7 @@ export function SuperAdmin() {
           </span>
           <span className="small">
             {c.admins.length ? `Admin${c.admins.length > 1 ? 's' : ''}: ${c.admins.join(', ')}` : 'No admin account yet'}
-            {c.leads.length ? ` · leads for ${c.leads.join(' ')}` : ''}{c.invites ? ` · ${c.invites} open invite${c.invites > 1 ? 's' : ''}` : ''}{c.legacy ? ' · old shared passwords still on' : ''}
+            {c.leads.length ? ` · section leads for ${c.leads.map((v) => VOICE_NAME[v] ?? v).join(', ')}` : ''}{c.invites ? ` · ${c.invites} open invite${c.invites > 1 ? 's' : ''}` : ''}{c.legacy ? ' · old shared passwords still on' : ''}
           </span>
           <div className="row wrap">
             <button className="btn small" aria-expanded={open === c.code} onClick={() => setOpen(open === c.code ? null : c.code)}>People</button>

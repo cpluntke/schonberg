@@ -85,7 +85,7 @@ export function PeoplePanel({ code, auth, superAdmin = false }: { code: string; 
   const invite = (role: 'admin' | 'lead') => run(async () => {
     const r = await createInvite(code, auth, role, role === 'lead' ? [leadVoice] : [], note.trim());
     const who = note.trim() ? ` for ${note.trim()}` : '';
-    setFresh({ token: r.token, title: role === 'admin' ? `Invite link: admin${who}` : `Invite link: ${VOICE_NAME[leadVoice]} section lead${who}` });
+    setFresh({ token: r.token, title: role === 'admin' ? `Invite link: admin${who}` : `Invite link: section lead for the ${VOICE_NAME[leadVoice]}${who}` });
     setNote('');
   });
   if (err && !people) return <div className="notice" role="alert">{err}</div>;
@@ -145,9 +145,14 @@ export function PeoplePanel({ code, auth, superAdmin = false }: { code: string; 
       </div>
       <div className="col" style={{ gap: 2 }}>
         <span className="eyebrow">Section leads</span>
-        <span className="small muted" data-testid="leads-by-voice">
-          {VOICES.map((v) => `${VOICE_NAME[v]}: ${leads.filter((a) => a.voices.includes(v)).map((a) => a.name).join(', ') || '–'}`).join(' · ')}
-        </span>
+        <div className="small" data-testid="leads-by-voice" style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 10, rowGap: 2 }}>
+          {VOICES.map((v) => (
+            <React.Fragment key={v}>
+              <span className="muted">{VOICE_NAME[v]}</span>
+              <span style={{ overflowWrap: 'anywhere' }}>{leads.filter((a) => a.voices.includes(v)).map((a) => a.name).join(', ') || '–'}</span>
+            </React.Fragment>
+          ))}
+        </div>
         {leads.map(person)}
       </div>
       {people.invites.length > 0 && (
@@ -176,7 +181,7 @@ export function PeoplePanel({ code, auth, superAdmin = false }: { code: string; 
           {VOICES.map((v) => <button key={v} className="chip" aria-pressed={leadVoice === v} onClick={() => setLeadVoice(v)}>{VOICE_NAME[v]}</button>)}
         </div>
         <div className="row wrap" style={{ gap: 6 }}>
-          <button className="btn small primary" disabled={busy} data-testid="invite-lead" onClick={() => invite('lead')}>Invite {VOICE_NAME[leadVoice]} section lead</button>
+          <button className="btn small primary" disabled={busy} data-testid="invite-lead" onClick={() => invite('lead')}>Invite a lead for the {VOICE_NAME[leadVoice]}</button>
           <button className="btn small" disabled={busy} data-testid="invite-admin" onClick={() => invite('admin')}>Invite an admin</button>
         </div>
         <span className="tiny muted">
