@@ -6,8 +6,9 @@ import {
 import { barsKey, getBars, type BarMap } from './bars';
 import { wordsKey } from './words';
 import {
-  applySnapshot, buildSnapshot, cleanProfile, confirmMerge, decodeBars, decodePiece, dismissSyncNotice, encodeBars, encodePiece, loadMeta,
-  mergeBars, mergeFull, mergeProfile, mergeProgress, mergeSection, pendingQuestion, suggestAccount, accountTipPending, dismissAccountTip, flushProgress, syncEnabled, syncNoticePending,
+  applySnapshot, buildSnapshot, cleanProfile, confirmMerge, decodeBars, decodePiece, encodeBars, encodePiece, loadMeta, accountConfirmed,
+  mergeBars, mergeFull, mergeProfile, mergeProgress, mergeSection, pendingQuestion, suggestAccount, accountTipPending, dismissAccountTip, flushProgress, syncEnabled,
+  staffSyncQuestion, answerStaffSync, onAccountConfirmed,
   throttle, TOTAL_BUDGET, uploadProgress, type ProgressSnapshot,
 } from './sync';
 import { saveSession, type Session } from './choir';
@@ -332,22 +333,32 @@ describe('sync with the choir account', () => {
     account: { id: 'acc000000001', name: 'Anna Example', role: 'member', voices: [], createdAt: 1, ...over },
   });
 
-  it('is on while logged in to the choir (any role), unless turned off', () => {
+  it('members: on while logged in unless turned off; admins and leads: asked first, nothing saved before', async () => {
+    fakeServer();
     seedSinger(1);
     expect(syncEnabled()).toBe(false);
     saveSession(session());
     expect(syncEnabled()).toBe(true);
+    expect(staffSyncQuestion()).toBe(false);
     saveSession(session({ role: 'admin' }));
+    expect(syncEnabled()).toBe(false);
+    expect(staffSyncQuestion()).toBe(true);
+    expect((await uploadProgress(true)).ok).toBe(false);
+    expect(calls).toHaveLength(0);
+    answerStaffSync(true);
     expect(syncEnabled()).toBe(true);
+    expect(staffSyncQuestion()).toBe(false);
     saveProfile({ ...loadProfile(), sync: false });
     expect(syncEnabled()).toBe(false);
     saveProfile({ ...loadProfile(), sync: undefined, choirCode: 'other' });
     expect(syncEnabled()).toBe(false); // the login belongs to another choir
   });
 
-  it('first time on a phone: pulls (nothing yet), then saves with the session; skips when nothing changed; one-time notice', async () => {
+  it('first time on a phone: pulls (nothing yet), then saves with the session; skips when nothing changed', async () => {
     fakeServer();
     seedSinger(2);
+    let confirmations = 0;
+    const off = onAccountConfirmed(() => { confirmations++; });
     saveSession(session());
     expect((await uploadProgress(false, true)).ok).toBe(true);
     expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual([
@@ -355,9 +366,9 @@ describe('sync with the choir account', () => {
     expect(calls[2].auth).toBe(`Bearer ${'t'.repeat(43)}`);
     expect(calls[2].body!.baseRev).toBe(0);
     expect(loadMeta()).toMatchObject({ account: 'acc000000001', rev: 1, error: null });
-    expect(syncNoticePending()).toBe(true);
-    dismissSyncNotice();
-    expect(syncNoticePending()).toBe(false);
+    expect(confirmations).toBeGreaterThanOrEqual(1);
+    expect(accountConfirmed()).toBe(true);
+    off();
     expect(await uploadProgress()).toEqual({ ok: true, skipped: true });
     expect(calls.at(-1)!.url).toMatch(/meta=1$/); // only the cheap check
     const p = getProgress('piece0', 'P2')!;
@@ -394,14 +405,22 @@ describe('sync with the choir account', () => {
     saveProfile({ ...DEFAULT_PROFILE, name: 'Ben', onboarded: true, choirCode: 'kammerchor' });
     writeJSON(progressKey('other', 'P1'), piece({ pieceId: 'other', partId: 'P1', sections: { a: sec({ level: 3 }) } }));
     saveSession(session());
+    let confirmations = 0;
+    const off = onAccountConfirmed(() => { confirmations++; });
     expect(await uploadProgress()).toEqual({ ok: false, ask: true });
     expect(calls.map((c) => c.method)).toEqual(['GET']);
+    // Not the account's yet: shared progress must not move to it.
+    expect(accountConfirmed()).toBe(false);
+    expect(confirmations).toBe(0);
     expect(pendingQuestion()).toMatchObject({ accountName: 'Anna Example', here: 'Ben', pieces: 1 });
     expect(getProgress('piece0', 'P2')).toBeUndefined();
     // Asked again later: still nothing uploads.
     expect((await uploadProgress()).ask).toBe(true);
     await confirmMerge();
     expect(pendingQuestion()).toBeNull();
+    expect(confirmations).toBe(1);
+    expect(accountConfirmed()).toBe(true);
+    off();
     expect(getProgress('piece0', 'P2')!.sections['s0-m1-8']).toBeTruthy();
     expect(getProgress('other', 'P1')!.sections.a.level).toBe(3);
     // Logging out clears the question.
@@ -460,6 +479,17 @@ describe('sync with the choir account', () => {
     expect(calls.at(-1)!.method).toBe('PUT');
   });
 
+  it('asks too when the phone\'s progress has no name, or the account has nothing saved yet', async () => {
+    fakeServer();
+    saveProfile({ ...DEFAULT_PROFILE, onboarded: true, choirCode: 'kammerchor' });
+    writeJSON(progressKey('other', 'P1'), piece({ pieceId: 'other', partId: 'P1', sections: { a: sec({ level: 3 }) } }));
+    saveSession(session({ role: 'lead', voices: ['A'] }));
+    answerStaffSync(true);
+    expect(await uploadProgress()).toEqual({ ok: false, ask: true });
+    expect(pendingQuestion()).toMatchObject({ here: 'no name', pieces: 0 });
+    expect(calls.some((c) => c.method === 'PUT')).toBe(false);
+  });
+
   it('the same singer on a phone with progress merges without asking', async () => {
     fakeServer();
     seedSinger(1);
@@ -507,16 +537,22 @@ describe('sync with the choir account', () => {
     release();
   });
 
-  it('a session the server ended is forgotten (and sharing stops); errors are kept and retried', async () => {
+  it('a session the server ended is forgotten (sharing stops only when the account was removed); errors are kept and retried', async () => {
     seedSinger(1);
     saveSession(session());
     fakeServer((c) => (c.method === 'PUT' ? { status: 507, body: { error: 'The server\'s storage is full.' } } : null));
     expect(await uploadProgress()).toEqual({ ok: false, error: 'The server\'s storage is full.' });
     expect(loadMeta().error).toMatch(/full/);
-    fakeServer(() => ({ status: 401, body: { error: 'logged out', loggedOut: true } }));
+    fakeServer(() => ({ status: 401, body: { error: 'Your login has expired.', loggedOut: true, reason: 'expired' } }));
     await uploadProgress();
     expect(syncEnabled()).toBe(false);
+    expect(loadProfile().shareProgress).toBe(true);
+    expect(loadMeta().account).toBe('acc000000001'); // logging in again resumes
+    saveSession(session());
+    fakeServer(() => ({ status: 401, body: { error: 'Your account was removed.', loggedOut: true, reason: 'removed' } }));
+    await uploadProgress();
     expect(loadProfile().shareProgress).toBe(false);
+    expect(loadMeta().account).toBeUndefined();
   });
 
   it('suggests an account once (on Results), after a pass, to choir singers without one', () => {

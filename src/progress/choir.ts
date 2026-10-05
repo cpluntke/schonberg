@@ -18,6 +18,8 @@ export interface ChoirInfo {
   leads: string[];
   /** The first version's shared admin / section-lead passwords can still become personal accounts. */
   legacyLogin?: boolean;
+  /** Singers may make their own member account (an admin can close this). */
+  signupsOpen?: boolean;
 }
 
 export class ChoirApiError extends Error {
@@ -77,7 +79,10 @@ async function call<T>(path: string, init: RequestInit & { auth?: Auth; member?:
   try { body = await res.json(); } catch { /* not json */ }
   if (!res.ok) {
     // The server ended this session (expired, logged out elsewhere, account removed): forget it here too.
-    if (res.status === 401 && auth && 'bearer' in auth && loadSession()?.token === auth.bearer) endSession();
+    if (res.status === 401 && auth && 'bearer' in auth && loadSession()?.token === auth.bearer) {
+      const b = body as { reason?: string; error?: string } | null;
+      endSession(b?.reason, b?.error);
+    }
     throw new ChoirApiError(res.status, (body as { error?: string } | null)?.error ?? `Server error (${res.status})`);
   }
   return body as T;
@@ -234,13 +239,15 @@ export interface People {
   invites: InviteInfo[];
   legacy: { active: boolean; admin: boolean; leads: string[]; until: number | null };
   you: string | null;
+  signupsOpen?: boolean;
+  maxMembers?: number;
 }
 
 // Kept outside the `sh:` keys, so a login never ends up in a backup file someone shares.
 const SESSION_KEY = 'schonberg:session';
 const INVITES_KEY = 'schonberg:inviteLinks';
 const sessionListeners = new Set<() => void>();
-export const LOGGED_OUT_ELSEWHERE = 'You were logged out (password changed or account removed). Log in again.';
+export const LOGGED_OUT_ELSEWHERE = 'You were logged out. Log in again.';
 let logoutNotice: string | null = null;
 /** Why this phone's login ended without the person logging out here (shown until they log in again). */
 export const loggedOutNotice = () => logoutNotice;
@@ -279,13 +286,21 @@ export function sessionFor(code: string | undefined | null): Session | null {
 export const sessionAuth = (s: Session): Auth => ({ bearer: s.token });
 
 /**
- * The server ended this phone's login (logged out elsewhere, password changed, account removed).
- * Sharing stops too, so a removed member's phone doesn't quietly share again without the account.
+ * The server ended this phone's login. `reason` (from the server): 'expired', 'password', 'replaced',
+ * 'logout' — the singer just logs in again, and sharing and progress sync resume with the account
+ * (until then sharing pauses rather than going anonymous); 'removed' (by an admin) or 'deleted' (by
+ * the singer) — the account is gone, so sharing stops and this phone forgets the account.
  */
-export function endSession(): void {
-  logoutNotice = LOGGED_OUT_ELSEWHERE;
-  const p = loadProfile();
-  if (p.shareProgress) saveProfile({ ...p, shareProgress: false });
+export function endSession(reason?: string, message?: string): void {
+  const gone = reason === 'removed' || reason === 'deleted';
+  logoutNotice = reason === 'deleted' ? null : message || LOGGED_OUT_ELSEWHERE;
+  if (gone) {
+    const p = loadProfile();
+    if (p.shareProgress) saveProfile({ ...p, shareProgress: false });
+    // The account this phone's progress went with (src/progress/sync.ts): forgotten.
+    rawRemove('schonberg:syncMeta');
+    rawRemove('schonberg:syncAsk');
+  }
   saveSession(null);
 }
 
@@ -365,7 +380,10 @@ export async function deleteMyAccount(password: string): Promise<void> {
   const s = loadSession();
   if (!s) throw new ChoirApiError(401, 'Log in first');
   await call('/session/account', { method: 'DELETE', auth: { bearer: s.token }, ...json({ password }) });
-  saveSession(null);
+  endSession('deleted');
+  // An anonymous entry this phone shared before the account (if any) goes too.
+  const p = loadProfile();
+  if (p.choirCode && p.name.trim()) void withdrawProgress(p.choirCode, p.name.trim()).catch(() => {});
 }
 /** Turn the first version's shared admin or section-lead password into my own account. */
 export async function claimAccount(code: string, oldPassword: string, name: string, password: string): Promise<Session> {
@@ -411,6 +429,12 @@ export async function resetPerson(code: string, auth: Auth, id: string): Promise
   rememberInvite(r.invite, r.token);
   return r;
 }
+/** Open or close self sign-up of member accounts. */
+export const setSignupsOpen = (code: string, auth: Auth, open: boolean) =>
+  call<People>(`/choirs/${enc(code)}/members/settings`, { method: 'PUT', auth, ...json({ open }) });
+/** Remove the member accounts made since `since` (ms), with their progress (a flood of fake sign-ups). */
+export const removeMembersSince = (code: string, auth: Auth, since: number) =>
+  call<People & { removed: number }>(`/choirs/${enc(code)}/members?since=${since}`, { method: 'DELETE', auth });
 export const retireOldPasswords = (code: string, auth: Auth) => call<People>(`/choirs/${enc(code)}/legacy`, { method: 'DELETE', auth });
 
 // ------------------------------------------------------------------ super admin

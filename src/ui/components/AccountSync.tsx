@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useProfile, useStoreVersion, toast } from '../hooks';
 import {
-  apiBase, cachedChoir, deleteMyAccount, joinChoir, login, logout, onSessionChange, sessionFor, signUp, loadSession,
+  apiBase, cachedChoir, deleteMyAccount, joinChoir, login, loggedOutNotice, logout, onSessionChange, sessionFor, signUp, loadSession,
 } from '../../progress/choir';
 import { loadProfile } from '../../progress/store';
-import { confirmMerge, dismissSyncNotice, loadMeta, pendingQuestion, syncEnabled, syncNoticePending, uploadProgress } from '../../progress/sync';
+import { answerStaffSync, confirmMerge, loadMeta, pendingQuestion, staffSyncQuestion, syncEnabled, uploadProgress } from '../../progress/sync';
 import { syncChoirNow } from '../library';
 
 /** What the account keeps, in one line (Settings and the one-time notice). */
@@ -47,19 +47,18 @@ export function MergeQuestionCard() {
   );
 }
 
-/** Home: the one-time notice when progress starts being kept with the account, and the merge question. */
+/** Home and Settings: the merge question, or (admins and section leads, once) whether to keep their progress with the account. */
 export function SyncNotice() {
   useStoreVersion();
   useSessionVersion();
-  const [, update] = useProfile();
   if (pendingQuestion()) return <MergeQuestionCard />;
-  if (!syncNoticePending()) return null;
+  if (!staffSyncQuestion()) return null;
   return (
-    <div className="notice info col" role="status" data-testid="sync-notice" style={{ gap: 6 }}>
-      <span className="small"><strong>Your progress is now kept with your choir account</strong>, so you see and update it on any phone where you log in. {KEPT}</span>
+    <div className="notice info col" role="status" data-testid="sync-question" style={{ gap: 6 }}>
+      <span className="small"><strong>Keep your own progress with your choir account?</strong> Then you see and carry on with it on any phone where you log in. {KEPT}</span>
       <div className="row" style={{ gap: 6 }}>
-        <button className="btn small" onClick={() => dismissSyncNotice()}>OK</button>
-        <button className="btn small ghost" onClick={() => { update({ sync: false }); dismissSyncNotice(); }}>Turn off</button>
+        <button className="btn small" data-testid="sync-yes" onClick={() => answerStaffSync(true)}>Yes, keep it</button>
+        <button className="btn small ghost" onClick={() => answerStaffSync(false)}>No</button>
       </div>
     </div>
   );
@@ -72,7 +71,7 @@ export function AccountSync() {
   const [profile, update] = useProfile();
   useStoreVersion();
   useSessionVersion();
-  const [mode, setMode] = useState<'create' | 'login'>(() => (profile.onboarded ? 'create' : 'login'));
+  const [mode, setMode] = useState<'create' | 'login'>(() => (profile.onboarded && cachedChoir()?.signupsOpen !== false && !loadMeta().account ? 'create' : 'login'));
   const [code, setCode] = useState(profile.choirCode ?? '');
   const [name, setName] = useState(profile.name);
   const [pw, setPw] = useState('');
@@ -124,9 +123,11 @@ export function AccountSync() {
             {!profile.choirCode && ' Join your choir first (Your choir above) to make one; without a choir, use a backup file (below).'}
           </span>
           {anySession && <span className="small muted">You're logged in to another choir ({anySession.code}).</span>}
+          {loggedOutNotice() && <span className="small" role="status" style={{ color: 'var(--accent-text)' }} data-testid="logged-out-why">{loggedOutNotice()}</span>}
+          {choir?.signupsOpen === false && profile.choirCode && <span className="small muted">Your choir isn't taking new member accounts at the moment: log in if you have one.</span>}
           {(profile.choirCode || mode === 'login') && (
             <div className="seg" role="group" aria-label="Account">
-              <button aria-pressed={mode === 'create'} disabled={!profile.choirCode} onClick={() => setMode('create')} data-testid="account-mode-create">Make an account</button>
+              <button aria-pressed={mode === 'create'} disabled={!profile.choirCode || choir?.signupsOpen === false} onClick={() => setMode('create')} data-testid="account-mode-create">Make an account</button>
               <button aria-pressed={mode === 'login'} onClick={() => setMode('login')} data-testid="account-mode-login">Log in</button>
             </div>
           )}
@@ -152,7 +153,7 @@ export function AccountSync() {
         </>
       ) : (
         <>
-          <MergeQuestionCard />
+          <SyncNotice />
           <div className="toggle-row">
             <span>Logged in as <strong data-testid="account-who">{session.account.name}</strong>
               <span className="tiny muted" style={{ display: 'block' }}>{choir?.name ?? session.choirName} · {session.account.role === 'member' ? 'member' : session.account.role === 'admin' ? 'choir admin' : 'section lead'}</span>
@@ -163,7 +164,7 @@ export function AccountSync() {
             <span>Keep my progress with my account
               <span className="tiny muted" style={{ display: 'block' }}>{KEPT}</span>
             </span>
-            <input type="checkbox" checked={profile.sync !== false} data-testid="sync-switch" onChange={(e) => update({ sync: e.target.checked })} />
+            <input type="checkbox" checked={syncEnabled(profile)} data-testid="sync-switch" onChange={(e) => update({ sync: e.target.checked })} />
           </label>
           {syncEnabled(profile) && !pendingQuestion() && (
             <span className="small muted" role="status" data-testid="sync-status">

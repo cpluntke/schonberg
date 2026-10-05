@@ -4,7 +4,7 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from '../hooks';
 import {
-  createInvite, fetchPeople, inviteLink, rememberedInvite, removePerson, resetPerson, retireOldPasswords, revokeInvite, updatePerson,
+  createInvite, fetchPeople, inviteLink, rememberedInvite, removePerson, resetPerson, retireOldPasswords, revokeInvite, updatePerson, setSignupsOpen, removeMembersSince,
   type Account, type Auth, type InviteInfo, type People,
 } from '../../progress/choir';
 
@@ -68,6 +68,7 @@ export function PeoplePanel({ code, auth, superAdmin = false, onChanged }: { cod
   const [leadVoice, setLeadVoice] = useState<string>('S');
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
+  const [since, setSince] = useState('');
   const load = () => fetchPeople(code, auth).then((p) => { setPeople(p); setErr(''); }).catch((e) => setErr((e as Error).message));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { void load(); }, [code]);
@@ -172,8 +173,33 @@ export function PeoplePanel({ code, auth, superAdmin = false, onChanged }: { cod
         {leads.map(person)}
       </div>
       <div className="col" style={{ gap: 2 }} data-testid="members">
-        <span className="eyebrow">Members with an account</span>
-        {members.length ? members.map(person) : <span className="small muted">None yet. Singers make one in Settings to keep their progress on every phone.</span>}
+        <span className="eyebrow">Members with an account ({members.length}{people.maxMembers ? ` of ${people.maxMembers}` : ''})</span>
+        <label className="toggle-row">
+          <span>New member accounts<span className="tiny muted" style={{ display: 'block' }}>Singers make their own with the choir code to keep their progress on every phone.</span></span>
+          <select aria-label="New member accounts" value={people.signupsOpen === false ? 'closed' : 'open'} disabled={busy} data-testid="signups-open"
+            onChange={(e) => void run(() => setSignupsOpen(code, auth, e.target.value === 'open'))}
+            style={{ minHeight: 44, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--line)', padding: '0 8px' }}>
+            <option value="open">Open</option>
+            <option value="closed">Closed</option>
+          </select>
+        </label>
+        {members.length ? members.map(person) : <span className="small muted">None yet.</span>}
+        {members.length > 0 && (
+          <details>
+            <summary className="small muted" style={{ minHeight: 44, display: 'flex', alignItems: 'center' }}>Remove members who signed up since…</summary>
+            <div className="row" style={{ gap: 6 }}>
+              <input type="date" aria-label="Signed up since" value={since} onChange={(e) => setSince(e.target.value)} style={{ minHeight: 44, flex: 1 }} />
+              <button className="btn small ghost danger" disabled={busy || !since} data-testid="remove-since" onClick={() => {
+                const t = new Date(`${since}T00:00:00`).getTime();
+                const n = members.filter((m) => (m.createdAt ?? 0) >= t).length;
+                if (!n) { toast('Nobody signed up since then'); return; }
+                if (confirm(`Remove ${n} member account${n === 1 ? '' : 's'} made since ${since}, with their progress?`)) {
+                  void run(async () => { const r = await removeMembersSince(code, auth, t); toast(`${r.removed} removed`); return r; });
+                }
+              }}>Remove</button>
+            </div>
+          </details>
+        )}
       </div>
       {people.invites.length > 0 && (
         <div className="col" style={{ gap: 2 }}>

@@ -22,8 +22,7 @@ import { ChoirScreen, ChoirAdmin, SectionLead, SuperAdmin } from './screens/Choi
 import { InviteScreen } from './screens/Invite';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { UpdatePrompt } from './components/UpdatePrompt';
-import { flushProgress, syncProgressSoon } from '../progress/sync';
-import { loadSession, onSessionChange } from '../progress/choir';
+import { flushProgress, onAccountConfirmed, syncProgressSoon } from '../progress/sync';
 import { shareMyProgress } from './play/shareProgress';
 
 const TABS: { name: Route['name']; label: string; icon: React.ReactNode }[] = [
@@ -63,12 +62,8 @@ export function App() {
     document.addEventListener('visibilitychange', onBack);
     window.addEventListener('focus', onBack);
     window.addEventListener('pagehide', flushProgress);
-    let account = loadSession()?.account.id ?? '';
-    const offSession = onSessionChange(() => {
-      const id = loadSession()?.account.id ?? '';
-      if (id && id !== account) void shareMyProgress(true);
-      account = id;
-    });
+    // Shared progress moves to the account only once this phone's progress is confirmed as the account's.
+    const offSession = onAccountConfirmed(() => { void shareMyProgress(true); });
     return () => { document.removeEventListener('visibilitychange', onBack); window.removeEventListener('focus', onBack); window.removeEventListener('pagehide', flushProgress); offSession(); };
   }, []);
   // Accessibility: on every screen change, move focus to the screen's heading and update the title.

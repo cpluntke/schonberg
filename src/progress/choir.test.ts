@@ -125,7 +125,7 @@ describe('choir accounts client', () => {
 
   it('a login ended elsewhere (401) leaves a notice until the next login', async () => {
     saveSession(session());
-    mockFetch((url) => (url.endsWith('/login') ? { body: session({ token: 'tok-new-' + 'y'.repeat(40) }) } : { status: 401, body: { error: 'x', loggedOut: true } }));
+    mockFetch((url) => (url.endsWith('/login') ? { body: session({ token: 'tok-new-' + 'y'.repeat(40) }) } : { status: 401, body: { loggedOut: true } }));
     await expect(fetchPeople('kammerchor', { bearer: session().token })).rejects.toThrow();
     expect(loadSession()).toBeNull();
     expect(loggedOutNotice()).toBe(LOGGED_OUT_ELSEWHERE);
@@ -187,5 +187,36 @@ describe('choir accounts client', () => {
     expect(headers(calls[1]).Authorization).toMatch(/^Bearer /);
     // The phone's token goes along once, so the server can move this phone's anonymous entry to the account.
     expect(headers(calls[1])['X-Member-Token']).toBe(tokenHeader);
+  });
+
+  it('why a login ended: expired or password changed keep sharing (paused); removed turns it off and forgets the account', async () => {
+    const reasons: [string, string][] = [['expired', 'Your login has expired. Log in again.'], ['password', 'Your password was changed.'], ['removed', 'Your account was removed from this choir.']];
+    for (const [reason, error] of reasons) {
+      saveProfile({ ...loadProfile(), choirCode: 'kammerchor', shareProgress: true });
+      localStorage.setItem('schonberg:syncMeta', JSON.stringify({ account: 'a1b2c3d4e5f6', rev: 3 }));
+      saveSession(session());
+      mockFetch(() => ({ status: 401, body: { error, loggedOut: true, reason } }));
+      expect(await refreshSession()).toBeNull();
+      expect(loadSession()).toBeNull();
+      expect(loggedOutNotice()).toBe(error);
+      const gone = reason === 'removed';
+      expect(loadProfile().shareProgress).toBe(!gone);
+      expect(localStorage.getItem('schonberg:syncMeta') === null).toBe(gone);
+    }
+  });
+
+  it('deleting my account turns sharing off and withdraws an anonymous entry', async () => {
+    saveProfile({ ...loadProfile(), name: 'Anna', choirCode: 'kammerchor', shareProgress: true });
+    saveSession(session({ account: { ...account, role: 'member' } }));
+    mockFetch(() => ({ body: { ok: true } }));
+    await deleteMyAccount('password-123');
+    expect(loadProfile().shareProgress).toBe(false);
+    expect(loadSession()).toBeNull();
+    expect(loggedOutNotice()).toBeNull();
+    await new Promise((r) => setTimeout(r, 0));
+    const w = calls.find((c) => c.url.endsWith('/progress/Anna'))!;
+    expect(w.init.method).toBe('DELETE');
+    expect(headers(w).Authorization).toBeUndefined();
+    expect(headers(w)['X-Member-Token']).toBeTruthy();
   });
 });

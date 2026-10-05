@@ -37,7 +37,6 @@ export const MIN_GAP_MS = 10_000;
 const META_KEY = 'schonberg:syncMeta';
 const ASK_KEY = 'schonberg:syncAsk';
 const TIP_KEY = 'sh:accountTip';
-const NOTICE_KEY = 'sh:syncNotice';
 
 // ------------------------------------------------------------------ the compact format
 
@@ -572,9 +571,34 @@ function setQuestion(q: MergeQuestion | null): void {
 export function syncSession(p: Profile = loadProfile()): Session | null {
   return sessionFor(p.choirCode);
 }
-/** On while logged in to the choir, unless the singer turned it off. */
+/**
+ * On while logged in to the choir: members made their account for it (on unless they turn it off);
+ * admins and section leads are asked first (staffSyncQuestion), and nothing goes up before they say yes.
+ */
 export function syncEnabled(p: Profile = loadProfile()): boolean {
-  return !!syncSession(p) && p.sync !== false;
+  const s = syncSession(p);
+  return !!s && (p.sync ?? s.account.role === 'member');
+}
+/** An admin or section lead logged in: keep their progress with the account? (asked once, before anything is saved) */
+export function staffSyncQuestion(p: Profile = loadProfile()): boolean {
+  const s = syncSession(p);
+  return !!s && s.account.role !== 'member' && p.sync === undefined && !!apiBase();
+}
+
+// Called once this phone's progress is known to go with the logged-in account (pulled and merged,
+// or the singer said "merge"): only then does shared progress move to the account.
+const confirmedListeners = new Set<() => void>();
+export function onAccountConfirmed(cb: () => void): () => void {
+  confirmedListeners.add(cb);
+  return () => { confirmedListeners.delete(cb); };
+}
+function confirmed(): void {
+  confirmedListeners.forEach((cb) => { try { cb(); } catch { /* ignore */ } });
+}
+/** This phone's progress goes with the logged-in account (no open merge question). */
+export function accountConfirmed(): boolean {
+  const s = syncSession();
+  return !!s && loadMeta().account === s.account.id && !pendingQuestion();
 }
 
 export class SyncError extends Error {
@@ -598,7 +622,7 @@ async function api(method: 'GET' | 'PUT', s: Session, body?: unknown, opts: { me
   let json: Record<string, unknown> | null = null;
   try { json = await res.json(); } catch { /* not json */ }
   // The server ended this login (logged out elsewhere, account removed): forget it here too.
-  if (res.status === 401 && loadSession()?.token === s.token) endSession();
+  if (res.status === 401 && loadSession()?.token === s.token) endSession(json?.reason as string | undefined, json?.error as string | undefined);
   return { status: res.status, json };
 }
 const errText = (r: { status: number; json: Record<string, unknown> | null }) =>
@@ -612,25 +636,29 @@ const nameKey = (x: string) => x.normalize('NFKC').trim().toLowerCase().replace(
  */
 export async function pullForAccount(s: Session, merge = false): Promise<'merged' | 'empty' | 'ask'> {
   const r = await api('GET', s);
-  if (r.status === 200 && r.json && !r.json.data && !num(r.json.rev)) {
-    saveMeta({ account: s.account.id, rev: 0 });
-    setQuestion(null);
-    return 'empty';
-  }
-  if (r.status !== 200 || !r.json || !isObj(r.json.data) || !isObj(r.json.data.p)) {
+  const empty = r.status === 200 && !!r.json && !r.json.data && !num(r.json.rev);
+  if (!empty && (r.status !== 200 || !r.json || !isObj(r.json.data) || !isObj(r.json.data.p))) {
     throw new SyncError(r.status, r.status === 200 ? 'The progress saved with your account is damaged.' : errText(r));
   }
+  // This phone's progress may be someone else's (another account before, another name, or no name):
+  // ask before merging it into this account, even when the account has nothing saved yet.
   const meta = loadMeta();
   const here = loadProfile().name.trim();
-  const other = (meta.account && meta.account !== s.account.id) || (here && nameKey(here) !== nameKey(s.account.name));
-  if (!merge && other && allProgress().length > 0) {
-    setQuestion({ account: s.account.id, accountName: s.account.name, here: here || 'no name', pieces: Object.keys(r.json.data.p).length, updatedAt: num(r.json.updatedAt) });
+  const mine = meta.account ? meta.account === s.account.id : !!here && nameKey(here) === nameKey(s.account.name);
+  if (!merge && !mine && allProgress().length > 0) {
+    const pieces = empty ? 0 : Object.keys((r.json!.data as Record<string, object>).p).length;
+    setQuestion({ account: s.account.id, accountName: s.account.name, here: here || 'no name', pieces, updatedAt: num(r.json?.updatedAt) });
     return 'ask';
   }
-  applySnapshot(r.json.data);
-  saveMeta({ account: s.account.id, rev: num(r.json.rev), savedAt: num(r.json.updatedAt) });
+  if (empty) {
+    saveMeta({ account: s.account.id, rev: 0 });
+  } else {
+    applySnapshot(r.json!.data);
+    saveMeta({ account: s.account.id, rev: num(r.json!.rev), savedAt: num(r.json!.updatedAt) });
+  }
   setQuestion(null);
-  return 'merged';
+  confirmed();
+  return empty ? 'empty' : 'merged';
 }
 
 /**
@@ -641,6 +669,7 @@ export async function pullForAccount(s: Session, merge = false): Promise<'merged
 export async function uploadProgress(force = false, auto = false): Promise<{ ok: boolean; skipped?: boolean; ask?: boolean; error?: string }> {
   const s = syncSession();
   if (!s || !apiBase()) return { ok: false, error: 'Log in to your choir first.' };
+  if (!syncEnabled()) return { ok: false, error: 'Keeping your progress with your account is off.' };
   let meta = loadMeta();
   try {
     if (meta.account !== s.account.id) {
@@ -698,7 +727,6 @@ export async function uploadProgress(force = false, auto = false): Promise<{ ok:
       return { ok: false, error };
     }
     saveMeta({ account: s.account.id, rev: num(r.json?.rev), savedAt: num(r.json?.updatedAt, Date.now()), hash, bytes, error: null });
-    if (auto && rawGet(NOTICE_KEY) == null) rawSet(NOTICE_KEY, 'show');
     return { ok: true };
   }
   return { ok: false, error: 'Your progress kept changing on another phone. Try again.' };
@@ -730,11 +758,10 @@ export async function confirmMerge(): Promise<void> {
   void uploadProgress(true);
 }
 
-/** The one-time "your progress is now kept with your account" notice. */
-export const syncNoticePending = () => rawGet(NOTICE_KEY) === 'show' && syncEnabled();
-export function dismissSyncNotice(): void {
-  rawSet(NOTICE_KEY, 'seen');
-  writeJSON('sh:syncState', Date.now());
+/** An admin or section lead answers whether to keep their progress with the account. */
+export function answerStaffSync(yes: boolean): void {
+  saveProfile({ ...loadProfile(), sync: yes });
+  if (yes) syncProgressSoon();
 }
 
 // ------------------------------------------------------------------ when to sync

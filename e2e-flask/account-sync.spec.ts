@@ -132,6 +132,7 @@ test('member: level 1 on phone A, account, phone B gets it; lead sees one entry;
   await pc.getByRole('button', { name: 'Choir admin' }).click();
   const members = pc.getByTestId('members');
   await expect(members).toContainText('Anna');
+  await expect(pc.getByTestId('signups-open')).toHaveValue('open');
   await members.scrollIntoViewIfNeeded();
   await shot(pc, '6-admin-people-members.png');
   pc.once('dialog', (d) => void d.accept());
@@ -144,6 +145,10 @@ test('member: level 1 on phone A, account, phone B gets it; lead sees one entry;
   // Phone B is logged out on its next sync, keeps its local progress, and doesn't share again.
   await pb.reload();
   await expect.poll(async () => pb.evaluate(() => localStorage.getItem('schonberg:session')), { timeout: 20_000 }).toBeNull();
+  await pb.goto('./#/settings');
+  await expect(pb.getByTestId('logged-out-why')).toContainText('removed');
+  await pb.getByTestId('account-sync').scrollIntoViewIfNeeded();
+  await shot(pb, '8-phone-b-account-removed.png');
   expect((await progressOf(pb))[pkey].sections[sid].level).toBe(1);
   await pb.waitForTimeout(1500);
   expect((await section(request, code, lead)).members).toEqual([]);
