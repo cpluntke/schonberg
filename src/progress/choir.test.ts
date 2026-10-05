@@ -3,7 +3,7 @@ import { _resetAllForTests, exportBackup, loadProfile, saveProfile } from './sto
 import {
   _resetSessionStateForTests, acceptInvite, createInvite, fetchPeople, inviteLink, leaveChoir, loadSession, loggedOutNotice, login, logout,
   LOGGED_OUT_ELSEWHERE, refreshSession, refreshSessionSoon, rememberedInvite, saveSession, sessionFor, superCreate, type Session,
-  signUp, shareProgress, deleteMyAccount,
+  signUp, shareProgress, deleteMyAccount, lastLogout, dismissLogout,
 } from './choir';
 import { parseHash, href } from '../ui/router';
 
@@ -218,5 +218,20 @@ describe('choir accounts client', () => {
     expect(w.init.method).toBe('DELETE');
     expect(headers(w).Authorization).toBeUndefined();
     expect(headers(w)['X-Member-Token']).toBeTruthy();
+  });
+
+  it('why the login ended is kept (for Home and Settings after a reload) until the next login or dismissal', async () => {
+    saveSession(session());
+    mockFetch((url) => (url.endsWith('/login') ? { body: session({ token: 'tok-new-' + 'z'.repeat(40) }) } : { status: 401, body: { error: 'Your login has expired. Log in again.', loggedOut: true, reason: 'expired' } }));
+    await refreshSession();
+    expect(lastLogout()).toEqual({ reason: 'expired', message: 'Your login has expired. Log in again.', code: 'kammerchor', name: 'Clara' });
+    expect(JSON.parse(localStorage.getItem('schonberg:loggedOut')!).name).toBe('Clara');
+    dismissLogout();
+    expect(lastLogout()).toBeNull();
+    saveSession(session());
+    await refreshSession();
+    expect(lastLogout()).not.toBeNull();
+    await login('kammerchor', 'Clara', 'password-123');
+    expect(lastLogout()).toBeNull();
   });
 });

@@ -248,9 +248,28 @@ const SESSION_KEY = 'schonberg:session';
 const INVITES_KEY = 'schonberg:inviteLinks';
 const sessionListeners = new Set<() => void>();
 export const LOGGED_OUT_ELSEWHERE = 'You were logged out. Log in again.';
-let logoutNotice: string | null = null;
+/** Why this phone's login ended (kept until the next login, so Home and Settings can say so after a reload). */
+export interface LoggedOut { reason: string; message: string; code: string; name: string }
+const LOGGED_OUT_KEY = 'schonberg:loggedOut';
+function setLoggedOut(v: LoggedOut | null): void {
+  if (v) rawSet(LOGGED_OUT_KEY, JSON.stringify(v));
+  else rawRemove(LOGGED_OUT_KEY);
+}
+export function lastLogout(): LoggedOut | null {
+  try {
+    const v = JSON.parse(rawGet(LOGGED_OUT_KEY) ?? 'null');
+    return v && typeof v.message === 'string' && typeof v.code === 'string' ? v as LoggedOut : null;
+  } catch {
+    return null;
+  }
+}
 /** Why this phone's login ended without the person logging out here (shown until they log in again). */
-export const loggedOutNotice = () => logoutNotice;
+export const loggedOutNotice = () => lastLogout()?.message ?? null;
+/** The singer read why they were logged out. */
+export function dismissLogout(): void {
+  setLoggedOut(null);
+  sessionListeners.forEach((cb) => { try { cb(); } catch { /* ignore */ } });
+}
 export function onSessionChange(cb: () => void): () => void {
   sessionListeners.add(cb);
   return () => { sessionListeners.delete(cb); };
@@ -293,7 +312,9 @@ export const sessionAuth = (s: Session): Auth => ({ bearer: s.token });
  */
 export function endSession(reason?: string, message?: string): void {
   const gone = reason === 'removed' || reason === 'deleted';
-  logoutNotice = reason === 'deleted' ? null : message || LOGGED_OUT_ELSEWHERE;
+  const s = loadSession();
+  setLoggedOut(reason === 'deleted' || !s ? null
+    : { reason: reason || 'expired', message: message || LOGGED_OUT_ELSEWHERE, code: s.code, name: s.account.name });
   if (gone) {
     const p = loadProfile();
     if (p.shareProgress) saveProfile({ ...p, shareProgress: false });
@@ -307,7 +328,7 @@ export function endSession(reason?: string, message?: string): void {
 /** Use a new login; a different one this phone had (maybe another choir) is ended on the server too. */
 function adoptSession(s: Session): void {
   const old = loadSession();
-  logoutNotice = null;
+  setLoggedOut(null);
   saveSession(s);
   if (old && old.token !== s.token) void call('/session', { method: 'DELETE', auth: { bearer: old.token } }).catch(() => {});
 }
@@ -320,7 +341,7 @@ export async function login(code: string, name: string, password: string): Promi
 /** Log out on this phone (the server forgets the session too). */
 export async function logout(): Promise<void> {
   const s = loadSession();
-  logoutNotice = null;
+  setLoggedOut(null);
   saveSession(null);
   if (s) await call('/session', { method: 'DELETE', auth: { bearer: s.token } }).catch(() => {});
 }
@@ -338,7 +359,7 @@ export async function refreshSession(): Promise<Session | null> {
   }
 }
 let lastRefresh = 0;
-export function _resetSessionStateForTests(): void { lastRefresh = 0; logoutNotice = null; }
+export function _resetSessionStateForTests(): void { lastRefresh = 0; setLoggedOut(null); }
 /** refreshSession at most every 20 s (on opening an admin or section screen, and when the app comes back). */
 export function refreshSessionSoon(): void {
   const now = Date.now();
@@ -476,8 +497,8 @@ export const superRename = (pw: string, code: string, name: string) =>
   call(`/super/choirs/${enc(code)}`, { method: 'PUT', auth: { superAdmin: pw }, ...json({ name }) });
 export const superDelete = (pw: string, code: string) => call(`/super/choirs/${enc(code)}`, { method: 'DELETE', auth: { superAdmin: pw } });
 /** Remove a choir's member accounts nobody used for `days` days (with the progress they kept). */
-export const superPurgeMembers = (pw: string, code: string, days: number) =>
-  call<{ removed: number }>(`/super/choirs/${enc(code)}/purge-members`, { method: 'POST', auth: { superAdmin: pw }, ...json({ days }) });
+export const superPurgeMembers = (pw: string, code: string, days: number, dryRun = false) =>
+  call<{ removed: number; names: string[] }>(`/super/choirs/${enc(code)}/purge-members`, { method: 'POST', auth: { superAdmin: pw }, ...json({ days, dryRun }) });
 
 // ------------------------------------------------------------------ the super-admin password (this tab only)
 

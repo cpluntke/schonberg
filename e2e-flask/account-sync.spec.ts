@@ -45,7 +45,7 @@ test('member: level 1 on phone A, account, phone B gets it; lead sees one entry;
   const pa = await a.newPage();
   pa.on('pageerror', (e) => errors.push(String(e)));
   await pa.goto('./#/');
-  await pa.evaluate(() => localStorage.setItem('sh:profile', JSON.stringify({ name: 'Anna', voice: 'A', notation: 'letter', strictness: 'standard', tuning: 'equal', latencyMs: 120, onboarded: true, leaderboardOptIn: false })));
+  await pa.evaluate(() => localStorage.setItem('sh:profile', JSON.stringify({ name: 'Anna', voice: 'A', notation: 'letter', strictness: 'standard', tuning: 'equal', latencyMs: 120, onboarded: false, leaderboardOptIn: false })));
   await pa.goto('./?simulate=perfect#/choir');
   await pa.getByLabel('Choir code').fill(code);
   await pa.getByTestId('join-choir').click();
@@ -69,6 +69,8 @@ test('member: level 1 on phone A, account, phone B gets it; lead sees one entry;
 
   await pa.getByTestId('account-tip').getByRole('button', { name: 'Make an account' }).click();
   await expect(pa.getByTestId('account-form')).toBeVisible();
+  // The tip opens "Make an account" (even though she never finished voice setup).
+  await expect(pa.getByTestId('account-mode-create')).toHaveAttribute('aria-pressed', 'true');
   await shot(pa, '2-settings-make-account.png');
   await pa.getByTestId('account-password').fill('anna-password');
   await pa.getByTestId('account-submit').click();
@@ -116,6 +118,15 @@ test('member: level 1 on phone A, account, phone B gets it; lead sees one entry;
   expect(await pb.evaluate(() => JSON.parse(localStorage.getItem('sh:profile')!).name)).toBe('Anna');
   await pb.getByTestId('account-sync').scrollIntoViewIfNeeded();
   await shot(pb, '5-phone-b-logged-in.png');
+  // Two phones of one account settle: reloading (start + focus) without singing saves nothing new.
+  const rev = () => pb.evaluate(async () => {
+    const t = JSON.parse(localStorage.getItem('schonberg:session')!).token;
+    return (await (await fetch('./api/session/progress?meta=1', { headers: { Authorization: `Bearer ${t}` } })).json()).rev as number;
+  });
+  await pb.waitForTimeout(1500);
+  const r0 = await rev();
+  for (let i = 0; i < 2; i++) { await pb.reload(); await pb.waitForTimeout(1500); await pa.reload(); await pa.waitForTimeout(1500); }
+  expect(await rev()).toBe(r0);
   // The lead still sees one entry.
   expect((await section(request, code, lead)).members.map((m) => m.name)).toEqual(['Anna']);
 
@@ -145,6 +156,9 @@ test('member: level 1 on phone A, account, phone B gets it; lead sees one entry;
   // Phone B is logged out on its next sync, keeps its local progress, and doesn't share again.
   await pb.reload();
   await expect.poll(async () => pb.evaluate(() => localStorage.getItem('schonberg:session')), { timeout: 20_000 }).toBeNull();
+  await pb.goto('./#/');
+  await expect(pb.getByTestId('logged-out-card')).toContainText('removed');
+  await shot(pb, '9-phone-b-home-removed.png');
   await pb.goto('./#/settings');
   await expect(pb.getByTestId('logged-out-why')).toContainText('removed');
   await pb.getByTestId('account-sync').scrollIntoViewIfNeeded();

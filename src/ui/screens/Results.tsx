@@ -420,7 +420,7 @@ function AccountTip() {
       <div className="row" style={{ gap: 6 }}>
         <button className="btn small" onClick={() => {
           dismissAccountTip();
-          try { sessionStorage.setItem('sh:openAccount', '1'); } catch { /* ignore */ }
+          try { sessionStorage.setItem('sh:openAccount', 'create'); } catch { /* ignore */ }
           go({ name: 'settings' });
         }}>Make an account</button>
         <button className="btn small ghost" onClick={() => { dismissAccountTip(); setShow(false); }}>Not now</button>

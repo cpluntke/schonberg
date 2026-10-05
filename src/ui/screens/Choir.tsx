@@ -723,7 +723,16 @@ export function SuperAdmin() {
               <button className="btn small ghost" onClick={async () => {
                 const d = Number(prompt('Remove the member accounts (and their kept progress) nobody used for how many days?', '365'));
                 if (!d) return;
-                try { const r = await superPurgeMembers(pw, c.code, d); toast(`${r.removed} member account${r.removed === 1 ? '' : 's'} removed`); await load(pw); } catch (e) { toast((e as Error).message); }
+                try {
+                  // A preview first: who would go.
+                  const p = await superPurgeMembers(pw, c.code, d, true);
+                  if (!p.names.length) { toast(`Every member used their account in the last ${d} days`); return; }
+                  const list = p.names.slice(0, 20).join(', ') + (p.names.length > 20 ? `, and ${p.names.length - 20} more` : '');
+                  if (!confirm(`Remove ${p.names.length} member account${p.names.length === 1 ? '' : 's'} not used for ${d} days, with their progress?\n\n${list}`)) return;
+                  const r = await superPurgeMembers(pw, c.code, d);
+                  toast(`${r.removed} member account${r.removed === 1 ? '' : 's'} removed`);
+                  await load(pw);
+                } catch (e) { toast((e as Error).message); }
               }}>Remove inactive members</button>
             )}
           </div>

@@ -9,7 +9,7 @@ import { rowOfTheDay } from '../../game/twelvetone';
 import { IconFlame, IconPlay, IconMic } from '../icons';
 import { IntroVideoButton } from '../components/IntroVideo';
 import { apiBase } from '../../progress/choir';
-import { SyncNotice } from '../components/AccountSync';
+import { LoggedOutCard, SyncNotice } from '../components/AccountSync';
 import { pieceStatus, todaysPlan, type PieceStatus } from '../plan';
 
 export { pieceStatus, type PieceStatus };
@@ -66,6 +66,7 @@ export function Home() {
 
       <Notice />
       <SyncNotice />
+      <LoggedOutCard />
 
       {!profile.onboarded && (
         <div className="card" style={{ borderColor: 'var(--voice-deep)' }}>
@@ -80,7 +81,7 @@ export function Home() {
           <button className="btn voice block" onClick={() => go({ name: 'setup' })}>Start setup</button>
           {apiBase() && (
             <button className="linklike small muted" style={{ alignSelf: 'center', minHeight: 40 }} data-testid="home-account"
-              onClick={() => { try { sessionStorage.setItem('sh:openAccount', '1'); } catch { /* ignore */ } go({ name: 'settings' }); }}>New phone? Log in to your choir account to get your progress back</button>
+              onClick={() => { try { sessionStorage.setItem('sh:openAccount', 'login'); } catch { /* ignore */ } go({ name: 'settings' }); }}>New phone? Log in to your choir account to get your progress back</button>
           )}
         </div>
       )}

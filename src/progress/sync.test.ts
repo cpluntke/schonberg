@@ -8,7 +8,7 @@ import { wordsKey } from './words';
 import {
   applySnapshot, buildSnapshot, cleanProfile, confirmMerge, decodeBars, decodePiece, encodeBars, encodePiece, loadMeta, accountConfirmed,
   mergeBars, mergeFull, mergeProfile, mergeProgress, mergeSection, pendingQuestion, suggestAccount, accountTipPending, dismissAccountTip, flushProgress, syncEnabled,
-  staffSyncQuestion, answerStaffSync, onAccountConfirmed,
+  staffSyncQuestion, answerStaffSync, onAccountConfirmed, contentHash,
   throttle, TOTAL_BUDGET, uploadProgress, type ProgressSnapshot,
 } from './sync';
 import { saveSession, type Session } from './choir';
@@ -391,7 +391,9 @@ describe('sync with the choir account', () => {
     expect((await uploadProgress()).ok).toBe(true);
     expect(getProgress('piece1', 'P2')!.full!.level).toBe(2);
     expect(loadProfile()).toMatchObject({ name: 'Anna Example', voice: 'A' });
-    expect(calls.at(-1)!.body!.baseRev).toBe(5);
+    // Nothing new on this phone: nothing is saved back.
+    expect(calls.some((c) => c.method === 'PUT')).toBe(false);
+    expect(loadMeta().rev).toBe(5);
   });
 
   it('a phone with progress under another name asks before merging; yes merges, nothing uploads before', async () => {
@@ -488,6 +490,63 @@ describe('sync with the choir account', () => {
     expect(await uploadProgress()).toEqual({ ok: false, ask: true });
     expect(pendingQuestion()).toMatchObject({ here: 'no name', pieces: 0 });
     expect(calls.some((c) => c.method === 'PUT')).toBe(false);
+  });
+
+  it('two phones of one account settle: refocusing without singing neither pulls nor saves again', async () => {
+    fakeServer();
+    const phone = (): Record<string, string> => ({ ...localStorage });
+    const use = (st: Record<string, string>) => { localStorage.clear(); _resetAllForTests(); for (const [k, v] of Object.entries(st)) localStorage.setItem(k, v); };
+    // Phone A: Anna's progress, delay 140 ms, letters.
+    seedSinger(2);
+    saveSession(session());
+    await uploadProgress();
+    const A = phone();
+    // Phone B: the same singer on a new phone (delay 60 ms measured there).
+    localStorage.clear();
+    _resetAllForTests();
+    saveProfile({ ...DEFAULT_PROFILE, choirCode: 'kammerchor', latencyMs: 60, latencySource: 'measured' });
+    saveSession(session({}, 'b'.repeat(43)));
+    await uploadProgress();
+    let B = phone();
+    // B changes a setting and sings more; A picks both up, keeping its own delay.
+    saveProfile({ ...loadProfile(), notation: 'fixed' });
+    const p = getProgress('piece0', 'P2')!;
+    p.sections['s0-m1-8'].level = 5;
+    writeJSON(progressKey('piece0', 'P2'), p);
+    await uploadProgress();
+    B = phone();
+    use(A);
+    await uploadProgress();
+    expect(loadProfile()).toMatchObject({ notation: 'fixed', latencyMs: 140 });
+    expect(getProgress('piece0', 'P2')!.sections['s0-m1-8'].level).toBe(5);
+    const settled = server!.rev;
+    let A2 = phone();
+    // Four focus cycles on each phone, no singing: no more saves.
+    for (let i = 0; i < 4; i++) {
+      use(B); await uploadProgress(); B = phone();
+      use(A2); await uploadProgress(); A2 = phone();
+    }
+    expect(server!.rev).toBe(settled);
+    expect(calls.filter((c) => c.method === 'PUT').length).toBeLessThanOrEqual(4);
+  });
+
+  it('the content fingerprint ignores key order, the time it was made and this phone\'s own delay', () => {
+    seedSinger(1);
+    const { data, hash } = buildSnapshot();
+    const shuffled = JSON.parse(JSON.stringify({ p: data.p, cycle: data.cycle, v: data.v, profile: { ...data.profile, latencyMs: 5 }, at: 1 }));
+    expect(contentHash(shuffled)).toBe(hash);
+    expect(contentHash({ ...data, profile: { ...data.profile, notation: 'fixed' } })).not.toBe(hash);
+  });
+
+  it('after merging into an account the phone takes the account\'s name', async () => {
+    fakeServer();
+    seedSinger(1);
+    server = { rev: 1, data: JSON.parse(JSON.stringify(buildSnapshot().data)) };
+    saveProfile({ ...loadProfile(), name: 'Anni' });
+    saveSession(session());
+    expect((await uploadProgress()).ask).toBe(true);
+    await confirmMerge();
+    expect(loadProfile().name).toBe('Anna Example');
   });
 
   it('the same singer on a phone with progress merges without asking', async () => {

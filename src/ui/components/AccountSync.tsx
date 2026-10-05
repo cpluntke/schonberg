@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useProfile, useStoreVersion, toast } from '../hooks';
 import {
-  apiBase, cachedChoir, deleteMyAccount, joinChoir, login, loggedOutNotice, logout, onSessionChange, sessionFor, signUp, loadSession,
+  apiBase, cachedChoir, deleteMyAccount, dismissLogout, joinChoir, lastLogout, login, loggedOutNotice, logout, onSessionChange, sessionFor, signUp, loadSession,
 } from '../../progress/choir';
 import { loadProfile } from '../../progress/store';
 import { answerStaffSync, confirmMerge, loadMeta, pendingQuestion, staffSyncQuestion, syncEnabled, uploadProgress } from '../../progress/sync';
 import { syncChoirNow } from '../library';
+import { go } from '../router';
 
 /** What the account keeps, in one line (Settings and the one-time notice). */
 export const KEPT = 'Your levels, best results and practice dates, a summary of each bar, your settings and programme. Never recordings or your practice log.';
@@ -47,6 +48,32 @@ export function MergeQuestionCard() {
   );
 }
 
+/** Home: why this phone's login ended, with a way back in (the reason survives a reload). */
+export function LoggedOutCard() {
+  useStoreVersion();
+  useSessionVersion();
+  const [profile] = useProfile();
+  const out = lastLogout();
+  if (!out || loadSession() || !apiBase()) return null;
+  const removed = out.reason === 'removed';
+  return (
+    <div className="notice col" role="status" data-testid="logged-out-card" style={{ gap: 6 }}>
+      <span className="small"><strong>{out.message}</strong> {removed
+        ? 'Your progress stays on this phone.'
+        : `Log in again to keep your progress in sync${profile.shareProgress ? ' and keep sharing it with your section lead' : ''}.`}</span>
+      <div className="row" style={{ gap: 6 }}>
+        {!removed && (
+          <button className="btn small" data-testid="logged-out-login" onClick={() => {
+            try { sessionStorage.setItem('sh:openAccount', 'login'); } catch { /* ignore */ }
+            go({ name: 'settings' });
+          }}>Log in again</button>
+        )}
+        <button className="btn small ghost" onClick={() => dismissLogout()}>{removed ? 'OK' : 'Not now'}</button>
+      </div>
+    </div>
+  );
+}
+
 /** Home and Settings: the merge question, or (admins and section leads, once) whether to keep their progress with the account. */
 export function SyncNotice() {
   useStoreVersion();
@@ -64,6 +91,16 @@ export function SyncNotice() {
   );
 }
 
+/** Which tab to open: what the singer came for, else "Log in" after a logout or on a phone that synced before. */
+function initialMode(asked: string | null, choirCode: string | undefined): 'create' | 'login' {
+  if (asked === 'create' && choirCode && cachedChoir()?.signupsOpen !== false) return 'create';
+  if (asked === 'login') return 'login';
+  const out = lastLogout();
+  if (out && out.reason !== 'removed') return 'login';
+  if (loadMeta().account && !out) return 'login';
+  return choirCode && cachedChoir()?.signupsOpen !== false ? 'create' : 'login';
+}
+
 const inputProps = { autoCapitalize: 'none', spellCheck: false } as const;
 
 /** Settings → "Keep my progress across phones": make an account or log in; then the status and switch. */
@@ -71,22 +108,24 @@ export function AccountSync() {
   const [profile, update] = useProfile();
   useStoreVersion();
   useSessionVersion();
-  const [mode, setMode] = useState<'create' | 'login'>(() => (profile.onboarded && cachedChoir()?.signupsOpen !== false && !loadMeta().account ? 'create' : 'login'));
-  const [code, setCode] = useState(profile.choirCode ?? '');
-  const [name, setName] = useState(profile.name);
+  // Where we came from: Results' "Make an account" ('create'), Home's "Log in again" ('login').
+  const [asked] = useState(() => {
+    try {
+      const v = sessionStorage.getItem('sh:openAccount');
+      sessionStorage.removeItem('sh:openAccount');
+      return v;
+    } catch { return null; }
+  });
+  const [mode, setMode] = useState<'create' | 'login'>(() => initialMode(asked, profile.choirCode));
+  const [code, setCode] = useState(profile.choirCode ?? lastLogout()?.code ?? '');
+  const [name, setName] = useState(lastLogout()?.name ?? profile.name);
   const [pw, setPw] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [delPw, setDelPw] = useState('');
-  // Home's "New phone? Log in…" scrolls here.
-  const [focus] = useState(() => {
-    try {
-      const v = sessionStorage.getItem('sh:openAccount');
-      sessionStorage.removeItem('sh:openAccount');
-      return !!v;
-    } catch { return false; }
-  });
+  const focus = !!asked;
+  const [soloOpen, setSoloOpen] = useState(false);
   const ref = useRef<HTMLElement>(null);
   useEffect(() => { if (focus) ref.current?.scrollIntoView({ block: 'start' }); }, [focus]);
   if (!apiBase()) return null;
@@ -116,14 +155,23 @@ export function AccountSync() {
   return (
     <section className="col" style={{ gap: 8 }} data-testid="account-sync" ref={ref}>
       <h2 className="eyebrow">Keep my progress across phones</h2>
-      {!session ? (
+      {!session && !profile.choirCode && !lastLogout() && !meta.account && !asked && !soloOpen ? (
+        // A singer without a choir: the backup file is their way; the login is for choir members.
+        <>
+          <span className="small muted" data-testid="account-solo">
+            Your progress lives on this phone. To move it to another phone, save a backup file (below). Singing in a choir that uses
+            Schönberg Hero? With an account in your choir, your progress follows you to any phone.
+          </span>
+          <button className="btn small" onClick={() => setSoloOpen(true)} data-testid="account-solo-open">I have a choir account: log in</button>
+        </>
+      ) : !session ? (
         <>
           <span className="small muted">
             With an account in your choir, your progress is kept on the choir server: you see it and carry on on any phone where you log in. {KEPT}
             {!profile.choirCode && ' Join your choir first (Your choir above) to make one; without a choir, use a backup file (below).'}
           </span>
           {anySession && <span className="small muted">You're logged in to another choir ({anySession.code}).</span>}
-          {loggedOutNotice() && <span className="small" role="status" style={{ color: 'var(--accent-text)' }} data-testid="logged-out-why">{loggedOutNotice()}</span>}
+          {loggedOutNotice() && <span className="small" role="status" style={{ color: 'var(--accent-text)' }} data-testid="logged-out-why">{loggedOutNotice()}{lastLogout()?.reason !== 'removed' ? ' Your progress and sharing carry on once you log in again.' : ''}</span>}
           {choir?.signupsOpen === false && profile.choirCode && <span className="small muted">Your choir isn't taking new member accounts at the moment: log in if you have one.</span>}
           {(profile.choirCode || mode === 'login') && (
             <div className="seg" role="group" aria-label="Account">

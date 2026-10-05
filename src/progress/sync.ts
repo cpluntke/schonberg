@@ -414,6 +414,28 @@ function splitKey(key: string, prefix: string): [string, string] | null {
   return i > 0 ? [rest.slice(0, i), rest.slice(i + 1)] : null;
 }
 
+/** JSON with object keys sorted (the same content always gives the same text). */
+function canonical(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(canonical).join(',')}]`;
+  if (isObj(v)) return `{${Object.keys(v).sort().filter((k) => v[k] !== undefined).map((k) => `${JSON.stringify(k)}:${canonical(v[k])}`).join(',')}}`;
+  return JSON.stringify(v) ?? 'null';
+}
+
+/**
+ * Fingerprint of what a snapshot says about the singer's progress and settings: the same on two phones
+ * that hold the same progress. Leaves out what belongs to one phone or isn't progress: when it was made,
+ * the headphone delay, part choices, the built-in preset and the per-day readiness value.
+ */
+export function contentHash(d: unknown): string {
+  if (!isObj(d)) return '';
+  const { at: _at, parts: _parts, cp: _cp, ...rest } = d;
+  const profile = isObj(rest.profile) ? { ...rest.profile } : {};
+  delete profile.latencyMs;
+  const p: Record<string, unknown> = {};
+  if (isObj(rest.p)) for (const [k, pc] of Object.entries(rest.p)) p[k] = isObj(pc) ? { ...pc, r: undefined } : pc;
+  return fnv(canonical({ ...rest, profile, p }));
+}
+
 function fnv(s: string): string {
   let h = 0x811c9dc5;
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
@@ -472,7 +494,7 @@ export function buildSnapshot(now = Date.now()): { data: ProgressSnapshot; hash:
     const extra = utf8(JSON.stringify(full)) - utf8(JSON.stringify(slim));
     if (full !== slim && size + extra <= budget) { data.p[k] = full; size += extra; } else data.p[k] = slim;
   }
-  const hash = fnv(JSON.stringify(data));
+  const hash = contentHash(data);
   data.at = now;
   return { data, hash, bytes: utf8(JSON.stringify(data)) };
 }
@@ -480,7 +502,12 @@ export function buildSnapshot(now = Date.now()): { data: ProgressSnapshot; hash:
 export interface ApplyResult { pieces: number; profile: boolean; cycle: boolean }
 
 /** Merge a saved copy into this phone (see the merge rules above). */
-export function applySnapshot(d: unknown): ApplyResult {
+/**
+ * `adoptSettings`: this phone already syncs with the account and the copy is newer (another phone of
+ * the singer changed it): take its settings and programme too (not the headphone delay, which is this
+ * phone's own), so two phones settle on the same copy instead of re-saving each other's differences.
+ */
+export function applySnapshot(d: unknown, opts: { adoptSettings?: boolean } = {}): ApplyResult {
   if (!isObj(d) || !isObj(d.p)) throw new Error('This saved progress is damaged.');
   const before = allProgress().length;
   const local = loadProfile();
@@ -510,14 +537,19 @@ export function applySnapshot(d: unknown): ApplyResult {
   }
   if (isObj(d.parts)) for (const [id, part] of Object.entries(d.parts)) if (typeof part === 'string' && !rawGet(`sh:part:${id}`)) rawSet(`sh:part:${id}`, part);
   let cycle = false;
-  if (!setUp && isObj(d.cycle) && Array.isArray(d.cycle.pieceIds)) {
+  if ((!setUp || opts.adoptSettings) && isObj(d.cycle) && Array.isArray(d.cycle.pieceIds)) {
     saveCycle({ ...loadCycle(), ...(d.cycle as unknown as Cycle) });
     if (typeof d.cp === 'string') rawSet('sh:cyclePreset', d.cp);
     rawSet('sh:cycleSeeded', '1');
     cycle = true;
   }
   const profile = isObj(d.profile);
-  saveProfile(mergeProfile(loadProfile(), d.profile, setUp)); // also tells the screens
+  if (opts.adoptSettings) {
+    const { latencyMs: _l, ...remote } = cleanProfile(d.profile);
+    saveProfile({ ...loadProfile(), ...remote }); // also tells the screens
+  } else {
+    saveProfile(mergeProfile(loadProfile(), d.profile, setUp)); // also tells the screens
+  }
   return { pieces, profile, cycle };
 }
 
@@ -654,8 +686,11 @@ export async function pullForAccount(s: Session, merge = false): Promise<'merged
     saveMeta({ account: s.account.id, rev: 0 });
   } else {
     applySnapshot(r.json!.data);
-    saveMeta({ account: s.account.id, rev: num(r.json!.rev), savedAt: num(r.json!.updatedAt) });
+    saveMeta({ account: s.account.id, rev: num(r.json!.rev), savedAt: num(r.json!.updatedAt), hash: contentHash(r.json!.data) });
   }
+  // Merged into this account: the phone goes by the account's name from now on.
+  const p = loadProfile();
+  if (p.name.trim() !== s.account.name) saveProfile({ ...p, name: s.account.name });
   setQuestion(null);
   confirmed();
   return empty ? 'empty' : 'merged';
@@ -689,8 +724,9 @@ export async function uploadProgress(force = false, auto = false): Promise<{ ok:
       const full = await api('GET', s);
       if (syncSession()?.token !== s.token) return switched;
       if (full.status === 200 && isObj(full.json?.data)) {
-        applySnapshot(full.json!.data);
-        meta = { ...meta, rev: num(full.json!.rev), hash: undefined };
+        applySnapshot(full.json!.data, { adoptSettings: true });
+        // What the server holds now: only a phone that knows more uploads.
+        meta = { ...meta, rev: num(full.json!.rev), hash: contentHash(full.json!.data), savedAt: num(full.json!.updatedAt, Date.now()), error: null };
         saveMeta(meta);
       }
     }
@@ -700,7 +736,8 @@ export async function uploadProgress(force = false, auto = false): Promise<{ ok:
   }
   for (let attempt = 0; attempt < 2; attempt++) {
     const { data, hash, bytes } = buildSnapshot();
-    if (!force && attempt === 0 && meta.hash === hash && meta.savedAt && Date.now() - meta.savedAt < REFRESH_MS && !meta.error) {
+    // Upload only when this phone's merged copy differs from the server's (or, rarely, to keep it fresh).
+    if (meta.hash === hash && meta.savedAt && Date.now() - meta.savedAt < REFRESH_MS && !meta.error) {
       return { ok: true, skipped: true };
     }
     // Nothing on the server until the singer passed something (no data for members who never practise).
@@ -717,8 +754,8 @@ export async function uploadProgress(force = false, auto = false): Promise<{ ok:
     if (syncSession()?.token !== s.token) return switched;
     const other = r.json?.progress as { rev?: number; data?: unknown } | undefined;
     if (r.status === 409 && other && attempt === 0) {
-      try { applySnapshot(other.data); } catch { /* a damaged copy is replaced by this phone's */ }
-      meta = { ...meta, rev: num(other.rev) };
+      try { applySnapshot(other.data, { adoptSettings: true }); } catch { /* a damaged copy is replaced by this phone's */ }
+      meta = { ...meta, rev: num(other.rev), hash: contentHash(other.data) };
       continue;
     }
     if (r.status < 200 || r.status >= 300) {
