@@ -60,10 +60,15 @@ export interface NoteResult {
   /**
    * The scorer can't judge this note reliably (absent = it can): 'short' = a very short note (body
    * under 0.15 s of score time: the voice rarely settles and the tracker gets few readings, so it is
-   * graded leniently), 'range' = the written pitch is outside the pitch tracker's range (60–1400 Hz).
+   * graded leniently), 'range' = the written pitch is outside the pitch tracker's range (60–1400 Hz),
+   * 'octave' = a low note (under 200 Hz) read partly or wholly an octave up that is right once those
+   * readings are folded down (the tracker's octave error on "oo"; never folded downward),
+   * 'tracker' = a note right once a minority of wild readings (more than 6 semitones from it and from
+   * both neighbours: the tracker locking onto a fraction of the pitch) are replaced by the reading
+   * before them.
    * Level 1 forgives such a note below "good" unless `clearly` says it was wrong (docs/LEVELS.md).
    */
-  unsure?: 'short' | 'range';
+  unsure?: 'short' | 'range' | 'octave' | 'tracker';
   /**
    * An unsure note graded below "good" that was still clearly wrong: 'silent' = no sound at all
    * inside the written note (no voiced reading, every reading below the silence level; either kind

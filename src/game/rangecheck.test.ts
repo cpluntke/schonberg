@@ -136,4 +136,12 @@ describe('range check: octaves', () => {
     expect(r.verdict).toBe('good');
     expect(judgePattern(60, sing(60).map((x, i) => (i % 7 === 3 && x.midi != null ? { ...x, midi: x.midi - 12 } : x))).verdict).toBe('good');
   });
+
+  it('a bass’s low notes read partly an octave up (the tracker on "oo") are still credited', () => {
+    // E2–G#2 pattern, about one reading in four an octave up in bursts: the run stays in the octave.
+    const flips = sing(40).map((x, i) => (i % 8 < 2 && x.midi != null ? { ...x, midi: x.midi + 12 } : x));
+    expect(judgePattern(40, flips).verdict).toBe('good');
+    const e3 = sing(52).map((x, i) => (i % 9 < 2 && x.midi != null ? { ...x, midi: x.midi + 12 } : x));
+    expect(judgePattern(52, e3).verdict).toBe('good');
+  });
 });

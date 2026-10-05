@@ -29,7 +29,10 @@ slowly; that bar shows as “needs work” in the bar strip, and the grade lette
   is forgiven when the scorer flags it as unsure (`NoteResult.unsure`): a **very short note** (its
   judged part is under 0.15 s of score time, the notes the scorer already grades leniently because
   the voice rarely settles and the tracker gets only a few readings), or a written pitch **outside
-  the tracker's range** (60–1400 Hz).
+  the tracker's range** (60–1400 Hz), or a note the tracker misread: a **low note (under 200 Hz)
+  read partly or wholly an octave up** on “oo”, or a note with **a few wild readings** (more than
+  6 semitones off, not an octave below), when the note is right once those readings are folded down
+  or replaced (see [SCORING.md](SCORING.md); never an octave low).
 - **…unless it was clearly wrong** (`NoteResult.clearly`): **no sound at all** inside the note
   (“not sung”; for both kinds, so a note out of the tracker's range must still be sung), or a very
   short note graded *miss* whose own readings were enough to judge

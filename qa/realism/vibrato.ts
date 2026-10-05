@@ -9,7 +9,7 @@ import type { AttemptResult, PitchSample, ScoringOptions } from '../../src/game/
 import type { ScoringContext } from '../../src/game/scoring';
 import * as cur from '../../src/game/scoring';
 import type { Part } from '../../src/music/types';
-import { attemptPasses, effectiveTolerance, levelSpec } from '../../src/progress/ladder';
+import { attemptPasses, effectiveTolerance, levelSpec, noteVerdict } from '../../src/progress/ladder';
 import { Rng } from './prng';
 import { loadPiece, REPO_ROOT } from './scores';
 import { gitVariant } from './variants';
@@ -142,10 +142,14 @@ export const VIB_WRONG: VibSinger[] = [
 // The same through the whole pipeline: rendered audio (singer.ts, on "doo"), the offline tracker,
 // the app's end of run (calibrated 150 ms). Before = scoring.ts / align.ts / pitch.ts at VIB_BASE_REF.
 
-export interface VibAudioRow { singer: string; level: number; sections: number; before: number; after: number; failedAfter: string[]; failedBefore: string[] }
+export interface VibAudioRow {
+  singer: string; level: number; sections: number; before: number; after: number; failedAfter: string[]; failedBefore: string[];
+  /** The notes that failed level 1 after: section, note, written MIDI, grade, cents, share of body readings in tune / an octave up / an octave down. */
+  wrongAfter: string[];
+}
 
 /** Every vocal part × section of the library (or every `stride`-th), sung with a centred vibrato of ±`cents` at level `level`. */
-export async function vibratoAudio(centsList: number[], o: { level?: number; stride?: number; offset?: number; wrong?: Partial<SingerProfile> & { name: string } } = {}): Promise<VibAudioRow[]> {
+export async function vibratoAudio(centsList: number[], o: { level?: number; stride?: number; offset?: number; wrong?: Partial<SingerProfile> & { name: string }; only?: string[]; debug?: (label: string, out: ReturnType<typeof runSession>, take: ReturnType<typeof renderSinger>) => void } = {}): Promise<VibAudioRow[]> {
   const level = o.level ?? 1;
   let before: PipelineSpec | null = null;
   try {
@@ -162,7 +166,7 @@ export async function vibratoAudio(centsList: number[], o: { level?: number; str
   for (const cents of centsList) {
     const base = o.wrong ?? SINGERS.goodChoir;
     const singer = onDoo({ ...SINGERS.goodChoir, ...base, name: o.wrong ? `${o.wrong.name}, vibrato ±${cents}¢` : `vibrato ±${cents}¢`, vibrato: { extentCents: [cents, cents], rateHz: [5.3, 5.7], delayMs: [100, 300], rampMs: 150, wander: 0.1 } });
-    const row: VibAudioRow = { singer: singer.name, level, sections: 0, before: 0, after: 0, failedAfter: [], failedBefore: [] };
+    const row: VibAudioRow = { singer: singer.name, level, sections: 0, before: 0, after: 0, failedAfter: [], failedBefore: [], wrongAfter: [] };
     let k = 0;
     for (const p of pieces) {
       for (const part of p.score.parts.filter((x) => x.notes.length && x.voiceType !== 'other')) {
@@ -170,6 +174,7 @@ export async function vibratoAudio(centsList: number[], o: { level?: number; str
           const range = noteRangeFor(part, sec.start, sec.end);
           if (!range) continue;
           if (k++ % (o.stride ?? 1) !== (o.offset ?? 0)) continue;
+          if (o.only && !o.only.includes(`${p.id} ${part.name} ${sec.label}`)) continue;
           const take = renderSinger({
             score: p.score, part, range, from: sec.start, to: sec.end, rate: L.rate, trueLatencyMs: 150, assumedLatencyMs: 450, guide: L.guide,
             profile: singer, channel: CHANNELS.phoneHeadphones,
@@ -178,8 +183,18 @@ export async function vibratoAudio(centsList: number[], o: { level?: number; str
           const setup = { take, part, ctx: { score: p.score, part, range, end: sec.end }, from: sec.start, to: sec.end, level, microSeed: k };
           row.sections++;
           const label = `${p.id} ${part.name} ${sec.label}`;
-          if (runSession(AFTER, setup, measured(150)).passed) row.after++;
-          else if (row.failedAfter.length < 8) row.failedAfter.push(label);
+          const oa = runSession(AFTER, setup, measured(150));
+          o.debug?.(label, oa, take);
+          if (oa.passed) row.after++;
+          else {
+            if (row.failedAfter.length < 8) row.failedAfter.push(label);
+            for (const n of oa.result.notes.filter((x) => noteVerdict(x) === 'wrong')) {
+              const sn = part.notes[n.index];
+              const body = oa.samples.filter((x) => x.midi != null && x.time >= sn.start + 0.08 && x.time < sn.start + sn.dur - 0.04).map((x) => 100 * (x.midi! - sn.midi));
+              const sh = (f: (d: number) => boolean) => (body.length ? Math.round((100 * body.filter(f).length) / body.length) : 0);
+              row.wrongAfter.push(`${label} #${n.index} m${sn.midi} ${n.grade} ${n.cents == null ? '–' : Math.round(n.cents)}¢ in ${sh((d) => Math.abs(d) <= 50)}% up ${sh((d) => Math.abs(d - 1200) <= 50)}% down ${sh((d) => Math.abs(d + 1200) <= 50)}% n${body.length}${n.unsure ? ' ' + n.unsure : ''}`);
+            }
+          }
           if (before) {
             if (runSession(before, setup, measured(150)).passed) row.before++;
             else if (row.failedBefore.length < 8) row.failedBefore.push(label);

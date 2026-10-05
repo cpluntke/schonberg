@@ -86,6 +86,13 @@ export const CLEAR_OFF_TOL = 1.5;
  * with no voiced reading and every reading this quiet wasn't sung at all (NoteResult.clearly 'silent').
  */
 export const SILENCE_RMS = 0.005;
+/**
+ * Below this pitch (Hz) a sung "oo" can put its strongest partial at twice the pitch (the first
+ * formant sits near 300 Hz), and the tracker then reads some or all of the note an octave up. At an
+ * every-note level such a low note is let off (NoteResult.unsure 'octave') when it is right once
+ * readings an octave up are folded down. Only upward: an octave low is never folded.
+ */
+export const OCTAVE_UP_HZ = 200;
 
 export const GRADE_POINTS: Record<Grade, number> = { perfect: 100, good: 70, ok: 40, miss: 0 };
 export const GRADE_VALUE: Record<Grade, number> = { perfect: 1, good: 0.85, ok: 0.5, miss: 0 };
@@ -208,6 +215,8 @@ interface NoteWindow {
   short: boolean;
   /** Written pitch outside the tracker's range (TRACKER_LOW_HZ…TRACKER_HIGH_HZ). */
   outOfRange: boolean;
+  /** Written pitch below OCTAVE_UP_HZ (the tracker may read it an octave up). */
+  lowForOctave: boolean;
   /** The note can be finalized once samples are past this time. */
   doneAt: number;
 }
@@ -282,7 +291,7 @@ function noteWindows(ctx: ScoringContext, opts: ScoringOptions): NoteWindow[] {
     const hz = 440 * Math.pow(2, (note.midi - 69) / 12);
     out.push({
       index: i, note, target: note.midi + half / 100, targetOffset, start: note.start, bodyStart, bodyEnd, legatoFrom, legatoTo, tolExtra: Math.abs(half),
-      short, outOfRange: hz < TRACKER_LOW_HZ || hz > TRACKER_HIGH_HZ, doneAt: short ? note.start + note.dur : bodyEnd,
+      short, outOfRange: hz < TRACKER_LOW_HZ || hz > TRACKER_HIGH_HZ, lowForOctave: hz < OCTAVE_UP_HZ, doneAt: short ? note.start + note.dur : bodyEnd,
     });
   }
   return out;
@@ -513,17 +522,20 @@ export class LiveScorer {
     }
     // Final judgement over the settled part of the note: a vibrato-cancelling average (or the
     // median for short notes), so neither vibrato nor the glide into the note reads as out of tune.
-    let hitTime = 0;
-    if (jT.length) {
-      const sm = vibratoSmoothed(jT, jD, this.vibWin);
-      if (sm) {
-        for (let k = 0; k < jT.length; k++) if (Math.abs(sm[k]) <= tolN) hitTime += jW[k];
-      } else {
-        // Median, not mean: a short pitch glitch shouldn't sink a short note.
-        if (Math.abs(median(jD)!) <= tolN) hitTime = jW.reduce((x, y) => x + y, 0) + excused;
+    const hitOf = (D: number[]): number => {
+      let hitTime = 0;
+      if (jT.length) {
+        const sm = vibratoSmoothed(jT, D, this.vibWin);
+        if (sm) {
+          for (let k = 0; k < jT.length; k++) if (Math.abs(sm[k]) <= tolN) hitTime += jW[k];
+        } else {
+          // Median, not mean: a short pitch glitch shouldn't sink a short note.
+          if (Math.abs(median(D)!) <= tolN) hitTime = jW.reduce((x, y) => x + y, 0) + excused;
+        }
       }
-    }
-    let hitRatio = clamp(hitTime / Math.max(1e-3, bodyDur - excused), 0, 1);
+      return clamp(hitTime / Math.max(1e-3, bodyDur - excused), 0, 1);
+    };
+    let hitRatio = hitOf(jD);
     const voicedRatio = clamp(a.voicedTime / Math.max(1e-3, w.bodyEnd - w.bodyStart), 0, 1);
     let medDev = jD.length ? median(jD) : median(a.devs);
     // Very short notes: what was sung is the median of the note's own readings (see shortNoteDev).
@@ -565,7 +577,25 @@ export class LiveScorer {
     // tracker's range, or a very short note (the voice rarely settles; few readings). Below "good",
     // say whether it was still clearly wrong: no sound at all inside the note (either kind), or (very
     // short notes) a definite pitch, from enough of its own readings (see shortNoteDev), clearly off.
-    const unsure: NoteResult['unsure'] = w.outOfRange ? 'range' : w.short ? 'short' : undefined;
+    // A low note read (partly) an octave up that is right once those readings are folded down: the
+    // tracker's octave error on "oo" (OCTAVE_UP_HZ), not a wrong note. Never folded downward.
+    const foldUp = (d: number) => (d > 600 && d < 1800 ? d - 1200 : d);
+    const octaveUp = w.lowForOctave && !this.opts.octaveTolerant && GRADE_RANK[grade] < GRADE_RANK.good
+      && jD.some((d) => d > 600 && d < 1800) && hitOf(jD.map(foldUp)) >= 0.6;
+    // A note with a minority of readings far from it and from both neighbours (more than SHORT_FAR:
+    // the tracker locking onto a fraction of the pitch, as dropped for very short notes) that is
+    // right once those readings are replaced by the reading before them: a tracker error.
+    const farFrom = (d: number, other: number | null) => Math.abs(d - 100 * ((other ?? w.note.midi) - w.target)) > SHORT_FAR;
+    // (Not an octave below: a voice can drop the octave, so those readings always count.)
+    const isFar = (d: number) => Math.abs(d) > SHORT_FAR && Math.abs(d + 1200) > tolN && farFrom(d, w.legatoFrom) && farFrom(d, w.legatoTo);
+    const nFar = jD.filter(isFar).length;
+    let slip = false;
+    if (!w.short && !octaveUp && GRADE_RANK[grade] < GRADE_RANK.good && nFar > 0 && 2 * nFar < jD.length) {
+      const kept = jD.find((d) => !isFar(d))!;
+      let last = kept;
+      slip = hitOf(jD.map((d) => (isFar(d) ? last : (last = d)))) >= 0.6;
+    }
+    const unsure: NoteResult['unsure'] = w.outOfRange ? 'range' : w.short ? 'short' : octaveUp ? 'octave' : slip ? 'tracker' : undefined;
     let clearly: NoteResult['clearly'];
     if (unsure && GRADE_RANK[grade] < GRADE_RANK.good) {
       if (a.inNote > 0 && a.loudInNote === 0) clearly = 'silent';

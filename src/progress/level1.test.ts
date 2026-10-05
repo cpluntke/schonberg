@@ -158,6 +158,29 @@ describe('level 1: what the scorer can’t judge reliably', () => {
     expect(attemptPasses(1, cut)).toBe(true);
   });
 
+  it('a low note the tracker reads (partly) an octave up is let off; an octave down or a wrong note is not', () => {
+    // E3 (165 Hz) held for 2 s: on "oo" the tracker sometimes locks onto the second partial.
+    const low = makePart('B', [[48, 1], [52, 2], [48, 1]], 60);
+    const lc: ScoringContext = { score: makeScore([low], 60), part: low, range: [0, 2] };
+    const sung = (f: (t: number) => number) => sampleSinging(low, (n, t, i) => n.midi + (i === 1 ? f(t) : 0));
+    const flips = scoreAttempt(lc, sung((t) => (Math.floor(t / 0.1) % 3 === 1 ? 12 : 0)), L1);
+    expect(flips.notes[1].grade === 'good' || flips.notes[1].grade === 'perfect').toBe(false);
+    expect(flips.notes[1].unsure).toBe('octave');
+    expect(noteVerdict(flips.notes[1])).toBe('forgiven');
+    const allUp = scoreAttempt(lc, sung(() => 12), L1);
+    expect(noteVerdict(allUp.notes[1])).toBe('forgiven');
+    // An octave down is never folded; a wrong note isn't either (also with octave-up flips).
+    expect(noteVerdict(scoreAttempt(lc, sung(() => -12), L1).notes[1])).toBe('wrong');
+    expect(noteVerdict(scoreAttempt(lc, sung((t) => (Math.floor(t / 0.1) % 3 === 1 ? -12 : 0)), L1).notes[1])).toBe('wrong');
+    expect(noteVerdict(scoreAttempt(lc, sung((t) => (Math.floor(t / 0.1) % 3 === 1 ? 13 : 1)), L1).notes[1])).toBe('wrong');
+    // A higher note (A4, 440 Hz) read an octave up is a wrong octave, not let off.
+    const high = makePart('A', [[64, 1], [69, 2], [64, 1]], 60);
+    const hc: ScoringContext = { score: makeScore([high], 60), part: high, range: [0, 2] };
+    const hr = scoreAttempt(hc, sampleSinging(high, (n, t, i) => n.midi + (i === 1 ? 12 : 0)), L1);
+    expect(hr.notes[1].unsure).toBeUndefined();
+    expect(noteVerdict(hr.notes[1])).toBe('wrong');
+  });
+
   it('a "doo" on every note (a short unvoiced "d" before each vowel) still scores every note', () => {
     // 25 ms without voice at the start of every note (the "d"), the vowel on pitch after it.
     const r = score((i, t) => (t < 0.025 ? null : part.notes[i].midi));

@@ -1,9 +1,9 @@
 # Realism: before / after the scoring fixes
 
-Generated 2026-10-05T11:25:27.264Z by `npx vitest run --config vitest.realism.config.ts` (files `qa/realism/cmp-*.test.ts`). The same rendered takes are scored by both pipelines:
+Generated 2026-10-05T12:07:30.200Z by `npx vitest run --config vitest.realism.config.ts` (files `qa/realism/cmp-*.test.ts`). The same rendered takes are scored by both pipelines:
 
 - **before** = baseline app (frozen `qa/realism/baseline/`, as in `docs/qa/realism-baseline.md`): N=2048 window, `scoreAttempt`, onset-based delay learning that re-scores the same run, pass = accuracy only, and an uncalibrated estimate of 80 ms.
-- **after** = current app at `cdc3a69` plus uncommitted changes in `rc/game/scoring.ts`, `src/game/types.ts`, `src/ui/components/IntroVideo.tsx`, `src/ui/play/lastResult.ts`, `src/ui/screens/Play.tsx`, `src/ui/screens/Results.tsx`, `src/ui/play/noteFault.ts`. The analysis window comes from `windowFor(part.low)` (1024 for these alto parts). Then `scoreAttempt` → `scoreAligned`, two-run delay learning and the Android estimate of 130 ms. Play.tsx/session policy detected from the source: LATE_FAIL_MS=250; GUIDE_LEARN_MAX_ABOVE=150; timing gate: measured; liftSubharmonics: true; session stores raw samples.
+- **after** = current app at `a748a58` plus uncommitted changes in `src/game/scoring.ts`, `src/game/types.ts`. The analysis window comes from `windowFor(part.low)` (1024 for these alto parts). Then `scoreAttempt` → `scoreAligned`, two-run delay learning and the Android estimate of 130 ms. Play.tsx/session policy detected from the source: LATE_FAIL_MS=250; GUIDE_LEARN_MAX_ABOVE=150; timing gate: measured; liftSubharmonics: true; session stores raw samples.
 - **after (80 ms estimate)** = the current app with the old 80 ms estimate (an iPhone-like device). It separates the estimate change from the rest.
 
 Run cells: `grade accuracy%` (✗ = run failed), `al±N` = the voice was shifted N ms for intonation, `→N ms` = the stored delay changed to N, `TF` = failed by the timing gate (median entry in ms), `[…]` = timing/wrong-note tips. Sequences are 3 consecutive runs (new performance each run) on a phone whose stored delay carries over.
@@ -11,8 +11,8 @@ Run cells: `grade accuracy%` (✗ = run failed), `al±N` = the voice was shifted
 ## Key numbers
 
 - **Good singer L1, calibrated:** before 100% in tune / 100% acc (S×6), after 100% / 100% (S×6).
-- **Good singer L1, true 200 ms, uncalibrated** (in tune/acc over 6 sections): before run 1: 95%/99% S×6 (6/6 pass); run 2: 95%/99% S×6 (6/6 pass); run 3: 94%/99% S×6 (6/6 pass). After run 1: 99%/99% S×5 B×1 (5/6 pass); run 2: 100%/100% S×6 (6/6 pass); run 3: 99%/99% S×5 B×1 (5/6 pass). After with 80 ms estimate: run 1: 99%/99% S×5 B×1 (5/6 pass); run 2: 100%/100% S×6 (6/6 pass); run 3: 99%/99% S×5 B×1 (5/6 pass).
-- **Good singer L1, true 280 ms, uncalibrated** (in tune/acc over 6 sections): before run 1: 99%/99% S×6 (6/6 pass); run 2: 100%/100% S×6 (6/6 pass); run 3: 100%/100% S×6 (6/6 pass). After run 1: 99%/99% S×5 B×1 (5/6 pass); run 2: 100%/100% S×5 B×1 (5/6 pass); run 3: 100%/100% S×6 (6/6 pass). After with 80 ms estimate: run 1: 99%/99% S×5 B×1 (5/6 pass); run 2: 100%/100% S×5 B×1 (5/6 pass); run 3: 100%/100% S×6 (6/6 pass).
+- **Good singer L1, true 200 ms, uncalibrated** (in tune/acc over 6 sections): before run 1: 95%/99% S×6 (6/6 pass); run 2: 95%/99% S×6 (6/6 pass); run 3: 94%/99% S×6 (6/6 pass). After run 1: 99%/99% S×6 (6/6 pass); run 2: 100%/100% S×6 (6/6 pass); run 3: 99%/99% S×5 B×1 (5/6 pass). After with 80 ms estimate: run 1: 99%/99% S×6 (6/6 pass); run 2: 100%/100% S×6 (6/6 pass); run 3: 99%/99% S×5 B×1 (5/6 pass).
+- **Good singer L1, true 280 ms, uncalibrated** (in tune/acc over 6 sections): before run 1: 99%/99% S×6 (6/6 pass); run 2: 100%/100% S×6 (6/6 pass); run 3: 100%/100% S×6 (6/6 pass). After run 1: 99%/99% S×6 (6/6 pass); run 2: 100%/100% S×6 (6/6 pass); run 3: 100%/100% S×6 (6/6 pass). After with 80 ms estimate: run 1: 99%/99% S×6 (6/6 pass); run 2: 100%/100% S×6 (6/6 pass); run 3: 100%/100% S×6 (6/6 pass).
 - **Good singer L4, calibrated:** before 97% in tune / 98% acc (S×6), after 100% / 99% (S×6).
 - **Good singer L4, true 200 ms, uncalibrated** (in tune/acc over 6 sections): before run 1: 79%/88% S×3 A×1 B×1 C×1 (4/6 pass); run 2: 78%/89% S×3 A×1 B×1 C×1 (4/6 pass); run 3: 78%/87% S×3 A×2 C×1 (5/6 pass). After run 1: 99%/99% S×6 (6/6 pass); run 2: 100%/99% S×6 (6/6 pass); run 3: 100%/99% S×6 (6/6 pass). After with 80 ms estimate: run 1: 99%/99% S×6 (6/6 pass); run 2: 100%/99% S×6 (6/6 pass); run 3: 100%/99% S×6 (6/6 pass).
 - **Good singer L4, true 280 ms, uncalibrated** (in tune/acc over 6 sections): before run 1: 89%/90% S×5 D×1 (5/6 pass); run 2: 98%/98% S×6 (6/6 pass); run 3: 98%/97% S×5 A×1 (6/6 pass). After run 1: 100%/99% S×6 (6/6 pass); run 2: 99%/98% S×6 (6/6 pass); run 3: 99%/98% S×5 A×1 (6/6 pass). After with 80 ms estimate: run 1: 100%/99% S×6 (6/6 pass); run 2: 99%/98% S×6 (6/6 pass); run 3: 99%/98% S×5 A×1 (6/6 pass).
@@ -42,6 +42,8 @@ Run cells: `grade accuracy%` (✗ = run failed), `al±N` = the voice was shifted
 12. **Level 1 on “doo”, every note right (section 8).** On “doo” (a 20–45 ms “d” before every note, vowel “u”) every good voice passed every level-1 run in the six sections, calibrated and uncalibrated (goodChoir 30/30 + 30/30 per delay here; 60/60 + 60/60 with 10 seeds in a longer run; operatic, control, ringing and slow-transition voices 18/18 each), with no note below *good*, so the exemption never had to act. The pieces' fast bars and synthetic 16ths at 104/144 bpm on “doo” also all passed. The same voices on the lyrics lose 1–2 runs in 18–30 under the new rule: long notes graded *miss* with a median of 1–28¢, i.e. readings flipping an octave within the note on some vowels, and a few whole notes read an octave up. That is the tracker, not the singer, and one more reason level 1 is sung on “doo”. Singers with a wrong note always fail on “doo”: a single note a semitone off fails 12/12 (the 75% rule passed all 12), 40 % wrong notes and one note behind fail everywhere. A single note 70¢ flat fails 11/12; the one pass is a very short note (judged leniently, median under 1.5 × tolerance) that is forgiven. The −40¢ singer is inside ±50¢ by design. A note tied over the end of a section is now judged on the part before the end (`ScoringContext.end`); before, it always read as missed, and 14 of 254 sections in the library end on such a note.
 
 13. **Wide vibrato at level 1 (section 9).** The vibrato window now follows the tempo (0.18 s of real time; before it was 0.18 score s, about 1.4 cycles of a 5.5 Hz vibrato at 70% tempo). With pitch-level readings on every library section (254), a centred vibrato of ±60/±70/±80¢ passes level 1 in every section before and after, also at 4.5 and 6.5 Hz and from the note start; the change shows at wider vibratos (±110¢: 208 → 220 sections, ±150¢: 145 → 180). Through rendered audio and the whole pipeline (on “doo”, calibrated): ±60¢ 249 → 247, ±70¢ 248 → 250, ±80¢ 251 → 250 of 254, i.e. unchanged within noise; the few failures are not vibrato: the same tenor/bass sections fail at every width, from the tracker reading low notes (E3) an octave up with this singer model's “u” formants (and one partly-judged note). Wrong singers are unchanged at every level (the window only differs at level 1), and at level 1 every section with a wrong note fails, except one 32nd note in Nicolette's bass too short to judge (forgiven like any very short note).
+
+14. **Tracker misreadings let off at level 1.** Through rendered audio (every library section, on “doo”, calibrated), the honest wide-vibrato singer failed a few sections at every width, all from the tracker: low notes (E3, 165 Hz) read partly or wholly an octave up on “oo”, and high soprano notes (B4, A5) with wild subharmonic readings (−19 to −45 semitones). A low note (< 200 Hz) that is right once octave-up readings are folded down (`unsure: 'octave'`, never folded downward), and a note right once a minority of wild readings (> 6 semitones from it and its neighbours, not an octave below) are replaced by the reading before (`unsure: 'tracker'`), are now let off at level 1. Sections passing level 1 of 254, before (`cdc3a69`) → after: ±60¢ 249 → 254, ±70¢ 248 → 254, ±80¢ 251 → 253. The one left is Nicolette's bass bar 3 at ±80¢: a 0.48 s note whose 2½ vibrato cycles leave the median 50¢ sharp; no detector error. Wrong singers (audio, every other section): an octave down 0/127 → 0/127, one note a semitone flat 0 → 0, one note an octave down 17 → 17 (unchanged: the end-of-run subharmonic lift in align.ts still reads some single octave-down notes as the tracker's subharmonic; pre-existing). The range check shows no such artefact on held low notes (0–2 % octave-up readings, E2–D4, on lyrics and “doo”); a test pins that bursts of octave-up readings on a bass's low notes are credited.
 
 ## 1. Tracker fidelity (smoothed output vs ground-truth f0, cents), before → after
 
@@ -81,14 +83,14 @@ Uncalibrated phone (fresh profile, then runs 2–3 with whatever the app stored)
 | section | L | true | before | after | after (80 ms estimate) |
 |---|---|---|---|---|---|
 | warmup-upbeat-6 | 1 | 200 ms | S 100 · S 100 · S 100 | S 100 · S 100 al+60 →160ms · S 100 | S 100 al+100 · S 100 al+110 →185ms · S 100 |
-| warmup-upbeat-6 | 1 | 280 ms | S 95 →266ms · S 100 · S 100 | B 95 ✗ al+130 · S 100 al+140 →265ms · S 100 | B 95 ✗ al+140 · S 100 al+140 →220ms · S 100 |
+| warmup-upbeat-6 | 1 | 280 ms | S 95 →266ms · S 100 · S 100 | S 95 al+130 · S 100 al+140 →265ms · S 100 | S 95 al+140 · S 100 al+140 →220ms · S 100 |
 | warmup-7-12 | 1 | 200 ms | S 100 · S 100 · S 100 | S 100 · S 100 →130ms · S 100 | S 100 al+100 · S 100 al+110 →185ms · S 100 |
 | warmup-7-12 | 1 | 280 ms | S 100 →250ms · S 100 · S 100 | S 100 al+120 · S 100 al+120 →250ms · S 100 | S 100 al+140 · S 100 al+140 →220ms · S 100 |
 | dieu-1-5 | 1 | 200 ms | S 96 · S 97 · S 97 | S 100 al+60 · S 100 al+70 →195ms · S 100 | S 100 al+110 · S 100 al+120 →195ms · S 100 |
 | dieu-1-5 | 1 | 280 ms | S 100 →256ms · S 100 · S 100 | S 100 al+150 · S 100 al+140 →275ms · S 100 | S 100 al+150 · S 100 al+150 →230ms · S 100 al+50 |
 | dieu-6-13 | 1 | 200 ms | S 99 · S 99 · S 99 | S 100 al+70 · S 100 al+60 →195ms · S 100 | S 100 al+120 · S 100 al+110 →195ms · S 100 |
-| dieu-6-13 | 1 | 280 ms | S 100 →247ms · S 98 · S 100 | S 100 al+140 · B 98 ✗ al+140 →270ms · S 100 | S 100 al+150 · B 98 ✗ al+150 →230ms · S 100 al+40 |
-| tabourin-solo-1-8 | 1 | 200 ms | S 99 · S 100 · S 98 | B 97 ✗ al+80 · S 100 al+80 →210ms · B 93 ✗ | B 97 ✗ al+130 · S 100 al+130 →210ms · B 93 ✗ |
+| dieu-6-13 | 1 | 280 ms | S 100 →247ms · S 98 · S 100 | S 100 al+140 · S 98 al+140 →270ms · S 100 | S 100 al+150 · S 98 al+150 →230ms · S 100 al+40 |
+| tabourin-solo-1-8 | 1 | 200 ms | S 99 · S 100 · S 98 | S 97 al+80 · S 100 al+80 →210ms · B 93 ✗ | S 97 al+130 · S 100 al+130 →210ms · B 93 ✗ |
 | tabourin-solo-1-8 | 1 | 280 ms | S 100 →253ms · S 100 · S 100 | S 100 al+140 · S 100 al+150 →275ms · S 100 | S 100 al+150 · S 100 al+150 →230ms · S 100 al+40 |
 | tabourin-solo-9-16 | 1 | 200 ms | S 100 · S 100 · S 100 | S 99 al+60 · S 100 al+60 →190ms · S 100 | S 99 al+110 · S 100 al+100 →185ms · S 100 |
 | tabourin-solo-9-16 | 1 | 280 ms | S 100 →208ms · S 100 · S 100 | S 100 al+140 · S 100 al+130 →265ms · S 100 | S 100 al+150 · S 100 al+150 →230ms · S 100 |
@@ -125,7 +127,7 @@ Uncalibrated phone (fresh profile, then runs 2–3 with whatever the app stored)
 | dieu-1-5 | 1 | 200 ms | S 96 | S 100 al+60 | S 100 al+110 |
 | dieu-1-5 | 1 | 280 ms | S 100 →256ms | S 100 al+150 | S 100 al+140 |
 | dieu-6-13 | 1 | 200 ms | S 97 | S 100 al+60 | S 100 al+110 |
-| dieu-6-13 | 1 | 280 ms | S 97 →247ms | B 98 ✗ al+140 | B 97 ✗ al+140 |
+| dieu-6-13 | 1 | 280 ms | S 97 →247ms | S 98 al+140 | S 97 al+140 |
 | warmup-7-12 | 1 | 200 ms | S 99 | S 100 | S 100 |
 | warmup-7-12 | 1 | 280 ms | S 100 →254ms | S 100 al+120 | S 100 al+130 |
 | dieu-1-5 | 4 | 200 ms | C 64 ✗ | S 98 al+60 | S 98 al+110 |
@@ -168,7 +170,7 @@ Uncalibrated phone (fresh profile, then runs 2–3 with whatever the app stored)
 | good choir singer | -13 dB | dieu-1-5 | 4 | cal | 56% / 57% | C FAIL | 96% / 95% | S 95 | 61% → 2% |
 | good choir singer | -13 dB | warmup-7-12 | 1 | cal | 86% / 86% | A pass | 100% / 100% | S 100 | 9% → 0% |
 | good choir singer | -13 dB | warmup-7-12 | 4 | cal | 65% / 66% | C FAIL | 81% / 80% | B 80 ✗ | 25% → 11% |
-| good choir singer | -8 dB | dieu-1-5 | 1 | cal | 39% / 47% | D FAIL | 98% / 98% | B 98 ✗ | 70% → 0% |
+| good choir singer | -8 dB | dieu-1-5 | 1 | cal | 39% / 47% | D FAIL | 98% / 98% | S 98 | 70% → 0% |
 | good choir singer | -8 dB | dieu-1-5 | 4 | cal | 29% / 33% | D FAIL | 83% / 82% | B 82 ✗ | 77% → 5% |
 | good choir singer | -8 dB | warmup-7-12 | 1 | cal | 42% / 38% | D FAIL | 83% / 83% | B 83 ✗ | 31% → 9% |
 | good choir singer | -8 dB | warmup-7-12 | 4 | cal | 20% / 19% | D FAIL | 59% / 57% | C 57 ✗ | 77% → 29% |
@@ -256,7 +258,7 @@ Uncalibrated phone (fresh profile, then runs 2–3 with whatever the app stored)
 | late pitch arrival (200 ms) | warmup-7-12 | 1 | measured 130 | S 97 | S 100 al+70 |
 | late pitch arrival (200 ms) | warmup-7-12 | 2 | measured 130 | A 91 [behind-beat] | S 99 ✗ al+70 TF263 [behind-beat] |
 | late pitch arrival (200 ms) | warmup-7-12 | 4 | measured 130 | A 86 [behind-beat] | S 99 ✗ al+80 TF258 [behind-beat] |
-| late pitch arrival (200 ms) | warmup-7-12 | 1 | uncalibrated (true 130) | S 99 →336ms · S 95 · S 100 | S 100 al+140 [behind-beat] · B 95 ✗ al+140 →270ms · S 100 al+60 |
+| late pitch arrival (200 ms) | warmup-7-12 | 1 | uncalibrated (true 130) | S 99 →336ms · S 95 · S 100 | S 100 al+140 [behind-beat] · S 95 al+140 →270ms · S 100 al+60 |
 | late pitch arrival (200 ms) | warmup-7-12 | 2 | uncalibrated (true 130) | S 99 →337ms · S 99 · S 100 | S 99 al+150 [behind-beat] · S 99 al+150 →280ms [behind-beat] · S 100 al+60 |
 
 ## 5. TRANSITION_MAX sweep (current scorer + alignment, calibrated 150 ms)
@@ -440,24 +442,24 @@ Each good voice sings the six sections on the lyrics and on “doo” (a 20–45
 
 | singer | sung on | delay | new | old | acc | below good | forgiven | wrong notes | median onset ms |
 |---|---|---|---|---|---|---|---|---|---|
-| good choir singer | lyrics | cal | 28/30 | 30/30 | 100% | 4 | 0 | dieu-6-13 #53 miss 13¢; dieu-6-13 #55 miss 28¢; dieu-6-13 #61 miss 4¢; tabourin-solo-1-8 #1 miss 27¢ | 21 |
+| good choir singer | lyrics | cal | 30/30 | 30/30 | 100% | 4 | 4 | – | 21 |
 | good choir singer | lyrics | uncal200 | 29/30 | 30/30 | 100% | 1 | 0 | tabourin-solo-1-8 #1 miss 1200¢ | 70 |
 | good choir singer | doo | cal | 30/30 | 30/30 | 100% | 0 | 0 | – | 18 |
 | good choir singer | doo | uncal200 | 30/30 | 30/30 | 100% | 0 | 0 | – | 68 |
 | operatic vibrato | lyrics | cal | 18/18 | 18/18 | 100% | 0 | 0 | – | 22 |
-| operatic vibrato | lyrics | uncal200 | 16/18 | 18/18 | 100% | 2 | 0 | dieu-6-13 #61 ok -3¢; tabourin-solo-9-16 #38 ok 15¢ | 72 |
+| operatic vibrato | lyrics | uncal200 | 18/18 | 18/18 | 100% | 2 | 2 | – | 72 |
 | operatic vibrato | doo | cal | 18/18 | 18/18 | 100% | 0 | 0 | – | 21 |
 | operatic vibrato | doo | uncal200 | 18/18 | 18/18 | 100% | 0 | 0 | – | 70 |
-| control (no vibrato, no overshoot) | lyrics | cal | 17/18 | 18/18 | 100% | 1 | 0 | tabourin-solo-9-16 #33 ok 1¢ | 22 |
-| control (no vibrato, no overshoot) | lyrics | uncal200 | 17/18 | 18/18 | 100% | 1 | 0 | dieu-6-13 #64 miss 5¢ | 71 |
+| control (no vibrato, no overshoot) | lyrics | cal | 18/18 | 18/18 | 100% | 1 | 1 | – | 22 |
+| control (no vibrato, no overshoot) | lyrics | uncal200 | 18/18 | 18/18 | 100% | 1 | 1 | – | 71 |
 | control (no vibrato, no overshoot) | doo | cal | 18/18 | 18/18 | 100% | 0 | 0 | – | 21 |
 | control (no vibrato, no overshoot) | doo | uncal200 | 18/18 | 18/18 | 100% | 0 | 0 | – | 70 |
-| ringing transitions (zeta 0.35) | lyrics | cal | 16/18 | 18/18 | 99% | 2 | 0 | warmup-upbeat-6 #19 miss 8¢; tabourin-solo-1-8 #1 miss 1191¢ | 24 |
+| ringing transitions (zeta 0.35) | lyrics | cal | 17/18 | 18/18 | 99% | 2 | 1 | tabourin-solo-1-8 #1 miss 1191¢ | 24 |
 | ringing transitions (zeta 0.35) | lyrics | uncal200 | 18/18 | 18/18 | 100% | 0 | 0 | – | 73 |
 | ringing transitions (zeta 0.35) | doo | cal | 18/18 | 18/18 | 100% | 0 | 0 | – | 22 |
 | ringing transitions (zeta 0.35) | doo | uncal200 | 18/18 | 18/18 | 100% | 0 | 0 | – | 73 |
-| slow transitions (fn 3–4 Hz) | lyrics | cal | 17/18 | 18/18 | 100% | 1 | 0 | dieu-6-13 #55 ok 4¢ | 41 |
-| slow transitions (fn 3–4 Hz) | lyrics | uncal200 | 16/18 | 18/18 | 99% | 3 | 0 | dieu-6-13 #58 ok -8¢; tabourin-solo-9-16 #17 miss 8¢; tabourin-solo-9-16 #22 miss 11¢ | 91 |
+| slow transitions (fn 3–4 Hz) | lyrics | cal | 18/18 | 18/18 | 100% | 1 | 1 | – | 41 |
+| slow transitions (fn 3–4 Hz) | lyrics | uncal200 | 18/18 | 18/18 | 99% | 3 | 3 | – | 91 |
 | slow transitions (fn 3–4 Hz) | doo | cal | 18/18 | 18/18 | 100% | 0 | 0 | – | 46 |
 | slow transitions (fn 3–4 Hz) | doo | uncal200 | 18/18 | 18/18 | 100% | 0 | 0 | – | 94 |
 
@@ -477,7 +479,7 @@ Each good voice sings the six sections on the lyrics and on “doo” (a 20–45
 | one wrong note (a semitone, random) | 0/12 | 12/12 | 96% | 1.0 | 0 |
 | one note a semitone flat | 0/12 | 12/12 | 96% | 1.0 | 0 |
 | one note 70¢ flat | 1/12 | 12/12 | 96% | 0.9 | 1 |
-| flat −40¢ | 0/12 | 7/12 | 77% | 2.4 | 8 |
+| flat −40¢ | 0/12 | 7/12 | 77% | 2.3 | 9 |
 
 ## 9. Wide vibrato at level 1, and wrong notes at every level (current app)
 
