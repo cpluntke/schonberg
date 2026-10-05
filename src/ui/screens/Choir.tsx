@@ -8,7 +8,7 @@ import { WEEKDAYS } from '../../progress/rehearsal';
 import {
   apiBase, cachedChoir, changePassword, choirPieceId, claimAccount, deleteChoirPiece, fetchChoir, fetchSection, joinChoir, leaveChoir, ChoirApiError,
   loadSession, loggedOutNotice, login, logout, onSessionChange, refreshSession, refreshSessionSoon, saveChoirCycle, sessionFor, sessionSecret, superCreate, superDelete,
-  superList, superRename, uploadChoirPiece, withdrawProgress, fetchChoirUsage, mb, type Auth, type ChoirInfo, type ChoirSummary, type ChoirUsage,
+  superList, superPurgeMembers, superRename, uploadChoirPiece, withdrawProgress, fetchChoirUsage, mb, type Auth, type ChoirInfo, type ChoirSummary, type ChoirUsage,
   type SectionView, type ServerUsage, type Session,
 } from '../../progress/choir';
 import { PieceMap } from '../components/PieceMap';
@@ -128,7 +128,7 @@ export function ChoirScreen() {
                 else if (profile.name.trim()) withdrawProgress(profile.choirCode!, profile.name.trim()).catch(() => {});
               }} />
             </label>
-            {!profile.name.trim() && profile.shareProgress && <span className="small" style={errStyle}>Add your name in Voice setup first.</span>}
+            {!profile.name.trim() && !sessionFor(profile.choirCode) && profile.shareProgress && <span className="small" style={errStyle}>Add your name in Voice setup first.</span>}
             {profile.name.trim() && profile.shareProgress && shareError() && <span className="small" role="alert" style={errStyle}>Not shared yet: {shareError()}</span>}
           </div>
           <AccountCard choir={choir!} />
@@ -151,9 +151,9 @@ function AccountCard({ choir }: { choir: ChoirInfo }) {
   if (!s) {
     return (
       <div className="card flat" data-testid="account-card">
-        <strong>Admins and section leads</strong>
+        <strong>Your account</strong>
         <LoggedOutNotice />
-        <span className="small muted">Log in with your own name and password. No account yet? Ask your choir admin for an invite link.</span>
+        <span className="small muted">Log in with your own name and password. Singers can make an account in Settings (Keep my progress across phones); admins and section leads get an invite link from a choir admin.</span>
         <LoginForm code={choir.code} legacy={!!choir.legacyLogin} />
       </div>
     );
@@ -166,7 +166,7 @@ function AccountCard({ choir }: { choir: ChoirInfo }) {
       <span className="small muted" data-testid="account-role">{roleText(s.account.role, s.account.voices)}</span>
       <div className="row wrap">
         {admin && <button className="btn small primary" onClick={() => go({ name: 'choiradmin' })}>Choir admin</button>}
-        <button className="btn small" onClick={() => go({ name: 'section' })}>{admin ? 'Sections' : 'Your section'}</button>
+        {s.account.role !== 'member' && <button className="btn small" onClick={() => go({ name: 'section' })}>{admin ? 'Sections' : 'Your section'}</button>}
         <button className="btn small ghost" onClick={() => setChanging(!changing)} aria-expanded={changing}>Change password</button>
         <button className="btn small ghost" data-testid="logout" onClick={() => void logout()}>Log out</button>
       </div>
@@ -693,15 +693,16 @@ export function SuperAdmin() {
       {usage && (
         <div className="card flat" data-testid="server-usage">
           <strong>Storage</strong>
-          <span className="small">{mb(usage.totalBytes)} of {mb(usage.capBytes)} used by all choirs and backups</span>
-          <span className="small muted">Singers' progress backups: {usage.backups.count} of {usage.backups.max} · {mb(usage.backups.bytes)} of {mb(usage.backups.capBytes)}</span>
+          <span className="small">{mb(usage.totalBytes)} of {mb(usage.capBytes)} used by all choirs</span>
+          <span className="small muted">Progress kept with accounts: {usage.accountProgress.count} account{usage.accountProgress.count === 1 ? '' : 's'} · {mb(usage.accountProgress.bytes)} of {mb(usage.accountProgress.capBytes)}</span>
         </div>
       )}
       {(list ?? []).map((c) => (
         <div key={c.code} className="card flat" data-testid="choir-row">
           <strong>{c.name}</strong>
           <span className="small muted">
-            code {c.code} · {c.pieces} score{c.pieces === 1 ? '' : 's'}{c.usage ? ` (${mb(c.usage.bytes)} of ${mb(c.usage.capBytes)})` : ''} · {c.members} sharing{c.programme ? ` · ${c.programme}` : ''}
+            code {c.code} · {c.pieces} score{c.pieces === 1 ? '' : 's'}{c.usage ? ` (${mb(c.usage.scoresBytes)} of ${mb(c.usage.capBytes)})` : ''} · {c.members} sharing
+            {c.usage?.memberAccounts ? ` · ${c.usage.memberAccounts} member account${c.usage.memberAccounts === 1 ? '' : 's'} (${mb(c.usage.accountProgressBytes ?? 0)} of progress)` : ''}{c.programme ? ` · ${c.programme}` : ''}
           </span>
           <span className="small">
             {c.admins.length ? `Admin${c.admins.length > 1 ? 's' : ''}: ${c.admins.join(', ')}` : 'No admin account yet'}
@@ -718,6 +719,13 @@ export function SuperAdmin() {
               if (prompt(`Type the code “${c.code}” to delete this choir and its scores`) !== c.code) return;
               try { await superDelete(pw, c.code); await load(pw); } catch (e) { toast((e as Error).message); }
             }}>Delete</button>
+            {!!c.usage?.memberAccounts && (
+              <button className="btn small ghost" onClick={async () => {
+                const d = Number(prompt('Remove the member accounts (and their kept progress) nobody used for how many days?', '365'));
+                if (!d) return;
+                try { const r = await superPurgeMembers(pw, c.code, d); toast(`${r.removed} member account${r.removed === 1 ? '' : 's'} removed`); await load(pw); } catch (e) { toast((e as Error).message); }
+              }}>Remove inactive members</button>
+            )}
           </div>
           {open === c.code && <PeoplePanel code={c.code} auth={auth} superAdmin onChanged={() => void load(pw)} />}
         </div>

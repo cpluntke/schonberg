@@ -131,11 +131,12 @@ export async function saveImportedScore(s: Score): Promise<void>;
 export async function loadImportedScores(): Promise<Score[]>;
 export async function deleteImportedScore(id: string): Promise<void>;
 export function exportBackup(): string; export function importBackup(json: string): void;
-// progress/backup.ts  (opt-in server copy of the essentials, ≤ ~8 KB: levels, bests, dates, to-fix lists,
-// off-book days, a 6-bit-per-bar summary, settings; never the attempt log or recordings. Identity = a
-// random 130-bit backup key; the server keeps sha256(key) only. backupCode.ts: restore code = key +
-// 2 check characters in 7 groups of 4. Restoring merges: higher levels and newer dates win.)
-export function buildBackup(): { data: BackupData; hash: string; bytes: number };
-export function applyBackup(d: unknown): ApplyResult;
-export function uploadBackup(force?: boolean): Promise<…>; export function restoreFromCode(code: string): Promise<ApplyResult>;
+// progress/sync.ts  (progress kept with a choir account on the server, ≤ ~8 KB: levels, bests, dates,
+// to-fix lists, off-book days, a 6-bit-per-bar summary, settings, programme; never the attempt log or
+// recordings. Any account syncs: members sign up with the choir code (choir.ts signUp), leads/admins via
+// invites. Start/focus: a revision check picks up other phones' saves; after runs within 10 s, on page
+// hide with keepalive. Merging never lowers anything; a phone with progress under another name asks first.)
+export function buildSnapshot(): { data: ProgressSnapshot; hash: string; bytes: number };
+export function applySnapshot(d: unknown): ApplyResult;
+export function uploadProgress(force?: boolean, auto?: boolean): Promise<…>; export function syncProgressSoon(): void;
 ```

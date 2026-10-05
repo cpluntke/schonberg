@@ -3,6 +3,7 @@ import { _resetAllForTests, exportBackup, loadProfile, saveProfile } from './sto
 import {
   _resetSessionStateForTests, acceptInvite, createInvite, fetchPeople, inviteLink, leaveChoir, loadSession, loggedOutNotice, login, logout,
   LOGGED_OUT_ELSEWHERE, refreshSession, refreshSessionSoon, rememberedInvite, saveSession, sessionFor, superCreate, type Session,
+  signUp, shareProgress, deleteMyAccount,
 } from './choir';
 import { parseHash, href } from '../ui/router';
 
@@ -155,5 +156,36 @@ describe('choir accounts client', () => {
     refreshSessionSoon();
     await new Promise((r) => setTimeout(r, 0));
     expect(calls.filter((c) => c.url === '/schonberg/api/session')).toHaveLength(1);
+  });
+
+  it('members sign up with the choir code (no invite) and their session is kept like any other', async () => {
+    const member = { ...account, id: 'm00000000001', name: 'Anna', role: 'member' as const };
+    mockFetch(() => ({ status: 201, body: { token: 'tok-' + 'm'.repeat(40), code: 'kammerchor', choirName: 'Kammerchor', account: member, expiresAt: Date.now() + 30 * DAY } }));
+    const s = await signUp('Kammerchor', 'Anna', 'password-123');
+    expect(calls[0].url).toBe('/schonberg/api/choirs/kammerchor/members');
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({ name: 'Anna', password: 'password-123' });
+    expect(loadSession()).toMatchObject({ token: s.token, account: { role: 'member' } });
+    expect(exportBackup()).not.toContain(s.token);
+    // Deleting the account forgets the session here too.
+    mockFetch(() => ({ body: { ok: true } }));
+    await deleteMyAccount('password-123');
+    expect(headers(calls[0]).Authorization).toBe(`Bearer ${s.token}`);
+    expect(loadSession()).toBeNull();
+  });
+
+  it('logged in, shared progress goes with the account (its name, the session) and still names this phone', async () => {
+    saveProfile({ ...loadProfile(), choirCode: 'kammerchor' });
+    mockFetch(() => ({ body: { ok: true, name: 'Anna' } }));
+    await shareProgress('kammerchor', 'Anni', 'A', {});
+    expect(calls[0].url).toBe('/schonberg/api/choirs/kammerchor/progress/Anni');
+    expect(headers(calls[0]).Authorization).toBeUndefined();
+    const tokenHeader = headers(calls[0])['X-Member-Token'];
+    expect(tokenHeader).toBeTruthy();
+    saveSession(session({ account: { ...account, id: 'm00000000001', name: 'Anna', role: 'member' } }));
+    await shareProgress('kammerchor', 'Anni', 'A', {});
+    expect(calls[1].url).toBe('/schonberg/api/choirs/kammerchor/progress/Anna');
+    expect(headers(calls[1]).Authorization).toMatch(/^Bearer /);
+    // The phone's token goes along once, so the server can move this phone's anonymous entry to the account.
+    expect(headers(calls[1])['X-Member-Token']).toBe(tokenHeader);
   });
 });

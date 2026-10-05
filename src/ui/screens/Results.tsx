@@ -10,6 +10,7 @@ import { LEVELS, OFF_BOOK_DAYS, fixesBefore, nextStep } from '../../progress/lad
 import { getProgress } from '../../progress/store';
 import { IconDown, IconUp, IconClock, IconLoop, IconStar, IconPlay, IconCube } from '../icons';
 import type { Insight } from '../../game/types';
+import { accountTipPending, dismissAccountTip } from '../../progress/sync';
 
 /** Start a run from Results; replace the history entry so "back" from the run doesn't land on stale results. */
 function goPlay(r: Parameters<typeof go>[0]) {
@@ -268,6 +269,7 @@ export function Results() {
           <button className="btn block" onClick={() => go({ name: 'piece', pieceId: piece.id })}>All sections</button>
         </div>
         <button className="btn ghost block" onClick={() => go({ name: 'ranks' })}>Leaderboard</button>
+        <AccountTip />
         <ShareRecording pieceId={lr.pieceId} partId={lr.partId} />
       </div>
     </main>
@@ -405,5 +407,24 @@ function WordsResults({ lr, words }: { lr: NonNullable<ReturnType<typeof getLast
         </div>
       </div>
     </main>
+  );
+}
+
+/** Once, after a choir singer's first pass without an account: make one to keep progress on every phone. */
+function AccountTip() {
+  const [show, setShow] = useState(accountTipPending);
+  if (!show) return null;
+  return (
+    <div className="notice info col" style={{ gap: 6 }} data-testid="account-tip">
+      <span className="small">Keep your progress on every phone: make an account in your choir (name and password).</span>
+      <div className="row" style={{ gap: 6 }}>
+        <button className="btn small" onClick={() => {
+          dismissAccountTip();
+          try { sessionStorage.setItem('sh:openAccount', '1'); } catch { /* ignore */ }
+          go({ name: 'settings' });
+        }}>Make an account</button>
+        <button className="btn small ghost" onClick={() => { dismissAccountTip(); setShow(false); }}>Not now</button>
+      </div>
+    </div>
   );
 }

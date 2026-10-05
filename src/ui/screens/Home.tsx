@@ -9,6 +9,7 @@ import { rowOfTheDay } from '../../game/twelvetone';
 import { IconFlame, IconPlay, IconMic } from '../icons';
 import { IntroVideoButton } from '../components/IntroVideo';
 import { apiBase } from '../../progress/choir';
+import { SyncNotice } from '../components/AccountSync';
 import { pieceStatus, todaysPlan, type PieceStatus } from '../plan';
 
 export { pieceStatus, type PieceStatus };
@@ -64,6 +65,7 @@ export function Home() {
       </div>
 
       <Notice />
+      <SyncNotice />
 
       {!profile.onboarded && (
         <div className="card" style={{ borderColor: 'var(--voice-deep)' }}>
@@ -77,8 +79,8 @@ export function Home() {
           <IntroVideoButton className="btn block" />
           <button className="btn voice block" onClick={() => go({ name: 'setup' })}>Start setup</button>
           {apiBase() && (
-            <button className="linklike small muted" style={{ alignSelf: 'center', minHeight: 40 }} data-testid="home-restore"
-              onClick={() => { try { sessionStorage.setItem('sh:openRestore', '1'); } catch { /* ignore */ } go({ name: 'settings' }); }}>New phone? Restore your progress from a code (Settings)</button>
+            <button className="linklike small muted" style={{ alignSelf: 'center', minHeight: 40 }} data-testid="home-account"
+              onClick={() => { try { sessionStorage.setItem('sh:openAccount', '1'); } catch { /* ignore */ } go({ name: 'settings' }); }}>New phone? Log in to your choir account to get your progress back</button>
           )}
         </div>
       )}

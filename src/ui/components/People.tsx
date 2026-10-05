@@ -16,6 +16,7 @@ export const voicesText = (vs: string[]) => vs.map((v) => VOICE_NAME[v] ?? v).jo
 const day = (ms: number) => new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 
 export function roleText(role: string, voices: string[]): string {
+  if (role === 'member') return 'Member (keeps their progress with the account)';
   return role === 'admin' ? 'Choir admin' : `Section lead${voices.length ? ` · ${voicesText(voices)}` : ''}`;
 }
 
@@ -94,6 +95,7 @@ export function PeoplePanel({ code, auth, superAdmin = false, onChanged }: { cod
   const admins = people.accounts.filter((a) => a.role === 'admin');
   const legacyLeads = VOICES.filter((v) => people.legacy.leads.includes(v));
   const leads = people.accounts.filter((a) => a.role === 'lead');
+  const members = people.accounts.filter((a) => a.role === 'member');
   const person = (a: Account) => (
     <div key={a.id} className="col" style={{ gap: 4, padding: '6px 0', borderBottom: '1px solid var(--surface-2)' }} data-testid="person">
       <div className="row" style={{ gap: 6 }}>
@@ -114,7 +116,9 @@ export function PeoplePanel({ code, auth, superAdmin = false, onChanged }: { cod
         )}
         {a.id !== people.you && (
           <button className="btn small ghost danger" disabled={busy} onClick={() => {
-            if (confirm(`Remove ${a.name}'s account? They can no longer log in.`)) void run(() => removePerson(code, auth, a.id));
+            if (confirm(a.role === 'member'
+              ? `Remove ${a.name}'s account? The progress kept with it and the progress they share with their section lead are deleted too.`
+              : `Remove ${a.name}'s account? They can no longer log in.`)) void run(() => removePerson(code, auth, a.id));
           }}>Remove</button>
         )}
       </div>
@@ -166,6 +170,10 @@ export function PeoplePanel({ code, auth, superAdmin = false, onChanged }: { cod
           ))}
         </div>
         {leads.map(person)}
+      </div>
+      <div className="col" style={{ gap: 2 }} data-testid="members">
+        <span className="eyebrow">Members with an account</span>
+        {members.length ? members.map(person) : <span className="small muted">None yet. Singers make one in Settings to keep their progress on every phone.</span>}
       </div>
       {people.invites.length > 0 && (
         <div className="col" style={{ gap: 2 }}>

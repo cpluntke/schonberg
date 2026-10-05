@@ -70,10 +70,10 @@ export interface Profile {
    */
   scoreStaves?: 'mine' | 'voices' | 'all';
   /**
-   * Keep a compact copy of my progress on the choir server (src/progress/backup.ts). Unset = on for
-   * singers who joined a choir, off otherwise.
+   * Logged in to the choir: keep my progress with my account on the server (src/progress/sync.ts).
+   * Unset = on; false = the singer turned it off.
    */
-  backup?: boolean;
+  sync?: boolean;
 }
 
 /** The practice display (the singer's choice, else sheet music at every level). */
@@ -334,7 +334,7 @@ export function loadProfile(): Profile {
 }
 export function saveProfile(p: Profile): void { writeJSON(K.profile, p); }
 
-/** The storage key of one piece/part's progress (for the server backup). */
+/** The storage key of one piece/part's progress (for the copy kept with a choir account). */
 export const progressKey = K.progress;
 
 // ---------------------------------------------------------------- progress

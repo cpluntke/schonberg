@@ -22,7 +22,9 @@ import { ChoirScreen, ChoirAdmin, SectionLead, SuperAdmin } from './screens/Choi
 import { InviteScreen } from './screens/Invite';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { UpdatePrompt } from './components/UpdatePrompt';
-import { backupSoon } from '../progress/backup';
+import { flushProgress, syncProgressSoon } from '../progress/sync';
+import { loadSession, onSessionChange } from '../progress/choir';
+import { shareMyProgress } from './play/shareProgress';
 
 const TABS: { name: Route['name']; label: string; icon: React.ReactNode }[] = [
   { name: 'home', label: 'Home', icon: <IconHome /> },
@@ -53,13 +55,21 @@ export function App() {
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);
   }, []);
-  // Progress backup: on start and whenever the app comes back, if something changed (at most once a minute).
+  // Progress kept with the choir account: on start and whenever the app comes back, if something
+  // changed (at most once a minute). A new login also moves this phone's shared progress to the account.
   useEffect(() => {
-    backupSoon();
-    const onBack = () => { if (!document.hidden) backupSoon(); };
+    syncProgressSoon();
+    const onBack = () => { if (!document.hidden) syncProgressSoon(); else flushProgress(); };
     document.addEventListener('visibilitychange', onBack);
     window.addEventListener('focus', onBack);
-    return () => { document.removeEventListener('visibilitychange', onBack); window.removeEventListener('focus', onBack); };
+    window.addEventListener('pagehide', flushProgress);
+    let account = loadSession()?.account.id ?? '';
+    const offSession = onSessionChange(() => {
+      const id = loadSession()?.account.id ?? '';
+      if (id && id !== account) void shareMyProgress(true);
+      account = id;
+    });
+    return () => { document.removeEventListener('visibilitychange', onBack); window.removeEventListener('focus', onBack); window.removeEventListener('pagehide', flushProgress); offSession(); };
   }, []);
   // Accessibility: on every screen change, move focus to the screen's heading and update the title.
   useEffect(() => {

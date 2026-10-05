@@ -4,7 +4,7 @@
 import { loadCycle, loadProfile, getProgress } from '../../progress/store';
 import { getBars, type BarMap } from '../../progress/bars';
 import { pieceReadiness } from '../../progress/ladder';
-import { shareProgress, apiBase } from '../../progress/choir';
+import { shareProgress, apiBase, sessionFor } from '../../progress/choir';
 import { getPiece, chosenPartId, singableSections } from '../library';
 
 const MIN_GAP_MS = 60_000;
@@ -25,12 +25,14 @@ let timer: ReturnType<typeof setTimeout> | null = null;
 
 async function send(): Promise<void> {
   const p = loadProfile();
-  if (!p.choirCode || !p.shareProgress || !p.name.trim() || !apiBase()) return;
+  // Logged in to the choir: the entry is the account's, under the account's name.
+  const name = sessionFor(p.choirCode)?.account.name ?? p.name.trim();
+  if (!p.choirCode || !p.shareProgress || !name || !apiBase()) return;
   if (!['S', 'A', 'T', 'B'].includes(p.voice)) {
     setShareError('Choose soprano, alto, tenor or bass in Voice setup so your section lead can see your progress.');
     return;
   }
-  if (/[/\\?#%]/.test(p.name)) {
+  if (/[/\\?#%]/.test(name)) {
     setShareError('Your name can’t contain / \\ ? # or %. Change it in Voice setup.');
     return;
   }
@@ -48,7 +50,7 @@ async function send(): Promise<void> {
   }
   last = Date.now();
   try {
-    await shareProgress(p.choirCode, p.name.trim(), p.voice, pieces);
+    await shareProgress(p.choirCode, name, p.voice, pieces);
     setShareError(null);
   } catch (e) {
     console.warn('share progress', e);

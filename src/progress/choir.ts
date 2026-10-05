@@ -77,10 +77,7 @@ async function call<T>(path: string, init: RequestInit & { auth?: Auth; member?:
   try { body = await res.json(); } catch { /* not json */ }
   if (!res.ok) {
     // The server ended this session (expired, logged out elsewhere, account removed): forget it here too.
-    if (res.status === 401 && auth && 'bearer' in auth && loadSession()?.token === auth.bearer) {
-      logoutNotice = LOGGED_OUT_ELSEWHERE;
-      saveSession(null);
-    }
+    if (res.status === 401 && auth && 'bearer' in auth && loadSession()?.token === auth.bearer) endSession();
     throw new ChoirApiError(res.status, (body as { error?: string } | null)?.error ?? `Server error (${res.status})`);
   }
   return body as T;
@@ -112,9 +109,7 @@ export async function joinChoir(code: string): Promise<ChoirInfo> {
 export function leaveChoir(): void {
   const p = loadProfile();
   if (p.choirCode && p.shareProgress && p.name.trim()) withdrawProgress(p.choirCode, p.name.trim()).catch(() => {});
-  // Backups were on because of the choir: they stay on (turn them off in Settings).
-  const keepBackup = p.backup === undefined && !!rawGet('schonberg:backupKey') ? { backup: true } : {};
-  saveProfile({ ...p, choirCode: undefined, shareProgress: false, ...keepBackup });
+  saveProfile({ ...p, choirCode: undefined, shareProgress: false });
   writeJSON(CACHE, null);
   try { localStorage.removeItem('sh:choirApplied'); } catch { /* ignore */ }
   // An admin's or section lead's login belongs to that choir.
@@ -199,7 +194,10 @@ export interface SectionView {
 }
 export const fetchSection = (code: string, voice: string, auth: Auth) => call<SectionView>(`/choirs/${enc(code)}/section/${voice}`, { auth });
 
-/** Share my per-bar progress with my section lead (opt-in). */
+/**
+ * Share my per-bar progress with my section lead (opt-in). Logged in to the choir, the entry is the
+ * account's (under its name, from any phone); this phone's anonymous entry moves to it.
+ */
 export function shareProgress(code: string, name: string, voice: string, pieces: Record<string, { readiness: number; level: number; bars: BarMap }>) {
   const body: Record<string, { readiness: number; level: number; bars: Record<string, number> }> = {};
   for (const [id, p] of Object.entries(pieces)) {
@@ -207,17 +205,23 @@ export function shareProgress(code: string, name: string, voice: string, pieces:
     for (const [m, s] of Object.entries(p.bars)) bars[m] = Math.round(s.ema * 100) / 100;
     body[id] = { readiness: p.readiness, level: p.level, bars };
   }
-  return call(`/choirs/${enc(code)}/progress/${enc(name)}`, { method: 'PUT', member: true, ...json({ voice, pieces: body }) });
+  const s = sessionFor(code);
+  return call<{ ok: boolean; name?: string }>(`/choirs/${enc(code)}/progress/${enc(s?.account.name ?? name)}`,
+    { method: 'PUT', member: true, ...(s ? { auth: sessionAuth(s) } : {}), ...json({ voice, pieces: body }) });
 }
-export const withdrawProgress = (code: string, name: string) => call(`/choirs/${enc(code)}/progress/${enc(name)}`, { method: 'DELETE', member: true });
+export function withdrawProgress(code: string, name: string) {
+  const s = sessionFor(code);
+  return call(`/choirs/${enc(code)}/progress/${enc(s?.account.name ?? name)}`, { method: 'DELETE', member: true, ...(s ? { auth: sessionAuth(s) } : {}) });
+}
 
 // ------------------------------------------------------------------ accounts (admins and section leads)
 
-export type Role = 'admin' | 'lead';
+/** admin and lead come from invite links; member = a singer's own account (made with the choir code). */
+export type Role = 'admin' | 'lead' | 'member';
 export interface Account {
   id: string; name: string; role: Role; voices: string[]; createdAt: number; lastLoginAt?: number | null;
   /** How the account was made. */
-  invitedBy?: 'invite' | 'super admin' | 'old password';
+  invitedBy?: 'invite' | 'super admin' | 'old password' | 'sign-up';
 }
 export interface Session { token: string; code: string; choirName: string; account: Account; expiresAt: number }
 export interface InviteInfo {
@@ -248,7 +252,7 @@ export function onSessionChange(cb: () => void): () => void {
 const isSession = (v: unknown): v is Session => {
   const s = v as Session | null;
   return !!s && typeof s.token === 'string' && typeof s.code === 'string' && typeof s.expiresAt === 'number'
-    && !!s.account && typeof s.account.name === 'string' && (s.account.role === 'admin' || s.account.role === 'lead') && Array.isArray(s.account.voices);
+    && !!s.account && typeof s.account.name === 'string' && (s.account.role === 'admin' || s.account.role === 'lead' || s.account.role === 'member') && Array.isArray(s.account.voices);
 };
 
 /** This phone's login (an admin's or section lead's session token, never the password). */
@@ -273,6 +277,17 @@ export function sessionFor(code: string | undefined | null): Session | null {
   return s && code && s.code === code.toLowerCase() ? s : null;
 }
 export const sessionAuth = (s: Session): Auth => ({ bearer: s.token });
+
+/**
+ * The server ended this phone's login (logged out elsewhere, password changed, account removed).
+ * Sharing stops too, so a removed member's phone doesn't quietly share again without the account.
+ */
+export function endSession(): void {
+  logoutNotice = LOGGED_OUT_ELSEWHERE;
+  const p = loadProfile();
+  if (p.shareProgress) saveProfile({ ...p, shareProgress: false });
+  saveSession(null);
+}
 
 /** Use a new login; a different one this phone had (maybe another choir) is ended on the server too. */
 function adoptSession(s: Session): void {
@@ -339,6 +354,19 @@ export async function acceptInvite(token: string, name: string, password: string
   adoptSession(s);
   return s;
 }
+/** A singer makes their own account in their choir (the choir code is enough, no invite). */
+export async function signUp(code: string, name: string, password: string): Promise<Session> {
+  const s = await call<Session>(`/choirs/${enc(code.toLowerCase())}/members`, { method: 'POST', ...json({ name, password }) });
+  adoptSession(s);
+  return s;
+}
+/** A member deletes their own account and the progress it kept. */
+export async function deleteMyAccount(password: string): Promise<void> {
+  const s = loadSession();
+  if (!s) throw new ChoirApiError(401, 'Log in first');
+  await call('/session/account', { method: 'DELETE', auth: { bearer: s.token }, ...json({ password }) });
+  saveSession(null);
+}
 /** Turn the first version's shared admin or section-lead password into my own account. */
 export async function claimAccount(code: string, oldPassword: string, name: string, password: string): Promise<Session> {
   const s = await call<Session>(`/choirs/${enc(code.toLowerCase())}/claim`, { method: 'POST', ...json({ oldPassword, name, password }) });
@@ -389,14 +417,17 @@ export const retireOldPasswords = (code: string, auth: Auth) => call<People>(`/c
 
 /** One choir's storage (scores against the per-choir cap, shared progress, members sharing it). */
 export interface ChoirUsage {
-  scoresBytes: number; progressBytes: number; bytes: number; capBytes: number; pieces: number; maxPieces: number; members: number;
+  scoresBytes: number; progressBytes: number; accountProgressBytes?: number; bytes: number; capBytes: number; pieces: number; maxPieces: number;
+  /** Singers sharing progress with their section lead. */
+  members: number;
+  accounts?: number; memberAccounts?: number; savedProgress?: number;
   /** All Schönberg data on the server (admins' view). */
   server?: { totalBytes: number; capBytes: number };
 }
-/** All Schönberg data on the server, and the singers' backups. */
+/** All Schönberg data on the server, and the progress kept with accounts. */
 export interface ServerUsage {
   totalBytes: number; capBytes: number;
-  backups: { count: number; bytes: number; max: number; capBytes: number };
+  accountProgress: { count: number; bytes: number; capBytes: number };
 }
 export interface ChoirSummary {
   code: string; name: string; pieces: number; createdAt: number; hasAdmin: boolean; programme: string | null; leads: string[]; members: number;
@@ -405,8 +436,9 @@ export interface ChoirSummary {
 }
 export const superList = (pw: string) => call<{ choirs: ChoirSummary[]; usage?: ServerUsage }>('/super/choirs', { auth: { superAdmin: pw } });
 export const fetchChoirUsage = (code: string, auth: Auth) => call<ChoirUsage>(`/choirs/${enc(code)}/usage`, { auth });
-/** "12.3 MB" (one decimal below 10 MB). */
+/** "740 KB" below 1 MB, else "12.3 MB" (one decimal below 10 MB). */
 export function mb(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
   const v = bytes / (1024 * 1024);
   return `${v < 10 ? v.toFixed(1) : Math.round(v)} MB`;
 }
@@ -419,6 +451,9 @@ export async function superCreate(pw: string, code: string, name: string, adminN
 export const superRename = (pw: string, code: string, name: string) =>
   call(`/super/choirs/${enc(code)}`, { method: 'PUT', auth: { superAdmin: pw }, ...json({ name }) });
 export const superDelete = (pw: string, code: string) => call(`/super/choirs/${enc(code)}`, { method: 'DELETE', auth: { superAdmin: pw } });
+/** Remove a choir's member accounts nobody used for `days` days (with the progress they kept). */
+export const superPurgeMembers = (pw: string, code: string, days: number) =>
+  call<{ removed: number }>(`/super/choirs/${enc(code)}/purge-members`, { method: 'POST', auth: { superAdmin: pw }, ...json({ days }) });
 
 // ------------------------------------------------------------------ the super-admin password (this tab only)
 
