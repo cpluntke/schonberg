@@ -82,7 +82,7 @@ test('new singer: level 3 opens in score view, a 1280-wide screen shows every vo
   await expect(page.getByTestId('howto')).toContainText('full score');
   await page.getByTestId('start').click();
   await expect.poll(async () => Number(await page.locator('canvas').getAttribute('data-staves')), { timeout: 10_000 }).toBeGreaterThanOrEqual(4);
-  await expect(page.locator('canvas')).toHaveAttribute('aria-label', 'Full score');
+  await expect(page.locator('canvas')).toHaveAttribute('aria-label', /^Full score: S A T B, your part: /);
   const ink = await page.locator('canvas').evaluate((cv: HTMLCanvasElement) => {
     const d = cv.getContext('2d')!.getImageData(0, 0, cv.width, cv.height).data;
     let n = 0;
@@ -99,6 +99,25 @@ test('new singer: level 3 opens in score view, a 1280-wide screen shows every vo
   await expect(page.getByTestId('staves-toggle')).toHaveCount(0);
   await page.getByTestId('start').click();
   await expect.poll(async () => page.locator('canvas').getAttribute('data-staves'), { timeout: 10_000 }).toBe('1');
+  expect(errors).toEqual([]);
+});
+
+// Off book the full score must not give the part away: no accompaniment (the organ doubles the
+// alto), no words under the other voices.
+test('off book on a laptop: full score of the voices only', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/?simulate=perfect#/play/vierne-kyrie/P2/all?level=5&from=44&to=70');
+  await expect(page.getByTestId('start')).toBeVisible({ timeout: 20_000 });
+  await page.getByRole('button', { name: 'Test: all hidden' }).click();
+  await page.getByTestId('start').click();
+  await expect.poll(async () => page.locator('canvas').getAttribute('aria-label'), { timeout: 10_000 }).toBe('Full score: S A T B, your part: alto');
+  await expect(page.locator('canvas')).toHaveAttribute('data-staves', '4');
+  // The same run at level 3 adds the organ.
+  await page.goto('/?simulate=perfect#/play/vierne-kyrie/P2/all?level=3&from=44&to=70');
+  await page.getByTestId('start').click();
+  await expect.poll(async () => page.locator('canvas').getAttribute('aria-label'), { timeout: 10_000 }).toBe('Full score: S A T B + organ, your part: alto');
   expect(errors).toEqual([]);
 });
 

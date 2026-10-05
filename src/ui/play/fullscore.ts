@@ -13,6 +13,10 @@ export type StaffShow = 'mine' | 'voices' | 'all';
 /** Rule of thumb for a readable full score. */
 export const MAX_VOICE_STAVES = 6;
 export const MAX_INST_STAVES = 2;
+/** The accompaniment is shown by default only for at most this many instrument parts… */
+export const MAX_INST_PARTS = 2;
+/** …playing at most this many notes per beat on average (a hymn-like organ part, not a busy orchestra). */
+export const MAX_ACC_DENSITY = 4;
 
 export interface StaffSpec {
   /** Part id, or 'acc' / 'acc:up' / 'acc:lo' for the accompaniment reduction. */
@@ -23,6 +27,8 @@ export interface StaffSpec {
   short: string;
   clef: Clef;
   kind: 'voice' | 'inst';
+  /** A staff of the accompaniment reduction (braced, barlines through). */
+  acc: boolean;
   own: boolean;
   /** The part has words. */
   hasLyrics: boolean;
@@ -31,8 +37,8 @@ export interface StaffSpec {
 const VT_RANK: Record<VoiceType, number> = { S: 0, A: 1, T: 2, B: 3, other: 4 };
 
 /** Sung parts, top voice first (soprano → bass; divisi and solo parts keep the score's order). */
-export function voiceParts(score: Pick<Score, 'parts'>, ownId: string): Part[] {
-  const ps = score.parts.filter((p) => p.notes.length && (p.voiceType !== 'other' || p.id === ownId));
+export function voiceParts(score: Pick<Score, 'parts'>): Part[] {
+  const ps = score.parts.filter((p) => p.notes.length && p.voiceType !== 'other');
   return ps.map((p, i) => ({ p, i })).sort((a, b) => VT_RANK[a.p.voiceType] - VT_RANK[b.p.voiceType] || a.i - b.i).map((x) => x.p);
 }
 
@@ -73,10 +79,20 @@ export function accompaniment(parts: Part[]): Part[] {
   return [mkPart('acc:up', name, all.filter((n) => n.midi >= 60)), mkPart('acc:lo', name, all.filter((n) => n.midi < 60))];
 }
 
-/** Short label for a staff: S, A, T, B (A1, A2 for divisi; "A solo"), "Org.", "Pno."… */
+/** Average notes per beat of the instrument parts over the beats where they play. */
+export function accompanimentDensity(parts: Part[]): number {
+  const notes = parts.flatMap((p) => p.notes);
+  if (!notes.length) return 0;
+  const a = Math.min(...notes.map((n) => n.startBeat));
+  const b = Math.max(...notes.map((n) => n.startBeat + n.durBeats));
+  return notes.length / Math.max(1, b - a);
+}
+
+/** Short label for a staff: S, A, T, B (A1, A2 for divisi; "A solo"), "Org.", "Ped.", "Pno."… */
 export function shortName(p: Pick<Part, 'name' | 'voiceType'>): string {
   const n = p.name.trim();
   if (p.voiceType === 'other') {
+    if (/pedal|pédale|pedale/i.test(n)) return 'Ped.';
     if (/piano|klavier|pianoforte/i.test(n)) return 'Pno.';
     if (/organ|orgel|orgue/i.test(n)) return 'Org.';
     if (/accomp/i.test(n)) return 'Acc.';
@@ -92,38 +108,71 @@ export function shortName(p: Pick<Part, 'name' | 'voiceType'>): string {
   return p.voiceType;
 }
 
-/** Staves for a choice of what to show: voices top to bottom, then the accompaniment. */
+const avgMidi = (p: Part) => (p.notes.length ? p.notes.reduce((a, n) => a + n.midi, 0) / p.notes.length : 60);
+
+/**
+ * Staves for a choice of what to show: voices top to bottom (bracketed), then the instruments: the
+ * accompaniment reduction (braced) and, when the singer practises an instrument line, that line on
+ * its own staff, above or below the reduction by pitch.
+ */
 export function planStaves(score: Pick<Score, 'parts'>, ownId: string, show: StaffShow): StaffSpec[] {
   const own = score.parts.find((p) => p.id === ownId);
-  const voice = (p: Part): StaffSpec => ({
-    id: p.id, part: p, name: p.name, short: shortName(p), clef: clefFor(p), kind: 'voice', own: p.id === ownId,
-    hasLyrics: p.notes.some((n) => n.lyric),
+  const staff = (p: Part): StaffSpec => ({
+    id: p.id, part: p, name: p.name, short: shortName(p), clef: clefFor(p), kind: p.voiceType === 'other' ? 'inst' : 'voice',
+    acc: false, own: p.id === ownId, hasLyrics: p.notes.some((n) => n.lyric),
   });
-  if (show === 'mine') return own ? [voice(own)] : [];
-  const out = voiceParts(score, ownId).map(voice);
-  if (show === 'all') {
-    const acc = accompaniment(instrumentParts(score, ownId));
-    for (const p of acc) {
-      const clef: Clef = p.id === 'acc:up' ? 'treble' : p.id === 'acc:lo' ? 'bass' : clefFor(p);
-      out.push({ id: p.id, part: p, name: p.name, short: shortName(p), clef, kind: 'inst', own: false, hasLyrics: false });
-    }
-  }
+  if (show === 'mine') return own ? [staff(own)] : [];
+  const out = voiceParts(score).map(staff);
+  const ownInst = own && own.voiceType === 'other' && own.notes.length ? staff(own) : null;
+  const acc: StaffSpec[] = show === 'all' ? accompaniment(instrumentParts(score, ownId)).map((p) => ({
+    id: p.id, part: p, name: p.name, short: shortName(p), clef: p.id === 'acc:up' ? 'treble' : p.id === 'acc:lo' ? 'bass' : clefFor(p),
+    kind: 'inst', acc: true, own: false, hasLyrics: false,
+  })) : [];
+  if (ownInst && acc.length && avgMidi(ownInst.part) < avgMidi({ notes: acc.flatMap((x) => x.part.notes) } as Part)) out.push(...acc, ownInst);
+  else out.push(...(ownInst ? [ownInst] : []), ...acc);
   return out;
 }
 
 /**
  * What to show when the singer hasn't chosen: all voices plus the accompaniment when that stays
- * readable (≤ 6 voice staves and the accompaniment on ≤ 2), else the voices only.
+ * readable (≤ 6 voice staves, ≤ 2 instrument parts on ≤ 2 staves, ≤ 4 notes a beat), else the
+ * voices only (the singer can still add the accompaniment).
  */
 export function defaultShow(score: Pick<Score, 'parts'>, ownId: string): StaffShow {
-  const v = voiceParts(score, ownId).length;
-  const i = accompaniment(instrumentParts(score, ownId)).length;
-  return i > 0 && v <= MAX_VOICE_STAVES && i <= MAX_INST_STAVES ? 'all' : 'voices';
+  const v = voiceParts(score).length;
+  const inst = instrumentParts(score, ownId);
+  const i = accompaniment(inst).length;
+  return i > 0 && v <= MAX_VOICE_STAVES && i <= MAX_INST_STAVES && inst.length <= MAX_INST_PARTS
+    && accompanimentDensity(inst) <= MAX_ACC_DENSITY ? 'all' : 'voices';
 }
 
 /** Does the piece have anything beyond the singer's own staff to show? */
 export function hasOtherStaves(score: Pick<Score, 'parts'>, ownId: string): { voices: boolean; accompaniment: boolean } {
-  return { voices: voiceParts(score, ownId).length > 1, accompaniment: instrumentParts(score, ownId).length > 0 };
+  return { voices: voiceParts(score).some((p) => p.id !== ownId), accompaniment: instrumentParts(score, ownId).length > 0 };
+}
+
+/** Is a choice of what to show more than the singer's own staff (so the full score is drawn)? */
+export function isFullScore(score: Pick<Score, 'parts'>, ownId: string, show: StaffShow): boolean {
+  return planStaves(score, ownId, show).length > 1;
+}
+
+/**
+ * Notes of another part that double one of yours (same onset, same pitch class: a unison or an
+ * octave): other note index → your note index. Off book they would give your hidden note away.
+ */
+export function doublings(own: Part, other: Part): Map<number, number> {
+  const at = new Map<number, { pc: number; i: number }[]>();
+  own.notes.forEach((n, i) => {
+    const k = Math.round(n.startBeat * 48);
+    (at.get(k) ?? at.set(k, []).get(k)!).push({ pc: ((Math.round(n.midi) % 12) + 12) % 12, i });
+  });
+  const out = new Map<number, number>();
+  other.notes.forEach((n, j) => {
+    const pc = ((Math.round(n.midi) % 12) + 12) % 12;
+    const hit = at.get(Math.round(n.startBeat * 48))?.find((x) => x.pc === pc);
+    if (hit) out.set(j, hit.i);
+  });
+  return out;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -138,6 +187,8 @@ export interface FullOpts {
   maxBars?: number;
   /** x of the staff lines' start (room for names and brackets to its left). */
   left: number;
+  /** Each system starts with the previous one's last bar (one system per screen: turn a bar early). */
+  overlap?: boolean;
   right?: number;
 }
 
@@ -244,6 +295,30 @@ function jointWidth(bars: StaffMeasure[], lyricOn: boolean[], sp: number, textW:
   return { changeW, lead, onsets, rel: rel.slice(0, n), total: changeW + lead + end };
 }
 
+/**
+ * Greedy system breaking where every system after the first starts again with the previous
+ * system's last bar. With one system on screen the page then turns as that bar begins, and the
+ * bar you're in is still there, at the start of the new system: you always see at least a bar ahead.
+ */
+export function breakSystemsOverlap(first: number[], rest: number[], avail: number, maxBars: number): number[][] {
+  const out: number[][] = [];
+  let i = 0;
+  while (i < first.length) {
+    const sys = [i];
+    let w = first[i];
+    let j = i + 1;
+    while (j < first.length && sys.length < maxBars && w + rest[j] <= avail) {
+      w += rest[j];
+      sys.push(j);
+      j++;
+    }
+    out.push(sys);
+    if (j >= first.length) break;
+    i = sys.length >= 2 ? j - 1 : j;
+  }
+  return out;
+}
+
 /** Lay out bars m0..m1 of every staff into systems of width `width`, aligned across staves. */
 export function layoutFullScore(score: Score, staves: StaffSpec[], m0: number, m1: number, o: FullOpts): FullLayout {
   const sp = o.sp;
@@ -268,7 +343,7 @@ export function layoutFullScore(score: Score, staves: StaffSpec[], m0: number, m
     return (CLEF_W + kw + (sm.timeChange ? TIME_W : 0) + 0.4) * sp;
   };
   const groups = nBars && staves.length
-    ? breakSystems(opening.map((w, k) => prefixW(k) + w.total), inner.map((w) => w.total), avail, maxBars)
+    ? (o.overlap ? breakSystemsOverlap : breakSystems)(opening.map((w, k) => prefixW(k) + w.total), inner.map((w) => w.total), avail, maxBars)
     : [];
   const out: FullStaff[] = staves.map((spec, si) => {
     let minStep = middleStep(spec.clef) - 4;

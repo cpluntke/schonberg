@@ -4,9 +4,10 @@ import { makePart, makeScore } from '../../game/testutil';
 import { importScoreFile } from '../../music/import';
 import type { Part, Score, VoiceType } from '../../music/types';
 import {
-  accompaniment, defaultShow, hasOtherStaves, layoutFullScore, MAX_VOICE_STAVES, planStaves, shortName, voiceParts,
-  type StaffSpec,
+  accompaniment, accompanimentDensity, breakSystemsOverlap, defaultShow, doublings, hasOtherStaves, isFullScore, layoutFullScore,
+  MAX_VOICE_STAVES, planStaves, shortName, voiceParts, type StaffSpec,
 } from './fullscore';
+import { systemAt } from './staff2d';
 import { layoutStaff } from './staff2d';
 
 const textW = (t: string) => t.length * 7;
@@ -83,8 +84,48 @@ describe('which staves', () => {
   it('never puts your own part into the reduction, even if it is an instrument line', () => {
     const s = makeScore([part('s', 'S', bars(1, 72, 1)), part('x', 'other', bars(1, 60, 1)), part('pno', 'other', bars(1, 48, 1))]);
     const st = planStaves(s, 'x', 'all');
-    expect(st.map((x) => [x.id, x.own])).toEqual([['s', false], ['x', true], ['acc', false]]);
-    expect(voiceParts(s, 'x').map((p) => p.id)).toEqual(['s', 'x']);
+    expect(st.map((x) => [x.id, x.own, x.kind, x.acc])).toEqual([['s', false, 'voice', false], ['x', true, 'inst', false], ['acc', false, 'inst', true]]);
+    expect(voiceParts(s).map((p) => p.id)).toEqual(['s']);
+  });
+
+  it('practising the Kyrie organ pedal: pedal staff under the organ, outside the voices', async () => {
+    const kyrie = await load('public/pieces/pd/vierne-kyrie.mxl');
+    const st = planStaves(kyrie, 'P6', 'all');
+    expect(st.map((x) => [x.id, x.short, x.kind, x.acc])).toEqual([
+      ['P1', 'S', 'voice', false], ['P2', 'A', 'voice', false], ['P3', 'T', 'voice', false], ['P4', 'B', 'voice', false],
+      ['acc:up', 'Org.', 'inst', true], ['acc:lo', 'Org.', 'inst', true], ['P6', 'Ped.', 'inst', false],
+    ]);
+    expect(st.filter((x) => x.own).map((x) => x.id)).toEqual(['P6']);
+    // Only the organ (not the pedal) is in the reduction.
+    expect(st[4].part.notes.length + st[5].part.notes.length).toBe(kyrie.parts.find((p) => p.id === 'P5')!.notes.length);
+  });
+
+  it('solo voice with piano is a full score (voice + piano)', () => {
+    const s = makeScore([part('v', 'S', bars(2, 72, 1)), part('pno', 'other', [[48, 4], [72, 4]], 'Piano')]);
+    expect(defaultShow(s, 'v')).toBe('all');
+    expect(isFullScore(s, 'v', 'all')).toBe(true);
+    expect(isFullScore(s, 'v', 'voices')).toBe(false);
+    expect(hasOtherStaves(s, 'v')).toEqual({ voices: false, accompaniment: true });
+  });
+
+  it('leaves a busy or many-part accompaniment out by default (it can still be added)', () => {
+    const satb = ['S', 'A', 'T', 'B'].map((v, i) => part(v, v as VoiceType, bars(2, 72 - 5 * i, 1)));
+    const strings = ['Violin 1', 'Violin 2', 'Viola', 'Cello'].map((n, i) => part(`str${i}`, 'other', bars(2, 76 - 10 * i, 1), n));
+    expect(defaultShow(makeScore([...satb, ...strings]), 'A')).toBe('voices');
+    expect(planStaves(makeScore([...satb, ...strings]), 'A', 'all').length).toBe(6);
+    // Piano in running sixteenths in both hands: 8 notes a beat.
+    const rh = part('rh', 'other', bars(2, 72, 0.25), 'Piano');
+    const lh = part('lh', 'other', bars(2, 48, 0.25), 'Piano');
+    expect(accompanimentDensity([rh, lh])).toBeCloseTo(8);
+    expect(defaultShow(makeScore([...satb, rh, lh]), 'A')).toBe('voices');
+    const hymn = part('org', 'other', bars(2, 60, 1), 'Organ');
+    expect(defaultShow(makeScore([...satb, hymn]), 'A')).toBe('all');
+  });
+
+  it('finds the notes of another voice that double yours (unison or octave, same onset)', () => {
+    const own = part('a', 'A', [[64, 1], [65, 1], [67, 2]]);
+    const oth = part('t', 'T', [[52, 1], [57, 0.5], [65, 0.5], [55, 2]]); // octave E, A, F off the beat, octave G
+    expect([...doublings(own, oth)]).toEqual([[0, 0], [3, 2]]);
   });
 
   it('abbreviates part names', () => {
@@ -163,6 +204,24 @@ describe('joint layout', () => {
     expect(12 / wide).toBeGreaterThanOrEqual(4); // a laptop shows at least four bars per system here
     const capped = layoutFullScore(s, staves, 0, 11, { width: 5000, sp: 7, textW, lyricIds: new Set(), left: 50, maxBars: 5 });
     expect(Math.max(...capped.staves[0].systems.map((sy) => sy.measures.length))).toBe(5);
+  });
+
+  it('one system per screen: each system starts again with the previous one\'s last bar (turns a bar early)', () => {
+    expect(breakSystemsOverlap([10, 10, 10, 10, 10, 10, 10], [10, 10, 10, 10, 10, 10, 10], 35, 12)).toEqual([[0, 1, 2], [2, 3, 4], [4, 5, 6]]);
+    // A single bar per system still moves on.
+    expect(breakSystemsOverlap([50, 50, 50], [50, 50, 50], 40, 12)).toEqual([[0], [1], [2]]);
+    const staves = planStaves(s, 'a', 'voices');
+    const F = layoutFullScore(s, staves, 0, 11, { width: 900, sp: 8, textW, lyricIds: new Set(), left: 50, overlap: true });
+    const sys = F.staves[1].systems;
+    expect(sys.length).toBeGreaterThan(1);
+    for (let j = 1; j < sys.length; j++) {
+      const prevLast = sys[j - 1].measures[sys[j - 1].measures.length - 1].sm.index;
+      expect(sys[j].measures[0].sm.index).toBe(prevLast);
+      // While that bar is sung the page has turned: the bar is on the new system, with what follows.
+      expect(systemAt(sys, sys[j].startBeat + 0.5)).toBe(j);
+      expect(systemAt(sys, sys[j].startBeat - 0.5)).toBe(j - 1);
+    }
+    expect(sys[sys.length - 1].measures.at(-1)!.sm.index).toBe(11);
   });
 
   it('lyrics under every voice push columns apart where a syllable needs it', () => {

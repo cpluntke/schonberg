@@ -25,7 +25,7 @@ import { setLastRun } from '../play/runExport';
 import { getBars, knownByHeart, provenOffBook, recordBars } from '../../progress/bars';
 import { drawHighway2D, pitchWindow, wordInitial, type DrawState } from '../play/highway2d';
 import { drawScoreView } from '../play/fullscore2d';
-import { defaultShow, hasOtherStaves } from '../play/fullscore';
+import { defaultShow, hasOtherStaves, isFullScore } from '../play/fullscore';
 import { drawArcade, lanesFor, newFx } from '../play/arcade3d';
 import { setLastResult } from '../play/lastResult';
 import { IconBack, IconPause, IconPlay, IconRestart, IconStop } from '../icons';
@@ -158,7 +158,10 @@ function SingPlay({ route }: { route: PlayRoute }) {
   const autoStaves = useMemo(() => (piece && part ? defaultShow(piece.score, part.id) : 'voices'), [piece, part]);
   const staves = profile.scoreStaves ?? autoStaves;
   const others = useMemo(() => (piece && part ? hasOtherStaves(piece.score, part.id) : { voices: false, accompaniment: false }), [piece, part]);
-  const fullScore = wide && display === 'score' && staves !== 'mine' && others.voices;
+  const fullScore = useMemo(() => wide && display === 'score' && !!piece && !!part && isFullScore(piece.score, part.id, staves),
+    [wide, display, piece, part, staves]);
+  /** Tapping what Automatic would show keeps Automatic (nothing is pinned). */
+  const pickStaves = (v: 'mine' | 'voices' | 'all') => updateProfile({ scoreStaves: v === autoStaves ? undefined : v });
   const singerIsHigh = profile.voice === 'S' || profile.voice === 'A';
   const partIsHigh = part ? part.voiceType === 'S' || part.voiceType === 'A' : singerIsHigh;
   // Singing a part written for the other voice range (e.g. a tenor practising the soprano line)
@@ -408,6 +411,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
         const info = drawScoreView(c, W, H, st);
         const n = String(info.staves);
         if (canvas.dataset.staves !== n) canvas.dataset.staves = n;
+        if (canvas.getAttribute('aria-label') !== info.label) canvas.setAttribute('aria-label', info.label);
       }
       else drawHighway2D(c, W, H, st);
 
@@ -495,7 +499,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
   const canToggleOwn = listenOnly || level <= 2;
 
   return (
-    <main className="play">
+    <main className={display === 'score' && route.mode === '2d' ? 'play play-score' : 'play'}>
       <h1 className="sr-only">{piece.title}: {part.name}, {section.label}</h1>
       <div className="play-hud">
         <button className="icon-btn" aria-label="Back" onClick={() => { sessionRef.current?.dispose(); leave(); }}><IconBack /></button>
@@ -514,7 +518,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
       </div>
 
       <div className="play-canvas-wrap" ref={wrapRef}>
-        <canvas ref={canvasRef} aria-label={display === 'score' ? (fullScore ? 'Full score' : 'Sheet music') : 'Note highway'} role="img" data-display={display} />
+        <canvas ref={canvasRef} aria-label={display === 'score' ? undefined : route.mode === '3d' ? 'Arcade' : 'Note highway'} role="img" data-display={display} />
         {hud.count > 0 && running && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
             <span style={{ fontSize: 96, fontWeight: 800, color: 'var(--accent)', textShadow: '0 0 24px #FF7A45' }}>{hud.count}</span>
@@ -579,14 +583,15 @@ function SingPlay({ route }: { route: PlayRoute }) {
                   </div>
                 </div>
               )}
-              {route.mode === '2d' && wide && display === 'score' && others.voices && (
+              {route.mode === '2d' && wide && display === 'score' && (others.voices || others.accompaniment) && (
                 <div className="col" style={{ gap: 4 }}>
-                  <span className="tiny muted" id="staves-label">Show <span style={{ opacity: 0.8 }}>(remembered)</span></span>
+                  <span className="tiny muted" id="staves-label">Show <span style={{ opacity: 0.8 }}>{profile.scoreStaves ? '(remembered)' : '(automatic)'}</span></span>
                   <div className="seg" role="group" aria-labelledby="staves-label" data-testid="staves-toggle">
-                    <button aria-pressed={staves === 'mine'} onClick={() => updateProfile({ scoreStaves: 'mine' })}>My part</button>
-                    <button aria-pressed={staves === 'voices' || (staves === 'all' && !others.accompaniment)} onClick={() => updateProfile({ scoreStaves: 'voices' })}>All voices</button>
-                    {others.accompaniment && <button aria-pressed={staves === 'all'} onClick={() => updateProfile({ scoreStaves: 'all' })} data-testid="staves-all">+ Accomp.</button>}
+                    <button aria-pressed={staves === 'mine' || (staves === 'voices' && !others.voices)} onClick={() => pickStaves('mine')}>My part</button>
+                    {others.voices && <button aria-pressed={staves === 'voices' || (staves === 'all' && !others.accompaniment)} onClick={() => pickStaves('voices')}>All voices</button>}
+                    {others.accompaniment && <button aria-pressed={staves === 'all'} onClick={() => pickStaves('all')} data-testid="staves-all">{others.voices ? '+ Accomp.' : 'With accomp.'}</button>}
                   </div>
+                  {offBook && staves !== 'mine' && <span className="tiny muted">Off book the full score shows the other voices without their words or the accompaniment, so nothing gives your part away.</span>}
                 </div>
               )}
               {level === 1 && (

@@ -85,7 +85,7 @@ export function Settings() {
               {profile.scoreStaves === 'mine' ? 'Only your part, large.'
                 : profile.scoreStaves === 'voices' ? 'The full score of the voices, your part highlighted.'
                   : profile.scoreStaves === 'all' ? 'All voices and the piano or organ, your part highlighted (the accompaniment drops out if the screen is too small).'
-                    : 'All voices, plus the piano or organ when the score stays readable (up to 6 voices).'}
+                    : 'All voices, plus the piano or organ when the score stays readable (up to 6 voices, a not-too-busy accompaniment).'}
             </span>
           </>
         )}

@@ -1383,6 +1383,8 @@ export interface Vis {
   inRange: (i: number) => boolean;
   /** Another voice in the full score: drawn plainly in these colours (no grades, no glow). */
   plain?: { note: string; lyric: string };
+  /** Draw only the notes (an overlay on a staff already drawn: no rests, triplet numbers or words). */
+  notesOnly?: boolean;
 }
 
 /** Opacity of a note: notes outside your section are faded (not in another voice's plain staff). */
@@ -1557,6 +1559,7 @@ export function drawStaffNotes(c: Ctx, g: SysGeo, layout: StaffLayout, L: Cached
     const e = eg.ev;
     const x = eg.x;
     if (e.kind === 'rest') {
+      if (v.notesOnly) continue;
       const pastRest = beatToTime(s.score.tempos, e.start + e.dur) <= s.pos;
       if (hiddenBars?.includes(eg.m.sm.index) && !pastRest) continue;
       c.fillStyle = INK.rest;
@@ -1620,6 +1623,7 @@ export function drawStaffNotes(c: Ctx, g: SysGeo, layout: StaffLayout, L: Cached
   c.globalAlpha = 1;
 
   // Triplet numbers.
+  if (v.notesOnly) return;
   if (sd.tups.length) {
     c.font = `italic 700 ${Math.round(sp * 1.25)}px Georgia, serif`;
     c.textAlign = 'center';

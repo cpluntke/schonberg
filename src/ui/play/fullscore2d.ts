@@ -9,7 +9,7 @@ import {
   drawTrace, fontGeneration, lyricFontFor, measureSpan, middleStep, spell, systemAt, updateTrace, xAtBeat,
   type Cached, type StaffLayout, type SysGeo, type Vis,
 } from './staff2d';
-import { layoutFullScore, planStaves, type FullLayout, type StaffShow, type StaffSpec } from './fullscore';
+import { doublings, layoutFullScore, planStaves, type FullLayout, type StaffShow, type StaffSpec } from './fullscore';
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -21,10 +21,14 @@ const SP_GOOD = 7;
 const SP_MIN = 5.6;
 /** Extra space between two systems (staff spaces). */
 const SYS_GAP = 2.2;
+/** Two systems are worth a slightly smaller staff (words only under yours). */
+const SP_TWO = 6.2;
 
 /** What the score view drew (for the screen around it). */
 export interface ScoreViewInfo {
   full: boolean;
+  /** What's shown, for screen readers ("Full score: S A T B + organ, your part: alto"). */
+  label: string;
   /** Staves drawn (1 = your part only). */
   staves: number;
   accompaniment: boolean;
@@ -46,6 +50,10 @@ interface StaffRow {
   L: Cached;
   /** DrawState for another voice's staff (plain, its own notes). */
   s: DrawState | null;
+  /** Off book: this staff's notes that double yours (their index → yours). */
+  doubled: Map<number, number> | null;
+  /** How the static layer draws this staff (without the doublings). */
+  plain: Vis;
 }
 
 interface FullCache {
@@ -67,18 +75,25 @@ let full: FullCache | null = null;
 /** Layouts that didn't fit (key → null) so they aren't tried again every frame. */
 let noFit: string | null = null;
 
+/** A duration that is written as a triplet (its "3" goes above the staff). */
+const isTriplet = (d: number) => Math.abs(d * 3 - Math.round(d * 3)) < 0.02 && Math.abs(d * 4 - Math.round(d * 4)) > 0.02;
+
 /** Vertical room of a staff (staff spaces), from the notes of the section. */
 function extents(spec: StaffSpec, key: KeySig, from: number, to: number, lyrics: boolean, first: boolean) {
   const mid = middleStep(spec.clef);
   let lo = mid - 4;
   let hi = mid + 4;
+  let tup = false;
   for (const n of spec.part.notes) {
     if (n.start + n.dur <= from || n.start >= to) continue;
     const st = spell(n.midi, key).step;
     if (st < lo) lo = st;
     if (st > hi) hi = st;
+    if (!tup && isTriplet(n.durBeats)) tup = true;
   }
   let above = Math.max(spec.own ? 2.6 : 1.5, (hi - (mid + 4)) / 2 + 1.5);
+  // Triplet numbers sit above the stems: keep them out of the words of the staff above.
+  if (tup) above = Math.max(above + 1.6, 3.4);
   if (first) above = Math.max(above, 2.7); // bar numbers
   const noteBelow = ((mid - 4) - lo) / 2;
   const lyricOff = Math.max(2.9, noteBelow + 2.4);
@@ -86,9 +101,9 @@ function extents(spec: StaffSpec, key: KeySig, from: number, to: number, lyrics:
   return { above, below, lyricOff };
 }
 
-function candidates(show: StaffShow): { show: StaffShow; lyrics: 'all' | 'own' }[] {
-  if (show === 'all') return [{ show: 'all', lyrics: 'all' }, { show: 'all', lyrics: 'own' }, { show: 'voices', lyrics: 'all' }, { show: 'voices', lyrics: 'own' }];
-  return [{ show: 'voices', lyrics: 'all' }, { show: 'voices', lyrics: 'own' }];
+/** Off book, other voices' words would be your words: none, and no accompaniment (it doubles you). */
+function shows(show: StaffShow, offBook: boolean): StaffShow[] {
+  return offBook || show === 'voices' ? ['voices'] : ['all', 'voices'];
 }
 
 function stripLyrics(p: Part): Part {
@@ -96,29 +111,43 @@ function stripLyrics(p: Part): Part {
 }
 
 function getFull(c: Ctx, W: number, H: number, s: DrawState, show: StaffShow): FullCache | null {
-  const key = `${s.score.id}|${s.part.id}|${s.part.notes.length}|${s.from}|${s.to}|${W}|${H}|${fontGeneration()}|${show}`;
+  const offBook = !!s.hide;
+  const key = `${s.score.id}|${s.part.id}|${s.part.notes.length}|${s.from}|${s.to}|${W}|${H}|${fontGeneration()}|${show}|${offBook}`;
   if (full && full.key === key) return full;
   if (noFit === key) return null;
   const [m0, m1] = measureSpan(s.score, s.from, s.to);
   const key0 = s.key;
   const avail = H - 12;
-  // Most systems that stay readable: all staves with words under every voice if possible, then
-  // words only under yours, then without the accompaniment; two or three systems when they fit at
-  // a good size, else one.
+  // What to draw, for each choice of staves (the singer's first): at least two systems, so the
+  // next line is always in view: with words under every voice at a good size, else words only
+  // under yours at a slightly smaller size. Only then one system (it turns a bar early, see
+  // breakSystemsOverlap), and only then fewer staves.
   type Pick = { specs: StaffSpec[]; ex: ReturnType<typeof extents>[]; lyr: boolean[]; n: number; sp: number; lyrics: 'all' | 'own'; show: StaffShow };
   let pick: Pick | null = null;
-  const tries: Pick[] = [];
-  for (const cand of candidates(show)) {
-    const specs = planStaves(s.score, s.part.id, cand.show);
-    if (specs.length < 2 || !specs.some((x) => x.own)) continue;
-    const lyr = specs.map((x) => x.hasLyrics && (x.own || cand.lyrics === 'all'));
+  const sized = (sh: StaffShow, lyrics: 'all' | 'own', n: number): Pick | null => {
+    const specs = planStaves(s.score, s.part.id, sh);
+    if (specs.length < 2 || !specs.some((x) => x.own)) return null;
+    const lyr = specs.map((x) => x.hasLyrics && (x.own || (lyrics === 'all' && !offBook)));
     const ex = specs.map((x, i) => extents(x, key0, s.from, s.to, lyr[i], i === 0));
     const U = ex.reduce((a, e) => a + e.above + 4 + e.below, 0);
-    for (let n = 3; n >= 1; n--) tries.push({ specs, ex, lyr, n, sp: Math.min(SP_MAX, avail / (n * (U + SYS_GAP))), lyrics: cand.lyrics, show: cand.show });
+    return { specs, ex, lyr, n, sp: Math.min(SP_MAX, avail / (n * (U + SYS_GAP))), lyrics, show: sh };
+  };
+  const rules: [('all' | 'own'), number, number][] = [
+    ['all', 3, SP_GOOD], ['all', 2, SP_GOOD], ['own', 3, SP_TWO], ['own', 2, SP_TWO], ['all', 1, SP_GOOD - 0.5], ['own', 1, SP_GOOD - 0.5],
+  ];
+  for (const sh of shows(show, offBook)) {
+    for (const [lyrics, n, min] of rules) {
+      const t = sized(sh, lyrics, n);
+      if (t && t.sp >= min) { pick = t; break; }
+    }
+    if (pick) break;
   }
-  // The first choice that is comfortably readable (several systems, else one), else any that's legible.
-  pick = tries.find((t) => (t.n > 1 && t.sp >= SP_GOOD) || (t.n === 1 && t.sp >= SP_GOOD - 0.5))
-    ?? tries.find((t) => t.n === 1 && t.sp >= SP_MIN) ?? null;
+  if (!pick) {
+    for (const sh of shows(show, offBook)) {
+      const t = sized(sh, 'own', 1);
+      if (t && t.sp >= SP_MIN) { pick = t; break; }
+    }
+  }
   if (!pick) {
     noFit = key;
     return null;
@@ -135,7 +164,7 @@ function getFull(c: Ctx, W: number, H: number, s: DrawState, show: StaffShow): F
   for (let guard = 0; ; guard++) {
     c.font = lyricFontFor(sp);
     const textW = (t: string) => c.measureText(t).width;
-    F = layoutFullScore(s.score, specs, m0, m1, { width: W, sp, textW, lyricIds, left, maxBars: 12 });
+    F = layoutFullScore(s.score, specs, m0, m1, { width: W, sp, textW, lyricIds, left, maxBars: 12, overlap: pick.n === 1 });
     let worst = Infinity;
     for (const sy of F.staves[0]?.systems ?? []) worst = Math.min(worst, sy.squeeze);
     if (worst >= 0.85 || sp <= SP_MIN + 1e-6 || guard >= 4) break;
@@ -149,21 +178,31 @@ function getFull(c: Ctx, W: number, H: number, s: DrawState, show: StaffShow): F
     const L: Cached = {
       key, layout, above: e.above, below: e.below, band: 0, lyricFont: lyricFontFor(sp), lyricOff: e.lyricOff, sys: [], textW: new Map(),
     };
+    // Off book: notes doubling yours (unison or octave, same onset) are drawn only once yours show.
+    const dbl = offBook && !fs.spec.own ? doublings(s.part, fs.spec.part) : null;
     const row: StaffRow = {
       spec: fs.spec, y, above: e.above, below: e.below, lyrics: lyr[i], L,
       s: fs.spec.own ? null : { ...s, part: lyr[i] ? fs.spec.part : stripLyrics(fs.spec.part), range: null, hide: undefined, live: null, samples: [] },
+      doubled: dbl && dbl.size ? dbl : null,
+      plain: dbl && dbl.size ? { ...PLAIN, vis: (j: number) => (dbl.has(j) ? 'none' : 'show') } : PLAIN,
     };
     y += 4 + e.below;
     return row;
   });
   const own = rows.findIndex((r) => r.spec.own);
   const sysH = y * sp;
+  const lowerName = (x: string) => x.toLowerCase();
+  const voicesTxt = rows.filter((r) => r.spec.kind === 'voice').map((r) => r.spec.short).join(' ');
+  const accRow = rows.find((r) => r.spec.acc);
+  const instOwn = rows.find((r) => r.spec.kind === 'inst' && !r.spec.acc);
+  const label = `Full score: ${voicesTxt}${instOwn ? `${voicesTxt ? ' + ' : ''}${lowerName(instOwn.spec.name)}` : ''}`
+    + `${accRow ? ` + ${lowerName(accRow.spec.name)}` : ''}, your part: ${lowerName(s.part.name)}`;
   const fit = Math.max(1, Math.floor(avail / (sysH + SYS_GAP * sp)));
   full = {
     key, F, rows, own, sp, sysH, fit, nameFont: nameFont(nameSize), layers: new Map(), layerDpr: 0,
     info: {
-      full: true, staves: rows.length, accompaniment: rows.some((r) => r.spec.kind === 'inst'),
-      lyricsAll: pick.lyrics === 'all' || rows.filter((r) => r.spec.hasLyrics).length <= 1, systems: fit,
+      full: true, staves: rows.length, accompaniment: rows.some((r) => r.spec.acc), label,
+      lyricsAll: rows.every((r) => !r.spec.hasLyrics || r.lyrics), systems: fit,
     },
   };
   return full;
@@ -189,7 +228,7 @@ function drawScoreViewInner(c: Ctx, W: number, H: number, s: DrawState): ScoreVi
   const F = W >= FULL_MIN_W && show !== 'mine' ? getFull(c, W, H, s, show) : null;
   if (!F) {
     drawStaff2D(c, W, H, s);
-    return { full: false, staves: 1, accompaniment: false, lyricsAll: false, systems: 0 };
+    return { full: false, label: `Sheet music: ${s.part.name}`, staves: 1, accompaniment: false, lyricsAll: false, systems: 0 };
   }
   drawFull(c, W, H, s, F);
   return F.info;
@@ -210,7 +249,7 @@ function systemGeos(F: FullCache, j: number, sysTop: number, s: DrawState): SysG
 function drawStatic(c: Ctx, F: FullCache, geos: SysGeo[], s: DrawState) {
   drawSystemFrame(c, F, geos, s, geos[0].j);
   F.rows.forEach((r, i) => {
-    if (r.s) drawStaffNotes(c, geos[i], r.L.layout, r.L, r.s, PLAIN);
+    if (r.s) drawStaffNotes(c, geos[i], r.L.layout, r.L, r.s, r.plain);
   });
 }
 
@@ -269,6 +308,7 @@ function drawFull(c: Ctx, W: number, H: number, s: DrawState, F: FullCache) {
   const v: Vis = { vis, isPast, isNow, inRange };
   const dpr = c.getTransform().a || 1;
   if (F.layerDpr !== dpr) {
+    for (const cv of F.layers.values()) cv.width = cv.height = 0;
     F.layers.clear();
     F.layerDpr = dpr;
   }
@@ -286,10 +326,22 @@ function drawFull(c: Ctx, W: number, H: number, s: DrawState, F: FullCache) {
     const layer = staticLayer(F, j, W, dpr, s);
     if (layer) c.drawImage(layer, 0, sysTop - LAYER_M * sp, W, layer.height / dpr);
     else drawStatic(c, F, geos, s);
+    rows.forEach((r, i) => {
+      const d = r.doubled;
+      if (!d || !r.s) return;
+      const live: Vis = { ...PLAIN, notesOnly: true, vis: (q: number) => (d.has(q) && vis(d.get(q)!) === 'show' ? 'show' : 'none') };
+      drawStaffNotes(c, geos[i], r.L.layout, r.L, r.s, live);
+    });
     drawStaffNotes(c, geos[F.own], ownRow.L.layout, ownRow.L, s, v);
     ownGeos.push(geos[F.own]);
   }
-  for (const j of [...F.layers.keys()]) if (!shown.has(j) && j !== k + fit) F.layers.delete(j);
+  for (const [j, cv] of [...F.layers]) {
+    if (shown.has(j)) continue;
+    // Release the bitmap now (iOS keeps canvas memory until the size is zeroed).
+    cv.width = 0;
+    cv.height = 0;
+    F.layers.delete(j);
+  }
 
   // Your voice, on your staff only.
   updateTrace(s, ownRow.L);
@@ -344,7 +396,7 @@ function drawSystemFrame(c: Ctx, F: FullCache, geos: SysGeo[], s: DrawState, j: 
   let i = 0;
   while (i < rows.length) {
     let i1 = i;
-    if (rows[i].spec.kind === 'inst') while (i1 + 1 < rows.length && rows[i1 + 1].spec.kind === 'inst') i1++;
+    if (rows[i].spec.acc) while (i1 + 1 < rows.length && rows[i1 + 1].spec.acc) i1++;
     const top = geos[i].top;
     const bot = geos[i1].top + h4;
     const ms = geos[i].sys.measures;
@@ -360,7 +412,7 @@ function drawSystemFrame(c: Ctx, F: FullCache, geos: SysGeo[], s: DrawState, j: 
   // Bracket over the voices, brace over the accompaniment's two staves.
   const voices = rows.map((r, q) => (r.spec.kind === 'voice' ? q : -1)).filter((q) => q >= 0);
   if (voices.length > 1) drawBracket(c, left - 0.9 * sp, geos[voices[0]].top, geos[voices[voices.length - 1]].top + h4, sp, INK.clef);
-  const inst = rows.map((r, q) => (r.spec.kind === 'inst' ? q : -1)).filter((q) => q >= 0);
+  const inst = rows.map((r, q) => (r.spec.acc ? q : -1)).filter((q) => q >= 0);
   if (inst.length > 1) drawBrace(c, left - 1.6 * sp, geos[inst[0]].top, geos[inst[inst.length - 1]].top + h4, sp, INK.clef);
 
   // Names, right-aligned before the brackets.
@@ -370,7 +422,7 @@ function drawSystemFrame(c: Ctx, F: FullCache, geos: SysGeo[], s: DrawState, j: 
   const nx = left - 2.0 * sp - (inst.length > 1 ? 0.3 * sp : 0);
   const done = new Set<string>();
   rows.forEach((r, q) => {
-    if (r.spec.kind === 'inst') {
+    if (r.spec.acc) {
       if (done.has('inst')) return;
       done.add('inst');
       const y = (geos[inst[0]].mid + geos[inst[inst.length - 1]].mid) / 2;
