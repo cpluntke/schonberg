@@ -152,7 +152,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
                   <strong>{l.name}</strong>
                   <span className="small muted">{l.description}</span>
                   <span className="tiny muted mono">
-                    {Math.round(l.rate * 100)}% tempo · {l.guide ? 'your part plays' : 'others only'} · {l.showNames ? 'note names' : 'lyrics only'}{l.doo ? ' · on “doo”' : ''} · ±{l.tolerance}¢ · pass: {passLabel(l)}
+                    {Math.round(l.rate * 100)}% tempo · {l.guide ? 'your part plays' : 'others only'} · {l.showNames ? 'note names' : 'lyrics only'}{l.doo ? ' · on “doo”' : ''} · ±{l.tolerance}¢ · pass: {passLabel(l)}{l.headphones ? ', headphones on' : ''}
                   </span>
                 </div>
               </div>

@@ -86,6 +86,15 @@ describe('merging never downgrades', () => {
     const kept = mergeProfile(mine, remote, true);
     expect(kept).toMatchObject({ name: 'Anna', voice: 'T', notation: 'letter', latencyMs: 80, latencySource: 'measured', choirCode: 'kammerchor', shareProgress: true });
   });
+
+  it('the "Headphones on?" answer stays on its phone, like the delay', () => {
+    saveProfile({ ...DEFAULT_PROFILE, name: 'Anna', onboarded: true, headphones: false });
+    expect(buildSnapshot().data.profile).not.toHaveProperty('headphones');
+    expect(cleanProfile({ ...DEFAULT_PROFILE, headphones: true })).not.toHaveProperty('headphones');
+    // A copy from another phone (where the answer was yes) doesn't change this phone's answer.
+    expect(mergeProfile({ ...DEFAULT_PROFILE, onboarded: true, headphones: false }, { ...DEFAULT_PROFILE, headphones: true }, true).headphones).toBe(false);
+    expect(mergeProfile({ ...DEFAULT_PROFILE }, { ...DEFAULT_PROFILE, onboarded: true, headphones: true }, false).headphones).toBeUndefined();
+  });
 });
 
 describe('compact format', () => {

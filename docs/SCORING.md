@@ -47,6 +47,9 @@ For every note in your part:
   right-octave readings (the detector reading a low “oo” an octave up, or the guide in the mic), and
   at level 1 one such note fails the run; a flickering detector on a note sung at the right octave
   reads mostly at the right octave.
+  Even so, through the speaker the detector misses too many notes for level 1's every-note rule
+  (whole notes read an octave low with nothing at the right octave), so **level 1 counts only with
+  headphones on**; without them it is practice ([LEVELS.md](LEVELS.md)).
 - **Level 1: every note right.** Level 1 (sung on “doo”) passes only when every note is *good* or
   better. A note the scorer can't judge reliably is let off below *good*: a very short note (as
   above), or a written pitch outside the detector's 60–1400 Hz. It still counts as wrong when it was

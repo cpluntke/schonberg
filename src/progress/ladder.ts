@@ -33,28 +33,34 @@ export interface LevelSpec {
   everyNote: boolean;
   /** Sung on "doo" instead of the words (the words are shown dimmed, for orientation). */
   doo: boolean;
+  /**
+   * Counts only with headphones on (the singer says so before the run): through the phone speaker
+   * the guide bleeds into the mic and the tracker can't hear every note reliably, which an
+   * every-note level can't allow. Without them the run is practice (see speakerPractice).
+   */
+  headphones: boolean;
   description: string;
 }
 
 export const LEVELS: LevelSpec[] = [
   {
-    level: 1, name: 'Note-learning', rate: 0.7, guide: true, showNames: true, cue: 'note', tolerance: 50, pass: 0.75, everyNote: true, doo: true,
-    description: 'Slow tempo (70%), sung on “doo”, with your part playing and note names shown. Learn the notes: every note must be right.',
+    level: 1, name: 'Note-learning', rate: 0.7, guide: true, showNames: true, cue: 'note', tolerance: 50, pass: 0.75, everyNote: true, doo: true, headphones: true,
+    description: 'Slow tempo (70%), sung on “doo”, with your part playing and note names shown. Learn the notes: every note must be right. Counts with headphones on.',
   },
   {
-    level: 2, name: 'In time', rate: 1.0, guide: true, showNames: true, cue: 'note', tolerance: 35, pass: 0.8, everyNote: false, doo: false,
+    level: 2, name: 'In time', rate: 1.0, guide: true, showNames: true, cue: 'note', tolerance: 35, pass: 0.8, everyNote: false, doo: false, headphones: false,
     description: 'Full tempo, now with the words, your part still playing. Lock in rhythm and entries.',
   },
   {
-    level: 3, name: 'Independent', rate: 1.0, guide: false, showNames: true, cue: 'note', tolerance: 30, pass: 0.8, everyNote: false, doo: false,
+    level: 3, name: 'Independent', rate: 1.0, guide: false, showNames: true, cue: 'note', tolerance: 30, pass: 0.8, everyNote: false, doo: false, headphones: false,
     description: 'Your part is muted: sing against the other voices only. Rehearsal-ready.',
   },
   {
-    level: 4, name: 'Concert-ready', rate: 1.0, guide: false, showNames: false, cue: 'chord', tolerance: 25, pass: 0.85, everyNote: false, doo: false,
+    level: 4, name: 'Concert-ready', rate: 1.0, guide: false, showNames: false, cue: 'chord', tolerance: 25, pass: 0.85, everyNote: false, doo: false, headphones: false,
     description: 'No guide, no note names (lyrics only), starting chord only. Concert-ready.',
   },
   {
-    level: 5, name: 'Off book', rate: 1.0, guide: false, showNames: false, cue: 'chord', tolerance: 25, pass: 0.85, everyNote: false, doo: false,
+    level: 5, name: 'Off book', rate: 1.0, guide: false, showNames: false, cue: 'chord', tolerance: 25, pass: 0.85, everyNote: false, doo: false, headphones: false,
     description: 'From memory: your notes and words fade out as you learn them, while the other voices play. Passed off book on two different days = memorised.',
   },
 ];
@@ -509,13 +515,38 @@ export function targetForDate(
 }
 
 /**
+ * A level that counts only with headphones (level 1), sung without them (`headphones`: the singer's
+ * answer before the run, undefined = not answered): practice, it never changes a level.
+ */
+export function speakerPractice(level: number, headphones: boolean | undefined): boolean {
+  return level >= 1 && levelSpec(level).headphones && headphones !== true;
+}
+
+/**
+ * Whether a run of one section counts for its level: not stopped early, at the level's full tempo,
+ * with a trustworthy timing, (off book) with everything hidden and no peeking, and (level 1) with
+ * headphones on. Says why not.
+ */
+export function sectionRunCounts(o: {
+  level: number; rate: number; partial: boolean; timingUnsure: boolean; offBookPractice: boolean; headphones?: boolean;
+}): { counted: boolean; why?: 'stopped' | 'tempo' | 'timing' | 'offbook' | 'speaker' } {
+  if (o.partial) return { counted: false, why: 'stopped' };
+  if (o.rate < levelSpec(o.level).rate - 1e-6) return { counted: false, why: 'tempo' };
+  if (o.timingUnsure) return { counted: false, why: 'timing' };
+  if (o.offBookPractice) return { counted: false, why: 'offbook' };
+  if (speakerPractice(o.level, o.headphones)) return { counted: false, why: 'speaker' };
+  return { counted: true };
+}
+
+/**
  * Whether a run of the whole piece counts for the piece level: in one go (not stopped early, not
- * paused and resumed), at the level's full tempo, with a trustworthy timing and (off book) with
- * everything hidden and no peeking. Says why not, for the results screen.
+ * paused and resumed), at the level's full tempo, with a trustworthy timing, (off book) with
+ * everything hidden and no peeking, and (level 1) with headphones on. Says why not, for the results
+ * screen.
  */
 export function fullRunCounts(o: {
-  level: number; rate: number; partial: boolean; resumed: boolean; timingUnsure: boolean; offBookPractice: boolean; arcade?: boolean;
-}): { counted: boolean; why?: 'arcade' | 'stopped' | 'paused' | 'tempo' | 'timing' | 'offbook' } {
+  level: number; rate: number; partial: boolean; resumed: boolean; timingUnsure: boolean; offBookPractice: boolean; arcade?: boolean; headphones?: boolean;
+}): { counted: boolean; why?: 'arcade' | 'stopped' | 'paused' | 'tempo' | 'timing' | 'offbook' | 'speaker' } {
   // The arcade is a reward mode: its runs of the whole piece are for fun, never a level test.
   if (o.arcade) return { counted: false, why: 'arcade' };
   if (o.partial) return { counted: false, why: 'stopped' };
@@ -523,5 +554,6 @@ export function fullRunCounts(o: {
   if (o.rate < levelSpec(o.level).rate - 1e-6) return { counted: false, why: 'tempo' };
   if (o.timingUnsure) return { counted: false, why: 'timing' };
   if (o.offBookPractice) return { counted: false, why: 'offbook' };
+  if (speakerPractice(o.level, o.headphones)) return { counted: false, why: 'speaker' };
   return { counted: true };
 }

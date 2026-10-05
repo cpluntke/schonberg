@@ -38,6 +38,12 @@ export interface Profile {
   latencySource?: 'measured' | 'learned';
   /** Delay suggested by the last run (ms), waiting for a second run to agree before it's learned. */
   latencyHint?: number;
+  /**
+   * The answer to "Headphones on?" before a level-1 run (undefined = never asked). Level 1 counts
+   * only with headphones (ladder.speakerPractice). It belongs to this phone, like the delay: not
+   * part of the saved copy (sync.ts PROFILE_KEYS).
+   */
+  headphones?: boolean;
   /** Practice beat: never, only where you sing alone (default), or always. */
   beat?: 'off' | 'alone' | 'always';
   /** Keep the last run's recording in memory so it can be shared (default on). */

@@ -3,11 +3,11 @@ import type { Route } from '../router';
 import { go, back } from '../router';
 import { getPiece, noteRangeFor, singableSections } from '../library';
 import { useProfile, useWide } from '../hooks';
-import { LEVELS, LISTEN, MAX_LEVEL, OFF_BOOK_DAYS, effectiveTolerance, fixesBefore, fullRunCounts, passLabel, pieceReadiness } from '../../progress/ladder';
+import { LEVELS, LISTEN, MAX_LEVEL, OFF_BOOK_DAYS, effectiveTolerance, fixesBefore, fullRunCounts, passLabel, pieceReadiness, sectionRunCounts, speakerPractice } from '../../progress/ladder';
 import { shareMyProgress } from '../play/shareProgress';
 import { postBoardEntrySoon } from '../play/boardEntry';
 import { syncProgressSoon, suggestAccount } from '../../progress/sync';
-import { recordAttempt, recordFullRun, getProgress, snapshotReadiness, personalBest, practiceDisplay } from '../../progress/store';
+import { recordAttempt, recordFullRun, getProgress, snapshotReadiness, personalBest, practiceDisplay, loadProfile } from '../../progress/store';
 import { keyAtTime } from '../../music/time';
 import { PracticeSession, estimateLatencyMs } from '../play/session';
 import { medianOnsetMs, scoreAligned } from '../../game/align';
@@ -307,8 +307,12 @@ function SingPlay({ route }: { route: PlayRoute }) {
     const isFull = section.id === 'all';
     const resumed = !!sess?.resumed;
     const arcade = route.mode === '3d';
-    const fullCounted = isFull && fullRunCounts({ level, rate, partial, resumed, timingUnsure: timingUnsure != null, offBookPractice, arcade }).counted;
-    const sectionLadder = realSection && !partial && timingUnsure == null && !offBookPractice && fullTempo;
+    // Level 1 counts only with headphones on (the answer on the pre-run card); without, it's practice.
+    const headphones = loadProfile().headphones;
+    const speaker = speakerPractice(level, headphones);
+    const fullCounted = isFull && fullRunCounts({ level, rate, partial, resumed, timingUnsure: timingUnsure != null, offBookPractice, arcade, headphones }).counted;
+    const sectionLadder = realSection && fullTempo
+      && sectionRunCounts({ level, rate, partial, timingUnsure: timingUnsure != null, offBookPractice, headphones }).counted;
     // Practice runs (slower tempo, stopped early) are logged but never change section levels.
     const recId = sectionLadder || !realSection ? section.id : 'practice';
     const durationSec = (section.end - section.start) / rate;
@@ -340,6 +344,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
       offBookDays: rec.offBookDays,
       full,
       fixed,
+      ...(speaker ? { speaker: true } : {}),
       notCounted: (realSection || isFull) && !ladder
         ? (partial ? 'stopped early'
           : isFull && arcade ? 'arcade runs of the whole piece are just for fun'
@@ -347,7 +352,9 @@ function SingPlay({ route }: { route: PlayRoute }) {
           : full?.blocked ? `first fix ${full.blocked.map((id) => secs.find((s) => s.id === id)?.label ?? id).join(', ')} on ${full.blocked.length > 1 ? 'their' : 'its'} own at level ${level}`
           : offBookPractice ? (peekedN > 0 ? `you peeked at ${peekedN} bar${peekedN > 1 ? 's' : ''}` : 'some bars were still showing (practice mode)')
           : timingUnsure != null ? `your voice reached the app about ${timingUnsure} ms after the beat, and without the delay check the app can't tell whether that's your timing or your phone and headphones. Do the 10-second delay check in Voice setup`
-            : 'slower than the level’s tempo')
+          : !fullTempo ? 'slower than the level’s tempo'
+            : speaker ? 'level 1 counts with headphones on'
+              : 'slower than the level’s tempo')
         : undefined,
       passed: rec.passed, prevLevel: rec.prevLevel, newLevel: rec.newLevel,
     });
@@ -515,6 +522,10 @@ function SingPlay({ route }: { route: PlayRoute }) {
   const running = phase === 'running';
   // A run of the whole piece: the sections still to fix at this level (it can't count until they're done).
   const isFullRun = section.id === 'all' && !listenOnly;
+  // Level 1 counts only with headphones on: ask before a run that could count (a section or the
+  // whole piece; drills and cold starts never count). Remembered on this phone.
+  const askHeadphones = !listenOnly && !!spec?.headphones && (isFullRun || !GENERATED_SECTIONS.has(section.id));
+  const headphonesUnanswered = askHeadphones && profile.headphones == null;
   const fullSecs = isFullRun ? singableSections(piece, part.id) : [];
   const fullFixes = isFullRun ? fixesBefore(fullSecs, getProgress(piece.id, part.id), level) : [];
 
@@ -577,6 +588,20 @@ function SingPlay({ route }: { route: PlayRoute }) {
                   {Math.round(rate * 100)}% tempo · ±{tolerance}¢ · pass: {passLabel(levelInfo)} · start: {levelInfo.cue === 'chord' ? 'chord only' : 'your note'}
                 </span>
               )}
+              {askHeadphones && (
+                <div className="col" style={{ gap: 4 }} data-testid="headphones-q">
+                  <span className="small" id="hp-label"><strong>Headphones on?</strong> <span className="tiny muted">(remembered on this phone)</span></span>
+                  <div className="seg" role="group" aria-labelledby="hp-label">
+                    <button aria-pressed={profile.headphones === true} onClick={() => updateProfile({ headphones: true })} data-testid="hp-yes">Yes</button>
+                    <button aria-pressed={profile.headphones === false} onClick={() => updateProfile({ headphones: false })} data-testid="hp-no">No, speaker</button>
+                  </div>
+                  <span className={profile.headphones === false ? 'tiny' : 'tiny muted'} style={profile.headphones === false ? { color: 'var(--accent-text)' } : undefined} data-testid="hp-note">
+                    {profile.headphones === false
+                      ? 'Practice only: level 1 counts with headphones on, because through the speaker the app can’t hear every note reliably.'
+                      : profile.headphones ? 'Level 1 counts with headphones on.' : 'Level 1 counts with headphones on. Choose one to start.'}
+                  </span>
+                </div>
+              )}
               {doo && !listenOnly && (
                 <div className="notice info small" data-testid="doo-note">
                   <strong>Sing every note on “doo”.</strong> The words are shown faintly; you sing them from level 2.
@@ -591,7 +616,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
               ) : (
                 <span className="small" data-testid="full-info">
                   Sing the whole piece in one go: pass it and the piece reaches level {level}. Every section is scored too,{' '}
-                  {levelInfo?.everyNote ? 'and every note in it must be right.' : `and each must reach ${Math.round((levelInfo?.pass ?? 0.8) * 100)}%.`}
+                  {levelInfo?.everyNote ? 'and every note in it must be right.' : `and each must reach ${Math.round((levelInfo?.pass ?? 0.8) * 100)}%.`}{' '}
                   Stopping or pausing makes it a practice run.
                 </span>
               ))}
@@ -679,7 +704,8 @@ function SingPlay({ route }: { route: PlayRoute }) {
                   )}
                 </div>
               )}
-              {!listenOnly && <span className="tiny muted">Wear headphones so the mic only hears you.{!profile.latencyMs ? ' Tip: run voice setup once to measure your headphone delay.' : ''}</span>}
+              {!listenOnly && !askHeadphones && <span className="tiny muted">Wear headphones so the mic only hears you.{!profile.latencyMs ? ' Tip: run voice setup once to measure your headphone delay.' : ''}</span>}
+              {askHeadphones && !profile.latencyMs && <span className="tiny muted">Tip: run voice setup once to measure your headphone delay.</span>}
               {listenOnly && listened && !GENERATED_SECTIONS.has(section.id) ? (
                 <>
                   <button className="btn primary block" onClick={() => go({ ...route, level: 1 }, true)} data-testid="learn-next">
@@ -688,8 +714,10 @@ function SingPlay({ route }: { route: PlayRoute }) {
                   <button className="btn block" onClick={start}>Listen again</button>
                 </>
               ) : (
-                <button className="btn primary block start-sticky" onClick={start} data-testid="start">
-                  <IconPlay size={18} /> {listenOnly ? 'Listen' : 'Start singing'}
+                // Waiting for "Headphones on?": not sticky, so it doesn't cover the question on a small phone.
+                <button className={`btn primary block${headphonesUnanswered ? '' : ' start-sticky'}`} onClick={start} disabled={headphonesUnanswered} data-testid="start"
+                  style={headphonesUnanswered ? { opacity: 1, background: 'var(--surface-2)', color: 'var(--muted)' } : undefined}>
+                  {headphonesUnanswered ? 'Answer above to start' : <><IconPlay size={18} /> {listenOnly ? 'Listen' : 'Start singing'}</>}
                 </button>
               )}
             </div>
@@ -761,7 +789,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
               <button className="big-play" aria-label="Pause" onClick={() => { sessionRef.current?.pause(); setPhase('paused'); }}><IconPause /></button>
             </>
           ) : (
-            <button className="big-play" aria-label="Start" onClick={() => (phase === 'paused' ? void resume() : start())}><IconPlay /></button>
+            <button className="big-play" aria-label="Start" disabled={phase === 'ready' && headphonesUnanswered} onClick={() => (phase === 'paused' ? void resume() : start())}><IconPlay /></button>
           )}
         </div>
       </div>

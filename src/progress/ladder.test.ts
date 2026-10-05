@@ -168,7 +168,8 @@ describe('ladder', () => {
     expect(fullRunCounts({ ...ok, partial: true }).why).toBe('stopped');
     expect(fullRunCounts({ ...ok, resumed: true }).why).toBe('paused');
     expect(fullRunCounts({ ...ok, level: 1, rate: 0.6 }).why).toBe('tempo');
-    expect(fullRunCounts({ ...ok, level: 1, rate: 0.7 }).counted).toBe(true);
+    expect(fullRunCounts({ ...ok, level: 1, rate: 0.7, headphones: true }).counted).toBe(true);
+    expect(fullRunCounts({ ...ok, level: 1, rate: 0.7 }).why).toBe('speaker');
     expect(fullRunCounts({ ...ok, level: 5, offBookPractice: true }).why).toBe('offbook');
     expect(fullRunCounts({ ...ok, timingUnsure: true }).why).toBe('timing');
   });

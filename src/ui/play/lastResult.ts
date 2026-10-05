@@ -24,6 +24,8 @@ export interface LastResult {
   prevBest?: number | null;
   /** Why a run of a real section didn't count toward its level. */
   notCounted?: string;
+  /** Level 1 sung without headphones (the singer's answer): practice, see ladder.speakerPractice. */
+  speaker?: boolean;
   /** Headphone/mic delay learned from this run (ms), if any. */
   latencyAdjusted?: number;
   /** The voice was lined up with the music by this many ms before scoring (device delay). */

@@ -104,7 +104,9 @@ export function Results() {
 
   // A run that failed (or didn't count) on timing isn't an "excellent run".
   // Nor is a level-1 run with a wrong note.
-  const insights = lr.timingFail != null || lr.timingUnsure != null || wrong.length > 0 ? r.insights.filter((i) => i.kind !== 'great') : r.insights;
+  // Nor a level-1 run through the speaker (practice: "move on to the next level" would be wrong).
+  const speakerRun = !!lr.speaker && !!lr.notCounted && /headphones/.test(lr.notCounted);
+  const insights = lr.timingFail != null || lr.timingUnsure != null || wrong.length > 0 || speakerRun ? r.insights.filter((i) => i.kind !== 'great') : r.insights;
 
   return (
     <main className="screen">
@@ -125,7 +127,13 @@ export function Results() {
               : ' If the next run shows the same, we’ll adjust. The 10-second delay check in Voice setup is quicker and more exact, and lets the app judge your timing.'}
         </div>
       )}
-      {lr.notCounted && (
+      {speakerRun && (
+        <div className="notice info" role="status" data-testid="pass-banner">
+          <strong>Practice:</strong> level 1 counts with headphones on, because through the speaker the app can’t hear every note reliably.
+          {wrong.length > 0 ? ` ${wrong.length === 1 ? 'One note wasn’t' : `${wrong.length} notes weren’t`} right: see below.` : ''}
+        </div>
+      )}
+      {lr.notCounted && !speakerRun && (
         <div className="notice info" role="status" data-testid="pass-banner">
           <strong>Practice run:</strong> {lr.notCounted}{lr.timingUnsure != null ? '.'
             : lr.full ? <>, so it doesn't count toward the piece's level.{lr.full.blocked ? '' : lr.level === 5 && /peeked|showing/.test(lr.notCounted) ? ' When you feel ready, choose “Test: all hidden” and sing it without peeking.' : ' Sing it all in one go at the level’s tempo to earn the level.'}</>
@@ -272,6 +280,10 @@ export function Results() {
               Back to {getPiece(piece.id.split('~')[0])?.title ?? 'the piece'}
             </button>
           )
+        ) : speakerRun ? (
+          <button className="btn primary block" data-testid="again-headphones" onClick={() => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, level: lr.level, mode: lr.mode })}>
+            <IconPlay size={18} /> Sing it again with headphones on
+          </button>
         ) : nextFix ? (
           <button className="btn primary block" data-testid="fix-first" onClick={() => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: nextFix, level: lr.level, mode: '2d' })}>
             <IconPlay size={18} /> Fix {label(nextFix)} at level {lr.level}

@@ -17,6 +17,7 @@ test('a perfect simulated singer passes level 1 and levels up', async ({ page })
 
   // Level 1 of the first section.
   await page.getByLabel('Sections').getByRole('button', { name: /level 1/ }).first().click(); // a section, not the full run
+  await page.getByTestId('hp-yes').click(); // level 1 counts with headphones on
   await page.getByTestId('start').click();
 
   // Wait for the results screen (sections are short; allow for count-in + 70% tempo).
@@ -36,6 +37,7 @@ test('level 1 on “doo”: one flat note fails it, and Results says which', asy
   await page.getByLabel('Sections').getByRole('button', { name: /level 1/ }).first().click();
   await expect(page.getByTestId('doo-note')).toContainText('doo');
   await expect(page.getByText(/pass: every note right/)).toBeVisible();
+  await page.getByTestId('hp-yes').click();
   await page.getByTestId('start').click();
   await expect(page.getByTestId('doo-label')).toBeVisible();
   await expect(page.getByTestId('pass-banner')).toContainText(/one note wasn’t right/, { timeout: 90_000 });
@@ -69,6 +71,51 @@ test('level 1 on “doo”: one flat note fails it, and Results says which', asy
   expect(errors).toEqual([]);
 });
 
+// Level 1 counts only with headphones on (docs/LEVELS.md): the pre-run card asks, Start waits for
+// the answer, the answer is remembered on this phone, and a perfect run through the speaker is
+// practice: scored, wrong notes listed, but no level. Level 2 doesn't ask.
+test('level 1 asks “Headphones on?”; without them a perfect run is practice', async ({ page }) => {
+  test.setTimeout(150_000);
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await page.goto('/?simulate=perfect#/piece/warmup-chorale');
+  await page.getByLabel('Sections').getByRole('button', { name: /level 1/ }).first().click();
+  const q = page.getByTestId('headphones-q');
+  await expect(q).toContainText('Headphones on?');
+  await expect(page.getByTestId('start')).toBeDisabled();
+  await page.getByTestId('hp-no').click();
+  await expect(page.getByTestId('hp-no')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('hp-note')).toContainText('level 1 counts with headphones on');
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('sh:profile') ?? '{}').headphones)).toBe(false);
+  await page.getByTestId('start').click();
+  await expect(page.getByTestId('pass-banner')).toContainText(
+    /Practice: level 1 counts with headphones on, because through the speaker the app can.t hear every note reliably/, { timeout: 90_000 });
+  await expect(page.getByTestId('result-score')).toBeVisible();
+  await expect(page.getByTestId('again-headphones')).toBeVisible();
+  // Not a pass: the section is still at level 0, and nothing was granted.
+  const level = await page.evaluate(() => {
+    const k = Object.keys(localStorage).find((x) => x.startsWith('sh:progress:warmup-chorale:'));
+    const p = k ? JSON.parse(localStorage.getItem(k)!) : null;
+    // (Uncounted runs are logged under 'practice', which isn't a section.)
+    return p ? Object.entries(p.sections as Record<string, { level: number }>).filter(([id]) => id !== 'practice').reduce((a, [, x]) => Math.max(a, x.level), 0) : -1;
+  });
+  expect(level).toBe(0);
+  // Next time the card is pre-filled; one tap changes it.
+  await page.goto('/?simulate=perfect#/piece/warmup-chorale');
+  await page.getByLabel('Sections').getByRole('button', { name: /level 1/ }).first().click();
+  await expect(page.getByTestId('hp-no')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('start')).toBeEnabled();
+  await page.getByTestId('hp-yes').click();
+  await expect(page.getByTestId('hp-yes')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('hp-note')).toHaveText('Level 1 counts with headphones on.');
+  // Level 2 doesn't ask.
+  await page.goto('/?simulate=perfect#/piece/warmup-chorale');
+  await page.getByLabel('Sections').getByRole('button', { name: /, level 2 In time/ }).first().click();
+  await expect(page.getByTestId('start')).toBeEnabled();
+  await expect(page.getByTestId('headphones-q')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
 // Score view (sheet music): suggested at level 1, switchable before Start, remembered, and a run
 // through it reaches the results.
 test('score view: switch display, sing level 1 from sheet music, reach results', async ({ page }) => {
@@ -88,6 +135,7 @@ test('score view: switch display, sing level 1 from sheet music, reach results',
   await expect(page.locator('canvas[data-display="score"]')).toHaveCount(1);
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('sh:profile') ?? '{}').display)).toBe('score');
 
+  await page.getByTestId('hp-yes').click();
   await page.getByTestId('start').click();
   await page.waitForTimeout(5000);
   // The staff is drawn: plenty of light (ink) pixels on the dark canvas.
@@ -182,6 +230,7 @@ test('a perfect simulated full run at level 1 grants piece level 1', async ({ pa
   await expect(page.getByTestId('piece-level')).toHaveText('Not sung through yet');
   await page.getByTestId('full-1').click();
   await expect(page.getByTestId('full-info')).toBeVisible();
+  await page.getByTestId('hp-yes').click();
   await page.getByTestId('start').click();
   await expect(page.getByTestId('pass-banner')).toContainText('Piece level 1 reached', { timeout: 150_000 });
   // Every section was scored within the run, none to fix.
@@ -260,6 +309,7 @@ test('a real-microphone run can be shared as a recording (WAV + run.json)', asyn
   await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
   await page.getByTestId('piece-row').first().click();
   await page.getByLabel('Sections').getByRole('button', { name: /level 1/ }).first().click(); // a section, not the full run
+  await page.getByTestId('hp-yes').click();
   await page.getByTestId('start').click();
   await expect(page.getByTestId('pass-banner')).toBeVisible({ timeout: 90_000 });
   const [dl] = await Promise.all([page.waitForEvent('download'), page.getByTestId('share-recording').click()]);

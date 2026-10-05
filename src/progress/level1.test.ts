@@ -7,7 +7,7 @@ import { MAX_HZ, MIN_HZ, RMS_GATE } from '../audio/pitch';
 import { makePart, makeScore, sampleSinging } from '../game/testutil';
 import type { AttemptResult, Grade, NoteResult, ScoringOptions } from '../game/types';
 import type { Section } from '../music/types';
-import { LEVELS, attemptPasses, levelSpec, noteVerdict, passLabel, sectionChecks, sectionHeld, wrongNotes, nextStep } from './ladder';
+import { LEVELS, attemptPasses, fullRunCounts, levelSpec, noteVerdict, passLabel, sectionChecks, sectionHeld, sectionRunCounts, speakerPractice, wrongNotes, nextStep } from './ladder';
 import { _resetAllForTests, getProgress, recordAttempt, recordFullRun } from './store';
 
 const L1: ScoringOptions = { toleranceCents: 50, tuning: 'equal', octaveTolerant: false };
@@ -273,5 +273,59 @@ describe('level 1: full runs', () => {
     const r = recordFullRun('p', 'S', 1, result(notes), secs, noteStart, { counted: true });
     expect(r).toMatchObject({ passed: false, newLevel: 2, prevLevel: 2 });
     expect(getProgress('p', 'S')!.sections.s0.level).toBe(2);
+  });
+});
+
+describe('level 1 needs headphones (docs/LEVELS.md)', () => {
+  const run = { rate: 0.7, partial: false, timingUnsure: false, offBookPractice: false };
+  const secs: Section[] = [0, 1, 2].map((i) => ({
+    id: `s${i}`, index: i, label: `S${i}`, startMeasure: i, endMeasure: i, start: i * 8, end: (i + 1) * 8,
+  }));
+  const noteStart = (i: number) => (i >= 0 && i < 24 ? i : undefined);
+
+  it('only level 1 asks; without headphones (or no answer) it is practice', () => {
+    expect(LEVELS.map((l) => l.headphones)).toEqual([true, false, false, false, false]);
+    expect(speakerPractice(1, false)).toBe(true);
+    expect(speakerPractice(1, undefined)).toBe(true);
+    expect(speakerPractice(1, true)).toBe(false);
+    for (const l of [2, 3, 4, 5]) expect(speakerPractice(l, false)).toBe(false);
+    expect(sectionRunCounts({ ...run, level: 1, headphones: false })).toEqual({ counted: false, why: 'speaker' });
+    expect(sectionRunCounts({ ...run, level: 1, headphones: true })).toEqual({ counted: true });
+    expect(sectionRunCounts({ ...run, level: 2, rate: 1, headphones: false })).toEqual({ counted: true });
+    expect(fullRunCounts({ ...run, level: 1, resumed: false, headphones: false })).toEqual({ counted: false, why: 'speaker' });
+    expect(fullRunCounts({ ...run, level: 1, resumed: false, headphones: true })).toEqual({ counted: true });
+    expect(fullRunCounts({ ...run, level: 3, rate: 1, resumed: false, headphones: false })).toEqual({ counted: true });
+    // A slower tempo or a stopped run says so first.
+    expect(sectionRunCounts({ ...run, level: 1, rate: 0.6, headphones: false }).why).toBe('tempo');
+  });
+
+  it('a perfect section without headphones is practice: no section level 1', () => {
+    // As Play.tsx records it: a run that doesn't count goes to the 'practice' record.
+    const c = sectionRunCounts({ ...run, level: 1, headphones: false });
+    expect(c.counted).toBe(false);
+    recordAttempt('p', 'S', c.counted ? 's0' : 'practice', 1, result(good(8)));
+    expect(getProgress('p', 'S')!.sections.s0?.level ?? 0).toBe(0);
+    // With headphones the same run passes.
+    expect(recordAttempt('p', 'S', 's0', 1, result(good(8)))).toMatchObject({ passed: true, newLevel: 1 });
+  });
+
+  it('a full run without headphones grants no piece level and leaves the fix list alone', () => {
+    const notes = good(24);
+    notes[3] = { grade: 'miss', cents: -80, hitRatio: 0 };
+    recordFullRun('p', 'S', 1, result(notes), secs, noteStart, { counted: true });
+    expect(getProgress('p', 'S')!.full?.toFix).toEqual({ 1: ['s0'] });
+    const counted = fullRunCounts({ ...run, level: 1, resumed: false, headphones: false }).counted;
+    // Perfect, but through the speaker: nothing changes.
+    const perfect = recordFullRun('p', 'S', 1, result(good(24)), secs, noteStart, { counted });
+    expect(perfect).toMatchObject({ counted: false, passed: false });
+    expect(getProgress('p', 'S')!.full?.level ?? 0).toBe(0);
+    expect(getProgress('p', 'S')!.full?.toFix).toEqual({ 1: ['s0'] });
+    // A wrong note elsewhere, through the speaker: no new section to fix either.
+    const other = good(24);
+    other[20] = { grade: 'miss', cents: 90, hitRatio: 0 };
+    recordFullRun('p', 'S', 1, result(other), secs, noteStart, { counted });
+    expect(getProgress('p', 'S')!.full?.toFix).toEqual({ 1: ['s0'] });
+    // And the section to fix isn't credited by the perfect speaker run.
+    expect(getProgress('p', 'S')!.sections.s0?.level ?? 0).toBe(0);
   });
 });

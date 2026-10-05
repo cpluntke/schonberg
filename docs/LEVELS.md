@@ -4,7 +4,7 @@ Every piece is cut into short sections, and there are five levels (`src/progress
 
 | Level | Name | Tempo | Sung on | Your part plays | Note names | Start | Tolerance | Pass |
 |---|---|---|---|---|---|---|---|---|
-| 1 | Note-learning | 70% | “doo” | yes | yes | your note | ±50¢ | every note right |
+| 1 | Note-learning | 70% | “doo” | yes | yes | your note | ±50¢ | every note right, with headphones on |
 | 2 | In time | 100% | the words | yes | yes | your note | ±35¢ | 80% |
 | 3 | Independent | 100% | the words | no | yes | your note | ±30¢ | 80% |
 | 4 | Concert-ready | 100% | the words | no | no | chord only | ±25¢ | 85% |
@@ -18,6 +18,19 @@ orientation. The words come in at level 2. (Words-in-rhythm and the lyrics quiz 
 unchanged.) Nothing in the scoring uses the words: notes are judged on pitch and onset only, and
 “doo” suits the pitch tracker well (a voiced, steady “u”; the short “d” before each note is a gap
 the scorer already allows for, like any consonant).
+
+**Level 1 counts only with headphones on** (`LevelSpec.headphones`, `ladder.speakerPractice`). The
+pre-run card of a level-1 section or full run asks **“Headphones on?”** (Yes / No, speaker), and
+Start waits for an answer. The answer is kept in the profile (`Profile.headphones`) and pre-filled
+next time, one tap to change. It belongs to the phone, like the headphone delay: it is not part of
+the copy kept with a choir account (`sync.ts`). Without headphones the guide (your own part) plays
+through the speaker into the mic, and the tracker can't hear every note reliably (in the realism
+harness, honest singers on the phone speaker passed level 1 on “doo” in about a third of runs;
+`docs/qa/realism-current.md`, section 8 and observation 15). So a level-1 run without headphones is
+**practice**: it is scored, kept in the bar history, and Results lists the notes that weren't right,
+but it never raises a section level, never grants piece level 1 and never changes a fix list.
+Results says: “Practice: level 1 counts with headphones on, because through the speaker the app
+can’t hear every note reliably.” Levels 2–5 don't ask.
 
 **Every note must be right** (`LevelSpec.everyNote`): a level-1 attempt passes only when every note
 is graded *good* or *perfect* (±50¢ at 70% tempo, the usual grades, see [SCORING.md](SCORING.md)).
@@ -61,8 +74,9 @@ A piece reaches level N only through a **full run-through at level N**, in one g
 - The whole piece, at the level's tempo, support, tolerance and pass mark.
 - **Not stopped early and not paused** (after your first note; a pause in the count-in is fine).
   A run that was stopped, or paused and carried on, is practice: it is scored and kept in the bar history, but it doesn't count. (Slower than the
-  level's tempo, e.g. the level-1 tempo slider below 70%, is practice too, and so is a level-5 run
-  with bars still showing or a peek. Arcade runs of the whole piece are just for fun and never count.)
+  level's tempo, e.g. the level-1 tempo slider below 70%, is practice too, and so is a level-1 run
+  without headphones, and a level-5 run with bars still showing or a peek. Arcade runs of the whole
+  piece are just for fun and never count.)
 - **Every section is scored within the run** (the same measure as the run's accuracy: the
   average grade of its notes). Sections with fewer than 8 notes get one weak note of slack (it counts as
   "good"), so a single "ok" note can't fail a level; a missed note is never forgiven. A section under 50% in the run never counts as held. The level is granted only when the run passes overall **and every
