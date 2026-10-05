@@ -28,7 +28,7 @@ The other voices and the accompaniment play as usual. Only your part disappears:
 - **Practise: fade out.** Bars you have sung well without note names and guide fade out. Hidden bars keep a rhythm line and the first letter of each word.
 - **Test: all hidden.** Nothing of your part is shown. Notes appear only after you have sung them, as feedback.
 - **Peek.** Hold it to see the next two bars for two seconds. A run with peeks is practice and doesn't count.
-- **Memorised.** A section counts as memorised once you pass the test on **two different days**.
+- **Memorised.** A section counts as memorised once you pass the test on **two different days**. The **piece** counts as memorised once you sing it all at level 5, everything hidden and in one go, on two different days (see [LEVELS.md](LEVELS.md)); every section must hold within that run.
 
 ## Cold start (Piece screen → "Learning it by heart")
 

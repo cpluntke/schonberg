@@ -1,8 +1,8 @@
 import React from 'react';
-import { allPieces, getPiece, singableSections, type PieceInfo } from '../library';
+import { allPieces, getPiece, type PieceInfo } from '../library';
 import { useProfile, useStoreVersion, formatDate, daysUntil, initials } from '../hooks';
 import { go } from '../router';
-import { loadCycle, getProgress, streakDays, sameWork } from '../../progress/store';
+import { loadCycle, streakDays, sameWork } from '../../progress/store';
 import { levelSpec } from '../../progress/ladder';
 import { nextRehearsal } from '../../progress/rehearsal';
 import { rowOfTheDay } from '../../game/twelvetone';
@@ -140,12 +140,12 @@ export function Home() {
               <span className="ellipsis" style={{ fontWeight: 600, fontSize: 15 }}>{s.piece.title}</span>
               <span className="small muted ellipsis">
                 {s.piece.composer}{s.partName ? ` · ${s.partName}` : ''}
-                {s.due.length ? ` · ${s.due.length} due for review` : ''}
+                {s.next?.kind === 'fix' ? ` · ${s.toFix.reduce((n, f) => n + f.sectionIds.length, 0)} to fix` : s.fullDue ? ' · full run due for review' : s.due.length ? ` · ${s.due.length} due for review` : ''}
               </span>
             </div>
             <div className="col" style={{ alignItems: 'flex-end', gap: 4 }}>
               <span className="mono small">{Math.round(s.pct * 100)}%</span>
-              <span className="tiny muted">{s.concertReady ? 'concert-ready' : s.rehearsalReady ? 'rehearsal-ready' : s.pct > 0 && s.minLevel === 0 ? 'in progress' : levelName(s.minLevel)}</span>
+              <span className="tiny muted" data-testid="piece-row-level">{pieceLabel(s)}</span>
             </div>
           </button>
         ))}
@@ -188,9 +188,22 @@ function Notice() {
   );
 }
 
+/** Short status for a piece row: its piece level, or what's in progress. */
+export function pieceLabel(s: PieceStatus): string {
+  if (s.memorised) return 'memorised';
+  if (s.concertReady) return 'concert-ready';
+  if (s.rehearsalReady) return 'rehearsal-ready';
+  if (s.pieceLevel > 0) return `level ${s.pieceLevel} · ${levelName(s.pieceLevel)}`;
+  if (s.toFix.length) return 'sections to fix';
+  if (s.multi && s.unconfirmed > 0) return `confirm level ${s.unconfirmed}`;
+  return s.pct > 0 ? 'in progress' : 'not started';
+}
+
 function NextUp({ status }: { status: PieceStatus }) {
   const n = status.next!;
   const spec = levelSpec(n.level);
+  // An experienced singer can skip the sections: offer the full run at the next piece level.
+  const skip = status.multi && n.kind === 'section' && status.pieceLevel < 5 ? status.pieceLevel + 1 : 0;
   return (
     <div className="col" style={{ gap: 10 }}>
       <div className="col" style={{ gap: 2 }}>
@@ -199,8 +212,13 @@ function NextUp({ status }: { status: PieceStatus }) {
         <span className="small muted">{n.reason}{spec && !n.reason.includes(spec.name) ? ` (level ${n.level}, ${spec.name})` : ''}</span>
       </div>
       <button className="btn primary block" onClick={() => go({ name: 'play', pieceId: status.piece.id, partId: status.partId, sectionId: n.sectionId, level: n.level, mode: '2d' })}>
-        <IconPlay size={18} /> Practise now
+        <IconPlay size={18} /> {n.sectionId === 'all' ? 'Sing it all now' : n.kind === 'fix' ? 'Fix it now' : 'Practise now'}
       </button>
+      {skip > 0 && (
+        <button className="btn ghost small" data-testid="skip-to-full" onClick={() => go({ name: 'play', pieceId: status.piece.id, partId: status.partId, sectionId: 'all', level: skip, mode: '2d' })}>
+          Know it already? Sing the whole piece at level {skip}
+        </button>
+      )}
     </div>
   );
 }
@@ -225,16 +243,15 @@ function cycleTarget(statuses: PieceStatus[], toRehearsal: number | null, toConc
   ];
   for (const g of goals) {
     if (g.days == null || g.days < 0) continue;
-    let missing = 0;
-    for (const st of g.set) {
-      const prog = getProgress(st.piece.id, st.partId);
-      for (const sec of singableSections(st.piece, st.partId)) if ((prog?.sections[sec.id]?.level ?? 0) < g.level) missing++;
-    }
+    // The piece level counts: a piece is ready once it has been sung through at the level.
+    const missing = g.set.filter((st) => st.pieceLevel < g.level).length;
     if (!missing) continue;
     const when = g.days === 0 ? 'today' : g.days === 1 ? 'tomorrow' : `in ${g.days} days`;
-    const what = g.label === 'Rehearsal' && focus ? ' of the rehearsal pieces' : '';
-    const perDay = g.days > 1 ? Math.ceil(missing / g.days) : missing;
-    return `${g.label} ${when}: ${missing} section${missing > 1 ? 's' : ''}${what} still below ${g.name}${g.days > 1 ? `, about ${perDay} a day` : ''}.`;
+    const what = g.label === 'Rehearsal' && focus
+      ? `${missing === g.set.length && missing > 1 ? 'the' : missing} rehearsal piece${missing > 1 ? 's' : ''}`
+      : `${missing} piece${missing > 1 ? 's' : ''}`;
+    const perDay = g.days > 1 && missing > 1 ? Math.ceil(missing / g.days) : 0;
+    return `${g.label} ${when}: ${what} not yet sung through at ${g.name}${perDay && perDay < missing ? `, about ${perDay} a day` : ''}.`;
   }
   return null;
 }

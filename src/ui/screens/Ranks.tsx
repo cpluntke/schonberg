@@ -3,7 +3,7 @@ import { getPiece, chosenPartId, singableSections, type PieceInfo } from '../lib
 import { useProfile, useStoreVersion, toast, initials } from '../hooks';
 import { loadCycle } from '../../progress/store';
 import {
-  computeMyEntry, rankEntries, getLeaderboardBackend, encodeShareCode, importShareCodes, removeLocalEntry, decodeShareCode,
+  computeMyEntry, rankEntries, READINESS_VERSION, getLeaderboardBackend, encodeShareCode, importShareCodes, removeLocalEntry, decodeShareCode,
   type LeaderboardEntry, type RankBy,
 } from '../../progress/leaderboard';
 import { IconShare } from '../icons';
@@ -120,6 +120,7 @@ export function Ranks() {
       </div>
 
       {!pieces.length && <div className="notice info">Add pieces to your cycle to see rankings.</div>}
+      <LevelsNote />
 
       <div className="seg" role="group" aria-label="Rank by">
         {TABS.map((t) => (
@@ -143,8 +144,11 @@ export function Ranks() {
       <div className="col" style={{ gap: 0 }}>
         {ranked.map((e, i) => {
           const isMe = me && e.name === me.name && e.updatedAt === me.updatedAt;
+          // Sent by an older app version: readiness from section levels alone, not comparable.
+          const old = !isMe && e.v !== READINESS_VERSION;
           return (
-            <div key={`${e.name}-${i}`} className="row" style={{
+            <div key={`${e.name}-${i}`} className="row" data-testid={old ? 'rank-old' : undefined} style={{
+              ...(old ? { opacity: 0.55 } : {}),
               minHeight: 56, padding: '0 10px', borderRadius: 12,
               ...(isMe ? { background: 'var(--voice-bg)', border: '1px solid var(--voice)' } : { borderBottom: '1px solid var(--surface-2)' }),
             }}>
@@ -152,7 +156,7 @@ export function Ranks() {
               <span style={{ width: 36, height: 36, borderRadius: 18, background: 'var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13 }}>{initials(e.name)}</span>
               <div className="grow col" style={{ gap: 0 }}>
                 <span style={{ fontWeight: 600 }}>{isMe ? (profile.name ? `${e.name} (you)` : 'You') : e.name}</span>
-                <span className="tiny muted">{({ S: 'Soprano', A: 'Alto', T: 'Tenor', B: 'Bass' } as Record<string, string>)[e.voice] ?? ''} · {e.streak}-day streak</span>
+                <span className="tiny muted">{({ S: 'Soprano', A: 'Alto', T: 'Tenor', B: 'Bass' } as Record<string, string>)[e.voice] ?? ''} · {e.streak}-day streak{old ? ' · older app: readiness not comparable' : ''}</span>
               </div>
               <span className="mono" style={{ fontWeight: 600 }}>{metric(e)}</span>
               {!isMe && backend.kind === 'local' && (
@@ -231,5 +235,21 @@ export function Ranks() {
         {err && <span className="small" style={{ color: 'var(--accent-text)' }}>{err}</span>}
       </div>
     </main>
+  );
+}
+
+/** Once: readiness was recalculated when piece levels started to need a full run-through. */
+function LevelsNote() {
+  const KEY = 'sh:seenLevelsNote';
+  const [show, setShow] = useState(() => { try { return localStorage.getItem(KEY) !== '1'; } catch { return false; } });
+  if (!show) return null;
+  return (
+    <div className="notice info row" role="status" data-testid="levels-note">
+      <span className="grow small">
+        <strong>Readiness was recalculated.</strong> A piece now reaches a level only when you sing it all through at that level in one go,
+        so section levels alone count half. Singers on an older app version are shown greyed until they update.
+      </span>
+      <button className="btn ghost small" onClick={() => { try { localStorage.setItem(KEY, '1'); } catch { /* ignore */ } setShow(false); }}>OK</button>
+    </div>
   );
 }

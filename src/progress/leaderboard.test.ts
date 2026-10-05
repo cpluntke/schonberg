@@ -46,8 +46,20 @@ describe('leaderboard', () => {
     recordAttempt('p', 'T', 's1', 1, res(0.5, 999), 30, now - 9 * DAY); // too old for weekly
     const e = computeMyEntry('p', 'T', sections, now);
     expect(e).toMatchObject({ name: 'Me', voice: 'T', pieceId: 'p', weeklyScore: 1100, streak: 2 });
-    expect(e.readiness).toBeCloseTo(2 / 8);
-    expect(e.improved).toBeCloseTo(0.25);
+    // Section levels not confirmed by a full run count half: s0 at level 2 of 4, of two sections.
+    expect(e.readiness).toBeCloseTo(1 / 8);
+    expect(e.improved).toBeCloseTo(0.125);
+  });
+  it('entries carry the readiness formula version; older entries stay unmarked', () => {
+    saveProfile({ ...loadProfile(), name: 'Me', voice: 'T' });
+    const mine = computeMyEntry('p', 'T', sections);
+    expect(mine.v).toBe(2);
+    expect(decodeShareCode(encodeShareCode(mine))?.v).toBe(2);
+    expect(decodeShareCode(encodeShareCode(entry))?.v).toBeUndefined();
+    // Older entries rank after current ones, whatever their (old-formula) readiness.
+    const oldHigh = { ...entry, name: 'Old', readiness: 0.9 };
+    const newLow = { ...entry, name: 'New', readiness: 0.3, v: 2 };
+    expect(rankEntries([oldHigh, newLow], 'readiness').map((e) => e.name)).toEqual(['New', 'Old']);
   });
   it('ranking', () => {
     const a = { ...entry, name: 'A', readiness: 0.5, streak: 10, improved: 0 };

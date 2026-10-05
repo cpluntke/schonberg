@@ -5,7 +5,7 @@ import { entryNotes } from '../../game/drills';
 import { useProfile, useStoreVersion } from '../hooks';
 import { go, back } from '../router';
 import { getProgress, dueForReview } from '../../progress/store';
-import { LEVELS, OFF_BOOK_DAYS, pieceReadiness, nextStep, sectionStatus } from '../../progress/ladder';
+import { LEVELS, OFF_BOOK_DAYS, pieceReadiness, nextStep, sectionStatus, levelSpec } from '../../progress/ladder';
 import { IconBack, IconEar, IconCube, IconPlay } from '../icons';
 import { voiceName } from './Home';
 import { PieceMap } from '../components/PieceMap';
@@ -63,6 +63,12 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
   const pick = (id: string) => { setPartId(id); rememberPart(piece.id, id); };
   const play = (sectionId: string, level: number, mode: '2d' | '3d' = '2d') =>
     go({ name: 'play', pieceId: piece.id, partId: part!.id, sectionId, level, mode });
+  const label = (id: string) => sections.find((s) => s.id === id)?.label ?? id;
+  // Sections that slipped in a full run, by section: the lowest level they must pass at.
+  const fixAt = new Map<string, number>();
+  for (const f of [...r.toFix].reverse()) for (const id of f.sectionIds) fixAt.set(id, f.level);
+  const multi = sections.length > 1;
+  const P = r.pieceLevel;
 
   return (
     <main className="screen">
@@ -103,23 +109,43 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
         )}
       </div>
 
-      <div className="card">
+      <div className="card" data-testid="readiness-card">
         <div className="row between">
           <div className="col" style={{ gap: 2 }}>
             <span className="eyebrow">Readiness</span>
-            <span style={{ fontWeight: 800, fontSize: 18 }}>
-              {r.memorised ? 'Memorised' : r.concertReady ? 'Concert-ready' : r.rehearsalReady ? 'Rehearsal-ready' : `${sections.length} sections to learn`}
+            <span style={{ fontWeight: 800, fontSize: 18 }} data-testid="piece-level">
+              {r.memorised ? 'Memorised' : r.concertReady ? 'Concert-ready' : r.rehearsalReady ? 'Rehearsal-ready'
+                : P > 0 ? `Piece level ${P}: ${levelSpec(P).name}` : multi ? 'Not sung through yet' : `${sections.length} section to learn`}
             </span>
           </div>
           <span className="mono" style={{ fontSize: 28, fontWeight: 600 }}>{Math.round(r.pct * 100)}%</span>
         </div>
         <div className="bar"><span style={{ width: `${r.pct * 100}%` }} /></div>
-        <span className="small muted">Rehearsal-ready = every section at level 3 (Independent). Concert-ready = level 4. Memorised = level 5 (off book){r.memorisedSections > 0 && !r.memorised ? `: ${r.memorisedSections} of ${sections.length} sections so far` : ''}.</span>
+        {multi && r.unconfirmed > 0 && !r.toFix.length && (
+          <div className="notice info small" data-testid="confirm-note">
+            <strong>Level {r.unconfirmed} in every section.</strong> Confirm it with a full run-through: the piece's level comes from singing it all in one go.
+          </div>
+        )}
+        {multi && r.toward && !r.unconfirmed && (
+          <div className="col" style={{ gap: 4 }} data-testid="toward-next">
+            <span className="small muted">
+              Toward piece level {r.toward.level}: {r.toward.done} of {r.toward.total} sections at level {r.toward.level}
+              {r.offBookDays > 0 ? ` · whole piece from memory: day ${r.offBookDays} of ${OFF_BOOK_DAYS}` : ''}
+            </span>
+            <div className="bar" style={{ height: 5 }}><span style={{ width: `${(r.toward.done / r.toward.total) * 100}%`, background: 'var(--voice-deep)' }} /></div>
+          </div>
+        )}
+        <span className="small muted">
+          {multi
+            ? <>The piece's level = the level you've sung the whole piece at, in one go. Rehearsal-ready = 3, concert-ready = 4, memorised = 5 (off book) on two different days.</>
+            : <>Rehearsal-ready = level 3 (Independent). Concert-ready = level 4. Memorised = level 5 (off book) on two different days.</>}
+        </span>
         {next && (
-          <button className="btn primary block" onClick={() => play(next.sectionId, next.level)}>
-            <IconPlay size={18} /> {sections.find((s) => s.id === next.sectionId)?.label}: level {next.level}
+          <button className="btn primary block" data-testid="piece-next" onClick={() => play(next.sectionId, next.level)}>
+            <IconPlay size={18} /> {next.sectionId === 'all' ? 'Sing it all' : next.kind === 'fix' ? `Fix ${label(next.sectionId)}` : label(next.sectionId)}: level {next.level}
           </button>
         )}
+        {next && !(next.kind === 'full' && r.unconfirmed > 0) && <span className="tiny muted" style={{ marginTop: -6 }}>{next.reason}</span>}
         <button className="btn ghost small" onClick={() => setShowHelp(!showHelp)} aria-expanded={showHelp}>
           {showHelp ? 'Hide' : 'How'} the levels work
         </button>
@@ -141,6 +167,59 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
         )}
       </div>
 
+      {part && multi && (
+        <div className="card" data-testid="full-run-card" style={{ borderColor: 'var(--accent-soft)' }}>
+          <div className="col" style={{ gap: 2 }}>
+            <strong>Sing it all</strong>
+            <span className="small muted">
+              The whole piece in one go, every section scored. Pass at a level and the piece reaches it.
+              Know it already? Go straight to any level: you don't have to do the sections first.
+            </span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 5 }}>
+            {LEVELS.map((L) => {
+              const l = L.level;
+              const fixes = r.toFix.find((f) => f.level === l)?.sectionIds ?? [];
+              // The suggested run: the level every section has reached, else the next piece level.
+              const cls = l <= P ? 'lvl-btn done' : l === (r.unconfirmed || P + 1) && !fixes.length ? 'lvl-btn next' : 'lvl-btn';
+              return (
+                <button key={l} className={cls} data-testid={`full-${l}`}
+                  aria-label={`Sing it all at level ${l} ${L.name}${l <= P ? ' (passed)' : ''}${fixes.length ? ` (fix ${fixes.length} section${fixes.length > 1 ? 's' : ''} first)` : ''}`}
+                  disabled={fixes.length > 0}
+                  title={fixes.length ? `Fix ${fixes.map(label).join(', ')} first` : undefined}
+                  onClick={() => play('all', l)} style={fixes.length ? { opacity: 0.45 } : undefined}>
+                  {l} <span style={{ fontWeight: 600, fontSize: 11 }}>{SHORT[l]}</span>
+                </button>
+              );
+            })}
+          </div>
+          {r.toFix.map((f) => (
+            <div key={f.level} className="col" style={{ gap: 6 }} data-testid="to-fix">
+              <span className="small" style={{ color: 'var(--accent-text)' }}>
+                <strong>To fix at level {f.level}</strong> (they slipped in your full run). Pass {f.sectionIds.length > 1 ? 'each' : 'it'} on {f.sectionIds.length > 1 ? 'its' : 'its'} own, then sing it all at level {f.level} again:
+              </span>
+              <div className="row wrap" style={{ gap: 6 }}>
+                {f.sectionIds.map((id) => (
+                  <button key={id} className="btn small" onClick={() => play(id, f.level)}><IconPlay size={14} color="currentColor" /> {label(id)}</button>
+                ))}
+              </div>
+            </div>
+          ))}
+          {r.laterFixes.map((f) => (
+            <span key={f.level} className="tiny muted" data-testid="later-fix">
+              In your run at level {f.level}, {f.sectionIds.map(label).join(', ')} slipped: practise {f.sectionIds.length > 1 ? 'them' : 'it'} at level {f.level} when you get there.
+            </span>
+          ))}
+          {P === 4 && r.offBookDays > 0 && !r.toFix.length && (
+            <span className="tiny muted">Whole piece from memory: day {r.offBookDays} of {OFF_BOOK_DAYS}. Sing it all at level 5 again on another day.</span>
+          )}
+          <div className="row wrap" style={{ gap: 6 }}>
+            <button className="btn small ghost" onClick={() => play('all', Math.max(2, Math.min(4, P || 3)), '3d')}><IconCube size={16} color="#B3A6FF" /> Arcade run</button>
+            <span className="tiny muted" style={{ alignSelf: 'center' }}>just for fun: doesn't count for a level</span>
+          </div>
+        </div>
+      )}
+
       {part && sections.length > 0 && (
         <details className="card" open>
           <summary style={{ cursor: 'pointer', fontWeight: 700 }}>Your map of the piece</summary>
@@ -157,7 +236,8 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
       )}
 
       <section className="ladder" aria-label="Sections">
-        <h2 style={{ marginBottom: 4 }}>Sections</h2>
+        <h2 style={{ marginBottom: 0 }}>Sections</h2>
+        {multi && <span className="tiny muted" style={{ marginBottom: 4 }}>Practice steps: take the piece apart, then put it together in a full run.</span>}
         {sections.map((s) => {
           const sp = prog?.sections[s.id];
           const lvl = sp?.level ?? 0;
@@ -170,7 +250,8 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
                   <span style={{ fontWeight: 700 }}>{s.label}</span>
                   {snippet(part!, s.start, s.end) && <span className="small ellipsis" style={{ color: 'var(--accent-text)', fontStyle: 'italic' }}>“{snippet(part!, s.start, s.end)}…”</span>}
                   <span className="tiny muted">
-                    {isDue ? 'Due for review' : status === 'new' ? 'Not started' : `Level ${lvl}${sp?.best?.[lvl] != null ? ` · best ${Math.round(sp.best[lvl] * 100)}%` : ''}`}
+                    {fixAt.has(s.id) ? <strong style={{ color: 'var(--accent-text)' }} data-testid="section-to-fix">To fix at level {fixAt.get(s.id)} · </strong> : null}
+                    {isDue ? 'Due for review' : status === 'new' ? (fixAt.has(s.id) ? 'not passed on its own yet' : 'Not started') : `Level ${lvl}${sp?.best?.[lvl] != null ? ` · best ${Math.round(sp.best[lvl] * 100)}%` : ''}`}
                     {lvl === 4 && sp?.offBookDays?.length ? ` · from memory: day ${sp.offBookDays.length} of ${OFF_BOOK_DAYS}` : ''}
                   </span>
                 </div>
@@ -263,19 +344,6 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
         </div>
       )}
 
-      {sections.length > 1 && (
-        <div className="card flat">
-          <strong>Run the whole piece</strong>
-          <span className="small muted">A full run-through doesn't change section levels, but counts for your streak and the leaderboard.</span>
-          <div className="row wrap">
-            <button className="btn small" onClick={() => play('all', 2)}>With your part</button>
-            <button className="btn small" onClick={() => play('all', 3)}>Others only</button>
-            <button className="btn small" onClick={() => play('all', 4)}>Concert mode</button>
-            <button className="btn small" onClick={() => play('all', 5)}>From memory</button>
-            <button className="btn small" onClick={() => play('all', 3, '3d')}><IconCube size={16} color="#B3A6FF" /> Arcade</button>
-          </div>
-        </div>
-      )}
       {piece.credit && <span className="tiny muted">{piece.credit}</span>}
     </main>
   );

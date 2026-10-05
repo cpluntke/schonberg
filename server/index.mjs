@@ -73,6 +73,7 @@ function validate(o, nameFromUrl) {
   };
   if (Object.values(e).some((v) => v === null)) return null;
   if (e.name !== nameFromUrl.trim().slice(0, 40)) return null;
+  if (o.v === 2) e.v = 2; // readiness formula (piece levels from full runs); absent = older app
   e.weeklyScore = Math.round(e.weeklyScore); e.streak = Math.round(e.streak);
   return e;
 }

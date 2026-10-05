@@ -25,10 +25,11 @@ target, movable/fixed solfège and Chinese numbered notation (jianpu), and an at
   pieces: public-domain Debussy, Ravel, Bruckner and Brahms (via the PDMX dataset) plus an
   original warm-up chorale.
 - **Coaching ladder:** each piece is split into sections, and each section climbs
-  Listen → 1 Note-learning → 2 In time → 3 Independent → 4 Concert-ready.
+  Listen → 1 Note-learning → 2 In time → 3 Independent → 4 Concert-ready → 5 Off book.
   Support is removed step by step: tempo, your part playing along, note names, and the
-  starting pitch. Readiness is shown per piece and per cycle; levels needed: rehearsal-ready
-  = everything at level 3, concert-ready = level 4. Sections you haven't sung in 7 days come back for review.
+  starting pitch. Section levels are practice steps: a **piece** reaches a level only when you
+  sing it all through at that level in one go, with every section holding (docs/LEVELS.md).
+  Rehearsal-ready = piece level 3, concert-ready = 4, memorised = 5 on two days. Reviews come back after 7 days.
 - **Practice mode (2D):** piano-roll highway, live pitch trace, cents readout, other voices as
   ghosts, lyrics, per-voice mixer, slow tempo for level 1.
 - **Arcade mode (3D):** notes rush down perspective lanes, combo multiplier,

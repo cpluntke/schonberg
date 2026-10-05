@@ -1,5 +1,6 @@
 import type { AttemptResult } from '../../game/types';
 import type { WordsResult, WordsStage } from '../../game/textrhythm';
+import type { FullRunRecord } from '../../progress/store';
 
 export interface LastResult {
   pieceId: string;
@@ -35,6 +36,10 @@ export interface LastResult {
   suggestDelayCheck?: boolean;
   /** The notes were right but entries came this many ms late (median), which failed the run. */
   timingFail?: number;
+  /** A run-through of the whole piece (docs/LEVELS.md): each section's score and what's left to fix. */
+  full?: FullRunRecord;
+  /** A section pass that cleared it from a full run's to-fix list (level, sections left to fix there). */
+  fixed?: { level: number; remaining: number }[];
 }
 
 let last: LastResult | null = null;

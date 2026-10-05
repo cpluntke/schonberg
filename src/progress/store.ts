@@ -4,7 +4,7 @@
 import { get as idbGet, set as idbSet, del as idbDel, keys as idbKeys } from 'idb-keyval';
 import type { Score, Section, VoiceType } from '../music/types';
 import type { AttemptResult, TuningMode } from '../game/types';
-import { LEVELS, MAX_LEVEL, OFF_BOOK_DAYS, isDue, type Strictness } from './ladder';
+import { LEVELS, MAX_LEVEL, OFF_BOOK_DAYS, fixesBefore, fixListLocks, isDue, sectionChecks, type Strictness } from './ladder';
 
 /** Structurally identical to game/notation.ts NotationMode. */
 export type NotationMode = 'letter' | 'fixed' | 'movable' | 'jianpu' | 'pc';
@@ -16,7 +16,9 @@ const K = {
   profile: 'sh:profile',
   cycle: 'sh:cycle',
   log: 'sh:log',
-  readiness: 'sh:readiness',
+  // Readiness history. v2: readiness counts piece levels from full runs (docs/LEVELS.md), so the
+  // history restarts (values under the old 'sh:readiness' key would show as a false drop).
+  readiness: 'sh:readiness2',
   progress: (pieceId: string, partId: string) => `sh:progress:${pieceId}:${partId}`,
 };
 export const LOG_CAP = 2000;
@@ -113,12 +115,41 @@ export interface SectionProgress {
   offBookDays?: string[];
 }
 
+/**
+ * Full run-throughs of the whole piece (docs/LEVELS.md). The piece's level is earned only here.
+ * Optional: progress saved before piece levels existed has none (piece level 0).
+ */
+export interface FullRunProgress {
+  /** Highest piece level earned in a counted full run (0 = none). */
+  level: number;
+  /** level → best accuracy of counted full runs (0..1). */
+  best: Record<number, number>;
+  /** level → best points score. */
+  bestScore?: Record<number, number>;
+  /** Counted full runs. */
+  attempts: number;
+  lastPracticed?: number;
+  lastPassed?: number;
+  /** Local dates of full runs passed off book; piece level 5 needs two different days. */
+  offBookDays?: string[];
+  /**
+   * level → sections that fell below the level's pass mark in the latest counted full run at that
+   * level and haven't passed at that level (or above) on their own since. While any are left, a
+   * full run at that level can't count.
+   */
+  toFix?: Record<number, string[]>;
+  /** level → the run that made that to-fix list held there, so the list locks even above the level being worked toward. */
+  toFixLocks?: Record<number, boolean>;
+}
+
 export interface PieceProgress {
   pieceId: string;
   partId: string;
   sections: Record<string, SectionProgress>;
   totalAttempts: number;
   bestScore: number;
+  /** Full run-throughs (absent in data saved before piece levels). */
+  full?: FullRunProgress;
 }
 
 export interface AttemptLog {
@@ -324,6 +355,47 @@ export interface RecordResult {
   prevLevel: number;
   /** Level 5: different days passed off book so far (memorised at OFF_BOOK_DAYS). */
   offBookDays?: number;
+  /** This pass cleared the section from the full run's to-fix list at these levels (with how many are left). */
+  fixed?: { level: number; remaining: number }[];
+}
+
+function localDay(now: number): string {
+  const d = new Date(now);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Remove a section from the to-fix lists of levels ≤ `level`; returns what was cleared. */
+function clearFix(full: FullRunProgress | undefined, sectionId: string, level: number): { level: number; remaining: number }[] {
+  const out: { level: number; remaining: number }[] = [];
+  if (!full?.toFix) return out;
+  for (const k of Object.keys(full.toFix).map(Number).sort((a, b) => a - b)) {
+    const ids = full.toFix[k] ?? [];
+    if (k > level || !ids.includes(sectionId)) continue;
+    const rest = ids.filter((x) => x !== sectionId);
+    if (rest.length) full.toFix[k] = rest;
+    else { delete full.toFix[k]; if (full.toFixLocks) delete full.toFixLocks[k]; }
+    out.push({ level: k, remaining: rest.length });
+  }
+  if (!Object.keys(full.toFix).length) delete full.toFix;
+  if (full.toFixLocks && !Object.keys(full.toFixLocks).length) delete full.toFixLocks;
+  return out;
+}
+
+/** Fold a section pass at `lvl` into its progress (level, best, review time, off-book days). */
+function passSection(sp: SectionProgress, lvl: number, accuracy: number, now: number): void {
+  const prevLevel = sp.level ?? 0;
+  sp.best = { ...(sp.best ?? {}) };
+  sp.best[lvl] = Math.max(sp.best[lvl] ?? 0, accuracy);
+  sp.lastPracticed = now;
+  let reach = lvl;
+  if (lvl === 5) {
+    sp.offBookDays = [...new Set([...(sp.offBookDays ?? []), localDay(now)])].slice(-5);
+    // Memorised only once it held on a second day; until then it stays concert-ready.
+    if (sp.offBookDays.length < OFF_BOOK_DAYS) reach = 4;
+  }
+  sp.level = Math.max(prevLevel, reach);
+  // Passing at (or above) the current level counts as a review.
+  if (lvl >= prevLevel) sp.lastPassed = now;
 }
 
 /**
@@ -352,6 +424,7 @@ export function recordAttempt(
   const score = Number.isFinite(result.score) ? result.score : 0;
 
   let passed = false;
+  let fixed: { level: number; remaining: number }[] = [];
   if (lvl === 0) {
     sp.lastPracticed = now;
   } else {
@@ -361,18 +434,10 @@ export function recordAttempt(
     sp.bestScore = { ...(sp.bestScore ?? {}) };
     sp.bestScore[lvl] = Math.max(sp.bestScore[lvl] ?? 0, score);
     sp.lastPracticed = now;
-    let reach = lvl;
-    if (passed && lvl === 5) {
-      const d = new Date(now);
-      const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      sp.offBookDays = [...new Set([...(sp.offBookDays ?? []), day])].slice(-5);
-      // Memorised only once it held on a second day; until then it stays concert-ready.
-      if (sp.offBookDays.length < OFF_BOOK_DAYS) reach = 4;
-    }
     if (passed) {
-      sp.level = Math.max(prevLevel, reach);
-      // Passing at (or above) the current level counts as a review.
-      if (lvl >= prevLevel) sp.lastPassed = now;
+      passSection(sp, lvl, accuracy, now);
+      // Passing a section on its own clears it from the full run's to-fix list (at this level and below).
+      fixed = clearFix(prog.full, sectionId, lvl);
     }
     prog.totalAttempts = (prog.totalAttempts ?? 0) + 1;
     prog.bestScore = Math.max(prog.bestScore ?? 0, score);
@@ -386,13 +451,142 @@ export function recordAttempt(
   log.push(entry);
   writeJSON(K.log, log.length > LOG_CAP ? log.slice(log.length - LOG_CAP) : log, false);
   emit();
-  return { passed, newLevel: sp.level, prevLevel, ...(lvl === 5 ? { offBookDays: sp.offBookDays?.length ?? 0 } : {}) };
+  return {
+    passed, newLevel: sp.level, prevLevel,
+    ...(lvl === 5 ? { offBookDays: sp.offBookDays?.length ?? 0 } : {}),
+    ...(fixed.length ? { fixed } : {}),
+  };
+}
+
+export interface FullRunSection { id: string; accuracy: number; passed: boolean }
+
+export interface FullRunRecord {
+  /** The run counted (in one go, at the level's tempo, nothing pending to fix at this level). */
+  counted: boolean;
+  /** Overall accuracy reached the pass mark (and the timing was fine). */
+  overallPassed: boolean;
+  /** The piece level was granted (or confirmed): overall pass and every section passed. */
+  passed: boolean;
+  prevLevel: number;
+  newLevel: number;
+  /** Each section's accuracy within the run, in score order (sections the run didn't reach are left out). */
+  sections: FullRunSection[];
+  /** Sections to fix at this level after the run. */
+  toFix: string[];
+  /** Sections that were still to fix at this level before the run, which kept it from counting. */
+  blocked?: string[];
+  /** Level 5: different days the whole piece was passed off book. */
+  offBookDays?: number;
+}
+
+/**
+ * Record a run-through of the whole piece at `level` (docs/LEVELS.md). The piece level N is granted
+ * only when a counted run passes overall AND every section within it reaches the level's pass mark.
+ * Sections below the mark become "to fix at level N" and must pass on their own (recordAttempt)
+ * before a full run at N counts again. Sections that passed within the run are credited like a
+ * section pass. Level 5 (off book) needs passes on OFF_BOOK_DAYS different days; until then the
+ * piece is concert-ready (4).
+ *
+ * `counted` = sung in one go (not stopped early, not paused), at the level's full tempo, and (level 5)
+ * with everything hidden and no peeking. Uncounted runs are logged as practice and change nothing.
+ */
+export function recordFullRun(
+  pieceId: string,
+  partId: string,
+  level: number,
+  result: AttemptResult,
+  sections: Section[],
+  noteStart: (index: number) => number | undefined,
+  opts: { counted: boolean; timingFail?: boolean; durationSec?: number; now?: number },
+): FullRunRecord {
+  const now = opts.now ?? Date.now();
+  const prog: PieceProgress = getProgress(pieceId, partId) ?? {
+    pieceId, partId, sections: {}, totalAttempts: 0, bestScore: 0,
+  };
+  const full: FullRunProgress = prog.full ?? { level: 0, best: {}, attempts: 0 };
+  full.best ??= {};
+  const lvl = Math.max(1, Math.min(MAX_LEVEL, Math.round(level) || 1));
+  const pass = LEVELS[lvl - 1].pass;
+  const accuracy = Number.isFinite(result.accuracy) ? result.accuracy : 0;
+  const score = Number.isFinite(result.score) ? result.score : 0;
+  const prevLevel = full.level ?? 0;
+  const checks = sectionChecks(sections, noteStart, result);
+  const runSections: FullRunSection[] = [...sections].sort((a, b) => a.index - b.index)
+    .filter((s) => checks[s.id] != null)
+    .map((s) => ({ id: s.id, accuracy: checks[s.id].accuracy, passed: checks[s.id].checked >= pass - 1e-9 }));
+  const overallPassed = accuracy >= pass && !opts.timingFail;
+  // Only fixes at the level being worked toward lock the run (ladder.fixTarget).
+  const pending = fixesBefore(sections, prog, lvl);
+  const blocked = opts.counted && pending.length > 0 ? pending : undefined;
+  const counted = opts.counted && !blocked;
+
+  let passed = false;
+  let toFix = pending;
+  full.lastPracticed = now;
+  const levelsBefore: Record<string, number> = {};
+  for (const s of sections) levelsBefore[s.id] = prog.sections[s.id]?.level ?? 0;
+  if (counted) {
+    full.attempts = (full.attempts ?? 0) + 1;
+    full.best[lvl] = Math.max(full.best[lvl] ?? 0, accuracy);
+    full.bestScore = { ...(full.bestScore ?? {}) };
+    full.bestScore[lvl] = Math.max(full.bestScore[lvl] ?? 0, score);
+    // Each section that held within the run counts as a pass of that section.
+    for (const rs of runSections) {
+      if (!rs.passed || opts.timingFail) continue;
+      const sp: SectionProgress = prog.sections[rs.id] ?? { level: 0, best: {}, attempts: 0 };
+      passSection(sp, lvl, rs.accuracy, now);
+      // Held in a counted run of the whole piece: that's a review of the section, whatever its level.
+      sp.lastPassed = now;
+      prog.sections[rs.id] = sp;
+      clearFix(full, rs.id, lvl);
+    }
+    toFix = runSections.filter((rs) => !rs.passed).map((rs) => rs.id);
+    full.toFix = { ...(full.toFix ?? {}) };
+    full.toFixLocks = { ...(full.toFixLocks ?? {}) };
+    if (toFix.length) full.toFix[lvl] = toFix;
+    else delete full.toFix[lvl];
+    if (toFix.length && fixListLocks({ level: lvl, accuracy, overallPassed, sections: runSections.length, slipped: toFix, levelsBefore })) {
+      full.toFixLocks[lvl] = true;
+    } else delete full.toFixLocks[lvl];
+    passed = overallPassed && toFix.length === 0 && runSections.length > 0;
+    if (passed) {
+      let reach = lvl;
+      if (lvl === 5) {
+        full.offBookDays = [...new Set([...(full.offBookDays ?? []), localDay(now)])].slice(-5);
+        if (full.offBookDays.length < OFF_BOOK_DAYS) reach = 4;
+      }
+      full.level = Math.max(prevLevel, reach);
+      if (lvl >= prevLevel) full.lastPassed = now;
+      // A pass at this level settles what was left to fix below it.
+      for (const k of Object.keys(full.toFix).map(Number)) if (k < lvl) { delete full.toFix[k]; delete full.toFixLocks[k]; }
+    }
+    if (!Object.keys(full.toFix).length) delete full.toFix;
+    if (!Object.keys(full.toFixLocks).length) delete full.toFixLocks;
+  }
+  prog.full = full;
+  prog.totalAttempts = (prog.totalAttempts ?? 0) + 1;
+  prog.bestScore = Math.max(prog.bestScore ?? 0, score);
+  writeJSON(K.progress(pieceId, partId), prog, false);
+
+  const entry: AttemptLog = { at: now, pieceId, partId, sectionId: counted ? 'all' : 'practice', level: lvl, accuracy, score, passed };
+  if (opts.durationSec != null && Number.isFinite(opts.durationSec)) entry.durationSec = opts.durationSec;
+  const log = attemptLog();
+  log.push(entry);
+  writeJSON(K.log, log.length > LOG_CAP ? log.slice(log.length - LOG_CAP) : log, false);
+  emit();
+  return {
+    counted, overallPassed, passed, prevLevel, newLevel: full.level ?? 0, sections: runSections, toFix,
+    ...(blocked ? { blocked } : {}),
+    ...(lvl === 5 ? { offBookDays: full.offBookDays?.length ?? 0 } : {}),
+  };
 }
 
 export function personalBest(
   pieceId: string, partId: string, sectionId: string, level: number,
 ): { accuracy: number; score: number } | null {
-  const sp = getProgress(pieceId, partId)?.sections[sectionId];
+  const prog = getProgress(pieceId, partId);
+  // The whole piece: counted full runs (the old 'all' record mixed in practice runs).
+  const sp = sectionId === 'all' ? prog?.full : prog?.sections[sectionId];
   if (!sp || sp.best?.[level] == null) return null;
   return { accuracy: sp.best[level], score: sp.bestScore?.[level] ?? 0 };
 }
