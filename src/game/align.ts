@@ -143,16 +143,18 @@ function typicalNoteSec(ctx: ScoringContext, rate: number): number {
  * Only intonation uses the lined-up voice. Onsets, rhythm and the timing tips stay on the delay
  * the app already applies (`latencyMs`), so a singer who follows the guide 300 ms behind still
  * hears that they're late. `calibrated` = that delay was measured with the delay check: then
- * only small corrections are made.
+ * only small corrections are made. `everyNote` = a level where every note must be right (level 1):
+ * there, a note is only lifted from an octave below when most of it is at the right octave (see
+ * liftSubharmonics).
  */
 export function scoreAligned(
   ctx: ScoringContext,
   samples: PitchSample[],
   opts: ScoringOptions,
-  run: { rate: number; latencyMs: number; calibrated: boolean; liftSubharmonics?: boolean; maxTotalMs?: number },
+  run: { rate: number; latencyMs: number; calibrated: boolean; liftSubharmonics?: boolean; everyNote?: boolean; maxTotalMs?: number },
 ): AlignedResult {
   const rate = run.rate > 0 ? run.rate : 1;
-  const prep = (xs: PitchSample[]) => (run.liftSubharmonics ? liftSubharmonics(ctx.part, xs) : xs);
+  const prep = (xs: PitchSample[]) => (run.liftSubharmonics ? liftSubharmonics(ctx.part, xs, { everyNote: run.everyNote }) : xs);
   // Search a plausible range of device delays around the current setting (total ≥ ~20 ms); with a
   // measured delay only a small correction.
   const lo = run.calibrated ? -CALIBRATED_MAX : Math.max(-0.25, -(run.latencyMs - 20) / 1000);
@@ -200,6 +202,11 @@ export function scoreAligned(
   return { result, estimate, shiftMs, beyondCapMs };
 }
 
+/** Share of a note's readings (right octave vs an octave below) that must be at the right octave before
+ * the octave-below ones are corrected (liftSubharmonics); at level 1 more than half. */
+export const OCTAVE_LIFT_SHARE = 0.3;
+export const OCTAVE_LIFT_SHARE_EVERY_NOTE = 0.5;
+
 /**
  * Practising on the phone speaker, the mic hears the backing too, and McLeod can lock onto the
  * common period of voice + chord: an octave and a fifth (×⅓) or two octaves (×¼) below the voice,
@@ -207,8 +214,12 @@ export function scoreAligned(
  * corrected when the same note also has readings at the right octave (the tracker flickering), so a
  * note genuinely sung an octave low still counts as an octave error. Readings matching the
  * previous or next written note are left alone (that's the voice moving, not a subharmonic).
+ * `everyNote` (level 1, where one wrong note fails the run): an octave below is only corrected
+ * when most of the note's readings are at the right octave (more than OCTAVE_LIFT_SHARE_EVERY_NOTE),
+ * so a note sung an octave low with some right-octave readings (the tracker reading a low "oo" an
+ * octave up, or the guide bleeding into the mic) is not moved onto the note.
  */
-export function liftSubharmonics(part: Part, samples: PitchSample[]): PitchSample[] {
+export function liftSubharmonics(part: Part, samples: PitchSample[], o: { everyNote?: boolean } = {}): PitchSample[] {
   const notes = part.notes;
   if (!notes.length) return samples;
   const starts = notes.map((n) => n.start);
@@ -245,7 +256,7 @@ export function liftSubharmonics(part: Part, samples: PitchSample[]): PitchSampl
     if (near(s.midi + 12, due)) {
       const on = onNote.get(i) ?? 0;
       const below = octBelow.get(i) ?? 0;
-      if (on >= 0.3 * (on + below)) return { ...s, midi: s.midi + 12 };
+      if (o.everyNote ? on > OCTAVE_LIFT_SHARE_EVERY_NOTE * (on + below) : on >= OCTAVE_LIFT_SHARE * (on + below)) return { ...s, midi: s.midi + 12 };
     }
     return s;
   });

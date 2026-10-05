@@ -20,7 +20,7 @@ import { hashSeed } from './prng';
 import type { RenderedTake } from './singer';
 import { PITCH_CURRENT, PITCH_HEAD, trackOffline, type PitchImpl, type TrackReading } from './tracker';
 import { REPO_ROOT } from './scores';
-import { attemptPasses } from '../../src/progress/ladder';
+import { attemptPasses, levelSpec } from '../../src/progress/ladder';
 
 /**
  * The end-of-run policy of src/ui/screens/Play.tsx and src/ui/play/session.ts, read from the source
@@ -35,6 +35,8 @@ export interface PlayPolicy {
   guideLearnMaxAbove: number | null;
   /** scoreAligned(…, { liftSubharmonics }) is used at the end of the run. */
   liftSubharmonics: boolean;
+  /** …with { everyNote } at every-note levels (level 1: no octave lift of single notes). */
+  everyNoteLift: boolean;
   /** session.onPitch stores fixSubharmonic-corrected samples (else raw; the fix is display-only). */
   fixSubInSamples: boolean;
   detected: string[];
@@ -57,9 +59,11 @@ export function detectPlayPolicy(): PlayPolicy {
   detected.push(`timing gate: ${timingGate}`);
   const liftSubharmonics = /liftSubharmonics:/.test(play);
   detected.push(`liftSubharmonics: ${liftSubharmonics}`);
+  const everyNoteLift = /liftSubharmonics: [^\n]*everyNote:/.test(play);
+  detected.push(`scoreAligned everyNote: ${everyNoteLift}`);
   const fixSubInSamples = /const midi = p\.midi != null && !this\.cfg\.scoring\.octaveTolerant \? fixSubharmonic/.test(sess);
   detected.push(`session stores ${fixSubInSamples ? 'fixSubharmonic-corrected' : 'raw'} samples`);
-  return { lateFailMs, timingGate, guideLearnMaxAbove, liftSubharmonics, fixSubInSamples, detected };
+  return { lateFailMs, timingGate, guideLearnMaxAbove, liftSubharmonics, everyNoteLift, fixSubInSamples, detected };
 }
 
 export const PLAY_POLICY = detectPlayPolicy();
@@ -88,7 +92,7 @@ export const measured = (ms: number): Profile => ({ latencyMs: ms, source: 'meas
 /** The scoring functions the AFTER pipeline uses (swap for variants, e.g. another TRANSITION_MAX). */
 export interface AfterImpl {
   scoreAttempt: Scorer;
-  scoreAligned: (ctx: ScoringContext, samples: PitchSample[], opts: ScoringOptions, run: { rate: number; latencyMs: number; calibrated: boolean; liftSubharmonics?: boolean; maxTotalMs?: number }) => curAlign.AlignedResult;
+  scoreAligned: (ctx: ScoringContext, samples: PitchSample[], opts: ScoringOptions, run: { rate: number; latencyMs: number; calibrated: boolean; liftSubharmonics?: boolean; everyNote?: boolean; maxTotalMs?: number }) => curAlign.AlignedResult;
   medianOnsetMs: (result: AttemptResult, rate: number, part?: Part) => number | null;
 }
 export const AFTER_CURRENT: AfterImpl = {
@@ -220,6 +224,7 @@ export function runSession(spec: PipelineSpec, setup: RunSetup, profile: Profile
     const idx = plain.notes.map((n) => n.index);
     const al = impl.scoreAligned({ ...ctx, range: [Math.min(...idx), Math.max(...idx)] }, samples, opts, {
       rate, latencyMs: latencyUsed, calibrated, ...(pol.liftSubharmonics ? { liftSubharmonics: !opts.octaveTolerant } : {}),
+      ...(pol.everyNoteLift ? { everyNote: levelSpec(level).everyNote } : {}),
       // Play.tsx: the lag search never looks past a plausible total device delay (guide on: estimate + cap).
       maxTotalMs: pol.guideLearnMaxAbove !== null && L.guide ? Math.max(spec.estimateMs + pol.guideLearnMaxAbove, latencyUsed + 80) : 450,
     });

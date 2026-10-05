@@ -10,7 +10,7 @@ import { noteVerdict } from '../../src/progress/ladder';
 import { ALL_TARGETS, SEEDS, T, render } from './compare';
 import { piecePassage, renderTake, scoreTake, synthPassage, type FastPassage } from './fastnotes';
 import { AFTER, UNCALIBRATED, measured, runSession, type SessionOutcome } from './pipeline';
-import { SINGERS, onDoo, type SingerProfile } from './singer';
+import { CHANNELS, SINGERS, onDoo, type ChannelProfile, type SingerProfile } from './singer';
 
 const CAL_MS = 150;
 
@@ -20,6 +20,8 @@ export interface L1Cell {
   singer: string;
   doo: boolean;
   latency: 'cal' | 'uncal200';
+  /** Practising on the phone speaker (the backing bleeds into the mic) rather than on headphones. */
+  speaker?: boolean;
   runs: number;
   /** New rule (every note right). */
   passes: number;
@@ -40,7 +42,7 @@ export interface L1Cell {
   rhythm: number;
 }
 
-export interface L1AdvRow { singer: string; target: string; latency: string; acc: number; passed: boolean; oldPassed: boolean; wrong: number; forgiven: number }
+export interface L1AdvRow { singer: string; target: string; latency: string; speaker?: boolean; acc: number; passed: boolean; oldPassed: boolean; wrong: number; forgiven: number }
 
 export interface L1DooReport {
   seeds: number;
@@ -48,6 +50,9 @@ export interface L1DooReport {
   fast: L1Cell[];
   adversarial: L1AdvRow[];
 }
+
+/** The phone speaker at −13 dB (CHANNELS.phoneSpeaker): the singer's own part plays back into the mic at level 1. */
+export const SPEAKER: ChannelProfile = CHANNELS.phoneSpeaker;
 
 function tally(cell: L1Cell, target: string, o: SessionOutcome, durOf: (i: number) => number): void {
   const r: AttemptResult = o.result;
@@ -90,21 +95,23 @@ function finishCell(c: L1Cell, onsets: number[]): L1Cell {
 const onsetsOf = (r: AttemptResult) => r.notes.map((n) => n.onsetMs).filter((x): x is number => x != null);
 
 /** Good singers × {lyrics, doo} × 6 sections × seeds × {calibrated, uncalibrated first run}. */
-export async function l1Grid(o: { seeds?: number; singers?: SingerProfile[] } = {}): Promise<L1Cell[]> {
+export async function l1Grid(o: { seeds?: number; singers?: SingerProfile[]; channel?: ChannelProfile; lyrics?: boolean } = {}): Promise<L1Cell[]> {
   const seeds = o.seeds ?? SEEDS;
+  const speaker = o.channel != null && o.channel.bleedDb !== null;
   const singers = o.singers ?? [SINGERS.goodChoir, SINGERS.operatic, SINGERS.plainControl, SINGERS.ringing, SINGERS.slowTransitions];
   const out: L1Cell[] = [];
   for (const base of singers) {
-    for (const doo of [false, true]) {
+    for (const doo of o.lyrics === false ? [true] : [false, true]) {
       const singer = doo ? onDoo(base) : base;
       const cells = { cal: newCell(base.name, doo, 'cal'), uncal200: newCell(base.name, doo, 'uncal200') };
+      if (speaker) cells.cal.speaker = cells.uncal200.speaker = true;
       const ons = { cal: [] as number[], uncal200: [] as number[] };
       // The first singer gets every seed; the others half (they're there for the spread of voices).
       const n = base === singers[0] ? seeds : Math.max(2, Math.ceil(seeds / 2));
       for (const target of ALL_TARGETS) {
         for (let k = 1; k <= n; k++) {
           for (const lat of ['cal', 'uncal200'] as const) {
-            const setup = await render({ target, singer, level: 1, trueLatencyMs: lat === 'cal' ? CAL_MS : 200, performanceSeed: 500 + k, microSeed: 500 + k });
+            const setup = await render({ target, singer, level: 1, trueLatencyMs: lat === 'cal' ? CAL_MS : 200, performanceSeed: 500 + k, microSeed: 500 + k, channel: o.channel });
             const res = runSession(AFTER, setup, lat === 'cal' ? measured(CAL_MS) : UNCALIBRATED);
             tally(cells[lat], target.id, res, (i) => setup.part.notes[i].dur / setup.take.rate);
             ons[lat].push(...onsetsOf(res.result));
@@ -145,25 +152,33 @@ export async function l1Fast(seeds = 4): Promise<L1Cell[]> {
   return out;
 }
 
-/** Singers who must fail level 1 (and two to report): wrong notes, one note behind, a single wrong note. */
-export async function l1Adversarial(seeds = 3): Promise<L1AdvRow[]> {
-  const singers: SingerProfile[] = [
+/** One note sung an octave low (the rest good): must fail level 1, also on the phone speaker. */
+export const OCTAVE_LOW: SingerProfile = { ...SINGERS.goodChoir, name: 'one note an octave low', wrongCount: 1, wrongByCents: -1200 };
+
+/**
+ * Singers who must fail level 1 (and two to report): wrong notes, one note behind, a single wrong
+ * note, one note an octave low. `channel`: e.g. SPEAKER (then each row is marked `speaker`).
+ */
+export async function l1Adversarial(seeds = 3, opt: { singers?: SingerProfile[]; channel?: ChannelProfile } = {}): Promise<L1AdvRow[]> {
+  const speaker = opt.channel != null && opt.channel.bleedDb !== null;
+  const singers: SingerProfile[] = opt.singers ?? [
     { ...SINGERS.wrongNotes },
     { ...SINGERS.oneBehind },
     { ...SINGERS.goodChoir, name: 'one wrong note (a semitone, random)', wrongCount: 1 },
     { ...SINGERS.goodChoir, name: 'one note a semitone flat', wrongCount: 1, wrongByCents: -100 },
     { ...SINGERS.goodChoir, name: 'one note 70¢ flat', wrongCount: 1, wrongByCents: -70 },
     { ...SINGERS.flat40 },
+    OCTAVE_LOW,
   ];
   const out: L1AdvRow[] = [];
   for (const s of singers) {
     for (const target of [T.dieu0, T.dieu1, T.warmup0, T.warmup1, T.tab0, T.tab1]) {
       for (let k = 1; k <= seeds; k++) {
-        const setup = await render({ target, singer: onDoo(s), level: 1, trueLatencyMs: CAL_MS, performanceSeed: 900 + k, microSeed: 900 + k });
+        const setup = await render({ target, singer: onDoo(s), level: 1, trueLatencyMs: CAL_MS, performanceSeed: 900 + k, microSeed: 900 + k, channel: opt.channel });
         const o = runSession(AFTER, setup, measured(CAL_MS));
         const v = o.result.notes.map(noteVerdict);
         out.push({
-          singer: s.name, target: target.id, latency: 'cal', acc: o.result.accuracy, passed: o.passed, oldPassed: o.result.accuracy >= 0.75,
+          singer: s.name, target: target.id, latency: 'cal', ...(speaker ? { speaker } : {}), acc: o.result.accuracy, passed: o.passed, oldPassed: o.result.accuracy >= 0.75,
           wrong: v.filter((x) => x === 'wrong').length, forgiven: v.filter((x) => x === 'forgiven').length,
         });
       }

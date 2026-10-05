@@ -204,6 +204,28 @@ describe('re-review scenarios', () => {
     });
     const al = scoreAligned(ctx, bleed, { ...opts, octaveTolerant: false }, { rate: 1, latencyMs: 130, calibrated: true, liftSubharmonics: true });
     expect(al.result.accuracy).toBeGreaterThan(0.9);
+    // Level 1 too: most of each note is at the right octave.
+    const l1 = scoreAligned(ctx, bleed, { ...opts, octaveTolerant: false }, { rate: 1, latencyMs: 130, calibrated: true, liftSubharmonics: true, everyNote: true });
+    expect(l1.result.accuracy).toBeGreaterThan(0.9);
+  });
+  it('at an every-note level, a note sung an octave low is only lifted when most of it reads at the right octave', () => {
+    // Note 5 (A4) sung an octave low, 2 readings in 5 at the right octave (the tracker or the guide
+    // bleeding in): lifted at levels 2–5 (≥ 30%), not at level 1 (needs more than half). ×⅓
+    // readings elsewhere are still corrected.
+    let k = 0;
+    const take = singRealistic(part).map((s) => {
+      if (s.midi === null) return s;
+      k++;
+      const i = part.notes.findIndex((n) => s.time >= n.start && s.time < n.start + n.dur);
+      if (i === 5) return { ...s, midi: k % 5 < 2 ? s.midi : s.midi - 12 };
+      return { ...s, midi: k % 7 === 0 ? s.midi - 19 : s.midi };
+    });
+    const run = { rate: 1, latencyMs: 130, calibrated: true, liftSubharmonics: true };
+    const levels2to5 = scoreAligned(ctx, take, strict, run).result;
+    expect(levels2to5.notes[5].grade).not.toBe('miss');
+    const level1 = scoreAligned(ctx, take, strict, { ...run, everyNote: true }).result;
+    expect(level1.notes[5].grade).toBe('miss');
+    expect(level1.notes.filter((n) => n.index !== 5 && n.grade !== 'perfect' && n.grade !== 'good')).toEqual([]);
   });
 });
 

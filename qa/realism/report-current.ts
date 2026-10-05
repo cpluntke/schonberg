@@ -280,9 +280,9 @@ const pct1 = (x: number | null | undefined) => (x == null || !Number.isFinite(x)
 function l1Section(L: string[], cells: Any[], adv: Any | null): void {
   L.push('## 8. Level 1 on “doo”: every note right (current app)');
   L.push('');
-  L.push('Each good voice sings the six sections on the lyrics and on “doo” (a 20–45 ms “d” before every note, vowel “u”) at 70% tempo: calibrated (150 ms) and an uncalibrated phone (true 200 ms, first run). *new* = passes with every note right (ladder.attemptPasses; unreliable notes forgiven unless clearly wrong), *old* = accuracy ≥ 75%. *below good*: notes graded ok/miss, of which *forgiven* by the exemption; *wrong*: notes that failed the run (target · note · grade · cents).');
+  L.push('Each good voice sings the six sections on the lyrics and on “doo” (a 20–45 ms “d” before every note, vowel “u”) at 70% tempo: calibrated (150 ms) and an uncalibrated phone (true 200 ms, first run); on headphones, and on “doo” also on the *phone speaker* (the backing, the own part included, bleeding into the mic at −13 dB). *new* = passes with every note right (ladder.attemptPasses; unreliable notes forgiven unless clearly wrong), *old* = accuracy ≥ 75%. *below good*: notes graded ok/miss, of which *forgiven* by the exemption; *wrong*: notes that failed the run (target · note · grade · cents).');
   L.push('');
-  const row = (c: Any) => [c.singer, c.doo ? 'doo' : 'lyrics', c.latency, `${c.passes}/${c.runs}`, `${c.oldPasses}/${c.runs}`, pct(c.meanAcc), c.belowGood, c.forgiven,
+  const row = (c: Any) => [c.singer, `${c.doo ? 'doo' : 'lyrics'}${c.speaker ? ', phone speaker' : ''}`, c.latency, `${c.passes}/${c.runs}`, `${c.oldPasses}/${c.runs}`, pct(c.meanAcc), c.belowGood, c.forgiven,
     c.wrong.length ? c.wrong.slice(0, 4).map((w: Any) => `${w.target} #${w.index} ${w.grade} ${w.cents ?? '–'}¢`).join('; ') + (c.wrong.length > 4 ? ` …+${c.wrong.length - 4}` : '') : '–',
     f0(c.medOnsetMs)];
   const head = ['singer', 'sung on', 'delay', 'new', 'old', 'acc', 'below good', 'forgiven', 'wrong notes', 'median onset ms'];
@@ -295,10 +295,13 @@ function l1Section(L: string[], cells: Any[], adv: Any | null): void {
     L.push('');
   }
   if (adv?.adversarial?.length) {
-    L.push('**Singers with wrong notes, on “doo”** (calibrated; runs passing level 1, new vs old rule):');
+    L.push('**Singers with wrong notes, on “doo”** (calibrated, headphones unless *phone speaker*: the backing, the own part included, bleeding into the mic at −13 dB; runs passing level 1, new vs old rule):');
     L.push('');
     const by = new Map<string, Any[]>();
-    for (const r of adv.adversarial) by.set(r.singer, [...(by.get(r.singer) ?? []), r]);
+    for (const r of adv.adversarial) {
+      const k = `${r.singer}${r.speaker ? ', phone speaker' : ''}`;
+      by.set(k, [...(by.get(k) ?? []), r]);
+    }
     L.push(table(['singer', 'new', 'old', 'mean acc', 'wrong / run', 'forgiven'], [...by].map(([s, rs]) => [
       s, `${rs.filter((r: Any) => r.passed).length}/${rs.length}`, `${rs.filter((r: Any) => r.oldPassed).length}/${rs.length}`, pct(mean(rs.map((r: Any) => r.acc))),
       f1(mean(rs.map((r: Any) => r.wrong))), rs.reduce((a: number, r: Any) => a + r.forgiven, 0),

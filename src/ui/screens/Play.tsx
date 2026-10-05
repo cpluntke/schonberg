@@ -237,7 +237,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
         { score: piece.score, part, range: [Math.min(...idx), Math.max(...idx)], end: sess.cfg.to },
         sess.samples, sess.cfg.scoring,
         {
-          rate: sess.cfg.rate, latencyMs: sess.latencyMs, calibrated, liftSubharmonics: !sess.cfg.scoring.octaveTolerant,
+          rate: sess.cfg.rate, latencyMs: sess.latencyMs, calibrated, liftSubharmonics: !sess.cfg.scoring.octaveTolerant, everyNote: !!spec?.everyNote,
           maxTotalMs: sess.cfg.guide ? Math.max(estimateLatencyMs() + GUIDE_LEARN_MAX_ABOVE, sess.latencyMs + 80) : 450,
         },
       );

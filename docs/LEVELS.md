@@ -32,7 +32,10 @@ slowly; that bar shows as “needs work” in the bar strip, and the grade lette
   the tracker's range** (60–1400 Hz), or a note the tracker misread: a **low note (under 200 Hz)
   read partly or wholly an octave up** on “oo”, or a note with **a few subharmonic readings** (18–46
   semitones under it, where no voice sings), when the note is right once those readings are folded down
-  or replaced (see [SCORING.md](SCORING.md); never an octave low).
+  or replaced (see [SCORING.md](SCORING.md); never an octave low). The end-of-run correction of
+  readings an octave under a note (the phone speaker's subharmonics) needs more than half of the
+  note at the right octave at level 1 (30% at levels 2–5), so a note sung an octave low with a few
+  right-octave readings (the tracker, or the guide in the mic) still fails.
 - **…unless it was clearly wrong** (`NoteResult.clearly`): **no sound at all** inside the note
   (“not sung”; for both kinds, so a note out of the tracker's range must still be sung), or a very
   short note graded *miss* whose own readings were enough to judge

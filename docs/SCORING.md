@@ -38,6 +38,15 @@ For every note in your part:
   - Accuracy is the average over notes (perfect 1, good 0.85, OK 0.5). The letter grade comes from accuracy.
 - **Notes tied over the end of a section** are judged on the part before the end: playback stops
   there, and the app stops listening shortly after.
+- **Practising on the phone speaker.** With the backing bleeding into the mic, the detector can
+  lock onto the common period of voice and backing: an octave and a fifth (×⅓) or two octaves (×¼)
+  below the voice, or an octave (×½). After the run, readings an octave and a fifth or two octaves
+  under the note that is due are moved onto it. Readings an octave under it are moved up only when
+  the same note also has readings at the right octave (the detector flickering): at least 30% of
+  them, and at level 1 **more than half**. A note sung an octave low can still get some
+  right-octave readings (the detector reading a low “oo” an octave up, or the guide in the mic), and
+  at level 1 one such note fails the run; a flickering detector on a note sung at the right octave
+  reads mostly at the right octave.
 - **Level 1: every note right.** Level 1 (sung on “doo”) passes only when every note is *good* or
   better. A note the scorer can't judge reliably is let off below *good*: a very short note (as
   above), or a written pitch outside the detector's 60–1400 Hz. It still counts as wrong when it was
