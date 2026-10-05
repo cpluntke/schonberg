@@ -7,6 +7,7 @@
 // maps to a float step by piecewise-linear interpolation between the seven letters' pitches in the
 // current key (plus the accidental of the note being sung), so a note sung 30 cents flat sits just
 // below its notehead and a perfectly sung C♮ in D major sits exactly on the C.
+import { F_CLEF, G_CLEF, GLYPH_UNITS_PER_SPACE } from './clefGlyphs';
 import type { KeySig, Part, Score } from '../../music/types';
 import type { Grade, PitchSample } from '../../game/types';
 import { beatToTime, timeToBeat } from '../../music/time';
@@ -722,71 +723,36 @@ const MAGNIFY = 3;
 
 type Ctx = CanvasRenderingContext2D;
 
-function treblePath(): Path2D {
-  // Unit = one staff space; origin on the G line; y up (flipped when drawn).
-  const p = new Path2D();
-  p.moveTo(0.32, -0.08);
-  p.bezierCurveTo(0.42, 0.55, -0.1, 1.0, -0.55, 0.7);
-  p.bezierCurveTo(-1.05, 0.35, -0.98, -0.72, -0.2, -0.98);
-  p.bezierCurveTo(0.55, -1.2, 1.15, -0.55, 0.98, 0.18);
-  p.bezierCurveTo(0.85, 0.9, 0.05, 1.45, -0.22, 2.35);
-  p.bezierCurveTo(-0.5, 3.25, -0.1, 4.35, 0.38, 4.5);
-  p.bezierCurveTo(0.78, 4.6, 0.78, 3.75, 0.42, 3.25);
-  p.bezierCurveTo(0.2, 2.9, 0.06, 2.4, 0.08, 1.6);
-  p.lineTo(0.28, -2.05);
-  p.bezierCurveTo(0.34, -2.75, -0.2, -2.98, -0.55, -2.65);
-  return p;
-}
 let TREBLE: Path2D | null = null;
+let BASS: Path2D | null = null;
+
+/** Draws a font outline (Bravura units, y up) with its origin at (x, lineY). */
+function drawGlyph(c: Ctx, path: Path2D, x: number, lineY: number, sp: number, color: string) {
+  const k = sp / GLYPH_UNITS_PER_SPACE;
+  c.save();
+  c.translate(x, lineY);
+  c.scale(k, -k);
+  c.fillStyle = color;
+  c.fill(path);
+  c.restore();
+}
 
 export function drawTreble(c: Ctx, x: number, gLineY: number, sp: number, color: string, eight: boolean) {
-  TREBLE ??= treblePath();
-  c.save();
-  c.translate(x + 1.0 * sp, gLineY);
-  c.scale(sp, -sp);
-  c.strokeStyle = color;
-  c.lineCap = 'round';
-  c.lineJoin = 'round';
-  c.lineWidth = 0.24;
-  c.stroke(TREBLE);
-  c.fillStyle = color;
-  c.beginPath();
-  c.arc(-0.38, -2.38, 0.3, 0, Math.PI * 2);
-  c.fill();
-  c.restore();
+  TREBLE ??= new Path2D(G_CLEF);
+  drawGlyph(c, TREBLE, x + 0.1 * sp, gLineY, sp, color);
   if (eight) {
     c.fillStyle = color;
     c.font = `700 ${Math.round(sp * 1.15)}px Georgia, serif`;
     c.textAlign = 'center';
     c.textBaseline = 'top';
-    c.fillText('8', x + 1.2 * sp, gLineY + 3.05 * sp);
+    c.fillText('8', x + 1.35 * sp, gLineY + 2.7 * sp);
     c.textAlign = 'left';
   }
 }
 
 function drawBass(c: Ctx, x: number, fLineY: number, sp: number, color: string) {
-  c.save();
-  c.translate(x + 0.45 * sp, fLineY);
-  c.scale(sp, sp);
-  c.fillStyle = color;
-  c.strokeStyle = color;
-  c.beginPath();
-  c.arc(0.05, 0.05, 0.38, 0, Math.PI * 2);
-  c.fill();
-  c.lineWidth = 0.24;
-  c.lineCap = 'round';
-  c.beginPath();
-  c.moveTo(-0.25, 0.0);
-  c.bezierCurveTo(-0.2, -0.9, 1.1, -1.2, 1.5, -0.35);
-  c.bezierCurveTo(1.85, 0.6, 1.0, 1.9, -0.35, 2.8);
-  c.stroke();
-  c.beginPath();
-  c.arc(2.2, -0.5, 0.18, 0, Math.PI * 2);
-  c.fill();
-  c.beginPath();
-  c.arc(2.2, 0.5, 0.18, 0, Math.PI * 2);
-  c.fill();
-  c.restore();
+  BASS ??= new Path2D(F_CLEF);
+  drawGlyph(c, BASS, x + 0.1 * sp, fLineY, sp, color);
 }
 
 /** Accidental glyph centred at (x, y). */

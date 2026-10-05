@@ -78,3 +78,7 @@ The Debussy, Ravel, Bruckner and Brahms editions (and the Reger, Elgar and Bach 
 [PDMX dataset](https://zenodo.org/records/15571083) (CC BY 4.0), which collects
 MuseScore.com scores marked Public Domain / CC0 by their uploaders. The compositions
 themselves are in the public domain.
+
+The treble and bass clefs in the score view are outlines from the [Bravura](https://github.com/steinbergmedia/bravura)
+music font (© Steinberg Media Technologies GmbH), used under the SIL Open Font License 1.1
+(`public/licenses/Bravura-OFL.txt`).
