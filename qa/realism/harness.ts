@@ -10,6 +10,7 @@ import { scoreAttempt as scoreHead } from './baseline/scoring';
 import { loadPiece, noteRangeFor } from './scores';
 import { trackOffline, type TrackOptions, type TrackReading } from './tracker';
 import { readWav } from './wav';
+import { micTrouble } from '../../src/audio/inputQuality';
 import { TRUTH_HZ, truthAt, type RenderedTake } from './singer';
 
 /** End-of-run scoring step. Defaults to the app's scoreAttempt. */
@@ -22,7 +23,8 @@ export const SCORE_HEAD: Scorer = scoreHead as unknown as Scorer;
 
 /** Sidecar JSON the app exports next to a 16-bit WAV recording. */
 export interface Sidecar {
-  version: 1;
+  /** 2 adds inputQuality and a 5th sample field (mic trouble); nothing here reads them. */
+  version: 1 | 2;
   pieceId: string;
   partId: string;
   from: number;
@@ -90,7 +92,7 @@ export function readingsToSamples(
   for (const r of readings) {
     const time = m.scoreTimeAtSample0 + (r.stampSec - m.latencyMs / 1000) * m.rate;
     if (time < minTime) continue;
-    out.push({ time, midi: r.midi, clarity: r.clarity, rms: r.rms });
+    out.push({ time, midi: r.midi, clarity: r.clarity, rms: r.rms, ...(micTrouble(r) ? { mic: true } : {}) });
   }
   return out;
 }
@@ -213,7 +215,7 @@ export { TRUTH_HZ };
  * the sidecar's window → scoreAttempt → scoreAligned (+ subharmonic lift) → timing gate (L≥2, measured
  * delay). Returns the pipeline outcome (result, alignedMs, timingFailMs, the delay the app would store…).
  */
-export async function scoreRecordingApp(wavPath: string, sidecar: Sidecar | string) {
+export async function scoreRecordingApp(wavPath: string, sidecar: Sidecar | string, spec?: import('./pipeline').PipelineSpec) {
   const { runSession, AFTER, measured } = await import('./pipeline');
   const sc: Sidecar = typeof sidecar === 'string' ? JSON.parse(readFileSync(sidecar, 'utf8')) : sidecar;
   const buf = readFileSync(wavPath);
@@ -228,7 +230,7 @@ export async function scoreRecordingApp(wavPath: string, sidecar: Sidecar | stri
     stopSec: wav.pcm.length / wav.sampleRate, truthMidi: new Float32Array(0), truthCentre: new Float32Array(0), notes: [],
   };
   const profile = sc.calibrated ? measured(sc.latencyMs) : { latencyMs: sc.latencyMs };
-  return runSession(AFTER, {
+  return runSession(spec ?? AFTER, {
     take, part, ctx: { score: piece.score, part, range, end: sc.to }, from: sc.from, to: sc.to, level: sc.level ?? 1, microSeed: 1, windowN: sc.windowN,
     scoring: { toleranceCents: sc.toleranceCents, tuning: sc.tuning, octaveTolerant: sc.octaveTolerant, rate: sc.rate },
   }, profile);

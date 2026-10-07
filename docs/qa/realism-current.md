@@ -1,9 +1,9 @@
 # Realism: before / after the scoring fixes
 
-Generated 2026-10-05T15:00:44.549Z by `npx vitest run --config vitest.realism.config.ts` (files `qa/realism/cmp-*.test.ts`). The same rendered takes are scored by both pipelines:
+Generated 2026-10-07T05:14:40.526Z by `npx vitest run --config vitest.realism.config.ts` (files `qa/realism/cmp-*.test.ts`). The same rendered takes are scored by both pipelines:
 
 - **before** = baseline app (frozen `qa/realism/baseline/`, as in `docs/qa/realism-baseline.md`): N=2048 window, `scoreAttempt`, onset-based delay learning that re-scores the same run, pass = accuracy only, and an uncalibrated estimate of 80 ms.
-- **after** = current app at `8c0d8a7` plus uncommitted changes in `rc/game/scoring.ts`, `src/game/types.ts`, `src/ui/screens/Play.tsx`, `src/ui/screens/Results.tsx`, `src/ui/styles.css`. The analysis window comes from `windowFor(part.low)` (1024 for these alto parts). Then `scoreAttempt` → `scoreAligned`, two-run delay learning and the Android estimate of 130 ms. Play.tsx/session policy detected from the source: LATE_FAIL_MS=250; GUIDE_LEARN_MAX_ABOVE=150; timing gate: measured; liftSubharmonics: true; scoreAligned everyNote: true; session stores raw samples.
+- **after** = current app at `c04ca36` plus uncommitted changes in `src/audio/pitch.ts`, `src/game/align.ts`, `src/game/scoring.ts`, `src/game/types.ts`, `src/ui/components/RangeCheck.tsx`, `src/ui/components/Tuner.tsx`, `src/ui/play/lastResult.ts`, `src/ui/play/runExport.ts`, `src/ui/play/session.ts`, `src/ui/screens/Diagnostics.tsx`, `src/ui/screens/Play.tsx`, `src/ui/screens/Results.tsx`, `src/ui/screens/Setup.tsx`, `src/audio/harmonics.ts`, `src/audio/inputFilter.ts`, `src/audio/inputQuality.ts`. The analysis window comes from `windowFor(part.low)` (1024 for these alto parts). Then `scoreAttempt` → `scoreAligned`, two-run delay learning and the Android estimate of 130 ms. Play.tsx/session policy detected from the source: LATE_FAIL_MS=250; GUIDE_LEARN_MAX_ABOVE=150; timing gate: measured; liftSubharmonics: true; scoreAligned everyNote: true; scoreAligned voiceOnly (headphones): true; session stores raw samples.
 - **after (80 ms estimate)** = the current app with the old 80 ms estimate (an iPhone-like device). It separates the estimate change from the rest.
 
 Run cells: `grade accuracy%` (✗ = run failed), `al±N` = the voice was shifted N ms for intonation, `→N ms` = the stored delay changed to N, `TF` = failed by the timing gate (median entry in ms), `[…]` = timing/wrong-note tips. Sequences are 3 consecutive runs (new performance each run) on a phone whose stored delay carries over.
@@ -17,13 +17,13 @@ Run cells: `grade accuracy%` (✗ = run failed), `al±N` = the voice was shifted
 - **Good singer L4, true 200 ms, uncalibrated** (in tune/acc over 6 sections): before run 1: 79%/88% S×3 A×1 B×1 C×1 (4/6 pass); run 2: 78%/89% S×3 A×1 B×1 C×1 (4/6 pass); run 3: 78%/87% S×3 A×2 C×1 (5/6 pass). After run 1: 99%/99% S×6 (6/6 pass); run 2: 100%/99% S×6 (6/6 pass); run 3: 100%/99% S×6 (6/6 pass). After with 80 ms estimate: run 1: 99%/99% S×6 (6/6 pass); run 2: 100%/99% S×6 (6/6 pass); run 3: 100%/99% S×6 (6/6 pass).
 - **Good singer L4, true 280 ms, uncalibrated** (in tune/acc over 6 sections): before run 1: 89%/90% S×5 D×1 (5/6 pass); run 2: 98%/98% S×6 (6/6 pass); run 3: 98%/97% S×5 A×1 (6/6 pass). After run 1: 100%/99% S×6 (6/6 pass); run 2: 99%/98% S×6 (6/6 pass); run 3: 99%/98% S×5 A×1 (6/6 pass). After with 80 ms estimate: run 1: 100%/99% S×6 (6/6 pass); run 2: 99%/98% S×6 (6/6 pass); run 3: 99%/98% S×5 A×1 (6/6 pass).
 - **C/A/A check, Debussy bars 1–5 at L2, 3 runs × 4 seeds (letters per run):** true 200 ms: before C/B/B, C/B/C, C/C/C, C/C/C; after S/S/S, S/S/S, S/S/S, S/S/S. true 215 ms: before C/C/C, C/C/S, C/C/C, C/C/S; after S/S/S, S/S/S, S/S/S, S/S/S. true 230 ms: before C/C/C, S/S/S, S/S/S, S/S/S; after S/S/S, S/S/S, S/S/S, S/S/S. true 280 ms: before S/S/S, D/S/S, S/S/S, S/S/S; after S/S/S, S/S/S, S/S/S, S/S/S.
-- **Tracker (good singer):** steady median 3.1 → 4.0¢, near-transition p90 20.0 → 17.4¢, displayed overshoot 19 → 28¢ (voice 28¢), invented 0% → 0%.
-- **Tracker with speaker bleed −13 dB (L1):** octave/subharmonic readings 27% → 0%, >50¢ off 28% → 1%, scored 77% → 98% accuracy.
-- **Speaker bleed, good singer, calibrated (accuracy, mean of 2 sections, before → after):** -18 dB: L1 91% → 100%, L4 82% → 97%; -13 dB: L1 77% → 98%, L4 62% → 88%; -8 dB: L1 42% → 88%, L4 26% → 70%.
+- **Tracker (good singer):** steady median 3.1 → 4.1¢, near-transition p90 20.0 → 17.7¢, displayed overshoot 19 → 28¢ (voice 28¢), invented 0% → 0%.
+- **Tracker with speaker bleed −13 dB (L1):** octave/subharmonic readings 27% → 0%, >50¢ off 28% → 0%, scored 77% → 99% accuracy.
+- **Speaker bleed, good singer, calibrated (accuracy, mean of 2 sections, before → after):** -18 dB: L1 91% → 100%, L4 82% → 97%; -13 dB: L1 77% → 99%, L4 62% → 87%; -8 dB: L1 42% → 88%, L4 26% → 72%.
 - **Live cents bubble after a note change (good singer, L1):** readout toward the previous note beyond tolerance in 100% → 73% of changes (calibrated), 100% → 100% at true 280 ms uncalibrated (run 1); beyond the new note 4% → 15%; out of tolerance until 137 → 151 ms.
 - **Real-recording path** (16-bit WAV + current-app sidecar → `scoreRecordingApp`): accuracy 99% direct vs 99% via the file (shift 70 / 70 ms).
 - **Sanity guard (current app):** all must-fail runs fail.
-- **Fast notes (< 0.15 s), good singer, measured delay — share scored ok/miss, before (`54ea7b9`) → after:** L1 0.0% → 0.0%, L2 7.2% → 3.4%, L4 11.7% → 6.8%. See section 7.
+- **Fast notes (< 0.15 s), good singer, measured delay — share scored ok/miss, before (`54ea7b9`) → after:** L1 0.0% → 0.0%, L2 7.2% → 3.5%, L4 11.6% → 6.7%. See section 7.
 
 ## Observations (hand-written for the run on the commit shown above; all takes are seeded)
 
@@ -53,11 +53,11 @@ Takes: dieu-1-5 and warmup-7-12 (Alto), L4 tempo, calibrated, headphones unless 
 
 | singer | steady med | steady p90 | near p90 | near p99 | >50¢ near | octave | missed voiced | false voiced | overshoot voice / tracker | invented | scored in tune / acc |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| good choir singer | 3.1 → 4.0 | 8.4 → 11.4 | 20.0 → 17.4 | 74 → 44 | 3% → 1% | 0% → 0% | 3% → 1% | 14% → 4% | 28 / 19 → 28 | 0% → 0% | 98%/99% → 100%/99% |
-| operatic vibrato | 7.5 → 6.9 | 18.8 → 17.8 | 29.1 → 24.2 | 106 → 93 | 4% → 2% | 0% → 0% | 2% → 1% | 14% → 6% | 41 / 34 → 48 | 0% → 0% | 96%/97% → 100%/99% |
-| control (no vibrato, no overshoot) | 1.9 → 3.1 | 5.1 → 8.2 | 15.9 → 15.4 | 50 → 48 | 1% → 1% | 0% → 0% | 2% → 1% | 13% → 6% | 2 / 3 → 7 | 0% → 0% | 98%/99% → 100%/100% |
-| ringing transitions (zeta 0.35) | 3.3 → 3.9 | 8.2 → 9.5 | 32.4 → 26.4 | 97 → 70 | 5% → 3% | 0% → 0% | 3% → 1% | 15% → 6% | 68 / 47 → 62 | 0% → 3% | 91%/95% → 98%/97% |
-| good choir singer + speaker bleed −13 dB (L1) | 6.5 → 5.1 | 1904.7 → 13.3 | 1896.7 → 21.8 | 1945 → 99 | 17% → 2% | 27% → 0% | 3% → 3% | 10% → 4% | 29 / 480 → 31 | 24% → 3% | 73%/77% → 98%/98% |
+| good choir singer | 3.1 → 4.1 | 8.4 → 11.5 | 20.0 → 17.7 | 74 → 44 | 3% → 1% | 0% → 0% | 3% → 1% | 14% → 4% | 28 / 19 → 28 | 0% → 0% | 98%/99% → 100%/99% |
+| operatic vibrato | 7.5 → 6.9 | 18.8 → 17.6 | 29.1 → 23.4 | 106 → 64 | 4% → 2% | 0% → 0% | 2% → 1% | 14% → 6% | 41 / 34 → 48 | 0% → 0% | 96%/97% → 100%/98% |
+| control (no vibrato, no overshoot) | 1.9 → 3.0 | 5.1 → 8.4 | 15.9 → 15.5 | 50 → 47 | 1% → 1% | 0% → 0% | 2% → 1% | 13% → 6% | 2 / 3 → 7 | 0% → 0% | 98%/99% → 100%/100% |
+| ringing transitions (zeta 0.35) | 3.3 → 3.8 | 8.2 → 9.7 | 32.4 → 26.0 | 97 → 71 | 5% → 3% | 0% → 0% | 3% → 1% | 15% → 6% | 68 / 47 → 62 | 0% → 3% | 91%/95% → 98%/97% |
+| good choir singer + speaker bleed −13 dB (L1) | 6.5 → 5.1 | 1904.7 → 13.5 | 1896.7 → 22.0 | 1945 → 65 | 17% → 2% | 27% → 0% | 3% → 2% | 10% → 4% | 29 / 480 → 31 | 24% → 3% | 73%/77% → 99%/99% |
 
 ## 2. Good singers: latency × section × level, before → after
 
@@ -77,7 +77,7 @@ Calibrated = true and measured delay 150 ms. Oracle = true f0 with the true late
 | warmup-7-12 | 4 | 99% / 100% | S pass | 100% / 99% | S 99 | 100% / 100% | 100% / 79% |
 | dieu-1-5 | 4 | 96% / 99% | S pass | 100% / 99% | S 99 | 99% / 100% | 100% / 90% |
 | dieu-6-13 | 4 | 94% / 99% | S pass | 100% / 99% | S 99 | 99% / 99% | 100% / 65% |
-| tabourin-solo-1-8 | 4 | 93% / 95% | S pass | 100% / 98% | S 98 | 98% / 99% | 100% / 75% |
+| tabourin-solo-1-8 | 4 | 93% / 95% | S pass | 100% / 98% | S 98 | 98% / 99% | 100% / 67% |
 | tabourin-solo-9-16 | 4 | 98% / 99% | S pass | 99% / 100% | S 100 | 100% / 100% | 100% / 65% |
 
 Uncalibrated phone (fresh profile, then runs 2–3 with whatever the app stored):
@@ -101,12 +101,12 @@ Uncalibrated phone (fresh profile, then runs 2–3 with whatever the app stored)
 | warmup-7-12 | 4 | 200 ms | S 99 · S 99 · S 99 | S 99 al+60 · S 99 al+50 →185ms · S 100 | S 99 al+110 · S 99 al+100 →185ms · S 100 |
 | warmup-7-12 | 4 | 280 ms | S 99 →255ms · S 98 · S 99 | S 99 al+130 · S 97 al+130 →260ms · S 99 | S 99 al+180 · S 97 al+180 →260ms · S 99 |
 | dieu-1-5 | 4 | 200 ms | C 63 ✗ · C 65 ✗ · C 55 ✗ | S 100 al+70 · S 98 al+70 →200ms · S 98 | S 100 al+120 · S 98 al+120 →200ms · S 98 |
-| dieu-1-5 | 4 | 280 ms | D 45 ✗ · S 99 →247ms · S 99 | S 99 al+150 · S 98 al+150 →280ms · S 100 | S 99 al+200 · S 98 al+200 →280ms · S 100 |
+| dieu-1-5 | 4 | 280 ms | D 45 ✗ · S 99 →247ms · S 99 | S 99 al+150 · S 99 al+150 →280ms · S 100 | S 99 al+200 · S 99 al+200 →280ms · S 100 |
 | dieu-6-13 | 4 | 200 ms | B 82 ✗ · B 82 ✗ · A 86 | S 99 al+80 · S 98 al+80 →210ms · S 99 | S 99 al+130 · S 98 al+130 →210ms · S 99 |
 | dieu-6-13 | 4 | 280 ms | S 98 →263ms · S 95 · A 92 | S 99 al+140 · S 98 al+150 →275ms · A 92 | S 99 al+190 · S 98 al+200 →275ms · A 92 |
 | tabourin-solo-1-8 | 4 | 200 ms | S 98 · A 92 · S 96 | S 100 al+80 · S 100 al+70 →205ms · S 99 | S 100 al+120 · S 100 al+120 →200ms · S 99 |
 | tabourin-solo-1-8 | 4 | 280 ms | S 100 →248ms · S 100 · S 99 | S 100 al+160 · S 100 al+170 →295ms · S 99 | S 100 al+210 · S 100 al+220 →295ms · S 99 |
-| tabourin-solo-9-16 | 4 | 200 ms | A 87 · S 97 · A 89 | S 95 al+70 · S 99 al+70 →200ms · S 98 | S 95 al+120 · S 99 al+110 →195ms · S 98 |
+| tabourin-solo-9-16 | 4 | 200 ms | A 87 · S 97 · A 89 | S 95 al+70 · S 99 al+60 →195ms · S 98 | S 95 al+120 · S 99 al+110 →195ms · S 98 |
 | tabourin-solo-9-16 | 4 | 280 ms | S 99 →219ms · S 99 · S 98 | S 99 al+150 · S 97 al+150 →280ms · S 99 | S 99 al+200 · S 97 al+200 →280ms · S 99 |
 
 ### operatic vibrato
@@ -134,19 +134,19 @@ Uncalibrated phone (fresh profile, then runs 2–3 with whatever the app stored)
 | warmup-7-12 | 1 | 280 ms | S 100 →254ms | S 100 al+120 | S 100 al+130 |
 | dieu-1-5 | 4 | 200 ms | C 64 ✗ | S 98 al+60 | S 98 al+110 |
 | dieu-1-5 | 4 | 280 ms | S 98 →249ms | S 98 al+150 | S 98 al+200 |
-| dieu-6-13 | 4 | 200 ms | B 79 ✗ | S 95 al+70 | S 95 al+120 |
+| dieu-6-13 | 4 | 200 ms | B 79 ✗ | A 95 al+70 | A 95 al+120 |
 | dieu-6-13 | 4 | 280 ms | S 95 →247ms | S 97 al+150 | S 97 al+200 |
-| warmup-7-12 | 4 | 200 ms | S 96 | S 97 | S 99 al+100 |
+| warmup-7-12 | 4 | 200 ms | S 96 | S 98 | S 99 al+100 |
 | warmup-7-12 | 4 | 280 ms | S 97 →253ms | S 96 al+130 | S 96 al+180 |
 
 ### Three runs in a row at L2 near the old learning threshold (Debussy bars 1–5)
 
 | true | seed | before | after | after (80 ms estimate) |
 |---|---|---|---|---|
-| 200 ms | 1 | C 62 ✗ · B 73 ✗ · B 73 ✗ | S 100 al+60 · S 99 al+60 →190ms · S 99 | S 100 al+110 · S 99 al+110 →190ms · S 99 |
+| 200 ms | 1 | C 62 ✗ · B 73 ✗ · B 73 ✗ | S 98 al+60 · S 99 al+60 →190ms · S 99 | S 98 al+110 · S 99 al+110 →190ms · S 99 |
 | 200 ms | 2 | C 66 ✗ · B 74 ✗ · C 66 ✗ | S 99 al+80 · S 99 al+70 →205ms · S 99 | S 99 al+130 · S 99 al+120 →205ms · S 99 |
 | 200 ms | 3 | C 69 ✗ · C 63 ✗ · C 66 ✗ | S 99 al+80 · S 100 al+70 →205ms · S 100 | S 99 al+130 · S 100 al+120 →205ms · S 100 |
-| 200 ms | 4 | C 65 ✗ · C 66 ✗ · C 69 ✗ | S 100 al+70 · S 100 al+90 →210ms · S 98 | S 100 al+120 · S 100 al+140 →210ms · S 98 |
+| 200 ms | 4 | C 65 ✗ · C 66 ✗ · C 69 ✗ | S 100 al+70 · S 100 al+90 →210ms · S 99 | S 100 al+120 · S 100 al+140 →210ms · S 99 |
 | 215 ms | 1 | C 57 ✗ · C 61 ✗ · C 60 ✗ | S 98 al+80 · S 99 al+80 →210ms · S 99 | S 98 al+130 · S 99 al+120 →205ms · S 99 |
 | 215 ms | 2 | C 65 ✗ · C 62 ✗ · S 98 →205ms | S 100 al+80 · S 99 al+80 →210ms · S 100 | S 100 al+130 · S 99 al+130 →210ms · S 100 |
 | 215 ms | 3 | C 55 ✗ · C 58 ✗ · C 58 ✗ | S 99 al+80 · S 100 al+90 →215ms · S 100 | S 99 al+130 · S 100 al+140 →215ms · S 100 |
@@ -154,7 +154,7 @@ Uncalibrated phone (fresh profile, then runs 2–3 with whatever the app stored)
 | 230 ms | 1 | C 53 ✗ · C 56 ✗ · C 56 ✗ | S 96 al+90 · S 100 al+100 →225ms · S 99 | S 96 al+140 · S 100 al+140 →220ms · S 99 |
 | 230 ms | 2 | S 100 →210ms · S 99 · S 98 | S 100 al+110 · S 99 al+100 →235ms · S 100 | S 100 al+150 · S 99 al+150 →230ms · S 100 |
 | 230 ms | 3 | S 100 →207ms · S 100 · S 100 | S 100 al+100 · S 100 al+100 →230ms · S 100 | S 100 al+150 · S 100 al+150 →230ms · S 100 |
-| 230 ms | 4 | S 99 →207ms · S 100 · S 99 | S 100 al+100 · S 100 al+110 →235ms · S 99 | S 100 al+140 · S 100 al+140 →220ms · S 99 |
+| 230 ms | 4 | S 99 →207ms · S 100 · S 99 | S 100 al+100 · S 100 al+110 →235ms · S 99 | S 100 al+150 · S 100 al+140 →225ms · S 99 |
 | 280 ms | 1 | S 98 →247ms · S 100 · S 99 | S 100 al+140 · S 99 al+150 →275ms · S 99 | S 99 al+150 · S 99 al+150 →230ms · S 99 al+50 |
 | 280 ms | 2 | D 47 ✗ · S 98 →247ms · S 100 | S 100 al+150 · S 99 al+150 →280ms · S 100 | S 100 al+150 · S 98 al+150 →230ms · S 100 al+50 |
 | 280 ms | 3 | S 98 →247ms · S 100 · S 99 | S 99 al+140 · S 100 al+140 →270ms · S 99 | S 99 al+150 · S 100 al+150 →230ms · S 99 al+50 |
@@ -168,22 +168,22 @@ Uncalibrated phone (fresh profile, then runs 2–3 with whatever the app stored)
 | good choir singer | -18 dB | dieu-1-5 | 4 | cal | 80% / 84% | B FAIL | 100% / 99% | S 99 | 18% → 0% |
 | good choir singer | -18 dB | warmup-7-12 | 1 | cal | 92% / 90% | A pass | 100% / 100% | S 100 | 2% → 0% |
 | good choir singer | -18 dB | warmup-7-12 | 4 | cal | 80% / 80% | B FAIL | 95% / 95% | A 95 | 14% → 2% |
-| good choir singer | -13 dB | dieu-1-5 | 1 | cal | 61% / 69% | C FAIL | 98% / 99% | S 99 | 56% → 1% |
-| good choir singer | -13 dB | dieu-1-5 | 4 | cal | 56% / 57% | C FAIL | 96% / 95% | S 95 | 61% → 2% |
-| good choir singer | -13 dB | warmup-7-12 | 1 | cal | 86% / 86% | A pass | 97% / 98% | B 98 ✗ | 9% → 0% |
+| good choir singer | -13 dB | dieu-1-5 | 1 | cal | 61% / 69% | C FAIL | 98% / 99% | S 99 | 56% → 0% |
+| good choir singer | -13 dB | dieu-1-5 | 4 | cal | 56% / 57% | C FAIL | 96% / 95% | A 95 | 61% → 2% |
+| good choir singer | -13 dB | warmup-7-12 | 1 | cal | 86% / 86% | A pass | 100% / 100% | S 100 | 9% → 0% |
 | good choir singer | -13 dB | warmup-7-12 | 4 | cal | 65% / 66% | C FAIL | 81% / 80% | B 80 ✗ | 25% → 11% |
 | good choir singer | -8 dB | dieu-1-5 | 1 | cal | 39% / 47% | D FAIL | 97% / 98% | B 98 ✗ | 70% → 0% |
 | good choir singer | -8 dB | dieu-1-5 | 4 | cal | 29% / 33% | D FAIL | 83% / 82% | B 82 ✗ | 77% → 5% |
-| good choir singer | -8 dB | warmup-7-12 | 1 | cal | 42% / 38% | D FAIL | 78% / 78% | B 78 ✗ | 31% → 9% |
-| good choir singer | -8 dB | warmup-7-12 | 4 | cal | 20% / 19% | D FAIL | 59% / 57% | C 57 ✗ | 77% → 29% |
-| good choir singer | -13 dB | dieu-1-5 | 1 | uncal200 | 49% / 66% | C FAIL | 98% / 98% | B 98 ✗ | 56% → 1% |
+| good choir singer | -8 dB | warmup-7-12 | 1 | cal | 42% / 38% | D FAIL | 78% / 78% | B 78 ✗ | 31% → 5% |
+| good choir singer | -8 dB | warmup-7-12 | 4 | cal | 20% / 19% | D FAIL | 62% / 62% | C 62 ✗ | 77% → 28% |
+| good choir singer | -13 dB | dieu-1-5 | 1 | uncal200 | 49% / 66% | C FAIL | 98% / 99% | S 99 | 56% → 1% |
 | good choir singer | -13 dB | dieu-1-5 | 4 | uncal200 | 19% / 38% | D FAIL | 90% / 91% | A 91 | 61% → 3% |
 | good choir singer | -13 dB | warmup-7-12 | 1 | uncal200 | 84% / 86% | A pass | 100% / 100% | S 100 | 8% → 0% |
-| good choir singer | -13 dB | warmup-7-12 | 4 | uncal200 | 35% / 37% | D FAIL | 71% / 71% | B 71 ✗ | 47% → 24% |
-| operatic vibrato | -13 dB | dieu-1-5 | 1 | cal | 77% / 80% | B pass | 100% / 99% | S 99 | 8% → 1% |
-| operatic vibrato | -13 dB | dieu-1-5 | 4 | cal | 39% / 57% | C FAIL | 89% / 87% | A 87 | 61% → 3% |
+| good choir singer | -13 dB | warmup-7-12 | 4 | uncal200 | 35% / 37% | D FAIL | 70% / 70% | B 70 ✗ | 47% → 24% |
+| operatic vibrato | -13 dB | dieu-1-5 | 1 | cal | 77% / 80% | B pass | 100% / 99% | S 99 | 8% → 0% |
+| operatic vibrato | -13 dB | dieu-1-5 | 4 | cal | 39% / 57% | C FAIL | 83% / 83% | B 83 ✗ | 61% → 4% |
 | operatic vibrato | -13 dB | warmup-7-12 | 1 | cal | 71% / 72% | B FAIL | 94% / 95% | B 95 ✗ | 15% → 4% |
-| operatic vibrato | -13 dB | warmup-7-12 | 4 | cal | 34% / 30% | D FAIL | 78% / 75% | B 75 ✗ | 40% → 13% |
+| operatic vibrato | -13 dB | warmup-7-12 | 4 | cal | 34% / 30% | D FAIL | 78% / 74% | B 74 ✗ | 40% → 14% |
 
 ## 3. Repeatability (good singer, Debussy bars 1–5, fresh profile each run)
 
@@ -198,11 +198,11 @@ Uncalibrated phone (fresh profile, then runs 2–3 with whatever the app stored)
 | 1 | uncal200 | performance | before | 94%–97% (0.7) | 76%–94% | S×9 A×1 | 10/10 |
 | 1 | uncal200 | performance | after | 100%–100% (0.0) | 100%–100% | S×10 | 10/10 |
 | 4 | cal | micro | before | 98%–99% (0.5) | 94%–98% | S×10 | 10/10 |
-| 4 | cal | micro | after | 99%–100% (0.3) | 100%–100% | S×10 | 10/10 |
+| 4 | cal | micro | after | 99%–100% (0.2) | 100%–100% | S×10 | 10/10 |
 | 4 | cal | performance | before | 97%–100% (0.9) | 94%–99% | S×10 | 10/10 |
 | 4 | cal | performance | after | 98%–100% (0.8) | 100%–100% | S×10 | 10/10 |
 | 4 | uncal200 | micro | before | 55%–67% (3.5) | 46%–48% | C×10 | 0/10 |
-| 4 | uncal200 | micro | after | 98%–100% (0.6) | 100%–100% | S×10 | 10/10 |
+| 4 | uncal200 | micro | after | 98%–100% (0.7) | 100%–100% | S×10 | 10/10 |
 | 4 | uncal200 | performance | before | 56%–75% (5.0) | 46%–55% | B×1 C×9 | 0/10 |
 | 4 | uncal200 | performance | after | 95%–100% (1.4) | 96%–100% | S×10 | 10/10 |
 
@@ -215,7 +215,7 @@ Uncalibrated phone (fresh profile, then runs 2–3 with whatever the app stored)
 | wrong notes (40 %) | dieu-1-5 | 1 | measured 130 | C 58 ✗ [wrong-notes] | C 58 ✗ [wrong-notes] |
 | wrong notes (40 %) | dieu-1-5 | 2 | measured 130 | C 58 ✗ [wrong-notes] | C 58 ✗ [wrong-notes] |
 | wrong notes (40 %) | dieu-1-5 | 4 | measured 130 | C 53 ✗ [wrong-notes] | C 56 ✗ [wrong-notes] |
-| wrong notes (40 %) | dieu-1-5 | 1 | uncalibrated (true 130) | C 58 ✗ [wrong-notes] · C 57 ✗ [wrong-notes] · C 62 ✗ [wrong-notes] | C 58 ✗ [wrong-notes] · C 57 ✗ [wrong-notes] · C 58 ✗ [wrong-notes] |
+| wrong notes (40 %) | dieu-1-5 | 1 | uncalibrated (true 130) | C 58 ✗ [wrong-notes] · C 57 ✗ [wrong-notes] · C 62 ✗ [wrong-notes] | C 58 ✗ [wrong-notes] · C 58 ✗ [wrong-notes] · C 58 ✗ [wrong-notes] |
 | wrong notes (40 %) | dieu-1-5 | 2 | uncalibrated (true 130) | C 56 ✗ [wrong-notes] · C 64 ✗ [wrong-notes] · C 64 ✗ [wrong-notes] | C 58 ✗ [wrong-notes] · C 56 ✗ [wrong-notes] · C 57 ✗ [wrong-notes] |
 | wrong notes (40 %) | warmup-7-12 | 1 | measured 130 | C 62 ✗ [wrong-notes] | C 62 ✗ [wrong-notes] |
 | wrong notes (40 %) | warmup-7-12 | 2 | measured 130 | C 62 ✗ [wrong-notes] | C 62 ✗ [wrong-notes] |
@@ -224,13 +224,13 @@ Uncalibrated phone (fresh profile, then runs 2–3 with whatever the app stored)
 | wrong notes (40 %) | warmup-7-12 | 2 | uncalibrated (true 130) | C 62 ✗ [wrong-notes] · C 61 ✗ [wrong-notes] · C 60 ✗ [wrong-notes] | C 61 ✗ [wrong-notes] · C 62 ✗ [wrong-notes] · C 62 ✗ [wrong-notes] |
 | flat −40¢ | dieu-1-5 | 1 | measured 130 | B 80 | B 77 ✗ |
 | flat −40¢ | dieu-1-5 | 2 | measured 130 | D 28 ✗ | D 35 ✗ |
-| flat −40¢ | dieu-1-5 | 4 | measured 130 | D 6 ✗ | D 7 ✗ |
-| flat −40¢ | dieu-1-5 | 1 | uncalibrated (true 130) | B 81 · B 83 · B 76 | B 75 ✗ · B 82 ✗ · B 75 ✗ |
-| flat −40¢ | dieu-1-5 | 2 | uncalibrated (true 130) | D 35 ✗ · C 55 ✗ · D 49 ✗ | D 32 ✗ · D 40 ✗ · D 46 ✗ |
+| flat −40¢ | dieu-1-5 | 4 | measured 130 | D 6 ✗ | D 11 ✗ |
+| flat −40¢ | dieu-1-5 | 1 | uncalibrated (true 130) | B 81 · B 83 · B 76 | B 76 ✗ · B 82 ✗ · B 75 ✗ |
+| flat −40¢ | dieu-1-5 | 2 | uncalibrated (true 130) | D 35 ✗ · C 55 ✗ · D 49 ✗ | D 34 ✗ · D 40 ✗ · D 50 ✗ |
 | flat −40¢ | warmup-7-12 | 1 | measured 130 | B 78 | B 78 ✗ |
 | flat −40¢ | warmup-7-12 | 2 | measured 130 | D 33 ✗ | D 31 ✗ |
 | flat −40¢ | warmup-7-12 | 4 | measured 130 | D 0 ✗ | D 0 ✗ |
-| flat −40¢ | warmup-7-12 | 1 | uncalibrated (true 130) | B 75 · C 67 ✗ · B 85 | B 77 ✗ · C 67 ✗ · B 81 ✗ |
+| flat −40¢ | warmup-7-12 | 1 | uncalibrated (true 130) | B 75 · C 67 ✗ · B 85 | B 77 ✗ · C 67 ✗ · B 82 ✗ |
 | flat −40¢ | warmup-7-12 | 2 | uncalibrated (true 130) | D 12 ✗ · D 17 ✗ · D 15 ✗ | D 12 ✗ · D 19 ✗ · D 15 ✗ |
 | echo (300 ms behind) | dieu-1-5 | 1 | measured 130 | C 53 ✗ [behind-beat] | C 58 ✗ al+80 [behind-beat] |
 | echo (300 ms behind) | dieu-1-5 | 2 | measured 130 | C 50 ✗ [behind-beat] | C 58 ✗ TF318 [behind-beat] |
@@ -241,12 +241,12 @@ Uncalibrated phone (fresh profile, then runs 2–3 with whatever the app stored)
 | echo (300 ms behind) | warmup-7-12 | 2 | measured 130 | B 81 [behind-beat] | S 95 ✗ al+80 TF342 [behind-beat] |
 | echo (300 ms behind) | warmup-7-12 | 4 | measured 130 | B 84 ✗ [behind-beat] | S 97 ✗ al+80 TF330 [behind-beat] |
 | echo (300 ms behind) | warmup-7-12 | 1 | uncalibrated (true 130) | S 100 →400ms · S 100 · S 100 | S 100 al+140 [behind-beat] · S 100 al+140 →270ms [behind-beat] · S 100 al+70 |
-| echo (300 ms behind) | warmup-7-12 | 2 | uncalibrated (true 130) | S 99 →400ms · S 99 · S 100 | S 100 al+150 [behind-beat] · S 99 al+150 →280ms [behind-beat] · S 100 al+80 [behind-beat] |
+| echo (300 ms behind) | warmup-7-12 | 2 | uncalibrated (true 130) | S 99 →400ms · S 99 · S 100 | S 99 al+150 [behind-beat] · S 99 al+150 →280ms [behind-beat] · S 100 al+80 [behind-beat] |
 | one note behind | dieu-1-5 | 1 | measured 130 | D 17 ✗ [wrong-notes] | D 17 ✗ [wrong-notes] |
 | one note behind | dieu-1-5 | 2 | measured 130 | D 17 ✗ [wrong-notes] | D 17 ✗ [wrong-notes] |
 | one note behind | dieu-1-5 | 4 | measured 130 | D 17 ✗ [wrong-notes] | D 17 ✗ [wrong-notes] |
 | one note behind | dieu-1-5 | 1 | uncalibrated (true 130) | D 17 ✗ [wrong-notes] · D 17 ✗ [wrong-notes] · D 17 ✗ [wrong-notes] | D 17 ✗ [wrong-notes] · D 17 ✗ [wrong-notes] · D 17 ✗ [wrong-notes] |
-| one note behind | dieu-1-5 | 2 | uncalibrated (true 130) | D 20 ✗ [wrong-notes] · D 20 ✗ [wrong-notes] · D 27 ✗ [wrong-notes] | C 65 ✗ al+440 TF440 [behind-beat] · C 63 ✗ al+440 TF440 [behind-beat] · C 65 ✗ al+440 TF440 [behind-beat] |
+| one note behind | dieu-1-5 | 2 | uncalibrated (true 130) | D 20 ✗ [wrong-notes] · D 20 ✗ [wrong-notes] · D 27 ✗ [wrong-notes] | C 65 ✗ al+440 TF440 [behind-beat] · C 63 ✗ al+440 TF440 [behind-beat] · C 67 ✗ al+440 TF440 [behind-beat] |
 | one note behind | warmup-7-12 | 1 | measured 130 | D 33 ✗ [wrong-notes] | D 33 ✗ [wrong-notes] |
 | one note behind | warmup-7-12 | 2 | measured 130 | D 33 ✗ [wrong-notes] | D 33 ✗ [wrong-notes] |
 | one note behind | warmup-7-12 | 4 | measured 130 | D 33 ✗ [wrong-notes] | D 33 ✗ [wrong-notes] |
@@ -259,7 +259,7 @@ Uncalibrated phone (fresh profile, then runs 2–3 with whatever the app stored)
 | late pitch arrival (200 ms) | dieu-1-5 | 2 | uncalibrated (true 130) | D 26 ✗ [wrong-notes] · S 98 →325ms [early-entries] · S 98 [early-entries] | S 100 al+140 [behind-beat] · S 100 al+150 →275ms [behind-beat] · S 99 al+40 [early-entries] |
 | late pitch arrival (200 ms) | warmup-7-12 | 1 | measured 130 | S 97 | S 100 al+70 |
 | late pitch arrival (200 ms) | warmup-7-12 | 2 | measured 130 | A 91 [behind-beat] | S 99 ✗ al+70 TF263 [behind-beat] |
-| late pitch arrival (200 ms) | warmup-7-12 | 4 | measured 130 | A 86 [behind-beat] | S 99 ✗ al+80 TF258 [behind-beat] |
+| late pitch arrival (200 ms) | warmup-7-12 | 4 | measured 130 | A 86 [behind-beat] | S 96 ✗ al+80 TF258 [behind-beat] |
 | late pitch arrival (200 ms) | warmup-7-12 | 1 | uncalibrated (true 130) | S 99 →336ms · S 95 · S 100 | S 100 al+140 [behind-beat] · B 95 ✗ al+140 →270ms · S 100 al+60 |
 | late pitch arrival (200 ms) | warmup-7-12 | 2 | uncalibrated (true 130) | S 99 →337ms · S 99 · S 100 | S 99 al+150 [behind-beat] · S 99 al+150 →280ms [behind-beat] · S 100 al+60 |
 
@@ -277,7 +277,7 @@ Cells: in tune / accuracy grade (✗ = fails the level). Generated scorer varian
 | operatic vibrato | dieu-1-5 | 4 | 100% / 98% S | 100% / 98% S | 100% / 98% S | 100% / 98% S |
 | operatic vibrato | warmup-7-12 | 2 | 100% / 100% S | 100% / 100% S | 100% / 100% S | 100% / 100% S |
 | operatic vibrato | warmup-7-12 | 4 | 100% / 99% S | 100% / 99% S | 100% / 99% S | 100% / 99% S |
-| ringing transitions (zeta 0.35) | dieu-1-5 | 2 | 100% / 98% S | 100% / 98% S | 100% / 98% S | 100% / 98% S |
+| ringing transitions (zeta 0.35) | dieu-1-5 | 2 | 100% / 97% S | 100% / 97% S | 100% / 97% S | 100% / 97% S |
 | ringing transitions (zeta 0.35) | dieu-1-5 | 4 | 96% / 96% S | 96% / 96% S | 96% / 96% S | 96% / 96% S |
 | ringing transitions (zeta 0.35) | warmup-7-12 | 2 | 100% / 100% S | 100% / 100% S | 100% / 100% S | 100% / 100% S |
 | ringing transitions (zeta 0.35) | warmup-7-12 | 4 | 100% / 100% S | 100% / 99% S | 100% / 99% S | 100% / 99% S |
@@ -303,7 +303,7 @@ Cells: in tune / accuracy grade (✗ = fails the level). Generated scorer varian
 | step | section | L | before in tune / acc | after in tune / acc | oracle acc before / after |
 |---|---|---|---|---|---|
 | 0 idealised | dieu-1-5 | 1 | 100% / 100% S | 100% / 100% S | 100% / 100% |
-| 0 idealised | dieu-1-5 | 4 | 100% / 100% S | 100% / 99% S | 100% / 100% |
+| 0 idealised | dieu-1-5 | 4 | 100% / 100% S | 100% / 100% S | 100% / 100% |
 | 0 idealised | warmup-7-12 | 1 | 97% / 99% S | 100% / 100% S | 100% / 100% |
 | 0 idealised | warmup-7-12 | 4 | 99% / 100% S | 100% / 100% S | 100% / 100% |
 | 1 + scatter & drift | dieu-1-5 | 1 | 100% / 100% S | 100% / 100% S | 100% / 100% |
@@ -321,7 +321,7 @@ Cells: in tune / accuracy grade (✗ = fails the level). Generated scorer varian
 | 4 + onset jitter | dieu-1-5 | 1 | 100% / 100% S | 100% / 100% S | 100% / 100% |
 | 4 + onset jitter | dieu-1-5 | 4 | 100% / 99% S | 100% / 99% S | 99% / 99% |
 | 4 + onset jitter | warmup-7-12 | 1 | 100% / 100% S | 100% / 100% S | 100% / 100% |
-| 4 + onset jitter | warmup-7-12 | 4 | 100% / 98% S | 100% / 98% S | 99% / 99% |
+| 4 + onset jitter | warmup-7-12 | 4 | 100% / 98% S | 100% / 99% S | 99% / 99% |
 | 5 + consonants (full) | dieu-1-5 | 1 | 100% / 100% S | 100% / 100% S | 100% / 100% |
 | 5 + consonants (full) | dieu-1-5 | 4 | 96% / 99% S | 100% / 99% S | 99% / 100% |
 | 5 + consonants (full) | warmup-7-12 | 1 | 99% / 100% S | 100% / 100% S | 100% / 100% |
@@ -336,34 +336,34 @@ Before = the app at `54ea7b9` (`scoring.ts`, `align.ts`, `pitch.ts` from git), a
 | debussy-yver A b1-23 | 100% | 100% | 100% | 100% | 99% | 99% |
 | debussy-dieu A b1-5 | 100% | 100% | 98% | 99% | 98% | 98% |
 | ravel-nicolette A b20-45 | 99% (2✗) | 100% | 97% | 99% | 97% | 99% |
-| synth 80bpm 16ths ta | 100% | 100% | 96% | 99% | 94% | 98% |
-| synth 80bpm 16ths a | 100% | 100% | 98% | 98% | 97% | 97% |
+| synth 80bpm 16ths ta | 100% | 100% | 96% | 99% | 95% | 98% |
+| synth 80bpm 16ths a | 100% | 100% | 99% | 98% | 97% | 97% |
 | synth 80bpm 16ths nolyr | 100% | 100% | 96% | 99% | 94% | 96% |
 | synth 104bpm 16ths ta | 100% | 100% | 90% · 3.1% | 96% · 1.0% | 82% · 9.9% (2✗) | 92% · 2.6% |
-| synth 104bpm 16ths a | 100% | 100% | 93% · 4.2% | 96% · 2.6% | 94% · 1.6% | 95% · 1.6% |
-| synth 104bpm 16ths nolyr | 100% | 100% | 91% · 4.2% | 96% · 1.6% | 90% · 4.7% | 94% · 2.6% |
-| synth 120bpm 16ths ta | 99% | 100% | 84% · 9.4% | 93% · 3.6% | 74% · 18.2% (2✗) | 85% · 9.4% (1✗) |
-| synth 120bpm 16ths a | 99% | 100% | 94% · 2.1% | 96% · 1.6% | 89% · 6.3% | 93% · 3.6% |
+| synth 104bpm 16ths a | 100% | 100% | 93% · 4.7% | 95% · 3.1% | 94% · 1.6% | 95% · 1.0% |
+| synth 104bpm 16ths nolyr | 100% | 100% | 92% · 3.6% | 96% · 1.6% | 90% · 4.7% | 94% · 2.6% |
+| synth 120bpm 16ths ta | 99% | 100% | 84% · 9.4% | 94% · 3.1% | 74% · 18.2% (2✗) | 85% · 9.4% (1✗) |
+| synth 120bpm 16ths a | 99% | 100% | 94% · 2.1% | 96% · 1.6% | 89% · 5.7% | 93% · 3.6% |
 | synth 120bpm 16ths nolyr | 99% | 100% | 90% · 4.7% | 95% · 2.1% | 85% · 8.3% (1✗) | 91% · 3.1% |
 | synth 144bpm 8ths ta | 100% | 100% | 98% | 99% | 95% | 98% |
-| synth 144bpm 8ths a | 100% | 100% | 100% | 100% | 98% | 98% |
+| synth 144bpm 8ths a | 100% | 100% | 100% | 100% | 98% | 99% |
 | synth 144bpm 8ths nolyr | 100% | 100% | 98% | 99% | 97% | 98% |
-| synth 144bpm 16ths ta | 98% · 0.0% | 99% · 0.0% | 74% · 18.2% (2✗) | 89% · 7.3% | 69% · 24.0% (2✗) | 79% · 16.1% (2✗) |
-| synth 144bpm 16ths a | 97% · 0.0% | 100% · 0.0% | 87% · 8.3% | 91% · 4.7% | 80% · 14.6% (2✗) | 84% · 11.5% (2✗) |
-| synth 144bpm 16ths nolyr | 98% · 0.0% | 100% · 0.0% | 85% · 10.4% | 89% · 6.3% | 76% · 17.7% (2✗) | 84% · 10.9% (2✗) |
+| synth 144bpm 16ths ta | 98% · 0.0% | 99% · 0.0% | 74% · 18.8% (2✗) | 89% · 7.8% | 70% · 23.4% (2✗) | 80% · 16.1% (2✗) |
+| synth 144bpm 16ths a | 97% · 0.0% | 100% · 0.0% | 88% · 7.3% | 91% · 4.7% | 81% · 14.1% (2✗) | 84% · 10.9% (2✗) |
+| synth 144bpm 16ths nolyr | 98% · 0.0% | 99% · 0.0% | 85% · 10.9% | 89% · 6.8% | 75% · 18.2% (2✗) | 84% · 10.9% (2✗) |
 
 **Why short notes were lost** (good singer, all levels; the diagnosis replays the scorer on the exact samples it judged and names the rule that dropped each ok/miss note; counts per 1000 notes of that length):
 
 | reason | 0.15–0.25 s before | 0.15–0.25 s after | <0.15 s before | <0.15 s after |
 |---|---|---|---|---|
-| tracker smear (window, reverb, smoother) | 2.9 | 1.6 | 28.8 | 18.1 |
-| too few readings in the note to judge it | 0.0 | 0.3 | 0.0 | 9.2 |
-| singer not settled (glide) | 1.0 | 0.0 | 36.2 | 15.1 |
+| tracker smear (window, reverb, smoother) | 2.6 | 1.3 | 28.0 | 18.1 |
+| too few readings in the note to judge it | 0.0 | 0.3 | 0.0 | 8.7 |
+| singer not settled (glide) | 0.6 | 0.0 | 36.7 | 15.1 |
+| only transition readings in the note | 0.0 | 0.0 | 0.0 | 1.5 |
 | no readings: consonant / silence | 0.0 | 0.0 | 0.2 | 0.2 |
-| only transition readings in the note | 0.0 | 0.0 | 0.0 | 1.2 |
-| arrival never reached | 0.0 | 0.0 | 9.7 | 0.0 |
-| no readings: tracker gated (unclear) | 0.0 | 0.0 | 6.0 | 0.0 |
-| **all lost** | 3.9 | 1.9 | 80.9 | 43.9 |
+| no readings: tracker gated (unclear) | 0.0 | 0.0 | 6.2 | 0.2 |
+| arrival never reached | 0.0 | 0.0 | 9.2 | 0.0 |
+| **all lost** | 3.2 | 1.6 | 80.4 | 43.9 |
 | notes | 3078 | 3078 | 4032 | 4032 |
 
 **Adversarial singers** (accuracy, ✗ = fails the level; `plain` = without the end-of-run line-up, i.e. what the live view shows; `al+N` = the voice was shifted N ms):
@@ -372,46 +372,46 @@ Before = the app at `54ea7b9` (`scoring.ts`, `align.ts`, `pitch.ts` from git), a
 |---|---|---|---|---|
 | wrong notes (40 %) | debussy-yver A b1-23 | 1 | 60% ✗ (plain 60%) | 60% ✗ (plain 60%) |
 | wrong notes (40 %) | debussy-yver A b1-23 | 2 | 60% ✗ (plain 60%) | 60% ✗ (plain 60%) |
-| wrong notes (40 %) | debussy-yver A b1-23 | 4 | 56% ✗ (plain 56%) | 56% ✗ (plain 56%) |
+| wrong notes (40 %) | debussy-yver A b1-23 | 4 | 57% ✗ (plain 57%) | 56% ✗ (plain 56%) |
 | wrong notes (40 %) | debussy-dieu A b1-5 | 1 | 58% ✗ (plain 58%) | 58% ✗ (plain 58%) |
 | wrong notes (40 %) | debussy-dieu A b1-5 | 2 | 58% ✗ (plain 58%) | 58% ✗ (plain 58%) |
 | wrong notes (40 %) | debussy-dieu A b1-5 | 4 | 52% ✗ (plain 52%) | 52% ✗ (plain 52%) |
 | wrong notes (40 %) | ravel-nicolette A b20-45 | 1 | 58% ✗ (plain 58%) | 60% ✗ (plain 60%) |
 | wrong notes (40 %) | ravel-nicolette A b20-45 | 2 | 57% ✗ (plain 57%) | 59% ✗ (plain 59%) |
-| wrong notes (40 %) | ravel-nicolette A b20-45 | 4 | 56% ✗ (plain 56%) | 58% ✗ (plain 58%) |
-| wrong notes (40 %) | synth 104bpm 16ths ta | 1 | 60% ✗ (plain 60%) | 60% ✗ (plain 60%) |
+| wrong notes (40 %) | ravel-nicolette A b20-45 | 4 | 56% ✗ (plain 56%) | 59% ✗ (plain 59%) |
+| wrong notes (40 %) | synth 104bpm 16ths ta | 1 | 60% ✗ (plain 60%) | 59% ✗ (plain 59%) |
 | wrong notes (40 %) | synth 104bpm 16ths ta | 2 | 52% ✗ (plain 52%) | 58% ✗ (plain 58%) |
-| wrong notes (40 %) | synth 104bpm 16ths ta | 4 | 48% ✗ (plain 48%) | 54% ✗ (plain 54%) |
+| wrong notes (40 %) | synth 104bpm 16ths ta | 4 | 47% ✗ (plain 47%) | 54% ✗ (plain 54%) |
 | wrong notes (40 %) | synth 144bpm 8ths ta | 1 | 60% ✗ (plain 60%) | 60% ✗ (plain 60%) |
 | wrong notes (40 %) | synth 144bpm 8ths ta | 2 | 59% ✗ (plain 59%) | 59% ✗ (plain 59%) |
 | wrong notes (40 %) | synth 144bpm 8ths ta | 4 | 58% ✗ (plain 58%) | 59% ✗ (plain 59%) |
 | wrong notes (40 %) | synth 144bpm 16ths ta | 1 | 59% ✗ (plain 59%) | 60% ✗ (plain 60%) |
-| wrong notes (40 %) | synth 144bpm 16ths ta | 2 | 52% ✗ (plain 52%) | 57% ✗ (plain 57%) |
-| wrong notes (40 %) | synth 144bpm 16ths ta | 4 | 43% ✗ (plain 42%) | 50% ✗ (plain 50%) |
+| wrong notes (40 %) | synth 144bpm 16ths ta | 2 | 53% ✗ (plain 53%) | 57% ✗ (plain 57%) |
+| wrong notes (40 %) | synth 144bpm 16ths ta | 4 | 44% ✗ (plain 43%) | 48% ✗ (plain 48%) |
 | wrong notes (40 %) | synth 144bpm 16ths a | 1 | 58% ✗ (plain 58%) | 58% ✗ (plain 58%) |
 | wrong notes (40 %) | synth 144bpm 16ths a | 2 | 59% ✗ (plain 59%) | 59% ✗ (plain 59%) |
-| wrong notes (40 %) | synth 144bpm 16ths a | 4 | 51% ✗ (plain 51%) | 54% ✗ (plain 54%) |
+| wrong notes (40 %) | synth 144bpm 16ths a | 4 | 53% ✗ (plain 53%) | 54% ✗ (plain 54%) |
 | flat −40¢ | debussy-yver A b1-23 | 1 | 79% ✗ (plain 79%) | 79% ✗ (plain 79%) |
-| flat −40¢ | debussy-yver A b1-23 | 2 | 32% ✗ (plain 32%) | 30% ✗ (plain 30%) |
+| flat −40¢ | debussy-yver A b1-23 | 2 | 33% ✗ (plain 33%) | 30% ✗ (plain 30%) |
 | flat −40¢ | debussy-yver A b1-23 | 4 | 4% ✗ (plain 4%) | 3% ✗ (plain 3%) |
-| flat −40¢ | debussy-dieu A b1-5 | 1 | 81% ✗ (plain 81%) | 78% ✗ (plain 78%) |
+| flat −40¢ | debussy-dieu A b1-5 | 1 | 82% ✗ (plain 82%) | 79% ✗ (plain 79%) |
 | flat −40¢ | debussy-dieu A b1-5 | 2 | 18% ✗ (plain 18%) | 25% ✗ (plain 25%) |
-| flat −40¢ | debussy-dieu A b1-5 | 4 | 25% ✗ (plain 25%) | 27% ✗ (plain 27%) |
+| flat −40¢ | debussy-dieu A b1-5 | 4 | 27% ✗ (plain 27%) | 23% ✗ (plain 23%) |
 | flat −40¢ | ravel-nicolette A b20-45 | 1 | 76% ✗ (plain 76%) | 73% ✗ (plain 73%) |
-| flat −40¢ | ravel-nicolette A b20-45 | 2 | 35% ✗ (plain 35%) | 37% ✗ (plain 37%) |
-| flat −40¢ | ravel-nicolette A b20-45 | 4 | 10% ✗ (plain 10%) | 15% ✗ (plain 17%) |
-| flat −40¢ | synth 104bpm 16ths ta | 1 | 78% ✗ (plain 78%) | 74% ✗ (plain 74%) |
-| flat −40¢ | synth 104bpm 16ths ta | 2 | 45% ✗ (plain 45%) | 54% ✗ (plain 54%) |
+| flat −40¢ | ravel-nicolette A b20-45 | 2 | 36% ✗ (plain 36%) | 38% ✗ (plain 38%) |
+| flat −40¢ | ravel-nicolette A b20-45 | 4 | 11% ✗ (plain 11%) | 14% ✗ (plain 15%) |
+| flat −40¢ | synth 104bpm 16ths ta | 1 | 79% ✗ (plain 79%) | 74% ✗ (plain 74%) |
+| flat −40¢ | synth 104bpm 16ths ta | 2 | 45% ✗ (plain 45%) | 56% ✗ (plain 56%) |
 | flat −40¢ | synth 104bpm 16ths ta | 4 | 19% ✗ (plain 19%) | 25% ✗ (plain 25%) |
 | flat −40¢ | synth 144bpm 8ths ta | 1 | 80% ✗ (plain 80%) | 80% (plain 80%) |
 | flat −40¢ | synth 144bpm 8ths ta | 2 | 50% ✗ (plain 50%) | 66% ✗ (plain 66%) |
-| flat −40¢ | synth 144bpm 8ths ta | 4 | 14% ✗ (plain 14%) | 25% ✗ (plain 25%) |
+| flat −40¢ | synth 144bpm 8ths ta | 4 | 14% ✗ (plain 14%) | 23% ✗ (plain 23%) |
 | flat −40¢ | synth 144bpm 16ths ta | 1 | 79% ✗ (plain 79%) | 78% (plain 78%) |
-| flat −40¢ | synth 144bpm 16ths ta | 2 | 39% ✗ (plain 39%) | 49% ✗ (plain 49%) |
+| flat −40¢ | synth 144bpm 16ths ta | 2 | 40% ✗ (plain 40%) | 49% ✗ (plain 49%) |
 | flat −40¢ | synth 144bpm 16ths ta | 4 | 19% ✗ (plain 19%) | 30% ✗ (plain 30%) |
-| flat −40¢ | synth 144bpm 16ths a | 1 | 73% ✗ (plain 73%) | 76% ✗ (plain 76%) |
+| flat −40¢ | synth 144bpm 16ths a | 1 | 74% ✗ (plain 74%) | 76% ✗ (plain 76%) |
 | flat −40¢ | synth 144bpm 16ths a | 2 | 37% ✗ (plain 37%) | 51% ✗ (plain 49%) |
-| flat −40¢ | synth 144bpm 16ths a | 4 | 28% ✗ (plain 28%) | 32% ✗ (plain 32%) |
+| flat −40¢ | synth 144bpm 16ths a | 4 | 27% ✗ (plain 27%) | 31% ✗ (plain 31%) |
 | one note behind | debussy-yver A b1-23 | 1 | 15% ✗ (plain 15%) | 15% ✗ (plain 15%) |
 | one note behind | debussy-yver A b1-23 | 2 | 15% ✗ (plain 15%) | 15% ✗ (plain 15%) |
 | one note behind | debussy-yver A b1-23 | 4 | 15% ✗ (plain 15%) | 15% ✗ (plain 15%) |
@@ -434,9 +434,9 @@ Before = the app at `54ea7b9` (`scoring.ts`, `align.ts`, `pitch.ts` from git), a
 | one note behind | synth 144bpm 16ths a | 2 | 11% ✗ (plain 11%) | 11% ✗ (plain 10%) |
 | one note behind | synth 144bpm 16ths a | 4 | 8% ✗ (plain 8%) | 9% ✗ (plain 9%) |
 
-**Live display vs result, measured delay** (good singer, L2+L4, after): fast notes shown ok/miss while singing 5.2% vs 5.1% in the result.
+**Live display vs result, measured delay** (good singer, L2+L4, after): fast notes shown ok/miss while singing 5.1% vs 5.1% in the result.
 
-**Live display vs result, uncalibrated phone** (true delay 200 ms, estimate 130 ms; notes shorter than 0.25 s shown ok/miss while singing vs in the result after the line-up): debussy-yver A b1-23 L2: 0/0 live vs 0/0 result; debussy-yver A b1-23 L4: 0/0 live vs 0/0 result; debussy-dieu A b1-5 L2: 2/9 live vs 0/9 result; debussy-dieu A b1-5 L4: 0/9 live vs 0/9 result; ravel-nicolette A b20-45 L2: 0/24 live vs 0/24 result; ravel-nicolette A b20-45 L4: 0/24 live vs 0/24 result; synth 104bpm 16ths ta L2: 14/96 live vs 1/96 result; synth 104bpm 16ths ta L4: 30/96 live vs 4/96 result; synth 144bpm 16ths a L2: 78/96 live vs 2/96 result; synth 144bpm 16ths a L4: 80/96 live vs 6/96 result.
+**Live display vs result, uncalibrated phone** (true delay 200 ms, estimate 130 ms; notes shorter than 0.25 s shown ok/miss while singing vs in the result after the line-up): debussy-yver A b1-23 L2: 0/0 live vs 0/0 result; debussy-yver A b1-23 L4: 0/0 live vs 0/0 result; debussy-dieu A b1-5 L2: 2/9 live vs 0/9 result; debussy-dieu A b1-5 L4: 0/9 live vs 0/9 result; ravel-nicolette A b20-45 L2: 0/24 live vs 0/24 result; ravel-nicolette A b20-45 L4: 0/24 live vs 0/24 result; synth 104bpm 16ths ta L2: 14/96 live vs 1/96 result; synth 104bpm 16ths ta L4: 30/96 live vs 5/96 result; synth 144bpm 16ths a L2: 79/96 live vs 2/96 result; synth 144bpm 16ths a L4: 81/96 live vs 5/96 result.
 
 ## 8. Level 1 on “doo”: every note right (current app)
 
@@ -445,9 +445,9 @@ Each good voice sings the six sections on the lyrics and on “doo” (a 20–45
 | singer | sung on | delay | new | old | acc | below good | forgiven | wrong notes | median onset ms |
 |---|---|---|---|---|---|---|---|---|---|
 | good choir singer | lyrics | cal | 28/30 | 30/30 | 100% | 4 | 0 | dieu-6-13 #53 miss 13¢; dieu-6-13 #55 miss 28¢; dieu-6-13 #61 miss 4¢; tabourin-solo-1-8 #1 miss 27¢ | 21 |
-| good choir singer | lyrics | uncal200 | 29/30 | 30/30 | 100% | 1 | 0 | tabourin-solo-1-8 #1 miss 1200¢ | 70 |
+| good choir singer | lyrics | uncal200 | 29/30 | 30/30 | 100% | 1 | 0 | tabourin-solo-1-8 #1 miss 1199¢ | 70 |
 | good choir singer | doo | cal | 30/30 | 30/30 | 100% | 0 | 0 | – | 18 |
-| good choir singer | doo | uncal200 | 30/30 | 30/30 | 100% | 0 | 0 | – | 68 |
+| good choir singer | doo | uncal200 | 30/30 | 30/30 | 100% | 0 | 0 | – | 69 |
 | operatic vibrato | lyrics | cal | 18/18 | 18/18 | 100% | 0 | 0 | – | 22 |
 | operatic vibrato | lyrics | uncal200 | 16/18 | 18/18 | 100% | 2 | 0 | dieu-6-13 #61 ok -3¢; tabourin-solo-9-16 #38 ok 15¢ | 72 |
 | operatic vibrato | doo | cal | 18/18 | 18/18 | 100% | 0 | 0 | – | 21 |
@@ -462,19 +462,19 @@ Each good voice sings the six sections on the lyrics and on “doo” (a 20–45
 | ringing transitions (zeta 0.35) | doo | uncal200 | 18/18 | 18/18 | 100% | 0 | 0 | – | 73 |
 | slow transitions (fn 3–4 Hz) | lyrics | cal | 17/18 | 18/18 | 100% | 1 | 0 | dieu-6-13 #55 ok 4¢ | 41 |
 | slow transitions (fn 3–4 Hz) | lyrics | uncal200 | 16/18 | 18/18 | 99% | 3 | 0 | dieu-6-13 #58 ok -8¢; tabourin-solo-9-16 #17 miss 8¢; tabourin-solo-9-16 #22 miss 11¢ | 91 |
-| slow transitions (fn 3–4 Hz) | doo | cal | 18/18 | 18/18 | 100% | 0 | 0 | – | 46 |
+| slow transitions (fn 3–4 Hz) | doo | cal | 18/18 | 18/18 | 100% | 0 | 0 | – | 47 |
 | slow transitions (fn 3–4 Hz) | doo | uncal200 | 18/18 | 18/18 | 100% | 0 | 0 | – | 94 |
-| good choir singer | doo, phone speaker | cal | 10/30 | 27/30 | 88% | 93 | 31 | warmup-upbeat-6 #13 miss -1210¢; warmup-upbeat-6 #15 miss -1191¢; warmup-upbeat-6 #17 miss -1187¢; warmup-upbeat-6 #19 miss -1188¢ …+58 | 23 |
-| good choir singer | doo, phone speaker | uncal200 | 8/30 | 26/30 | 87% | 98 | 42 | warmup-upbeat-6 #10 miss -1198¢; warmup-upbeat-6 #12 miss -1180¢; warmup-upbeat-6 #13 miss -21¢; warmup-upbeat-6 #14 miss -1182¢ …+52 | 74 |
-| operatic vibrato | doo, phone speaker | cal | 7/18 | 16/18 | 89% | 54 | 28 | warmup-upbeat-6 #15 miss -1197¢; warmup-upbeat-6 #19 miss -1185¢; warmup-upbeat-6 #10 miss -1150¢; warmup-upbeat-6 #13 miss -1185¢ …+22 | 28 |
-| operatic vibrato | doo, phone speaker | uncal200 | 7/18 | 15/18 | 89% | 50 | 22 | warmup-upbeat-6 #15 miss -1202¢; warmup-upbeat-6 #16 miss 0¢; warmup-upbeat-6 #17 miss -86¢; warmup-upbeat-6 #19 miss -1198¢ …+24 | 76 |
+| good choir singer | doo, phone speaker | cal | 10/30 | 27/30 | 88% | 90 | 33 | warmup-upbeat-6 #13 miss -1211¢; warmup-upbeat-6 #15 miss -1192¢; warmup-upbeat-6 #17 miss -1186¢; warmup-upbeat-6 #19 miss -1189¢ …+53 | 23 |
+| good choir singer | doo, phone speaker | uncal200 | 9/30 | 27/30 | 87% | 98 | 44 | warmup-upbeat-6 #10 miss -1196¢; warmup-upbeat-6 #12 miss -1179¢; warmup-upbeat-6 #13 miss -22¢; warmup-upbeat-6 #14 miss -1182¢ …+50 | 74 |
+| operatic vibrato | doo, phone speaker | cal | 7/18 | 16/18 | 89% | 58 | 32 | warmup-upbeat-6 #15 miss -1197¢; warmup-upbeat-6 #19 miss -1186¢; warmup-upbeat-6 #10 miss -1151¢; warmup-upbeat-6 #13 miss -1182¢ …+22 | 28 |
+| operatic vibrato | doo, phone speaker | uncal200 | 6/18 | 15/18 | 89% | 51 | 23 | warmup-upbeat-6 #15 miss -1203¢; warmup-upbeat-6 #17 miss -1112¢; warmup-upbeat-6 #19 miss -1199¢; warmup-upbeat-6 #10 miss -1180¢ …+24 | 76 |
 
 **Fast bars** (Debussy *Yver* 1–23, *Dieu* 1–5, Ravel *Nicolette* 20–45, synthetic 16ths at 104/144 bpm and 8ths at 144 bpm; good singer, calibrated):
 
 | singer | sung on | delay | new | old | acc | below good | forgiven | wrong notes | median onset ms |
 |---|---|---|---|---|---|---|---|---|---|
 | good choir singer, fast bars | lyrics | cal | 17/18 | 18/18 | 100% | 1 | 0 | ravel-nicolette A b20-45 #107 miss -15¢ | 23 |
-| good choir singer, fast bars | doo | cal | 18/18 | 18/18 | 100% | 0 | 0 | – | 19 |
+| good choir singer, fast bars | doo | cal | 18/18 | 18/18 | 100% | 0 | 0 | – | 20 |
 
 **Singers with wrong notes, on “doo”** (calibrated, headphones unless *phone speaker*: the backing, the own part included, bleeding into the mic at −13 dB; runs passing level 1, new vs old rule):
 
@@ -485,10 +485,10 @@ Each good voice sings the six sections on the lyrics and on “doo” (a 20–45
 | one wrong note (a semitone, random) | 0/12 | 12/12 | 96% | 1.0 | 0 |
 | one note a semitone flat | 0/12 | 12/12 | 96% | 1.0 | 0 |
 | one note 70¢ flat | 1/12 | 12/12 | 96% | 0.9 | 1 |
-| flat −40¢ | 0/12 | 7/12 | 77% | 2.3 | 9 |
+| flat −40¢ | 0/12 | 8/12 | 77% | 2.3 | 9 |
 | one note an octave low | 0/12 | 12/12 | 96% | 1.0 | 0 |
-| one wrong note (a semitone, random), phone speaker | 0/12 | 10/12 | 83% | 3.1 | 14 |
-| one note an octave low, phone speaker | 1/12 | 11/12 | 85% | 2.8 | 11 |
+| one wrong note (a semitone, random), phone speaker | 0/12 | 10/12 | 83% | 3.0 | 13 |
+| one note an octave low, phone speaker | 1/12 | 10/12 | 84% | 2.8 | 13 |
 
 ## 9. Wide vibrato at level 1, and wrong notes at every level (current app)
 
@@ -529,3 +529,46 @@ Every vocal part × section of the library (warm-up and choir library), sung on 
 | one note a semitone flat (the 3rd) | 5 | 254 | 243 | 243 |
 | all a semitone flat | 5 | 254 | 0 | 0 |
 | an octave down | 5 | 254 | 0 | 0 |
+
+## 10. Microphone trouble: mains hum and distortion (current app)
+
+A real level-1 run (`qa/fixtures/hum-run.wav`: Vierne Kyrie, bass, the written C#4 sung cleanly, Firefox on macOS with mains hum at 59 Hz) and synthetic takes of the same bars with hum and hum-driven distortion added (`humchannel.ts`: the voice modulated by the hum’s 3rd harmonic). *Before* = the tracker, scorer and line-up at the commit noted; *after* = the input filters (high-pass under the lowest note, notches at the hum), the harmonic check in the tracker and the scoring now. *at pitch* = voiced readings within ±50¢ of the written note (real run) or of what was sung (synthetic); *⅓* / *½* = readings an octave and a fifth / an octave under it. *wrong* = notes failing level 1, *mic* = notes let off as microphone trouble.
+
+| run | at pitch | ⅓ | ½ | grade | acc | level 1 | p/g/o/m | wrong | mic |
+|---|---|---|---|---|---|---|---|---|---|
+| before (c04ca36) | 28% | 68% | 1% | C | 61% | not yet | 3/6/1/4 | 5 | 0 |
+| old tracker, new scoring | 28% | 68% | 1% | D | 23% | not yet | 1/2/1/10 | 11 | 0 |
+| + input filters only | 29% | 67% | 1% | D | 35% | not yet | 3/1/2/8 | 10 | 0 |
+| + harmonic check only | 93% | 3% | 0% | C | 61% | not yet | 3/6/1/4 | 0 | 5 |
+| after | 96% | 1% | 0% | C | 69% | not yet | 7/2/2/3 | 0 | 5 |
+
+Input quality found on the real run: hum, distortion; hum 58.8 Hz at -44.6 dBFS (-25.9 dB under the voice); clipping in 0.9% of the singing time (peak 1); components at ½ / ⅓ of the note -9.8 dB under it, 58% of the readings lifted; filters: high-pass 72.7 Hz, notches 58.9 Hz.
+
+**Synthetic takes** (good singer on “doo”, level 1, measured delay, two seeds each):
+
+| run | at pitch | ⅓ | ½ | grade | acc | level 1 | p/g/o/m | wrong | mic |
+|---|---|---|---|---|---|---|---|---|---|
+| good, clean mic s1 before | 100% | 0% | 0% | S | 100% | pass | 14/0/0/0 | 0 | 0 |
+| good, clean mic s1 after | 100% | 0% | 0% | S | 100% | pass | 14/0/0/0 | 0 | 0 |
+| good, clean mic s2 before | 100% | 0% | 0% | S | 100% | pass | 14/0/0/0 | 0 | 0 |
+| good, clean mic s2 after | 100% | 0% | 0% | S | 100% | pass | 14/0/0/0 | 0 | 0 |
+| good, hum only s1 before | 100% | 0% | 0% | S | 100% | pass | 14/0/0/0 | 0 | 0 |
+| good, hum only s1 after | 100% | 0% | 0% | S | 100% | pass | 14/0/0/0 | 0 | 0 |
+| good, hum only s2 before | 100% | 0% | 0% | S | 100% | pass | 14/0/0/0 | 0 | 0 |
+| good, hum only s2 after | 100% | 0% | 0% | S | 100% | pass | 14/0/0/0 | 0 | 0 |
+| good, hum + distortion s1 before | 4% | 15% | 80% | D | 7% | not yet | 1/0/0/13 | 13 | 0 |
+| good, hum + distortion s1 after | 100% | 0% | 0% | S | 100% | pass | 14/0/0/0 | 0 | 0 |
+| good, hum + distortion s2 before | 32% | 51% | 17% | B | 79% | not yet | 10/0/2/2 | 4 | 0 |
+| good, hum + distortion s2 after | 100% | 0% | 0% | S | 100% | pass | 14/0/0/0 | 0 | 0 |
+| 2 wrong notes, hum + distortion s1 before | 42% | 23% | 34% | D | 7% | not yet | 1/0/0/13 | 13 | 0 |
+| 2 wrong notes, hum + distortion s1 after | 100% | 0% | 0% | B | 86% | not yet | 12/0/0/2 | 2 | 0 |
+| 2 wrong notes, hum + distortion s2 before | 9% | 19% | 73% | D | 7% | not yet | 1/0/0/13 | 13 | 0 |
+| 2 wrong notes, hum + distortion s2 after | 95% | 0% | 5% | B | 86% | not yet | 12/0/0/2 | 2 | 0 |
+| sings F#2 (19 st low), hum + distortion s1 before | 100% | 0% | 0% | S | 100% | pass | 14/0/0/0 | 0 | 0 |
+| sings F#2 (19 st low), hum + distortion s1 after | 100% | 0% | 0% | D | 0% | not yet | 0/0/0/14 | 14 | 0 |
+| sings F#2 (19 st low), hum + distortion s2 before | 100% | 0% | 0% | S | 100% | pass | 14/0/0/0 | 0 | 0 |
+| sings F#2 (19 st low), hum + distortion s2 after | 100% | 0% | 0% | D | 0% | not yet | 0/0/0/14 | 14 | 0 |
+| sings an octave low, hum + distortion s1 before | 94% | 0% | 6% | D | 0% | not yet | 0/0/0/14 | 14 | 0 |
+| sings an octave low, hum + distortion s1 after | 100% | 0% | 0% | D | 0% | not yet | 0/0/0/14 | 14 | 0 |
+| sings an octave low, hum + distortion s2 before | 93% | 0% | 7% | D | 0% | not yet | 0/0/0/14 | 14 | 0 |
+| sings an octave low, hum + distortion s2 after | 99% | 0% | 1% | D | 0% | not yet | 0/0/0/14 | 14 | 0 |

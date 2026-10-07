@@ -19,6 +19,8 @@ import { avgCents, emulateLatencyLearn, gradeLetter, letterFor, levelSetup, read
 import { hashSeed } from './prng';
 import type { RenderedTake } from './singer';
 import { PITCH_CURRENT, PITCH_HEAD, trackOffline, type PitchImpl, type TrackReading } from './tracker';
+import { offlinePlan, rawBlocks } from './quality';
+import type { InputFilterPlan } from '../../src/audio/inputFilter';
 import { REPO_ROOT } from './scores';
 import { attemptPasses, levelSpec } from '../../src/progress/ladder';
 
@@ -39,6 +41,8 @@ export interface PlayPolicy {
   everyNoteLift: boolean;
   /** session.onPitch stores fixSubharmonic-corrected samples (else raw; the fix is display-only). */
   fixSubInSamples: boolean;
+  /** scoreAligned gets { voiceOnly } (headphones on: no backing in the mic). */
+  voiceOnly: boolean;
   detected: string[];
 }
 
@@ -62,8 +66,10 @@ export function detectPlayPolicy(): PlayPolicy {
   const everyNoteLift = /liftSubharmonics: [^\n]*everyNote:/.test(play);
   detected.push(`scoreAligned everyNote: ${everyNoteLift}`);
   const fixSubInSamples = /const midi = p\.midi != null && !this\.cfg\.scoring\.octaveTolerant \? fixSubharmonic/.test(sess);
+  const voiceOnly = /voiceOnly: headphonesRef\.current/.test(play);
+  detected.push(`scoreAligned voiceOnly (headphones): ${voiceOnly}`);
   detected.push(`session stores ${fixSubInSamples ? 'fixSubharmonic-corrected' : 'raw'} samples`);
-  return { lateFailMs, timingGate, guideLearnMaxAbove, liftSubharmonics, everyNoteLift, fixSubInSamples, detected };
+  return { lateFailMs, timingGate, guideLearnMaxAbove, liftSubharmonics, everyNoteLift, fixSubInSamples, voiceOnly, detected };
 }
 
 export const PLAY_POLICY = detectPlayPolicy();
@@ -92,7 +98,7 @@ export const measured = (ms: number): Profile => ({ latencyMs: ms, source: 'meas
 /** The scoring functions the AFTER pipeline uses (swap for variants, e.g. another TRANSITION_MAX). */
 export interface AfterImpl {
   scoreAttempt: Scorer;
-  scoreAligned: (ctx: ScoringContext, samples: PitchSample[], opts: ScoringOptions, run: { rate: number; latencyMs: number; calibrated: boolean; liftSubharmonics?: boolean; everyNote?: boolean; maxTotalMs?: number }) => curAlign.AlignedResult;
+  scoreAligned: (ctx: ScoringContext, samples: PitchSample[], opts: ScoringOptions, run: { rate: number; latencyMs: number; calibrated: boolean; liftSubharmonics?: boolean; everyNote?: boolean; voiceOnly?: boolean; maxTotalMs?: number }) => curAlign.AlignedResult;
   medianOnsetMs: (result: AttemptResult, rate: number, part?: Part) => number | null;
 }
 export const AFTER_CURRENT: AfterImpl = {
@@ -109,6 +115,10 @@ export interface PipelineSpec {
   /** Pitch tracker functions for the AFTER pipeline (default: src/audio/pitch.ts); `pitchKey` names it for the readings cache. */
   pitch?: PitchImpl;
   pitchKey?: string;
+  /** AFTER without the input filters (high-pass, hum notches) the app puts in front of the tracker. */
+  noInputFilter?: boolean;
+  /** AFTER without the note-due hint the session gives the harmonic check. */
+  noHint?: boolean;
 }
 
 export const BEFORE: PipelineSpec = { id: 'before', estimateMs: 80 };
@@ -166,6 +176,24 @@ function readingsFor(take: RenderedTake, key: string, make: () => TrackReading[]
   return r;
 }
 
+const planCache = new WeakMap<RenderedTake, Map<string, InputFilterPlan>>();
+
+/**
+ * The filters session.ts puts in front of the tracker: a high-pass under the lowest note the singer
+ * sings (an octave lower for a singer in another octave), notches at the hum found in the silence
+ * before the first note.
+ */
+export function inputPlanFor(take: RenderedTake, part: Part, range: [number, number], octaveTolerant: boolean): InputFilterPlan {
+  const lowest = part.low - (octaveTolerant ? 12 : 0);
+  const firstRec = (part.notes[range[0]].start - take.scoreTimeAtSample0) / take.rate;
+  const key = `${lowest}:${firstRec.toFixed(2)}`;
+  let m = planCache.get(take);
+  if (!m) planCache.set(take, (m = new Map()));
+  let p = m.get(key);
+  if (!p) m.set(key, (p = offlinePlan(rawBlocks(take.pcm, take.sampleRate, Math.max(0, firstRec)), lowest, firstRec)));
+  return p;
+}
+
 export function noteDueAt(part: Part, t: number): number | null {
   const ns = part.notes;
   let lo = 0;
@@ -190,8 +218,15 @@ export function runSession(spec: PipelineSpec, setup: RunSetup, profile: Profile
   const after = spec.id === 'after';
   const N = setup.windowN ?? (after ? windowFor(part.low, take.sampleRate) : 2048);
   const pitchImpl = after ? spec.pitch ?? PITCH_CURRENT : PITCH_HEAD;
-  const all = readingsFor(take, `${spec.id}:${N}:${after && spec.pitch ? spec.pitchKey ?? 'custom' : ''}`, () =>
-    trackOffline(take.pcm, take.sampleRate, { windowN: N, jitterMs: 3, seed: hashSeed('hop', setup.microSeed), impl: pitchImpl }));
+  const octaveTolerant = opts.octaveTolerant;
+  // session.ts: the tracker's input filters (lowest note sung; hum found in the pre-roll) and the
+  // note-due hint for the harmonic check (not for singers in another octave).
+  const plan: InputFilterPlan | null = after && !spec.noInputFilter ? inputPlanFor(take, part, setup.ctx.range, octaveTolerant) : null;
+  const hintLatency = after && !spec.noHint && !octaveTolerant ? latencyUsed : null;
+  const hint = hintLatency == null ? null : (rec: number) => noteDueAt(part, take.scoreTimeAtSample0 + (rec - hintLatency / 1000) * rate);
+  const planKey = plan ? `${plan.highpassHz}/${plan.notches.join(',')}` : 'raw';
+  const all = readingsFor(take, `${spec.id}:${N}:${after && spec.pitch ? spec.pitchKey ?? 'custom' : ''}:${planKey}:${hintLatency ?? ''}`, () =>
+    trackOffline(take.pcm, take.sampleRate, { windowN: N, jitterMs: 3, seed: hashSeed('hop', setup.microSeed), impl: pitchImpl, filter: plan, hint }));
   const readings = all.filter((r) => r.centreSec + N / 2 / take.sampleRate <= stopSec);
   const mapping = { scoreTimeAtSample0: take.scoreTimeAtSample0, rate, latencyMs: latencyUsed, from: setup.from };
   let samples = readingsToSamples(readings, mapping);
@@ -225,6 +260,8 @@ export function runSession(spec: PipelineSpec, setup: RunSetup, profile: Profile
     const al = impl.scoreAligned({ ...ctx, range: [Math.min(...idx), Math.max(...idx)] }, samples, opts, {
       rate, latencyMs: latencyUsed, calibrated, ...(pol.liftSubharmonics ? { liftSubharmonics: !opts.octaveTolerant } : {}),
       ...(pol.everyNoteLift ? { everyNote: levelSpec(level).everyNote } : {}),
+      // The singer answers "Headphones on?" truthfully: yes unless the take bleeds the backing in.
+      ...(pol.voiceOnly ? { voiceOnly: !take.speaker } : {}),
       // Play.tsx: the lag search never looks past a plausible total device delay (guide on: estimate + cap).
       maxTotalMs: pol.guideLearnMaxAbove !== null && L.guide ? Math.max(spec.estimateMs + pol.guideLearnMaxAbove, latencyUsed + 80) : 450,
     });

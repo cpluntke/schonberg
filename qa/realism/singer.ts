@@ -137,6 +137,8 @@ export interface RenderedTake {
   /** Same without vibrato (the "centre" the singer aims at incl. transition dynamics and drift). */
   truthCentre: Float32Array;
   notes: RenderedNote[];
+  /** Practised on the phone speaker (the backing bleeds into the mic): the singer answers "no headphones". */
+  speaker?: boolean;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -523,6 +525,7 @@ export function renderSinger(o: RenderOptions): RenderedTake {
     notes: notes.map(({ index, writtenMidi, targetMidi, scoreStart, scoreDur, cmdSec, vowelSec, consonantSec, afterRest, wrong }) => ({
       index, writtenMidi, targetMidi, scoreStart, scoreDur, cmdSec, vowelSec, consonantSec, afterRest, wrong,
     })),
+    ...(o.channel.bleedDb !== null ? { speaker: true } : {}),
   };
 }
 

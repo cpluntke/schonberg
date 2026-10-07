@@ -54,7 +54,8 @@ export function writeCurrentReport(): boolean {
   const abl = read('ablation');
   const roundtrip = read('roundtrip');
   const fast = read('fast');
-  writeFileSync(resolve(ROOT, 'qa/realism/out/report-current.json'), JSON.stringify({ meta, grid, seqL2, rep, sanity, violations, tm, fid, bleed, abl, roundtrip, fast }, null, 1));
+  const hum = read('hum');
+  writeFileSync(resolve(ROOT, 'qa/realism/out/report-current.json'), JSON.stringify({ meta, grid, seqL2, rep, sanity, violations, tm, fid, bleed, abl, roundtrip, fast, hum }, null, 1));
 
   const L: string[] = [];
   L.push('# Realism: before / after the scoring fixes');
@@ -267,8 +268,32 @@ export function writeCurrentReport(): boolean {
     L.push(table(['singer', 'level', 'sections', 'before', 'after'], vib.wrong.map((r: Any) => [r.singer, r.level, r.sections, r.before ?? '–', r.after])));
     L.push('');
   }
+  if (hum) humSection(L, hum);
   writeFileSync(resolve(ROOT, 'docs/qa/realism-current.md'), L.join('\n'));
   return true;
+}
+
+/** Section 10: microphone trouble (cmp-hum.test.ts). */
+function humSection(L: string[], hum: Any): void {
+  L.push('## 10. Microphone trouble: mains hum and distortion (current app)');
+  L.push('');
+  L.push('A real level-1 run (`qa/fixtures/hum-run.wav`: Vierne Kyrie, bass, the written C#4 sung cleanly, Firefox on macOS with mains hum at 59 Hz) and synthetic takes of the same bars with hum and hum-driven distortion added (`humchannel.ts`: the voice modulated by the hum’s 3rd harmonic). *Before* = the tracker, scorer and line-up at the commit noted; *after* = the input filters (high-pass under the lowest note, notches at the hum), the harmonic check in the tracker and the scoring now. *at pitch* = voiced readings within ±50¢ of the written note (real run) or of what was sung (synthetic); *⅓* / *½* = readings an octave and a fifth / an octave under it. *wrong* = notes failing level 1, *mic* = notes let off as microphone trouble.');
+  L.push('');
+  const head = ['run', 'at pitch', '⅓', '½', 'grade', 'acc', 'level 1', 'p/g/o/m', 'wrong', 'mic'];
+  const row = (r: Any) => [r.label, pct(r.atPitch), pct(r.third), pct(r.half), r.letter, pct(r.accuracy), r.passed ? 'pass' : 'not yet', `${r.counts.perfect}/${r.counts.good}/${r.counts.ok}/${r.counts.miss}`, r.wrong, r.mic];
+  if (hum.fixture?.length) L.push(table(head, hum.fixture.map(row)));
+  L.push('');
+  const q = hum.quality;
+  if (q?.problems) {
+    L.push(`Input quality found on the real run: ${q.problems.join(', ') || 'nothing'}; hum ${q.hum ? `${q.hum.hz} Hz at ${q.hum.db} dBFS (${q.hum.vsVoiceDb} dB under the voice)` : 'none'}; clipping in ${pct1(q.clip?.share)} of the singing time (peak ${q.clip?.peak}); components at ½ / ⅓ of the note ${q.sub?.db ?? '–'} dB under it, ${pct(q.sub?.liftedShare)} of the readings lifted; filters: high-pass ${q.filter?.hp} Hz, notches ${(q.filter?.notches ?? []).join(', ') || 'none'} Hz.`);
+    L.push('');
+  }
+  if (hum.synthetic?.length) {
+    L.push('**Synthetic takes** (good singer on “doo”, level 1, measured delay, two seeds each):');
+    L.push('');
+    L.push(table(head, hum.synthetic.map(row)));
+    L.push('');
+  }
 }
 
 const fastTotal = (r: Any) => r.fast.perfect + r.fast.good + r.fast.ok + r.fast.miss;
