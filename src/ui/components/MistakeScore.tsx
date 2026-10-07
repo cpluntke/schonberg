@@ -197,13 +197,19 @@ export function MistakeScore({ piece, part, notes, tol, level, from, to, play }:
     };
   };
 
+  const closing = useRef(false);
   // The zoomed view is a history entry: "back" closes it.
   const zoomed = zoom != null ? spots[zoom] : undefined;
   const open = (k: number) => {
-    try { history.pushState({ mistakeZoom: true }, ''); } catch { /* ignore */ }
+    closing.current = false;
+    // (keeps the entry's own marks, e.g. what lies below Results, so a stray Forward stays harmless)
+    try { history.pushState({ ...((history.state as object | null) ?? {}), mistakeZoom: true }, ''); } catch { /* ignore */ }
     setZoom(k);
   };
   const close = (then?: Extract<Route, { name: 'play' }>) => {
+    // (once: a double tap or a held Escape must not step back past Results)
+    if (closing.current) return;
+    closing.current = true;
     let viaHistory = false;
     try { viaHistory = !!(history.state as { mistakeZoom?: boolean } | null)?.mistakeZoom; } catch { /* ignore */ }
     if (viaHistory) {

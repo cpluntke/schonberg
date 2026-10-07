@@ -89,4 +89,17 @@ describe('practice screens sit right above their piece', () => {
     expect(practiceParent({ ...play, pieceId: 'row-2026-10-07-P0' })).toEqual({ name: 'expert' });
     expect(practiceParent({ name: 'results' })).toBeNull();
   });
+
+  it('a Play opened cold (nothing below): Again keeps it unstamped, so ← replaces it with the piece', async () => {
+    history.replaceState(null, '', '#/play/p1/S/s1?level=1');
+    await settle();
+    go({ name: 'results' }, true);
+    go(play, true);
+    expect((history.state as { shUp?: string } | null)?.shUp).toBeUndefined();
+    const n = history.length;
+    leaveTo({ name: 'piece', pieceId: 'p1' });
+    await settle();
+    expect(location.hash).toBe('#/piece/p1');
+    expect(history.length).toBe(n); // replaced, nothing pushed, nothing stepped out of
+  });
 });

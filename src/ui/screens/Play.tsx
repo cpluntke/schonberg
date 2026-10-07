@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { Route } from '../router';
-import { go, leaveTo, practiceParent, pushGuard, useBackGuard } from '../router';
+import { dropGuard, go, leaveTo, practiceParent, pushGuard, useBackGuard } from '../router';
 import { getPiece, noteRangeFor, singableSections } from '../library';
 import { useProfile, useWide } from '../hooks';
 import { LEVELS, LISTEN, MAX_LEVEL, OFF_BOOK_DAYS, effectiveTolerance, fixesBefore, fullRunCounts, passLabel, pieceReadiness, sectionRunCounts, speakerPractice } from '../../progress/ladder';
@@ -217,6 +217,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
     if (!piece || !part || !section) return;
     if (!GENERATED_SECTIONS.has(section.id) && (r || listenOnly)) markSeen(piece.id, part.id, section.id);
     if (!r || listenOnly) {
+      dropGuard(); // (the run ended here, without leaving the screen)
       if (listenOnly) {
         recordAttempt(piece.id, part.id, section.id, 0, emptyResult(), section.end - section.start);
         trackPlayRun({ pieceId: piece.id, part, sectionId: section.id, level: 0, mode: route.mode, listenOnly: true, realSection: false, ladder: false,
@@ -418,6 +419,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
       setMicMsg(s.micError ?? 'Could not start audio.');
       track('err.mic');
       setPhase('micError');
+      dropGuard();
     }
   }
 
@@ -503,6 +505,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
           s.pause();
           setMicMsg('The microphone disconnected (headset unplugged or another app took it). Plug it back in and try again.');
           setPhase('micError');
+      dropGuard();
         }
         let count = 0;
         if (s && s.phase === 'countin') {

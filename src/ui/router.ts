@@ -135,11 +135,21 @@ export function practiceParent(r: Route): Route | null {
   return { name: 'piece', pieceId: r.pieceId.split('~')[0] };
 }
 
-type HState = { shUp?: string; shGuard?: boolean } | null;
+type HState = { shUp?: string; shGuard?: string | boolean; shDup?: boolean; mistakeZoom?: boolean } | null;
 const hstate = (): HState => {
   const s = history.state as unknown;
   return s && typeof s === 'object' ? (s as HState) : null;
 };
+// A guard belongs to the page load that pushed it. One that survived a reload (or a tab the phone
+// discarded) sits on a duplicate of the Play entry whose lower entries belong to the old page: it's
+// no guard any more (popping it would reload Play), so it becomes a plain entry marked as a duplicate,
+// and leaving steps two back, past the old Play entry, to the piece.
+const LOAD = Math.random().toString(36).slice(2);
+const guarded = () => hstate()?.shGuard === LOAD;
+try {
+  const st = hstate();
+  if (st?.shGuard) history.replaceState({ ...st, shGuard: undefined, shDup: true }, '', location.href);
+} catch { /* ignore */ }
 const same = (a: Route, b: Route) => href(a) === href(b);
 const notify = () => window.dispatchEvent(new Event('sh:route'));
 
@@ -149,7 +159,7 @@ export const isDroppingGuard = () => droppingGuard;
 
 /** Run `then` once no guard entry is on top (pops it first when there is one). */
 function settle(then: () => void) {
-  if (!hstate()?.shGuard) { then(); return; }
+  if (!guarded()) { then(); return; }
   droppingGuard = true;
   let done = false;
   const finish = () => {
@@ -169,8 +179,8 @@ function settle(then: () => void) {
 /** While a run is sung: an entry the back button pops instead of leaving the screen (call in the tap that starts it). */
 export function pushGuard() {
   const st = hstate();
-  if (st?.shGuard) return;
-  try { history.pushState({ ...(st ?? {}), shGuard: true }, '', location.href); } catch { /* ignore */ }
+  if (guarded()) return;
+  try { history.pushState({ ...(st ?? {}), shDup: undefined, shGuard: LOAD }, '', location.href); } catch { /* ignore */ }
 }
 
 /** Drop the run's guard entry, if any (the run ended without leaving the screen). */
@@ -179,16 +189,17 @@ export function dropGuard(then: () => void = () => {}) { settle(then); }
 export function go(r: Route, replace = false) {
   const h = href(r);
   const cur = parseHash(location.hash);
-  if (isPractice(cur) || hstate()?.shGuard) {
+  if (isPractice(cur) || guarded()) {
     settle(() => {
-      const up = hstate()?.shUp;
+      const { shUp: up, shDup: dup } = hstate() ?? {};
       if (isPractice(r)) {
-        // Practice screens replace each other, keeping what lies below.
+        // Practice screens replace each other, keeping what lies below (and only that: a screen opened
+        // cold has nothing below it, and a stamp would make ← step out of the app).
         const parent = practiceParent(r);
-        history.replaceState({ shUp: parent ? href(parent) : up }, '', h);
+        history.replaceState({ shUp: parent && up !== href(parent) ? undefined : up, shDup: dup }, '', h);
         notify();
       } else if (up && up === h) {
-        history.back(); // the page below: step back, don't stack it again
+        history.go(dup ? -2 : -1); // the page below: step back, don't stack it again
       } else if (replace) location.replace(h);
       else location.hash = h;
     });
@@ -211,7 +222,8 @@ export function go(r: Route, replace = false) {
 /** ← on a practice screen: to the page below it (its piece), by stepping back when it's there. */
 export function leaveTo(r: Route) {
   settle(() => {
-    if (hstate()?.shUp === href(r)) history.back();
+    const st = hstate();
+    if (st?.shUp === href(r)) history.go(st.shDup ? -2 : -1);
     else go(r, true);
   });
 }
@@ -259,7 +271,7 @@ export function useBackGuard(onBack: () => void) {
   useEffect(() => {
     const mine = location.hash;
     const on = () => {
-      if (droppingGuard || hstate()?.shGuard || location.hash !== mine) return;
+      if (droppingGuard || guarded() || hstate()?.mistakeZoom || location.hash !== mine) return;
       ref.current();
     };
     window.addEventListener('popstate', on);
