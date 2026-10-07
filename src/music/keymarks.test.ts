@@ -30,6 +30,11 @@ describe('key marks', () => {
     expect(nk.map((k) => [k.beat, k.fifths, k.mode])).toEqual([[0, 4, 'minor'], [8, 1, 'major'], [16, 4, 'minor'], [24, -2, 'major']]);
   });
 
+  it('a mark that only repeats the key in force leaves no extra change', () => {
+    const nk = nameKeys({ keys: [key(0, 0), key(32, -1)], measures }, [{ bar: 8, fifths: 0, mode: 'major' }, { bar: 3 }]);
+    expect(nk).toEqual([key(0, 0)]);
+  });
+
   it('a mark at bar 1 corrects the mode of the whole piece', () => {
     const nk = nameKeys({ keys: [key(0, 4)], measures }, [{ bar: 0, fifths: 4, mode: 'minor' }]);
     expect(nk).toEqual([key(0, 4, 'minor')]);

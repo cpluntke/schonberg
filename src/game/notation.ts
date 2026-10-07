@@ -215,6 +215,9 @@ export function keyName(key: Pick<KeySig, 'fifths' | 'mode'>): string {
   return `${keyTonicName(key)} ${key.mode}`;
 }
 
+/** Notations whose names move with the key (do / 1 is the key's tonic): they get "Do = …" hints. */
+export const movesWithKey = (mode: NotationMode): boolean => mode === 'movable' || mode === 'jianpu';
+
 /**
  * Short hint for where the names start from in a key: "Do = E" (movable do: the relative major's
  * tonic, also in minor), "1 = E" (jianpu), the key's name otherwise ("C♯ minor", fixed do: "Do♯

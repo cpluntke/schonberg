@@ -15,10 +15,20 @@ const KEYS: { value: string; label: string }[] = (['major', 'minor'] as const).f
     value: `${fifths}:${mode}`,
     label: `${keyName({ fifths, mode })} (${keyHint('movable', { fifths, mode })})`,
   })),
-).sort((a, b) => (a.value.endsWith('major') === b.value.endsWith('major') ? a.label.localeCompare(b.label) : a.value.endsWith('major') ? -1 : 1));
+).sort((a, b) => {
+  const ma = a.value.endsWith('major');
+  if (ma !== b.value.endsWith('major')) return ma ? -1 : 1;
+  const acc = (l: string) => (l[1] === '♭' ? 0 : l[1] === '♯' ? 2 : 1);
+  return a.label[0].localeCompare(b.label[0]) || acc(a.label) - acc(b.label);
+});
 const AS_WRITTEN = 'score';
 
-interface Row { bar: string; key: string }
+interface Row {
+  bar: string;
+  key: string;
+  /** The bar (index) the row was loaded with: kept while its number is unchanged (numbers can repeat). */
+  idx?: number;
+}
 
 /** Bar (index) of a beat. */
 function barAt(piece: PieceInfo, beat: number): number {
@@ -63,15 +73,17 @@ export function KeyMarksCard({ piece }: { piece: PieceInfo }) {
 
   const startEdit = () => {
     setError(null);
-    setRows(marks.map((m) => ({ bar: ms[m.bar]?.number ?? String(m.bar + 1), key: m.fifths == null ? AS_WRITTEN : `${m.fifths}:${m.mode}` })));
+    setRows(marks.map((m) => ({ bar: ms[m.bar]?.number ?? String(m.bar + 1), key: m.fifths == null ? AS_WRITTEN : `${m.fifths}:${m.mode}`, idx: m.bar })));
   };
 
   const save = async () => {
     if (!rows) return;
     const out: KeyMark[] = [];
     for (const r of rows) {
-      const bar = ms.findIndex((m) => m.number === r.bar.trim());
-      if (bar < 0) { setError(`There is no bar “${r.bar.trim()}” in this piece.`); return; }
+      const t = r.bar.trim();
+      if (!t) { setError('Enter the bar where the key changes.'); return; }
+      const bar = r.idx != null && ms[r.idx]?.number === t ? r.idx : ms.findIndex((m) => m.number === t);
+      if (bar < 0) { setError(`There is no bar “${t}” in this piece.`); return; }
       if (out.some((m) => m.bar === bar)) { setError(`Bar ${r.bar.trim()} is marked twice.`); return; }
       if (r.key === AS_WRITTEN) out.push({ bar });
       else {
@@ -104,9 +116,14 @@ export function KeyMarksCard({ piece }: { piece: PieceInfo }) {
       </summary>
       <span className="small muted">
         Movable do and the 1–7 numbers start from the key: do (1) is the tonic of the major key with this key signature,
-        also in minor (C♯ minor: do = E, so C♯ is la). Where the key signature changes, do moves with it.
+        also in minor (A minor: do = C, so A is la). Where the key signature changes, do moves with it.
       </span>
       <ul className="small" style={{ margin: '4px 0', paddingLeft: 18 }} data-testid="key-list">{keys.map(line)}</ul>
+      {marks.length > 0 && (
+        <span className="tiny muted" data-testid="key-marks-list">
+          Key marks: {marks.map((m) => `bar ${ms[m.bar]?.number ?? m.bar + 1} → ${m.fifths == null ? 'the key signature' : keyName({ fifths: m.fifths, mode: m.mode ?? 'major' })}`).join('; ')}
+        </span>
+      )}
       {rows == null ? (
         canEdit ? (
           <div className="col" style={{ gap: 6 }}>
@@ -121,9 +138,9 @@ export function KeyMarksCard({ piece }: { piece: PieceInfo }) {
       ) : (
         <div className="col" style={{ gap: 8 }}>
           {rows.map((r, i) => (
-            <div key={i} className="row wrap" style={{ gap: 6 }}>
-              <label className="small">From bar{' '}
-                <input type="text" inputMode="numeric" aria-label="Bar" value={r.bar} style={{ ...inputStyle, width: 64 }} data-testid="key-mark-bar"
+            <div key={i} className="row wrap" style={{ gap: 6, alignItems: 'center', paddingBottom: 8, borderBottom: '1px solid var(--line)' }}>
+              <label className="small" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>From bar
+                <input type="text" aria-label="Bar" placeholder="41" value={r.bar} style={{ ...inputStyle, width: 64 }} data-testid="key-mark-bar"
                   onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, bar: e.target.value } : x)))} />
               </label>
               <select aria-label="Key" value={r.key} style={{ ...inputStyle, maxWidth: '100%' }} data-testid="key-mark-key"
@@ -137,7 +154,7 @@ export function KeyMarksCard({ piece }: { piece: PieceInfo }) {
           <div className="row wrap" style={{ gap: 6 }}>
             <button className="btn small" data-testid="key-mark-add" onClick={() => {
               const k = keys[0] ?? { fifths: 0, mode: 'major' as const };
-              setRows([...rows, { bar: ms[0]?.number ?? '1', key: `${k.fifths}:${k.mode}` }]);
+              setRows([...rows, { bar: '', key: `${k.fifths}:${k.mode}` }]);
             }}>Add a key mark</button>
             <span className="grow" />
             <button className="btn small" onClick={() => { setRows(null); setError(null); }}>Cancel</button>

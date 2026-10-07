@@ -2,7 +2,7 @@
 import type { Part, Score, KeySig } from '../../music/types';
 import type { PitchSample, Grade } from '../../game/types';
 import type { LiveScorer } from '../../game/scoring';
-import { keyHint, noteLabel, type NotationMode } from '../../game/notation';
+import { keyHint, movesWithKey, noteLabel, type NotationMode } from '../../game/notation';
 import { keyAtTimeIn } from '../../music/keymarks';
 import { nameKeysOf } from '../../progress/keymarks';
 
@@ -142,7 +142,7 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
 
   // Where the names' do moves (a new key signature or an admin's key mark): a dashed line and "Do = …".
   const nks = nameKeysOf(s.score);
-  for (let k = 1; k < nks.length; k++) {
+  for (let k = 1; k < nks.length && movesWithKey(s.notation); k++) {
     const kt = nks[k].time;
     if (kt < tMin - 0.01 || kt > tMax || nks[k].fifths === nks[k - 1].fifths) continue;
     const hint = keyHint(s.notation, nks[k]);
@@ -284,7 +284,7 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
     }
     // A note past a change of do: the gutter still names the rows in the key at the playhead, so
     // the note carries its own name until the playhead reaches the change.
-    if (s.showNames && !past && nks.length > 1 && (s.notation === 'movable' || s.notation === 'jianpu')) {
+    if (s.showNames && !past && nks.length > 1 && movesWithKey(s.notation)) {
       const nk = keyAtTimeIn(nks, n.start);
       if (nk.fifths !== s.key.fifths) {
         c.font = '700 11px "JetBrains Mono", monospace';

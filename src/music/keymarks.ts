@@ -61,8 +61,9 @@ export function nameKeys(score: Pick<Score, 'keys' | 'measures'>, marks: KeyMark
     const { fifths, mode } = e.key();
     const k: KeySig = { beat: e.beat, time: e.time, fifths, mode };
     const last = out[out.length - 1];
-    if (last && Math.abs(last.beat - k.beat) < 1e-6) out[out.length - 1] = k;
-    else if (!last || last.fifths !== k.fifths || last.mode !== k.mode) out.push(k);
+    if (last && Math.abs(last.beat - k.beat) < 1e-6) out.pop();
+    const prev = out[out.length - 1];
+    if (!prev || prev.fifths !== k.fifths || prev.mode !== k.mode) out.push(k);
   }
   return out;
 }

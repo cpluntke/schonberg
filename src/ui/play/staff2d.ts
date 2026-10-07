@@ -11,9 +11,9 @@ import { F_CLEF, G_CLEF, GLYPH_UNITS_PER_SPACE } from './clefGlyphs';
 import type { KeySig, NoteSpelling, Part, Score } from '../../music/types';
 import type { Grade, PitchSample } from '../../game/types';
 import { beatToTime, timeToBeat } from '../../music/time';
-import { keyHint, noteLabel, spellNote, type NotationMode } from '../../game/notation';
+import { keyHint, movesWithKey, noteLabel, spellNote, type NotationMode } from '../../game/notation';
 import { keyAtBeatIn } from '../../music/keymarks';
-import { nameKeysOf } from '../../progress/keymarks';
+import { nameKeysOf, nameKeysSig } from '../../progress/keymarks';
 import { COLORS, wordInitial, type DrawState } from './highway2d';
 
 const EPS = 0.01;
@@ -1423,7 +1423,7 @@ export function staffSpace(W: number, H: number, perSys: number): { sp: number; 
 
 function getLayout(c: Ctx, W: number, H: number, s: DrawState): Cached {
   const names = namesOn(s);
-  const key = `${s.score.id}|${s.part.id}|${s.part.notes.length}|${s.from}|${s.to}|${W}|${H}|${fontGen}|${names ? s.notation : '-'}`;
+  const key = `${s.score.id}|${s.part.id}|${s.part.notes.length}|${s.from}|${s.to}|${W}|${H}|${fontGen}|${names ? s.notation : '-'}|${s.notation}|${nameKeysSig(s.score)}`;
   if (cache && cache.key === key) return cache;
   const [m0, m1] = measureSpan(s.score, s.from, s.to);
   const clef = clefFor(s.part);
@@ -1634,11 +1634,17 @@ export function drawStaffFrame(c: Ctx, g: Pick<SysGeo, 'sys' | 'top' | 'mid'>, l
     const nx = mi === 0 ? sys.clefX : m.x0 - 0.2 * sp;
     if (o.numbers && m.sm.number !== '0') c.fillText(m.sm.number, nx, top - 1.75 * sp);
     // Where the names' do is (first bar shown) or moves to: "Do = G" next to the bar number.
-    const hint = o.numbers && m.sm.nameChange ? keyHint(s.notation, m.sm.nameKey) : null;
+    const hint = o.numbers && m.sm.nameChange && movesWithKey(s.notation) ? keyHint(s.notation, m.sm.nameKey) : null;
     if (hint) {
       const hx = nx + (m.sm.number !== '0' ? c.measureText(m.sm.number).width + 0.5 * sp : 0);
       c.font = `700 ${Math.round(Math.max(10, sp * 1.05))}px system-ui, sans-serif`;
-      c.fillStyle = COLORS.targetText;
+      const fs = Math.max(10, sp * 1.05);
+      // (on a backdrop: high notes' stems and beams can reach up here)
+      c.fillStyle = COLORS.bg;
+      c.globalAlpha = 0.85;
+      c.fillRect(hx - 2, top - 1.75 * sp - fs * 0.85, c.measureText(hint).width + 4, fs * 1.1);
+      c.globalAlpha = 1;
+      c.fillStyle = COLORS.text;
       c.fillText(hint, hx, top - 1.75 * sp);
     }
     if (m.changeX != null) {

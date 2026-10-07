@@ -4,7 +4,7 @@ import { back, go } from '../router';
 import { useProfile } from '../hooks';
 import { IconBack } from '../icons';
 import { buildMemoryMap, type MapEntry, type MapSection } from '../../game/memorymap';
-import { nameKeysOf } from '../../progress/keymarks';
+import { nameKeysOf, nameKeysSig } from '../../progress/keymarks';
 import { track } from '../../progress/metrics';
 import { missingText } from '../components/NotFound';
 
@@ -138,7 +138,8 @@ export function MemoryMap({ pieceId, partId }: { pieceId: string; partId: string
   const [letters, setLetters] = useState(true);
   const map = useMemo(
     () => (piece ? buildMemoryMap(piece.score, piece.sections, partId, { notation: profile.notation, nameKeys: nameKeysOf(piece.score) }) : null),
-    [piece, partId, profile.notation],
+    // (the key marks: a sync or an admin's change re-builds the map)
+    [piece, partId, profile.notation, piece ? nameKeysSig(piece.score) : ''],
   );
   const goBack = () => back({ name: 'piece', pieceId });
 

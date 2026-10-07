@@ -2,6 +2,7 @@
 // readable), several bars per system, your own staff highlighted and the only one with your voice
 // drawn on it. Narrow screens (phones) get the single-staff view (staff2d.ts) unchanged.
 import type { KeySig, Part } from '../../music/types';
+import { nameKeysSig } from '../../progress/keymarks';
 import type { NotationMode } from '../../game/notation';
 import { beatToTime, timeToBeat } from '../../music/time';
 import { COLORS, type DrawState } from './highway2d';
@@ -116,7 +117,7 @@ function stripLyrics(p: Part): Part {
 function getFull(c: Ctx, W: number, H: number, s: DrawState, show: StaffShow): FullCache | null {
   const offBook = !!s.hide;
   const names = namesOn(s) ? s.notation : null;
-  const key = `${s.score.id}|${s.part.id}|${s.part.notes.length}|${s.from}|${s.to}|${W}|${H}|${fontGeneration()}|${show}|${offBook}|${names ?? '-'}`;
+  const key = `${s.score.id}|${s.part.id}|${s.part.notes.length}|${s.from}|${s.to}|${W}|${H}|${fontGeneration()}|${show}|${offBook}|${names ?? '-'}|${s.notation}|${nameKeysSig(s.score)}`;
   if (full && full.key === key) return full;
   if (noFit === key) return null;
   const [m0, m1] = measureSpan(s.score, s.from, s.to);

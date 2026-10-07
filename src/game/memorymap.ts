@@ -334,7 +334,7 @@ export function buildMemoryMap(score: Score, sections: Section[], partId: string
     const inSec = (t: number) => t >= sec.start - EPS && t < sec.end - EPS;
     const secNotes = notes.filter((n) => inSec(n.start));
     const changes: MapChange[] = [];
-    for (const k of score.keys) {
+    for (const k of opts.nameKeys ?? score.keys) {
       if (k.beat <= EPS || !inSec(k.time)) continue;
       const m = measureOfBeat(score, k.beat);
       changes.push({ kind: 'key', measure: m, bar: ms[m]?.number ?? '', text: `Key: ${keyName(k)}` });
@@ -380,7 +380,7 @@ export function buildMemoryMap(score: Score, sections: Section[], partId: string
     };
   });
 
-  const k0 = score.keys[0] ?? { fifths: 0, mode: 'major' as const };
+  const k0 = (opts.nameKeys ?? score.keys)[0] ?? { fifths: 0, mode: 'major' as const };
   return {
     partId: part.id,
     partName: part.name,

@@ -1,6 +1,6 @@
 // Canvas renderer for "arcade" mode: notes rush toward you down perspective lanes, one lane per pitch.
 import type { Grade } from '../../game/types';
-import { keyHint, noteLabel } from '../../game/notation';
+import { keyHint, movesWithKey, noteLabel } from '../../game/notation';
 import { nameKeysOf } from '../../progress/keymarks';
 import { COLORS, gradeColor, type DrawState } from './highway2d';
 
@@ -171,7 +171,7 @@ export function drawArcade(c: CanvasRenderingContext2D, W: number, H: number, s:
   }
 
   // The names' do moves soon (or just did): "Do = …" at the top.
-  if (s.showNames) {
+  if (movesWithKey(s.notation)) {
     const nks = nameKeysOf(s.score);
     for (let k = 1; k < nks.length; k++) {
       const dt = nks[k].time - s.pos;

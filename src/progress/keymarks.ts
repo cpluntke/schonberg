@@ -33,6 +33,11 @@ let version = 0;
 subscribe(() => { version++; });
 const memo = new WeakMap<Score, { v: number; keys: KeySig[] }>();
 
+/** Changes whenever the score's name keys change (for layout caches). */
+export function nameKeysSig(score: Score): string {
+  return nameKeysOf(score).map((k) => `${k.beat}:${k.fifths}:${k.mode}`).join(',');
+}
+
 /** The keys the note names (movable do, jianpu) and the "Do = …" hints follow. */
 export function nameKeysOf(score: Score): KeySig[] {
   const m = memo.get(score);
