@@ -10,10 +10,10 @@ import { LEVELS, OFF_BOOK_DAYS, effectiveTolerance, fixesBefore, nextStep, noteV
 import { inputAdvice, type InputAdvice } from '../../audio/inputQuality';
 import { getProgress, loadProfile, saveProfile } from '../../progress/store';
 import { barRangeLabel } from '../../music/sections';
-import { noteFault } from '../play/noteFault';
+import { MistakeScore } from '../components/MistakeScore';
 import { IconDown, IconUp, IconClock, IconLoop, IconStar, IconPlay, IconCube, IconEar, IconFlame, IconRestart, IconList } from '../icons';
 import { STUCK_AFTER, failsInARow, slowRate } from '../../progress/struggle';
-import type { Insight, NoteResult } from '../../game/types';
+import type { Insight } from '../../game/types';
 import type { PieceInfo } from '../library';
 import { accountTipPending, dismissAccountTip } from '../../progress/sync';
 import { startPresence } from '../../progress/presence';
@@ -323,7 +323,7 @@ export function Results() {
         </div>
       )}
 
-      {wrong.length > 0 && part && <WrongNotes piece={piece} notes={wrong} part={part} tol={tol} loop={(m) => playLoop(m, m, 1)} />}
+      {wrong.length > 0 && part && <MistakeScore piece={piece} part={part} notes={wrong} tol={tol} level={lr.level} from={lr.from} to={lr.to} play={goPlay} />}
 
       {measureIdx.length > 0 && (
         <div className="col" style={{ gap: 8 }}>
@@ -514,47 +514,6 @@ function MicAdvice({ advice, micBars }: { advice: InputAdvice[]; micBars: string
           </span>
         )}
       </div>
-    </div>
-  );
-}
-
-/** Level 1: the notes that weren't right, grouped by bar, each bar with a slow loop to drill it. */
-function WrongNotes({ piece, part, notes, tol, loop }: {
-  piece: PieceInfo; part: { notes: { measure: number; lyric?: string }[] }; notes: NoteResult[]; tol: number; loop: (measure: number) => void;
-}) {
-  const MAX_BARS = 5;
-  const bars = new Map<number, NoteResult[]>();
-  for (const n of notes) {
-    const m = part.notes[n.index]?.measure;
-    if (m == null) continue;
-    bars.set(m, [...(bars.get(m) ?? []), n]);
-  }
-  const list = [...bars.entries()].sort((a, b) => a[0] - b[0]);
-  /** 1-based position of the note within its bar. */
-  const nth = (i: number) => {
-    const m = part.notes[i].measure;
-    let k = 1;
-    for (let j = i - 1; j >= 0 && part.notes[j].measure === m; j--) k++;
-    return k;
-  };
-  return (
-    <div className="col" style={{ gap: 8 }} data-testid="wrong-notes">
-      <h2 style={{ fontSize: 16 }}>Notes to fix</h2>
-      {list.slice(0, MAX_BARS).map(([m, ns]) => (
-        <div key={m} className="card" style={{ padding: '10px 14px', gap: 8 }} data-testid="wrong-bar">
-          <span className="small">
-            <strong>{barRangeLabel(piece.score, m, m)}:</strong>{' '}
-            {ns.map((n, k) => {
-              const ly = part.notes[n.index]?.lyric;
-              return <span key={n.index}>{k ? '; ' : ''}note {nth(n.index)}{ly ? ` (“${ly}”)` : ''} was {noteFault(n, tol)}</span>;
-            })}
-          </span>
-          <button className="btn small" onClick={() => loop(m)}>
-            <IconLoop size={16} /> Loop {barRangeLabel(piece.score, m, m, true)} slowly
-          </button>
-        </div>
-      ))}
-      {list.length > MAX_BARS && <span className="tiny muted">…and {list.length - MAX_BARS} more bar{list.length - MAX_BARS > 1 ? 's' : ''}: see “Bar by bar” below.</span>}
     </div>
   );
 }
