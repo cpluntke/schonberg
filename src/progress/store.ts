@@ -842,6 +842,23 @@ export function attemptLog(): AttemptLog[] {
   return v.filter((e) => isObj(e) && typeof e.at === 'number');
 }
 
+const MORE_DAYS = 'sh:moreDays';
+/** Practice days known from the account copy (another phone's practice counts toward the streak). */
+export function syncedDays(): string[] {
+  return readJSON<string[]>(MORE_DAYS, [], Array.isArray).filter((d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d));
+}
+export function addSyncedDays(days: unknown): void {
+  if (!Array.isArray(days)) return;
+  const ok = days.filter((d): d is string => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d));
+  if (!ok.length) return;
+  const all = [...new Set([...syncedDays(), ...ok])].sort().slice(-400);
+  writeJSON(MORE_DAYS, all, false);
+}
+/** The days practised, newest last (this phone's log and the account copy's), at most `n`. */
+export function practiceDays(n = 120): string[] {
+  return [...new Set([...attemptLog().map((e) => dayKey(e.at)), ...syncedDays()])].sort().slice(-n);
+}
+
 /** Local-time day key 'YYYY-MM-DD'. */
 export function dayKey(t: number | Date): string {
   const d = new Date(t);
@@ -852,7 +869,7 @@ function prevDay(d: Date): Date { return new Date(d.getFullYear(), d.getMonth(),
 
 /** Consecutive local days with ≥1 attempt, ending today or yesterday. */
 export function streakDays(now: Date = new Date()): number {
-  const days = new Set(attemptLog().map((e) => dayKey(e.at)));
+  const days = new Set([...attemptLog().map((e) => dayKey(e.at)), ...syncedDays()]);
   let d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12);
   if (!days.has(dayKey(d))) {
     d = prevDay(d);

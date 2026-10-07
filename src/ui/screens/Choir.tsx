@@ -436,7 +436,8 @@ function ProgrammeEditor({ code, auth, info, library, draft, onDraft, onSaved, o
   return (
     <div className="card" data-testid="programme-editor">
       <strong>Programme</strong>
-      <label className="field"><span>Name</span><input type="text" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} /></label>
+      <label className="field"><span>Name</span><input type="text" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} data-testid="programme-name" /></label>
+      <span className="tiny muted">A new name starts a new cycle: everyone’s “notes right this cycle” go back to 0. Keep the name to carry on counting.</span>
       <span className="small">Pieces (tap to include; ★ = the next rehearsal works on it)</span>
       <div className="col" style={{ gap: 4 }}>
         {choices.map((p) => {

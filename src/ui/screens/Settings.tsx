@@ -141,6 +141,7 @@ export function Settings() {
         <label className="field"><span>Name</span>
           <input type="text" value={cycle.name} onChange={(e) => setCycle({ name: e.target.value })} placeholder="e.g. Spring concert" />
         </label>
+        {!profile.choirCode && <span className="tiny muted">A new name starts a new cycle: your “notes right this cycle” start again from 0.</span>}
         <div className="row">
           <label className="field grow"><span>Rehearsals</span>
             <select value={cycle.rehearsalWeekday ?? -1} aria-label="Rehearsal day"

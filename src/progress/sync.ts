@@ -15,12 +15,13 @@
 
 import {
   allProgress, getProgress, keysWithPrefix, loadCycle, loadProfile, progressKey, rawGet, rawRemove, rawSet, reachLevel,
-  readinessHistory, readJSON, saveCycle, saveProfile, snapshotReadiness, writeJSON,
+  readinessHistory, readJSON, saveCycle, saveProfile, snapshotReadiness, writeJSON, addSyncedDays, practiceDays,
   type Cycle, type FullRunProgress, type PieceProgress, type Profile, type SectionProgress,
 } from './store';
 import { barsKey, getBars, type BarMap, type BarStat } from './bars';
 import { getWords, wordsKey, type WordsProgress } from './words';
 import { apiBase, endSession, loadSession, onSessionChange, sessionFor, type Session } from './choir';
+import { mergeSyncedPoints, pointsForSync, type CyclePoints } from './points';
 
 export const SNAPSHOT_VERSION = 1;
 export const MAX_PIECES = 60;
@@ -77,6 +78,10 @@ export interface ProgressSnapshot {
   parts?: Record<string, string>;
   /** `pieceId|partId` → progress. */
   p: Record<string, PieceC>;
+  /** Cycle points (notes sung right this cycle). */
+  pts?: CyclePoints;
+  /** Days practised (YYYY-MM-DD, the last few months): the streak carries over to a new phone. */
+  days?: string[];
 }
 
 const PROFILE_KEYS = [
@@ -471,6 +476,10 @@ export function buildSnapshot(now = Date.now()): { data: ProgressSnapshot; hash:
   const cp = rawGet('sh:cyclePreset');
   if (cp && cp.length < 120) data.cp = cp;
   if (Object.keys(parts).length) data.parts = parts;
+  const pts = pointsForSync();
+  if (pts) data.pts = { k: pts.k.slice(0, 200), n: pts.n, since: pts.since };
+  const days = practiceDays(120);
+  if (days.length) data.days = days;
   // The envelope the server receives: {"baseRev":…,"data":{…,"at":…}}.
   const rest = utf8(JSON.stringify({ baseRev: 1e12, data: { ...data, at: now } }));
   const budget = TOTAL_BUDGET - rest;
@@ -568,6 +577,8 @@ export function applySnapshot(d: unknown, opts: { adoptSettings?: boolean } = {}
     rawSet('sh:cycleSeeded', '1');
     cycle = true;
   }
+  addSyncedDays(d.days);
+  mergeSyncedPoints(d.pts);
   const profile = isObj(d.profile);
   if (opts.adoptSettings) {
     const here = loadProfile();

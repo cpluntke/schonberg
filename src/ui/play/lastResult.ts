@@ -25,6 +25,12 @@ export interface LastResult {
   prevBest?: number | null;
   /** Why a run of a real section didn't count toward its level. */
   notCounted?: string;
+  /** Notes sung right in this run, and the cycle's total after it. */
+  points?: { gained: number; total: number };
+  /** The practice streak after this run, and whether this run started today's day of it. */
+  streak?: { days: number; extended: boolean };
+  /** Sung slower than the level's tempo ("practise slowly"): the tempo, as a factor. Practice only. */
+  slow?: number;
   /** Level 1 sung without headphones (the singer's answer): practice, see ladder.speakerPractice. */
   speaker?: boolean;
   /** Headphone/mic delay learned from this run (ms), if any. */

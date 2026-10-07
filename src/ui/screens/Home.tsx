@@ -6,7 +6,8 @@ import { loadCycle, streakDays, sameWork } from '../../progress/store';
 import { levelSpec } from '../../progress/ladder';
 import { nextRehearsal } from '../../progress/rehearsal';
 import { rowOfTheDay } from '../../game/twelvetone';
-import { IconFlame, IconPlay, IconMic } from '../icons';
+import { IconFlame, IconPlay, IconMic, IconStar } from '../icons';
+import { cyclePoints, practisedToday } from '../../progress/points';
 import { IntroVideoButton } from '../components/IntroVideo';
 import { apiBase, loadSession, sharingNeedsOk, startSharing } from '../../progress/choir';
 import { shareMyProgress } from '../play/shareProgress';
@@ -32,6 +33,8 @@ export function Home() {
   const cyclePieces = cycle.pieceIds.map((id) => getPiece(id)).filter(Boolean) as PieceInfo[];
   const statuses = cyclePieces.map((p) => pieceStatus(p, profile.voice));
   const streak = streakDays();
+  const today = practisedToday();
+  const points = cyclePoints();
   const focusIds = new Set(cycle.focusPieceIds ?? []);
   const plan = todaysPlan(statuses, cycle);
   const focus = plan[0] ?? null;
@@ -63,9 +66,25 @@ export function Home() {
 
       <div className="col" style={{ gap: 4 }}>
         <h1 className="hero">{greeting()}{profile.name ? `, ${profile.name.split(' ')[0]}` : ''}</h1>
-        <div className="row small muted" style={{ gap: 8 }}>
-          <IconFlame size={16} color="#FF7A45" />
-          <span>{streak > 0 ? `${streak}-day practice streak` : 'Start a streak today'} · {voiceName(profile.voice)}</span>
+        <span className="small muted">{voiceName(profile.voice)}</span>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 10 }} data-testid="stats">
+        <div className="card flat" style={{ gap: 2, padding: '12px 14px', minWidth: 0 }} data-testid="streak-tile">
+          <div className="row" style={{ gap: 6 }}>
+            <IconFlame size={26} color={streak > 0 && !today ? '#8A6A5C' : '#FF7A45'} />
+            <span className="mono" style={{ fontSize: 30, fontWeight: 700, lineHeight: 1 }} data-testid="streak-days">{streak}</span>
+          </div>
+          <span className="small" style={{ fontWeight: 700 }}>{streak === 1 ? 'day streak' : 'days streak'}</span>
+          <span className="tiny muted">{today ? 'Practised today ✓' : streak > 0 ? 'Sing today to keep it going' : 'Sing today to start one'}</span>
+        </div>
+        <div className="card flat" style={{ gap: 2, padding: '12px 14px', minWidth: 0 }} data-testid="points-tile">
+          <div className="row" style={{ gap: 6 }}>
+            <IconStar size={24} color="#4CC9F0" />
+            <span className="mono" style={{ fontSize: 30, fontWeight: 700, lineHeight: 1 }} data-testid="cycle-points">{points.n.toLocaleString()}</span>
+          </div>
+          <span className="small" style={{ fontWeight: 700 }}>notes right this cycle</span>
+          <span className="tiny muted">{points.name ? `${points.name} · back to 0 when a new cycle starts` : 'Back to 0 when a new cycle starts'}</span>
         </div>
       </div>
 

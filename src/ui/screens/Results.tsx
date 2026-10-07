@@ -11,7 +11,8 @@ import { inputAdvice, type InputAdvice } from '../../audio/inputQuality';
 import { getProgress, loadProfile, saveProfile } from '../../progress/store';
 import { barRangeLabel } from '../../music/sections';
 import { noteFault } from '../play/noteFault';
-import { IconDown, IconUp, IconClock, IconLoop, IconStar, IconPlay, IconCube } from '../icons';
+import { IconDown, IconUp, IconClock, IconLoop, IconStar, IconPlay, IconCube, IconEar, IconFlame } from '../icons';
+import { STUCK_AFTER, failsInARow, slowRate } from '../../progress/struggle';
 import type { Insight, NoteResult } from '../../game/types';
 import type { PieceInfo } from '../library';
 import { accountTipPending, dismissAccountTip } from '../../progress/sync';
@@ -115,6 +116,18 @@ export function Results() {
   const advice = inputAdvice(lr.inputQuality).filter((a) => !(lr.speaker && a.kind === 'distortion'));
   const micNotes = everyNote ? r.notes.filter((n) => n.unsure === 'mic' && noteVerdict(n) === 'forgiven') : [];
   const micBars = [...new Set(micNotes.map((n) => part?.notes[n.index]?.measure).filter((m): m is number => m != null))].sort((a, b) => a - b);
+
+  // Missed it: listening to the section again, or singing it slowly first, usually helps. After
+  // misses in a row that's what comes first; the full-tempo try stays one tap away. (Not for a run
+  // whose notes were right but late, or one through the phone's speaker: neither helps there.)
+  const same = { name: 'play' as const, pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, mode: '2d' as const,
+    ...(lr.sectionId === 'drill' ? { from: lr.from, to: lr.to } : {}) };
+  const listenAgain = () => goPlay({ ...same, level: 0, after: lr.level });
+  const singSlowly = () => goPlay({ ...same, level: lr.level, rate: slowRate(lr.level) });
+  const timingOnly = lr.timingFail != null && r.accuracy >= (spec?.pass ?? 0.8);
+  const offerHelp = lr.ladder && !lr.passed && !lr.full && !speakerRun && !timingOnly && lr.mode === '2d';
+  const stuck = offerHelp && failsInARow(piece.id, lr.partId, lr.sectionId, lr.level) >= STUCK_AFTER;
+  const slowLabel = `${lr.level === 1 ? 'Sing it slower' : 'Practise slowly'} (${Math.round(slowRate(lr.level) * 100)}%)`;
 
   return (
     <main className="screen">
@@ -264,6 +277,21 @@ export function Results() {
         </div>
       )}
 
+      {(lr.points || lr.streak) && (
+        <div className="row wrap" style={{ gap: 8 }} data-testid="run-stats">
+          {lr.streak && lr.streak.days > 0 && (
+            <span className="chip" style={{ gap: 6 }} data-testid="run-streak">
+              <IconFlame size={16} color="#FF7A45" /> {lr.streak.days}-day streak{lr.streak.extended ? (lr.streak.days > 1 ? ' · today counts!' : ' · started today!') : ''}
+            </span>
+          )}
+          {lr.points && (
+            <span className="chip" style={{ gap: 6 }} data-testid="run-points">
+              <IconStar size={16} color="#4CC9F0" /> {lr.points.gained > 0 ? `+${lr.points.gained.toLocaleString()} notes right · ` : ''}{lr.points.total.toLocaleString()} {lr.points.gained > 0 ? 'this cycle' : 'notes right this cycle'}
+            </span>
+          )}
+        </div>
+      )}
+
       {insights.length > 0 && (
         <div className="col" style={{ gap: 8 }}>
           <h2 style={{ fontSize: 16 }}>Coach notes</h2>
@@ -283,6 +311,22 @@ export function Results() {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {offerHelp && (
+        <div className="card flat" data-testid="help-card" style={{ gap: 8 }}>
+          <strong style={{ fontSize: 15 }}>{stuck ? 'Tricky one: take it in smaller steps' : lr.level === 1 ? 'Not there yet? Listen to it again' : 'Need a hand with it?'}</strong>
+          <span className="small muted">
+            {lr.level === 1
+              ? 'Hear how it goes once more, then sing it. Or sing it slower: it won’t count, but the notes settle.'
+              : 'Listen to the section, or sing it slowly first: slow runs don’t count, but they make the full-tempo run easier.'}
+          </span>
+          <div className="row wrap" style={{ gap: 6 }}>
+            {!(stuck && lr.level === 1) && <button className="btn small" data-testid="help-listen" onClick={listenAgain}><IconEar size={16} /> {lr.level === 1 ? 'Listen again' : 'Listen'}</button>}
+            {!(stuck && lr.level > 1) && <button className="btn small" data-testid="help-slow" onClick={singSlowly}>{slowLabel}</button>}
+            {stuck && <button className="btn small" data-testid="help-again" onClick={() => goPlay({ ...same, level: lr.level, mode: lr.mode })}><IconPlay size={16} color="currentColor" /> Try again at full tempo</button>}
+          </div>
         </div>
       )}
 
@@ -309,6 +353,14 @@ export function Results() {
           }}>
             <IconPlay size={18} /> Sing it again with headphones on
           </button>
+        ) : lr.slow != null && lr.sectionId !== 'cold' ? (
+          <button className="btn primary block" data-testid="full-tempo" onClick={() => goPlay({ ...same, level: lr.level, mode: lr.mode })}>
+            <IconPlay size={18} /> Now at full tempo
+          </button>
+        ) : stuck ? (
+          lr.level === 1
+            ? <button className="btn primary block" data-testid="stuck-listen" onClick={listenAgain}><IconEar size={18} color="#0B0D1A" /> Listen again, then sing it</button>
+            : <button className="btn primary block" data-testid="stuck-slow" onClick={singSlowly}><IconPlay size={18} /> {slowLabel}</button>
         ) : nextFix ? (
           <button className="btn primary block" data-testid="fix-first" onClick={() => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: nextFix, level: lr.level, mode: '2d' })}>
             <IconPlay size={18} /> Fix {label(nextFix)} at level {lr.level}

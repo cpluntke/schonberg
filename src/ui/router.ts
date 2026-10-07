@@ -4,7 +4,13 @@ export type Route =
   | { name: 'home' }
   | { name: 'library' }
   | { name: 'piece'; pieceId: string }
-  | { name: 'play'; pieceId: string; partId: string; sectionId: string; level: number; mode: '2d' | '3d'; from?: number; to?: number; words?: boolean }
+  | {
+    name: 'play'; pieceId: string; partId: string; sectionId: string; level: number; mode: '2d' | '3d'; from?: number; to?: number; words?: boolean;
+    /** Practise slowly: start at this tempo (0.4..1, slower than the level's: practice only). */
+    rate?: number;
+    /** Listening (level 0) before singing: the level to sing next. */
+    after?: number;
+  }
   | { name: 'results' }
   | { name: 'setup' }
   | { name: 'settings' }
@@ -39,6 +45,10 @@ export function parseHash(hash: string): Route {
         const toN = Number(q.get('to'));
         const okRange = q.get('from') != null && q.get('to') != null && Number.isFinite(fromN) && Number.isFinite(toN) && fromN >= 0 && toN > fromN;
         const lv = Math.round(Number(q.get('level') ?? 1));
+        const rq = Number(q.get('rate'));
+        const rateQ = q.get('rate') != null && Number.isFinite(rq) && rq >= 0.4 && rq < 1 ? Math.round(rq * 100) / 100 : null;
+        const aq = Math.round(Number(q.get('after')));
+        const afterQ = q.get('after') != null && aq >= 1 && aq <= 5 ? aq : null;
         const mode = seg[0] === 'arcade' ? '3d' : '2d';
         // Arcade is a reward from level 2 up; clamp hand-edited levels.
         const level = Math.max(mode === '3d' ? 2 : 0, Math.min(mode === '3d' ? 4 : 5, Number.isFinite(lv) ? lv : 1));
@@ -46,6 +56,8 @@ export function parseHash(hash: string): Route {
           name: 'play', pieceId: seg[1], partId: seg[2], sectionId: seg[3], level, mode,
           from: okRange ? fromN : undefined, to: okRange ? toN : undefined,
           ...(q.get('words') === '1' ? { words: true } : {}),
+          ...(rateQ != null ? { rate: rateQ } : {}),
+          ...(afterQ != null && level === 0 ? { after: afterQ } : {}),
         };
       }
       break;
@@ -78,6 +90,8 @@ export function href(r: Route): string {
       if (r.from != null) q.set('from', String(r.from));
       if (r.to != null) q.set('to', String(r.to));
       if (r.words) q.set('words', '1');
+      if (r.rate != null) q.set('rate', String(r.rate));
+      if (r.after != null) q.set('after', String(r.after));
       return `#/${r.mode === '3d' ? 'arcade' : 'play'}/${e(r.pieceId)}/${e(r.partId)}/${e(r.sectionId)}?${q}`;
     }
     case 'lyrics':

@@ -7,7 +7,8 @@ import { LEVELS, LISTEN, MAX_LEVEL, OFF_BOOK_DAYS, effectiveTolerance, fixesBefo
 import { shareMyProgress } from '../play/shareProgress';
 import { postBoardEntrySoon } from '../play/boardEntry';
 import { syncProgressSoon, suggestAccount } from '../../progress/sync';
-import { recordAttempt, recordFullRun, getProgress, snapshotReadiness, personalBest, practiceDisplay, loadProfile } from '../../progress/store';
+import { recordAttempt, recordFullRun, getProgress, snapshotReadiness, personalBest, practiceDisplay, loadProfile, streakDays } from '../../progress/store';
+import { addCyclePoints, rightNotes } from '../../progress/points';
 import { keyAtTimeIn } from '../../music/keymarks';
 import { nameKeysOf } from '../../progress/keymarks';
 import { PracticeSession, estimateLatencyMs } from '../play/session';
@@ -34,7 +35,8 @@ import { defaultShow, hasOtherStaves, isFullScore } from '../play/fullscore';
 import { drawArcade, lanesFor, newFx } from '../play/arcade3d';
 import { setLastResult } from '../play/lastResult';
 import { useResume } from '../play/useResume';
-import { IconBack, IconPause, IconPlay, IconRestart, IconStop } from '../icons';
+import { IconBack, IconEar, IconPause, IconPlay, IconRestart, IconStop } from '../icons';
+import { STUCK_AFTER, failsInARow, firstTime, slowRate } from '../../progress/struggle';
 import type { AttemptResult } from '../../game/types';
 import type { NotationMode } from '../../game/notation';
 import { NotFound } from '../components/NotFound';
@@ -71,7 +73,9 @@ function SingPlay({ route }: { route: PlayRoute }) {
     return s ? { id: s.id, label: s.label, start: s.start, end: s.end } : null;
   }, [piece, route]);
 
-  const [rateOverride, setRateOverride] = useState<number | null>(null);
+  // "Practise slowly" (from the results screen): start at that tempo; it's practice, not a counted run.
+  const [rateOverride, setRateOverride] = useState<number | null>(() => (route.rate != null && route.rate < (spec?.rate ?? 1) - 1e-6 ? route.rate : null));
+  const [slowShown, setSlowShown] = useState(() => route.rate != null);
   // First-run "how to read the screen", once per display (the highway's flag predates the score view).
   const [howtoSeen, setHowtoSeen] = useState<{ score: boolean; highway: boolean } | null>(() => {
     try {
@@ -323,6 +327,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
     const recId = sectionLadder || !realSection ? section.id : 'practice';
     const durationSec = (section.end - section.start) / rate;
     const prevBest = personalBest(piece.id, part.id, recId, level)?.score ?? null;
+    const streakBefore = streakDays();
     const secs = singableSections(piece, part.id);
     const full = isFull
       ? recordFullRun(piece.id, part.id, level, r, secs, (i) => part.notes[i]?.start,
@@ -364,6 +369,9 @@ function SingPlay({ route }: { route: PlayRoute }) {
       ...(sess?.inputQuality ? { inputQuality: sess.inputQuality } : {}),
       reached,
       ...(notCounted === SPEAKER_PRACTICE ? { speaker: true } : {}),
+      ...(!fullTempo ? { slow: rate } : {}),
+      points: { gained: rightNotes(r), total: addCyclePoints(rightNotes(r)) },
+      streak: { days: streakDays(), extended: streakDays() > streakBefore },
       notCounted,
       passed: rec.passed, prevLevel: rec.prevLevel, newLevel: rec.newLevel,
     });
@@ -537,6 +545,14 @@ function SingPlay({ route }: { route: PlayRoute }) {
   // whole piece; drills and cold starts never count). Remembered on this phone.
   const askHeadphones = !listenOnly && !!spec?.headphones && (isFullRun || !GENERATED_SECTIONS.has(section.id));
   const headphonesUnanswered = askHeadphones && profile.headphones == null;
+  // Help on every sung level: listen to the section first, or sing it slowly. A section met for the
+  // first time at level 1 offers to listen first (not required); after misses in a row, both are suggested.
+  const helpable = !listenOnly && route.mode === '2d' && !cold && section.id !== 'entries';
+  const realSec = !GENERATED_SECTIONS.has(section.id);
+  const firstListen = helpable && level === 1 && realSec && firstTime(getProgress(piece.id, part.id)?.sections[section.id]);
+  const fails = helpable && realSec ? failsInARow(piece.id, part.id, section.id, level) : 0;
+  const stuck = fails >= STUCK_AFTER ? fails : 0;
+  const listenFirst = () => go({ ...route, level: 0, after: level, rate: undefined }, true);
   const fullSecs = isFullRun ? singableSections(piece, part.id) : [];
   const fullFixes = isFullRun ? fixesBefore(fullSecs, getProgress(piece.id, part.id), level) : [];
 
@@ -599,6 +615,34 @@ function SingPlay({ route }: { route: PlayRoute }) {
                   {Math.round(rate * 100)}% tempo · ±{tolerance}¢ · pass: {passLabel(levelInfo)} · start: {levelInfo.cue === 'chord' ? 'chord only' : 'your note'}
                 </span>
               )}
+              {/* Listen / slow help near the top too: the sticky Start button covers the card's lower part on a phone. */}
+              {helpable && (firstListen ? (
+                <div className="notice info small col" style={{ gap: 8 }} data-testid="first-listen">
+                  <span><strong>New to this section?</strong> Listen to it once, then sing it. Know it already? Sing it straight away.</span>
+                  <div className="row wrap" style={{ gap: 6 }}>
+                    <button className="btn voice" onClick={listenFirst} data-testid="listen-first"><IconEar size={18} /> Listen first</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="col" style={{ gap: 6 }} data-testid="help-row">
+                  {stuck > 0 && (
+                    <span className="small" data-testid="stuck-hint">
+                      <strong>This one has been tricky</strong> ({stuck} misses in a row). Listen to it again, or sing it slowly first: then try it at full tempo.
+                    </span>
+                  )}
+                  <div className="row wrap" style={{ gap: 6 }}>
+                    <button className={`btn small${stuck > 0 ? ' voice' : ''}`} onClick={listenFirst} data-testid="listen-btn"><IconEar size={16} /> Listen</button>
+                    {!(level === 1 || slowShown) && (
+                      <button className={`btn small${stuck > 0 ? ' voice' : ''}`} data-testid="slow-btn"
+                        onClick={() => { setSlowShown(true); setRateOverride(slowRate(level)); }}>Practise slowly</button>
+                    )}
+                    {level === 1 && rate >= (spec?.rate ?? 1) - 1e-6 && (
+                      <button className={`btn small${stuck > 0 ? ' voice' : ''}`} data-testid="slow-btn"
+                        onClick={() => setRateOverride(slowRate(level))}>Slower ({Math.round(slowRate(level) * 100)}%)</button>
+                    )}
+                  </div>
+                </div>
+              ))}
               {askHeadphones && (
                 <div className="col" style={{ gap: 4 }} data-testid="headphones-q">
                   <span className="small" id="hp-label"><strong>Headphones on?</strong> <span className="tiny muted">(remembered on this phone)</span></span>
@@ -690,8 +734,8 @@ function SingPlay({ route }: { route: PlayRoute }) {
                   {offBook && staves !== 'mine' && <span className="tiny muted">Off book the full score shows the other voices without their words or the accompaniment, so nothing gives your part away.</span>}
                 </div>
               )}
-              {level === 1 && (
-                <label className="field">
+              {helpable && (level === 1 || slowShown) && (
+                <label className="field" data-testid="tempo">
                   <span className="small">Tempo {Math.round(rate * 100)}%{rate < (spec?.rate ?? 1) - 1e-6 ? ' (slower than the level: practice only, won’t count)' : ''}</span>
                   <input type="range" min={40} max={100} step={5} value={Math.round(rate * 100)} onChange={(e) => setRateOverride(Number(e.target.value) / 100)} />
                 </label>
@@ -718,10 +762,10 @@ function SingPlay({ route }: { route: PlayRoute }) {
               )}
               {!listenOnly && !askHeadphones && <span className="tiny muted">Wear headphones so the mic only hears you.{!profile.latencyMs ? ' Tip: run voice setup once to measure your headphone delay.' : ''}</span>}
               {askHeadphones && !profile.latencyMs && <span className="tiny muted">Tip: run voice setup once to measure your headphone delay.</span>}
-              {listenOnly && listened && !GENERATED_SECTIONS.has(section.id) ? (
+              {listenOnly && listened && (route.after != null || !GENERATED_SECTIONS.has(section.id)) ? (
                 <>
-                  <button className="btn primary block" onClick={() => go({ ...route, level: 1 }, true)} data-testid="learn-next">
-                    <IconPlay size={18} /> Now learn it: level 1
+                  <button className="btn primary block" onClick={() => go({ ...route, level: route.after ?? 1, after: undefined }, true)} data-testid="learn-next">
+                    <IconPlay size={18} /> {route.after != null && route.after > 1 ? `Now sing it: level ${route.after}` : 'Now sing it: level 1'}
                   </button>
                   <button className="btn block" onClick={start}>Listen again</button>
                 </>
@@ -729,7 +773,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
                 // Waiting for "Headphones on?": not sticky, so it doesn't cover the question on a small phone.
                 <button className={`btn primary block${headphonesUnanswered ? '' : ' start-sticky'}`} onClick={start} disabled={headphonesUnanswered} data-testid="start"
                   style={headphonesUnanswered ? { opacity: 1, background: 'var(--surface-2)', color: 'var(--muted)' } : undefined}>
-                  {headphonesUnanswered ? 'Answer above to start' : <><IconPlay size={18} /> {listenOnly ? 'Listen' : 'Start singing'}</>}
+                  {headphonesUnanswered ? 'Answer above to start' : <><IconPlay size={18} /> {listenOnly ? 'Listen' : firstListen ? 'Sing it now' : 'Start singing'}</>}
                 </button>
               )}
             </div>

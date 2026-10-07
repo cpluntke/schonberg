@@ -10,6 +10,33 @@ Every piece is cut into short sections, and there are five levels (`src/progress
 | 4 | Concert-ready | 100% | the words | no | no | chord only | ±25¢ | 85% |
 | 5 | Off book | 100% | the words | no | hidden | chord only | ±25¢ | 85% |
 
+## Listening and singing slowly, at every level
+
+Singers start from scratch but aren't held back (`src/progress/struggle.ts`):
+
+- **First read-through.** A section met for the first time at level 1 (never sung or listened to)
+  offers **Listen first** on its pre-run card; Start reads **Sing it now**, so a singer who knows it
+  sings straight away. Listening is level 0 with `after` in the route: when it ends, **Now sing it**
+  returns to the level.
+- **Always there.** Every sung level's card has **Listen** and **Practise slowly** (level 1: 50%,
+  from level 2: 70%, the tempo slider stays adjustable). A slower run is practice: it is scored and
+  kept in the bar history but never moves a level; its Results put **Now at full tempo** first.
+- **When it goes wrong.** Results of a missed counted run offer listening and singing slowly (not
+  for a run whose notes were right but late, nor one through the phone's speaker). After
+  `STUCK_AFTER` (2) misses in a row of the same section at the same level (`failsInARow`, a pass ends
+  the count), they come first: level 1 **Listen again, then sing it**, from level 2 **Practise
+  slowly**, with the full-tempo try one tap away; the pre-run card says the section has been tricky.
+
+## Streak and cycle points
+
+Home shows the practice streak (consecutive days with any run, listening too) and the **notes sung
+right this cycle** (`src/progress/points.ts`): every sung run adds its notes graded right (practice
+runs too). A choir's cycle is its programme name: when an admin publishes the programme under a new
+name, everyone's count starts again from 0 (the programme editor says so). Without a choir, the
+singer's own cycle name does the same. Results show the run's notes right, the cycle total and the
+streak. Both travel with the choir account's copy (`ProgressSnapshot.pts`, `days`): another phone's
+practice days keep the streak, and the larger count of the same cycle wins.
+
 ## Level 1: the notes, on “doo”
 
 Level 1 is for learning the notes, so it is sung on **“doo”**: the pre-run card says so, a small
