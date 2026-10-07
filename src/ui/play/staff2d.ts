@@ -8,10 +8,10 @@
 // current key (plus the accidental of the note being sung), so a note sung 30 cents flat sits just
 // below its notehead and a perfectly sung C♮ in D major sits exactly on the C.
 import { F_CLEF, G_CLEF, GLYPH_UNITS_PER_SPACE } from './clefGlyphs';
-import type { KeySig, Part, Score } from '../../music/types';
+import type { KeySig, NoteSpelling, Part, Score } from '../../music/types';
 import type { Grade, PitchSample } from '../../game/types';
 import { beatToTime, timeToBeat } from '../../music/time';
-import { noteLabel, spellPc, type NotationMode } from '../../game/notation';
+import { noteLabel, spellNote, type NotationMode } from '../../game/notation';
 import { COLORS, wordInitial, type DrawState } from './highway2d';
 
 const EPS = 0.01;
@@ -47,10 +47,10 @@ export function middleStep(clef: Clef): number {
   return clef === 'treble' ? 34 /* B4 */ : clef === 'treble8' ? 27 /* B3 */ : 22 /* D3 */;
 }
 
-/** Diatonic step and alteration of a sounding pitch, spelled in `key`. */
-export function spell(midi: number, key: Pick<KeySig, 'fifths' | 'mode'>): { step: number; alt: number } {
+/** Diatonic step and alteration of a sounding pitch: as written (`written`, from the source) or spelled in `key`. */
+export function spell(midi: number, key: Pick<KeySig, 'fifths' | 'mode'>, written?: Pick<NoteSpelling, 'letter' | 'alter'> | null): { step: number; alt: number } {
   const m = Math.round(midi);
-  const s = spellPc(m, key);
+  const s = spellNote(m, key, written);
   const natural = m - s.accidental;
   const oct = Math.floor(natural / 12) - 1;
   return { step: oct * 7 + LETTERS.indexOf(s.letter), alt: s.accidental };
@@ -209,6 +209,11 @@ export interface StaffEvent extends Piece {
   alt?: number;
   /** Alteration to print in front of the note (0 = natural), or null. */
   accidental?: number | null;
+  /** That accidental is a courtesy one (drawn in parentheses), see markAccidentals. */
+  courtesy?: boolean;
+  /** The accidental the source printed on the note (first piece only), and whether it was cautionary. */
+  srcAcc?: number;
+  srcCourtesy?: boolean;
   tieStart?: boolean;
   tieEnd?: boolean;
   /** First written piece of the ScoreNote (carries the lyric). */
@@ -229,6 +234,9 @@ export interface ChordNote {
   step: number;
   alt: number;
   accidental?: number | null;
+  courtesy?: boolean;
+  srcAcc?: number;
+  srcCourtesy?: boolean;
   tieStart: boolean;
   tieEnd: boolean;
   first: boolean;
@@ -261,23 +269,55 @@ export interface StaffMeasure {
   events: StaffEvent[];
   /** Beam groups: indices into `events`. */
   beams: number[][];
+  /** Accidentals still in force at the bar's end (for the next bar's courtesy accidentals). */
+  carry: Carried;
 }
 
-/** Print accidentals relative to the key signature; they carry through the bar. */
-export function markAccidentals(events: StaffEvent[], fifths: number): void {
+/** Letters (0..6 = C..B) that end a bar altered against the key signature → the alterations. */
+export type Carried = Map<number, Set<number>>;
+
+type Head = { step?: number; alt?: number; tieEnd?: boolean; accidental?: number | null; courtesy?: boolean; srcAcc?: number; srcCourtesy?: boolean };
+
+/**
+ * Accidentals of a bar, relative to the key signature `fifths`:
+ * - an accidental holds for that pitch (letter and octave) until the barline; a note tied over the
+ *   barline keeps its alteration without repeating the accidental;
+ * - courtesy accidental: when a letter ended the previous bar (`prev`, in any octave) with an
+ *   alteration other than the one it has now, its first (untied) note in this bar shows its
+ *   accidental again, in parentheses (D♮ | D♯ in E major: the ♯ is printed after the barline);
+ * - an accidental the source printed (`srcAcc`, e.g. its own cautionary ones) is always shown.
+ * Returns what this bar hands on to the next one.
+ */
+export function markAccidentals(events: StaffEvent[], fifths: number, prev?: Carried): Carried {
   const ka = keyAlts(fifths);
   const state = new Map<number, number>();
-  const mark = (h: { step?: number; alt?: number; tieEnd?: boolean; accidental?: number | null }) => {
+  /** Alteration of each step's latest note (also tied ones). */
+  const sounding = new Map<number, number>();
+  const seen = new Set<number>();
+  const mark = (h: Head) => {
+    h.courtesy = undefined;
     if (h.step == null) return;
+    const alt = h.alt ?? 0;
+    const letter = mod(h.step, 7);
+    sounding.set(h.step, alt);
     if (h.tieEnd) {
       // A tie into the bar doesn't need (or set) an accidental.
       h.accidental = null;
       return;
     }
-    const cur = state.get(h.step) ?? ka[mod(h.step, 7)];
-    if ((h.alt ?? 0) !== cur) {
-      h.accidental = h.alt ?? 0;
-      state.set(h.step, h.alt ?? 0);
+    const first = !seen.has(letter);
+    seen.add(letter);
+    const cur = state.get(h.step) ?? ka[letter];
+    if (alt !== cur) {
+      h.accidental = alt;
+      state.set(h.step, alt);
+    } else if (first && [...(prev?.get(letter) ?? [])].some((a) => a !== alt)) {
+      h.accidental = alt;
+      h.courtesy = true;
+    } else if (h.srcAcc === alt) {
+      // printed in the source although the rules above don't need it: the engraver's choice
+      h.accidental = alt;
+      if (h.srcCourtesy) h.courtesy = true;
     } else h.accidental = null;
   };
   for (const e of events) {
@@ -285,6 +325,14 @@ export function markAccidentals(events: StaffEvent[], fifths: number): void {
     mark(e);
     if (e.chord) for (const c of e.chord) mark(c);
   }
+  const carry: Carried = new Map();
+  for (const [step, alt] of sounding) {
+    const letter = mod(step, 7);
+    if (alt === ka[letter]) continue;
+    if (!carry.has(letter)) carry.set(letter, new Set());
+    carry.get(letter)!.add(alt);
+  }
+  return carry;
 }
 
 /** Beam 8ths and shorter within a beat (rests break beams). Sets stem directions too. */
@@ -332,7 +380,7 @@ export function beamGroups(events: StaffEvent[], origin: number, beamSpan: numbe
 const MIN_HELD = 0.2;
 
 /** Bars [m0, m1] of a part as notatable events: rests fill gaps, notes split at barlines with ties. */
-export function buildMeasures(score: Score, part: Part, m0: number, m1: number, clef: Clef = clefFor(part)): StaffMeasure[] {
+export function buildMeasures(score: Score, part: Part, m0: number, m1: number, clef: Clef = clefFor(part), withPrev = true): StaffMeasure[] {
   const mid = middleStep(clef);
   const ms = score.measures;
   const buckets: { s: number; e: number; i: number }[][] = [];
@@ -361,6 +409,8 @@ export function buildMeasures(score: Score, part: Part, m0: number, m1: number, 
     }
   });
   const out: StaffMeasure[] = [];
+  // The bar before m0 (not shown) still decides m0's courtesy accidentals.
+  let carry: Carried | undefined = withPrev && m0 > 0 && m0 <= ms.length ? buildMeasures(score, part, m0 - 1, m0 - 1, clef, false)[0]?.carry : undefined;
   let prevKey: number | null = null;
   let prevTs: string | null = null;
   const firstOfNote = new Set<number>();
@@ -415,19 +465,22 @@ export function buildMeasures(score: Score, part: Part, m0: number, m1: number, 
         const cut = g.e > end + 0.03;
         const keep = cut && g.e - end >= MIN_HELD;
         if (cut && !keep) dropped.add(g.i);
-        return { g, n, sp: spell(n.midi, key), more: cut ? keep : ends[g.i] > g.e + 0.03 };
+        return { g, n, sp: spell(n.midi, key, n.spelling), more: cut ? keep : ends[g.i] > g.e + 0.03 };
       });
       pieces.forEach((p, pi) => {
         const lastPiece = pi === pieces.length - 1;
         const hs = heads.map(({ g, n, sp: hsp, more }) => {
           const isFirst = !firstOfNote.has(g.i);
           firstOfNote.add(g.i);
-          return { noteIndex: g.i, midi: n.midi, step: hsp.step, alt: hsp.alt, tieStart: !lastPiece || more, tieEnd: !isFirst, first: isFirst, n };
+          const src: { srcAcc?: number; srcCourtesy?: boolean } = isFirst && n.spelling?.acc != null
+            ? { srcAcc: n.spelling.acc, ...(n.spelling.courtesy ? { srcCourtesy: true } : {}) } : {};
+          return { noteIndex: g.i, midi: n.midi, step: hsp.step, alt: hsp.alt, tieStart: !lastPiece || more, tieEnd: !isFirst, first: isFirst, ...src, n };
         });
         const [h0, ...rest] = hs;
         events.push({
           ...p, kind: 'note', noteIndex: h0.noteIndex, midi: h0.midi, step: h0.step, alt: h0.alt,
           tieStart: h0.tieStart, tieEnd: h0.tieEnd, first: h0.first,
+          ...(h0.srcAcc != null ? { srcAcc: h0.srcAcc, srcCourtesy: h0.srcCourtesy } : {}),
           lyric: h0.first ? h0.n.lyric : undefined, syllabic: h0.first ? h0.n.syllabic : undefined,
           ...(rest.length ? { chord: rest.map(({ n: _n, ...c }) => c) } : {}),
         });
@@ -439,14 +492,14 @@ export function buildMeasures(score: Score, part: Part, m0: number, m1: number, 
       if (!events.length) events.push({ kind: 'rest', start: a, dur: m.durBeats, base: 4, dots: 0, measureRest: true });
       else pushRest(t, b);
     }
-    markAccidentals(events, key.fifths);
+    carry = markAccidentals(events, key.fifths, carry);
     const beams = beamGroups(events, origin, beam, mid);
     const tsKey = ts.join('/');
     out.push({
       index: mi, number: m.number, startBeat: a, endBeat: b, key, timeSig: ts,
       keyChange: prevKey != null && prevKey !== key.fifths, timeChange: prevTs == null || prevTs !== tsKey,
       prevFifths: prevKey ?? key.fifths, doubleBar: !!m.doubleBar || mi === ms.length - 1,
-      events, beams,
+      events, beams, carry,
     });
     prevKey = key.fifths;
     prevTs = tsKey;
@@ -544,6 +597,12 @@ export const keyChangeW = (fifths: number, prev: number) => {
   return n ? n * 0.85 + 0.7 : 0.3;
 };
 export const hasAcc = (e: StaffEvent | undefined) => !!e && (e.accidental != null || !!e.chord?.some((c) => c.accidental != null));
+/** Room for an event's accidentals (staff spaces): wider for one in parentheses. */
+export const accW = (e: StaffEvent | undefined): number => {
+  if (!hasAcc(e)) return 0;
+  const paren = (e!.accidental != null && e!.courtesy) || !!e!.chord?.some((c) => c.accidental != null && c.courtesy);
+  return ACC_W + (paren ? PAREN_W : 0);
+};
 /** Two heads a step apart in a chord: one sits on the other side of the stem. */
 export const hasSecond = (e: StaffEvent) => {
   const st = eventSteps(e).sort((a, b) => a - b);
@@ -551,15 +610,21 @@ export const hasSecond = (e: StaffEvent) => {
   return false;
 };
 export const ACC_W = 1.25;
+/** Extra room for the parentheses of a courtesy accidental. */
+export const PAREN_W = 0.75;
 /** Least gap between two note names (staff spaces). */
 export const NAME_GAP = 0.45;
 
-/** Width in px of the name of a note (`midi` in `key`), as printed under the staff. */
-export type NameW = (midi: number, key: KeySig) => number;
+/** Width in px of the name of a note (`midi` in `key`, spelled as `written`), as printed under the staff. */
+export type NameW = (midi: number, key: KeySig, written?: Pick<NoteSpelling, 'letter' | 'alter'>) => number;
+
+/** The spelling an event's (main) note is drawn with, for its name. */
+export const eventSpelling = (e: Pick<StaffEvent, 'step' | 'alt'>): Pick<NoteSpelling, 'letter' | 'alter'> | undefined =>
+  e.step == null ? undefined : { letter: mod(e.step, 7), alter: e.alt ?? 0 };
 
 /** Widths of the note names of a bar's events (0 for rests and tied continuations). */
 export function nameWidths(sm: StaffMeasure, nameW: NameW | undefined): number[] {
-  return sm.events.map((e) => (nameW && e.kind === 'note' && e.first && e.midi != null ? nameW(e.midi, sm.key) : 0));
+  return sm.events.map((e) => (nameW && e.kind === 'note' && e.first && e.midi != null ? nameW(e.midi, sm.key, eventSpelling(e)) : 0));
 }
 
 function measureWidths(sm: StaffMeasure, sp: number, textW: (s: string) => number, inside: boolean, nameW?: NameW) {
@@ -570,7 +635,7 @@ function measureWidths(sm: StaffMeasure, sp: number, textW: (s: string) => numbe
   let changeW = 0;
   if (inside && sm.keyChange) changeW += keyChangeW(sm.key.fifths, sm.prevFifths) * sp;
   if (inside && sm.timeChange) changeW += TIME_W * sp;
-  let lead = Math.max(1.3 * sp + (hasAcc(evs[0]) ? ACC_W * sp : 0), lw[0] / 2 + 0.4 * sp, (nw[0] ?? 0) / 2 + 0.4 * sp);
+  let lead = Math.max(1.3 * sp + accW(evs[0]) * sp, lw[0] / 2 + 0.4 * sp, (nw[0] ?? 0) / 2 + 0.4 * sp);
   if (evs[0]?.measureRest) lead = 2.2 * sp;
   for (let j = 0; j < evs.length; j++) {
     const e = evs[j];
@@ -580,7 +645,7 @@ function measureWidths(sm: StaffMeasure, sp: number, textW: (s: string) => numbe
     if (e.kind === 'note' && hasSecond(e)) g += 1.1 * sp;
     if (j + 1 < evs.length) {
       const nx = evs[j + 1];
-      if (hasAcc(nx)) g = Math.max(g, (1.5 + ACC_W + 0.4) * sp);
+      if (hasAcc(nx)) g = Math.max(g, (1.5 + accW(nx) + 0.4) * sp);
       if (lw[j] || lw[j + 1]) {
         const hyph = e.syllabic === 'begin' || e.syllabic === 'middle';
         g = Math.max(g, lw[j] / 2 + lw[j + 1] / 2 + (hyph ? 1.4 : 0.6) * sp);
@@ -769,12 +834,25 @@ function drawBass(c: Ctx, x: number, fLineY: number, sp: number, color: string) 
   drawGlyph(c, BASS, x + 0.1 * sp, fLineY, sp, color);
 }
 
-/** Accidental glyph centred at (x, y). */
-function drawAccidental(c: Ctx, x: number, y: number, sp: number, alt: number, color: string) {
+/** Accidental glyph centred at (x, y); a courtesy one (`paren`) in parentheses. */
+function drawAccidental(c: Ctx, x: number, y: number, sp: number, alt: number, color: string, paren = false) {
   c.save();
   c.strokeStyle = color;
   c.fillStyle = color;
   c.lineCap = 'butt';
+  if (paren) {
+    // Parentheses hugging the glyph (a flat's bowl sits right of its stem, low).
+    const l = alt < 0 ? -0.62 - (alt === -2 ? 0.32 : 0) : alt === 0 ? -0.62 : -0.78;
+    const r = alt < 0 ? 0.68 + (alt === -2 ? 0.32 : 0) : alt === 0 ? 0.62 : 0.78;
+    const cy = alt < 0 ? y - 0.35 * sp : y;
+    c.lineWidth = Math.max(1, 0.12 * sp);
+    for (const [px, dir] of [[x + l * sp, 1], [x + r * sp, -1]] as const) {
+      c.beginPath();
+      c.moveTo(px + dir * 0.18 * sp, cy - 1.05 * sp);
+      c.quadraticCurveTo(px - dir * 0.22 * sp, cy, px + dir * 0.18 * sp, cy + 1.05 * sp);
+      c.stroke();
+    }
+  }
   const thin = Math.max(1, 0.11 * sp);
   const thick = Math.max(1.5, 0.28 * sp);
   if (alt === 1) {
@@ -1022,6 +1100,8 @@ interface HeadG {
   /** Steps from the middle line. */
   off: number;
   acc: number | null;
+  /** The accidental is a courtesy one: drawn in parentheses. */
+  paren: boolean;
   accX: number;
   tieStart: boolean;
   tieEnd: boolean;
@@ -1093,8 +1173,8 @@ export function buildSysDraw(sys: StaffSystem, layout: StaffLayout, notes: Part[
       if (e.kind !== 'note' || e.step == null) continue;
       const up = g.up;
       const raw = [
-        { i: e.noteIndex!, step: e.step, acc: e.accidental ?? null, tieStart: !!e.tieStart, tieEnd: !!e.tieEnd },
-        ...(e.chord ?? []).map((h) => ({ i: h.noteIndex, step: h.step, acc: h.accidental ?? null, tieStart: h.tieStart, tieEnd: h.tieEnd })),
+        { i: e.noteIndex!, step: e.step, acc: e.accidental ?? null, paren: !!e.courtesy, tieStart: !!e.tieStart, tieEnd: !!e.tieEnd },
+        ...(e.chord ?? []).map((h) => ({ i: h.noteIndex, step: h.step, acc: h.accidental ?? null, paren: !!h.courtesy, tieStart: h.tieStart, tieEnd: h.tieEnd })),
       ].sort((a, b) => (up ? a.step - b.step : b.step - a.step));
       // From the stem's root: a head a step from the previous one goes on the other side of the stem.
       let prevStep = NaN;
@@ -1105,18 +1185,19 @@ export function buildSysDraw(sys: StaffSystem, layout: StaffLayout, notes: Part[
         const x = disp ? le.x + (up ? 1 : -1) * (2 * headRx - stemW) : le.x;
         if (disp && !up) dispLeft = true;
         if (disp && up) g.dotX = Math.max(g.dotX, x + headRx);
-        g.heads.push({ i: h.i, x, dy: yOf(h.step), off: h.step - layout.mid, acc: h.acc, accX: 0, tieStart: h.tieStart, tieEnd: h.tieEnd });
+        g.heads.push({ i: h.i, x, dy: yOf(h.step), off: h.step - layout.mid, acc: h.acc, paren: h.acc != null && h.paren, accX: 0, tieStart: h.tieStart, tieEnd: h.tieEnd });
         prevStep = h.step;
         prevDisp = disp;
       }
       // Accidentals: top to bottom, in columns so that close ones don't collide.
       const cols: number[][] = [];
       const withAcc = g.heads.filter((h) => h.acc != null).sort((a, b) => b.off - a.off);
+      const colW = withAcc.some((h) => h.paren) ? 1.0 + PAREN_W : 1.0;
       for (const h of withAcc) {
         let col = 0;
         while (cols[col]?.some((o) => Math.abs(o - h.off) < 6)) col++;
         (cols[col] ??= []).push(h.off);
-        h.accX = le.x - headRx - 0.75 * sp - col * 1.0 * sp - (dispLeft ? 2 * headRx - stemW : 0);
+        h.accX = le.x - headRx - 0.75 * sp - (h.paren ? 0.5 * PAREN_W * sp : 0) - col * colW * sp - (dispLeft ? 2 * headRx - stemW : 0);
       }
       // Ledger lines (one per height, as wide as the heads on it).
       const led = new Map<number, [number, number]>();
@@ -1303,8 +1384,8 @@ export function textRows(noteBelow: number, sp: number, o: { min: number; pad: n
 /** Width measure for note names in `font` (cached per text). */
 export function nameMeasure(c: Ctx, font: string, notation: NotationMode): NameW {
   const memo = new Map<string, number>();
-  return (midi, key) => {
-    const t = noteLabel(midi, notation, key).text;
+  return (midi, key, written) => {
+    const t = noteLabel(midi, notation, key, written).text;
     let w = memo.get(t);
     if (w == null) {
       const f = c.font;
@@ -1338,7 +1419,7 @@ function getLayout(c: Ctx, W: number, H: number, s: DrawState): Cached {
   const nA = s.range ? s.range[0] : 0;
   const nB = s.range ? s.range[1] : -1;
   for (let i = nA; i <= nB; i++) {
-    const st = spell(s.part.notes[i].midi, s.key).step;
+    const st = spell(s.part.notes[i].midi, s.key, s.part.notes[i].spelling).step;
     lo = Math.min(lo, st);
     hi = Math.max(hi, st);
   }
@@ -1633,7 +1714,7 @@ export function drawStaffNotes(c: Ctx, g: SysGeo, layout: StaffLayout, L: Cached
         drawNotehead(c, h.x, y, sp, e.base);
         c.shadowBlur = 0;
       } else drawNotehead(c, h.x, y, sp, e.base);
-      if (h.acc != null) drawAccidental(c, h.accX, y, sp, h.acc, hc);
+      if (h.acc != null) drawAccidental(c, h.accX, y, sp, h.acc, hc, h.paren);
       // Dots (moved into the space when the note sits on a line).
       for (let d = 0; d < e.dots; d++) {
         const dy = mod(h.off, 2) === 0 ? -0.5 * sp : 0;
@@ -1697,7 +1778,7 @@ function drawNames(c: Ctx, g: SysGeo, s: DrawState, L: Cached, v: Vis) {
     if (e.kind !== 'note' || !e.first || e.midi == null) continue;
     const i = e.noteIndex!;
     if (v.vis(i) !== 'show') continue;
-    const lab = noteLabel(notes[i].midi, s.notation, eg.m.sm.key);
+    const lab = noteLabel(notes[i].midi, s.notation, eg.m.sm.key, eventSpelling(e));
     const now = v.isNow(i);
     c.fillStyle = !v.inRange(i) || (v.isPast(i) && !now) ? INK.lyricPast : now ? COLORS.target : COLORS.label;
     c.globalAlpha = alphaOf(v, i);

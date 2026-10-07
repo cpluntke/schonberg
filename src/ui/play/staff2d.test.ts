@@ -4,8 +4,9 @@ import { resolve } from 'node:path';
 import { makePart, makeScore } from '../../game/testutil';
 import { importScoreFile } from '../../music/import';
 import type { Score } from '../../music/types';
-import type { Part } from '../../music/types';
+import type { NoteSpelling, Part } from '../../music/types';
 import {
+  ACC_W, accW, markAccidentals, type StaffMeasure,
   beamGroups, breakSystems, buildMeasures, clefFor, eventHas, eventSteps, keyAlts, layoutStaff, measureSpan, midiToStep,
   middleStep, spell, splitDuration, staffSpace, STAFF_GRADE, sungStep, systemAt, textRows, writtenValue, xAtBeat, type StaffEvent,
 } from './staff2d';
@@ -365,4 +366,111 @@ describe('built-in and choir-library pieces', () => {
       }
     }
   }, 60_000);
+});
+
+describe('accidentals: written spelling, carrying, courtesy', () => {
+  /** A bass part in E major / C♯ minor (4 sharps) from [midi, beats] and optional spellings by note index. */
+  const setup = (spec: [number | null, number][], spellings: Record<number, NoteSpelling> = {}) => {
+    const part = { ...makePart('b', spec), voiceType: 'B' as const };
+    for (const [i, sp] of Object.entries(spellings)) part.notes[+i].spelling = sp;
+    const score = makeScore([part]);
+    score.keys = [{ beat: 0, time: 0, fifths: 4, mode: 'minor' }];
+    return { part, score };
+  };
+  const heads = (ms: StaffMeasure[], m: number) => ms[m].events.filter((e) => e.kind === 'note');
+  const acc = (ms: StaffMeasure[], m: number) => heads(ms, m).map((e) => (e.accidental == null ? null : e.courtesy ? `(${e.accidental})` : e.accidental));
+  const Bs = { letter: 6, alter: 1 };
+
+  it('draws a written B♯ on the B line with a sharp (do ti do = C♯ B♯ C♯), not as C♮', () => {
+    const { part, score } = setup([[49, 1], [48, 1], [48, 1], [49, 1]], { 1: Bs, 2: Bs });
+    const ms = buildMeasures(score, part, 0, 0, 'bass');
+    expect(heads(ms, 0).map((e) => [e.step, e.alt])).toEqual([[21, 1], [20, 1], [20, 1], [21, 1]]);
+    expect(acc(ms, 0)).toEqual([null, 1, null, null]);
+    // without a written spelling the key decides (C♯ minor: the leading tone is B♯ too)
+    const plain = setup([[49, 1], [48, 1]]);
+    expect(heads(buildMeasures(plain.score, plain.part, 0, 0, 'bass'), 0).map((e) => e.step)).toEqual([21, 20]);
+  });
+
+  it('keeps a real C♮ a C♮', () => {
+    const { part, score } = setup([[49, 1], [48, 1], [49, 2]], { 1: { letter: 0, alter: 0, acc: 0 } });
+    const ms = buildMeasures(score, part, 0, 0, 'bass');
+    expect(heads(ms, 0).map((e) => [e.step, e.alt])).toEqual([[21, 1], [21, 0], [21, 1]]);
+    expect(acc(ms, 0)).toEqual([null, 0, 1]);
+  });
+
+  it('D♮ D♮ | D♯: a courtesy sharp after the barline, on the first D only, and only in that bar', () => {
+    const { part, score } = setup([[50, 2], [50, 2], [51, 1], [51, 1], [52, 2], [51, 4]]);
+    const ms = buildMeasures(score, part, 0, 2, 'bass');
+    expect(acc(ms, 0)).toEqual([0, null]);
+    expect(acc(ms, 1)).toEqual(['(1)', null, null]);
+    expect(acc(ms, 2)).toEqual([null]);
+  });
+
+  it('courtesy in any octave (D♮4 | D♯3), not when the bar ended with the letter restored', () => {
+    const a = setup([[62, 4], [51, 4]]);
+    expect(acc(buildMeasures(a.score, a.part, 0, 1, 'bass'), 1)).toEqual(['(1)']);
+    const b = setup([[50, 2], [51, 2], [51, 4]]); // D♮ D♯ | D♯
+    const ms = buildMeasures(b.score, b.part, 0, 1, 'bass');
+    expect(acc(ms, 0)).toEqual([0, 1]);
+    expect(acc(ms, 1)).toEqual([null]);
+  });
+
+  it('accidentals hold through the bar, the barline cancels them, a regular accidental needs no courtesy', () => {
+    // C major: F♯ F♯ | F♯ F♮ F♮ | F♮ (bar 2 ended on F♮: no courtesy in bar 3)
+    const part = makePart('s', [[66, 2], [66, 2], [66, 1], [65, 1], [65, 2], [65, 4]]);
+    const ms = buildMeasures(makeScore([part]), part, 0, 2, 'treble');
+    expect(acc(ms, 0)).toEqual([1, null]);
+    expect(acc(ms, 1)).toEqual([1, 0, null]);
+    expect(acc(ms, 2)).toEqual([null]);
+  });
+
+  it('a note tied over the barline keeps its alteration silently; the next D♯ then needs its sharp (courtesy)', () => {
+    // D♮ tied into bar 2, then D♯ in bar 2
+    const { part, score } = setup([[50, 3], [50, 2], [51, 3]]);
+    const ms = buildMeasures(score, part, 0, 1, 'bass');
+    expect(acc(ms, 0)).toEqual([0, null]);
+    expect(heads(ms, 1)[0].tieEnd).toBe(true);
+    expect(acc(ms, 1)).toEqual([null, '(1)']);
+  });
+
+  it('a section that starts later still sees the bar before it', () => {
+    const { part, score } = setup([[50, 4], [51, 4]]);
+    const ms = buildMeasures(score, part, 1, 1, 'bass');
+    expect(ms).toHaveLength(1);
+    expect(acc(ms, 0)).toEqual(['(1)']);
+  });
+
+  it('do ti | ti: B♯ in one bar, B♮ in the next gets a courtesy natural', () => {
+    const { part, score } = setup([[49, 2], [48, 2], [47, 4]], { 1: Bs });
+    const ms = buildMeasures(score, part, 0, 1, 'bass');
+    expect(acc(ms, 0)).toEqual([null, 1]);
+    expect(acc(ms, 1)).toEqual(['(0)']);
+  });
+
+  it("shows the source's own accidentals: cautionary ones in parentheses, redundant plain ones as printed", () => {
+    // D♮ then D♯ marked cautionary in the file: it needs a real sharp anyway
+    const { part, score } = setup([[50, 1], [51, 1], [56, 1], [56, 1]], { 1: { letter: 1, alter: 1, acc: 1, courtesy: true } });
+    expect(acc(buildMeasures(score, part, 0, 0, 'bass'), 0)).toEqual([0, 1, null, null]);
+    // a cautionary D♯ (no D♮ before it) and a redundant plain G♯, both printed in the file
+    const only = setup([[51, 2], [56, 2]], { 0: { letter: 1, alter: 1, acc: 1, courtesy: true }, 1: { letter: 4, alter: 1, acc: 1 } });
+    expect(acc(buildMeasures(only.score, only.part, 0, 0, 'bass'), 0)).toEqual(['(1)', 1]);
+  });
+
+  it('markAccidentals hands on what is still altered at the barline', () => {
+    const ev = (start: number, step: number, alt: number, tieEnd = false): StaffEvent => ({ kind: 'note', start, dur: 1, base: 1, dots: 0, step, alt, tieEnd });
+    // 4 sharps: D♮3 E♯3 F♯3 F♯3 (steps: D3 = 22, E3 = 23, F3 = 24)
+    const carry = markAccidentals([ev(0, 22, 0), ev(1, 23, 1), ev(2, 24, 1), ev(3, 24, 1)], 4);
+    expect([...carry.entries()].map(([l, s]) => [l, [...s]])).toEqual([[1, [0]], [2, [1]]]);
+    // next bar: E♮4 (another octave) and D♯3 both get courtesy accidentals
+    const next = [ev(0, 30, 0), ev(1, 22, 1)];
+    markAccidentals(next, 4, carry);
+    expect(next.map((e) => [e.accidental, !!e.courtesy])).toEqual([[0, true], [1, true]]);
+  });
+
+  it('a courtesy accidental takes the room of its parentheses', () => {
+    const base: StaffEvent = { kind: 'note', start: 0, dur: 1, base: 1, dots: 0, step: 22, alt: 1, accidental: 1 };
+    expect(accW(base)).toBe(ACC_W);
+    expect(accW({ ...base, courtesy: true })).toBeGreaterThan(ACC_W);
+    expect(accW({ ...base, accidental: null })).toBe(0);
+  });
 });

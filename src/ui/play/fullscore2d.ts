@@ -88,7 +88,7 @@ function extents(spec: StaffSpec, key: KeySig, from: number, to: number, lyrics:
   let tup = false;
   for (const n of spec.part.notes) {
     if (n.start + n.dur <= from || n.start >= to) continue;
-    const st = spell(n.midi, key).step;
+    const st = spell(n.midi, key, n.spelling).step;
     if (st < lo) lo = st;
     if (st > hi) hi = st;
     if (!tup && isTriplet(n.durBeats)) tup = true;

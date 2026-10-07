@@ -4,9 +4,10 @@
 // Diatonic notes of the key use the key's own spelling (so F♯ major has E♯, G♭ major has C♭);
 // chromatic notes use a natural letter when one exists, otherwise sharps in sharp keys and flats
 // in flat keys. In minor keys the raised 7th (leading tone) is always spelled as such (E♯ in
-// F♯ minor, C♯ in D minor).
+// F♯ minor, C♯ in D minor). A note that carries its written spelling (from the MusicXML source)
+// is named as written: a B♯ stays a B♯ whatever the key says.
 
-import type { KeySig } from '../music/types';
+import type { KeySig, NoteSpelling } from '../music/types';
 
 export type NotationMode = 'letter' | 'fixed' | 'movable' | 'jianpu' | 'pc';
 
@@ -72,6 +73,23 @@ export function spellPc(pc: number, key: Pick<KeySig, 'fifths' | 'mode'>): Spell
   return fromLof(cMajor[pc]);
 }
 
+/** Letters (0..6 = C..B) → line-of-fifths position of the natural. */
+const LETTER_LOF = [0, 2, 4, -1, 1, 3, 5];
+
+/** A written spelling (letter + alteration) on the line of fifths. */
+function fromSpelling(sp: Pick<NoteSpelling, 'letter' | 'alter'>): Spelled {
+  return fromLof(LETTER_LOF[mod(sp.letter, 7)] + 7 * sp.alter);
+}
+
+/** The note's written spelling when it has one that fits its pitch, else the key's. */
+export function spellNote(midi: number, key: Pick<KeySig, 'fifths' | 'mode'>, written?: Pick<NoteSpelling, 'letter' | 'alter'> | null): Spelled {
+  if (written && Math.abs(written.alter) <= 2) {
+    const s = fromSpelling(written);
+    if (mod(7 * s.lof - Math.round(midi), 12) === 0) return s;
+  }
+  return spellPc(midi, key);
+}
+
 function spellName(s: Spelled): string {
   return s.letter + accidentalSymbol(s.accidental);
 }
@@ -92,8 +110,8 @@ const MOVABLE_FLAT: Record<number, string> = { 1: 'Ra', 2: 'Me', 4: 'Se', 5: 'Le
 const SHARP_TABLE: [number, number][] = [[0, 0], [0, 1], [1, 0], [1, 1], [2, 0], [3, 0], [3, 1], [4, 0], [4, 1], [5, 0], [5, 1], [6, 0]];
 const FLAT_TABLE: [number, number][] = [[0, 0], [1, -1], [1, 0], [2, -1], [2, 0], [3, 0], [4, -1], [4, 0], [5, -1], [5, 0], [6, -1], [6, 0]];
 
-function relativeDegree(midi: number, key: Pick<KeySig, 'fifths' | 'mode'>): { degree: number; alt: number } {
-  const s = spellPc(midi, key);
+function relativeDegree(midi: number, key: Pick<KeySig, 'fifths' | 'mode'>, written?: Pick<NoteSpelling, 'letter' | 'alter'> | null): { degree: number; alt: number } {
+  const s = spellNote(midi, key, written);
   const d = degreeOf(s, key.fifths);
   const syllableExists = d.alt === 0 || (d.alt === 1 && d.degree in MOVABLE_SHARP) || (d.alt === -1 && d.degree in MOVABLE_FLAT);
   if (syllableExists) return d;
@@ -109,25 +127,30 @@ export function pcSymbol(pc: number): string {
   return PC_SYMBOLS[mod(Math.round(pc), 12)];
 }
 
-export function noteLabel(midi: number, mode: NotationMode, key: Pick<KeySig, 'fifths' | 'mode'>): NoteLabel {
+/**
+ * A note's name in `mode`. `written`: the note's spelling as written (else it is spelled from the
+ * key). Movable do is la-based in minor (do = the relative major's tonic), so a written B♯ in C♯
+ * minor is "Si", the raised sol.
+ */
+export function noteLabel(midi: number, mode: NotationMode, key: Pick<KeySig, 'fifths' | 'mode'>, written?: Pick<NoteSpelling, 'letter' | 'alter'> | null): NoteLabel {
   const m = Math.round(midi);
   const plain = (text: string): NoteLabel => ({ text, dotsAbove: 0, dotsBelow: 0 });
   switch (mode) {
     case 'pc':
       return plain(pcSymbol(m));
     case 'letter':
-      return plain(spellName(spellPc(m, key)));
+      return plain(spellName(spellNote(m, key, written)));
     case 'fixed': {
-      const s = spellPc(m, key);
+      const s = spellNote(m, key, written);
       return plain(FIXED_SYLLABLES[s.letter] + accidentalSymbol(s.accidental));
     }
     case 'movable': {
-      const { degree, alt } = relativeDegree(m, key);
+      const { degree, alt } = relativeDegree(m, key, written);
       const text = alt === 0 ? MOVABLE_DIATONIC[degree] : alt > 0 ? MOVABLE_SHARP[degree] : MOVABLE_FLAT[degree];
       return plain(text);
     }
     case 'jianpu': {
-      const { degree, alt } = relativeDegree(m, key);
+      const { degree, alt } = relativeDegree(m, key, written);
       const text = accidentalSymbol(alt) + String(degree + 1);
       // Reference octave: the octave starting at "1" (do) whose pitch lies in [55, 66].
       const doPc = mod(7 * key.fifths, 12);

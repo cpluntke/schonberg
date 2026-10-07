@@ -3,7 +3,7 @@
 // aligned across all staves. Pure layout (unit-tested); fullscore2d.ts draws it.
 import type { Part, Score, ScoreNote, VoiceType } from '../../music/types';
 import {
-  ACC_W, CLEF_W, NAME_GAP, TIME_W, breakSystems, buildMeasures, clefFor, eventSteps, hasAcc, hasSecond, keyChangeW, keyW,
+  accW, CLEF_W, NAME_GAP, TIME_W, breakSystems, buildMeasures, clefFor, eventSteps, hasAcc, hasSecond, keyChangeW, keyW,
   middleStep, nameWidths, naturalSpace, type Clef, type NameW, type LaidEvent, type LaidMeasure, type StaffMeasure, type StaffSystem,
 } from './staff2d';
 
@@ -265,7 +265,7 @@ function jointWidth(bars: StaffMeasure[], lyricOn: boolean[], sp: number, textW:
     const lw = lyricOn[si] ? evs.map((e) => (e.lyric ? textW(e.lyric) : 0)) : evs.map(() => 0);
     const nw = nameWidths(sm, nameOn[si]);
     if (evs[0]?.measureRest) anyRest = true;
-    else lead = Math.max(lead, 1.3 * sp + (hasAcc(evs[0]) ? ACC_W * sp : 0), lw[0] / 2 + 0.4 * sp, nw[0] / 2 + 0.4 * sp);
+    else lead = Math.max(lead, 1.3 * sp + accW(evs[0]) * sp, lw[0] / 2 + 0.4 * sp, nw[0] / 2 + 0.4 * sp);
     for (let j = 0; j < evs.length; j++) {
       const e = evs[j];
       if (e.measureRest) continue;
@@ -280,7 +280,7 @@ function jointWidth(bars: StaffMeasure[], lyricOn: boolean[], sp: number, textW:
       if (e.dots) x += 0.35 * sp * e.dots;
       if (e.kind === 'note' && hasSecond(e)) x += 1.1 * sp;
       extra[i0] = Math.max(extra[i0], x);
-      if (i0 > 0 && hasAcc(e)) gap[i0 - 1] = Math.max(gap[i0 - 1], (1.5 + ACC_W + 0.4) * sp);
+      if (i0 > 0 && hasAcc(e)) gap[i0 - 1] = Math.max(gap[i0 - 1], (1.5 + accW(e) + 0.4) * sp);
       const hyph = e.syllabic === 'begin' || e.syllabic === 'middle';
       if (j + 1 < evs.length) {
         if (lw[j] || lw[j + 1]) cons.push([i0, onsetIndex(onsets, evs[j + 1].start), lw[j] / 2 + lw[j + 1] / 2 + (hyph ? 1.4 : 0.6) * sp]);

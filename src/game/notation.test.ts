@@ -131,3 +131,35 @@ describe('keyName', () => {
     expect(keyName(key(7, 'minor'))).toBe('A♯ minor');
   });
 });
+
+describe('noteLabel – written spelling', () => {
+  const E = { fifths: 4, mode: 'major' as const }; // a C♯-minor piece whose file says "E major"
+  const cs = { fifths: 4, mode: 'minor' as const };
+  const Bs = { letter: 6, alter: 1 }; // B♯ (sounds as C)
+  it('a written B♯ stays B♯ whatever the key says', () => {
+    expect(noteLabel(60, 'letter', E).text).toBe('C'); // from the key alone
+    expect(noteLabel(60, 'letter', E, Bs).text).toBe('B♯');
+    expect(noteLabel(60, 'fixed', E, Bs).text).toBe('Si♯');
+  });
+  it('movable do (la-based minor): B♯ in C♯ minor is Si, the raised sol; C♯ is La', () => {
+    expect(noteLabel(60, 'movable', cs, Bs).text).toBe('Si');
+    expect(noteLabel(60, 'movable', E, Bs).text).toBe('Si');
+    expect(noteLabel(61, 'movable', cs, { letter: 0, alter: 1 }).text).toBe('La');
+    expect(noteLabel(60, 'jianpu', cs, Bs).text).toBe('♯5');
+  });
+  it('the minor mode alone spells the leading tone too', () => {
+    expect(noteLabel(60, 'letter', cs).text).toBe('B♯');
+    expect(noteLabel(60, 'movable', cs).text).toBe('Si');
+  });
+  it('a real C♮ stays C♮', () => {
+    expect(noteLabel(60, 'letter', cs, { letter: 0, alter: 0 }).text).toBe('C');
+    expect(noteLabel(60, 'movable', cs, { letter: 0, alter: 0 }).text).toBe('Le');
+  });
+  it('a spelling that does not fit the pitch is ignored', () => {
+    expect(noteLabel(62, 'letter', E, Bs).text).toBe('D');
+  });
+  it('double sharps and flats', () => {
+    expect(noteLabel(67, 'letter', cs, { letter: 3, alter: 2 }).text).toBe('F𝄪');
+    expect(noteLabel(59, 'letter', { fifths: -6, mode: 'major' }, { letter: 0, alter: -1 }).text).toBe('C♭');
+  });
+});

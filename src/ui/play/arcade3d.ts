@@ -158,7 +158,8 @@ export function drawArcade(c: CanvasRenderingContext2D, W: number, H: number, s:
   if (s.showNames) {
     c.textBaseline = 'top';
     lanes.forEach((m, i) => {
-      const lab = noteLabel(m, s.notation, s.key).text;
+      // (named as the lane's notes in view are written, when they say)
+      const lab = noteLabel(m, s.notation, s.key, vis.map((vi) => notes[vi]).find((x) => x.midi === m && x.spelling)?.spelling).text;
       const fs = n > 9 ? 11 : 14;
       c.font = `800 ${fs}px "Bricolage Grotesque", sans-serif`;
       const tw = c.measureText(lab).width;

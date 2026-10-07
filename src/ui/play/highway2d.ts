@@ -381,8 +381,9 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
     c.fillRect(0, 0, gutter, H);
     c.textBaseline = 'middle';
     for (let m = lo; m <= hi; m++) {
-      const lab = noteLabel(m, s.notation, s.key);
       const isCur = current >= 0 && notes[current].midi === m;
+      // (the current note's row is named as the note is written: B♯, not C)
+      const lab = noteLabel(m, s.notation, s.key, isCur ? notes[current].spelling : undefined);
       const diatonic = inKey(m, s.key) || s.notation === 'pc';
       if (!diatonic && rowH < 16 && !isCur) continue;
       c.font = `${isCur ? 800 : diatonic ? 600 : 400} ${rowH < 14 ? 10 : 12}px "JetBrains Mono", monospace`;

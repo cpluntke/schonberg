@@ -6,9 +6,9 @@
 //
 // Pure: no DOM, no storage.
 
-import type { KeySig, Part, Score, Section } from '../music/types';
+import type { KeySig, NoteSpelling, Part, Score, Section } from '../music/types';
 import { beatLength, keyAtTime } from '../music/time';
-import { intervalLongName, keyName, noteLabel, spellPc, type NotationMode } from './notation';
+import { intervalLongName, keyName, noteLabel, spellNote, type NotationMode } from './notation';
 import { firstLetters, lyricLines, type LyricLine } from './lyrics';
 
 export interface MapCue {
@@ -107,11 +107,11 @@ export interface MemoryMap {
 const EPS = 1e-6;
 
 /** Note name in the chosen notation; jianpu octave dots as combining dots. */
-export function noteText(midi: number, notation: NotationMode, key: Pick<KeySig, 'fifths' | 'mode'>, withOctave = false): string {
-  const l = noteLabel(midi, notation, key);
+export function noteText(midi: number, notation: NotationMode, key: Pick<KeySig, 'fifths' | 'mode'>, withOctave = false, written?: NoteSpelling): string {
+  const l = noteLabel(midi, notation, key, written);
   if (notation === 'jianpu') return l.text + '̇'.repeat(l.dotsAbove) + '̣'.repeat(l.dotsBelow);
   if (withOctave && notation === 'letter') {
-    const s = spellPc(midi, key);
+    const s = spellNote(midi, key, written);
     const octave = Math.floor((Math.round(midi) - s.accidental) / 12) - 1;
     return l.text + octave;
   }
@@ -296,13 +296,13 @@ export function buildMemoryMap(score: Score, sections: Section[], partId: string
       time: n.start,
       word: wordAt.get(i),
       midi: n.midi,
-      note: noteText(n.midi, notation, key),
+      note: noteText(n.midi, notation, key, false, n.spelling),
       restBeats,
     };
     const cue = findCue(score, others, n.startBeat, n.midi, bl);
     if (cue) {
       const semis = n.midi - cue.midi;
-      const cueNote = noteText(cue.midi, notation, key);
+      const cueNote = noteText(cue.midi, notation, key, false, cue.spelling);
       const where = `${possessive(cue.part.name)} ${cueNote}`;
       entry.cue = {
         partId: cue.part.id,
@@ -409,25 +409,25 @@ function measureOfBeat(score: Score, beat: number): number {
  * was still sounding (or had just stopped) within two beats. Voices are preferred to instruments;
  * among simultaneous onsets, the note closest in pitch to the entry.
  */
-function findCue(score: Score, others: Part[], beat: number, midi: number, beatLen: number): { part: Part; midi: number } | null {
-  type Cand = { part: Part; midi: number; onset: number; vocal: boolean };
+function findCue(score: Score, others: Part[], beat: number, midi: number, beatLen: number): { part: Part; midi: number; spelling?: NoteSpelling } | null {
+  type Cand = { part: Part; midi: number; onset: number; vocal: boolean; spelling?: NoteSpelling };
   const cands: Cand[] = [];
   const window = 2 * beatLen;
   for (const p of others) {
     // last onset strictly before the entry
-    let best: { midi: number; onset: number; end: number } | null = null;
+    let best: { midi: number; onset: number; end: number; spelling?: NoteSpelling } | null = null;
     for (const n of p.notes) {
       if (n.startBeat >= beat - EPS) break;
       const end = n.startBeat + n.durBeats;
       if (!best || n.startBeat > best.onset + EPS || (Math.abs(n.startBeat - best.onset) < EPS && Math.abs(n.midi - midi) < Math.abs(best.midi - midi))) {
-        best = { midi: n.midi, onset: n.startBeat, end };
+        best = { midi: n.midi, onset: n.startBeat, end, spelling: n.spelling };
       }
     }
     if (!best || best.end < beat - window - EPS) continue;
-    cands.push({ part: p, midi: best.midi, onset: best.onset, vocal: isVocal(p) });
+    cands.push({ part: p, midi: best.midi, onset: best.onset, vocal: isVocal(p), spelling: best.spelling });
   }
   if (!cands.length) return null;
   const pool = cands.some((c) => c.vocal) ? cands.filter((c) => c.vocal) : cands;
   pool.sort((x, y) => (y.onset - x.onset > EPS ? 1 : x.onset - y.onset > EPS ? -1 : Math.abs(x.midi - midi) - Math.abs(y.midi - midi)));
-  return { part: pool[0].part, midi: pool[0].midi };
+  return { part: pool[0].part, midi: pool[0].midi, spelling: pool[0].spelling };
 }
