@@ -277,8 +277,9 @@ export async function syncChoir(importFile: (name: string, data: ArrayBuffer, me
   try { applied = localStorage.getItem('sh:choirApplied'); } catch { /* ignore */ }
   // (a phone that applied the programme before cycles had dates, when the choir last changed it: it
   // has the running cycle already if that one had started by then)
-  const nowStart = info.cycles?.find((c) => c.id === now?.id)?.start;
-  if (nowStart && info.cycleUpdatedAt && applied === `${info.code}:${info.cycleUpdatedAt}` && nowStart <= localDay(new Date(info.cycleUpdatedAt))) applied = stamp;
+  // (its stamp was the choir's change time, which is the running cycle's own change time while
+  // nobody has edited that cycle since)
+  if (now && dated && now.updatedAt && applied === `${info.code}:${now.updatedAt}`) applied = stamp;
   // (joined from another choir: its programme isn't this choir's)
   const otherChoir = !!loadCycle().preset?.startsWith('choir:') && loadCycle().preset !== `choir:${info.code}`;
   if (!now && applied !== stamp && ((dated && applied?.startsWith(`${info.code}:`)) || otherChoir)) {

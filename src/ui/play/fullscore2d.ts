@@ -9,7 +9,7 @@ import { COLORS, type DrawState } from './highway2d';
 import {
   INK, buildSysDraw, drawBarline, drawBubble, drawCountdown, drawOutlines, drawStaff2D, drawStaffFrame, drawStaffNotes,
   drawTrace, fontGeneration, lyricFontFor, measureSpan, middleStep, nameFontFor, nameMeasure, namesOn, spell, systemAt,
-  scrollOffset, textRows, updateTrace, xAtBeat,
+  keyAtBeat, scrollOffset, textRows, updateTrace, xAtBeat,
   type Cached, type StaffLayout, type StaffSystem, type SysGeo, type Vis,
 } from './staff2d';
 import { doublings, layoutFullScore, planStaves, type FullLayout, type StaffShow, type StaffSpec } from './fullscore';
@@ -273,7 +273,7 @@ function releaseLayers(F: FullCache) {
 }
 
 /** The static part of system j, rendered once at device resolution (null without a canvas API). */
-function staticLayer(F: FullCache, j: number, W: number, dpr: number, s: DrawState): HTMLCanvasElement | OffscreenCanvas | null {
+function staticLayer(F: FullCache, j: number, W: number, dpr: number, s: DrawState, x0 = 0): HTMLCanvasElement | OffscreenCanvas | null {
   const have = F.layers.get(j);
   if (have) return have;
   const w = Math.ceil(W * dpr);
@@ -289,7 +289,7 @@ function staticLayer(F: FullCache, j: number, W: number, dpr: number, s: DrawSta
   } catch { cv = null; }
   const lc = cv?.getContext('2d') as Ctx | null | undefined;
   if (!cv || !lc) return null;
-  lc.setTransform(dpr, 0, 0, dpr, 0, 0);
+  lc.setTransform(dpr, 0, 0, dpr, -x0 * dpr, 0);
   drawStatic(lc, F, systemGeos(F, j, LAYER_M * F.sp, s), s);
   F.layers.set(j, cv);
   return cv;
@@ -321,16 +321,27 @@ function drawFullScroll(c: Ctx, W: number, H: number, s: DrawState, F: FullCache
   const vis = (i: number): 'show' | 'letters' | 'none' => ((isPast(i) && inRange(i)) || !s.hide ? 'show' : s.hide(i));
   const v: Vis = { vis, isPast, isNow, inRange };
   const pinned = systems[0].prefixEnd;
-  if (F.layers.size) releaseLayers(F);
+  const dpr = c.getTransform().a || 1;
+  if (F.layerDpr !== dpr) {
+    releaseLayers(F);
+    F.layerDpr = dpr;
+  }
 
   c.save();
   c.translate(-off, 0);
   const ownGeos: SysGeo[] = [];
+  const shown = new Set<number>();
   for (let j = 0; j < systems.length; j++) {
     const sy = systems[j];
     if (sy.x1 - off < pinned - 2 * sp || sy.prefixEnd - off > W + 2 * sp) continue;
+    shown.add(j);
     const geos = systemGeos(F, j, sysTop, s);
-    drawStatic(c, F, geos, s);
+    // The other staves of a stretch don't change: drawn once into a layer the stretch's width.
+    const x0 = sy.prefixEnd - LAYER_M * sp;
+    const lw = sy.x1 - sy.prefixEnd + 2 * LAYER_M * sp;
+    const layer = staticLayer(F, j, lw, dpr, s, x0);
+    if (layer) c.drawImage(layer, x0, sysTop - LAYER_M * sp, lw, layer.height / dpr);
+    else drawStatic(c, F, geos, s);
     rows.forEach((r, i) => {
       const d = r.doubled;
       if (!d || !r.s) return;
@@ -339,6 +350,12 @@ function drawFullScroll(c: Ctx, W: number, H: number, s: DrawState, F: FullCache
     });
     drawStaffNotes(c, geos[F.own], ownRow.L.layout, ownRow.L, s, v);
     ownGeos.push(geos[F.own]);
+  }
+  for (const [j, cv] of [...F.layers]) {
+    if (shown.has(j)) continue;
+    cv.width = 0;
+    cv.height = 0;
+    F.layers.delete(j);
   }
   updateTrace(s, ownRow.L);
   for (const g of ownGeos) drawTrace(c, g, s, ownRow.L, beat);
@@ -361,8 +378,8 @@ function drawFullScroll(c: Ctx, W: number, H: number, s: DrawState, F: FullCache
   c.closePath();
   c.fill();
   if (cur) {
-    drawCountdown(c, cur, s, ownRow.L, px, cur.top - Math.max(1.2, ownRow.above - 1.2) * sp);
-    drawBubble(c, cur, s, ownRow.L, px);
+    drawCountdown(c, cur, s, ownRow.L, px, cur.top - Math.max(1.2, ownRow.above - 1.2) * sp, pinned + off + 0.5 * sp);
+    drawBubble(c, cur, s, ownRow.L, px, off + W - 0.5 * sp);
   }
   c.restore();
 
@@ -372,9 +389,8 @@ function drawFullScroll(c: Ctx, W: number, H: number, s: DrawState, F: FullCache
   const pinGeos: SysGeo[] = rows.map((r) => {
     const top = sysTop + r.y * sp;
     const rs = r.L.layout.systems;
-    const here = rs[Math.min(k, rs.length - 1)];
     const sys: StaffSystem = {
-      ...rs[0], cont: false, measures: [], x1: pinned, key: here.measures[0]?.sm.key ?? rs[0].key, cancelFifths: 0,
+      ...rs[0], cont: false, measures: [], x1: pinned, key: keyAtBeat(s.score, beat), cancelFifths: 0,
       timeSig: off < 1 ? (rs[0].measures[0]?.sm.timeSig ?? null) : null,
     };
     return { j: -1, sys, sd: { evs: [], beams: [], ties: [], tups: [] }, top, mid: top + 2 * sp };

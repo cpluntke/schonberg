@@ -358,6 +358,8 @@ export function layoutFullScore(score: Score, staves: StaffSpec[], m0: number, m
     : scroll ? stretches(nBars, o.scroll!)
     : (o.overlap ? breakSystemsOverlap : breakSystems)(opening.map((w, k) => prefixW(k) + w.total), inner.map((w) => w.total), avail, maxBars);
   let carryX = 0;
+  // Scrolling: the pinned start holds the widest key signature of the section.
+  const pinKeyW = Math.max(...ref.map((sm) => keyW(sm.key.fifths)), 0);
   const out: FullStaff[] = staves.map((spec, si) => {
     let minStep = middleStep(spec.clef) - 4;
     let maxStep = middleStep(spec.clef) + 4;
@@ -371,9 +373,9 @@ export function layoutFullScore(score: Score, staves: StaffSpec[], m0: number, m
     const firstSm = ref[g[0]];
     const clefX = left + 0.3 * sp;
     const keyX = left + CLEF_W * sp;
-    const timeX = keyX + (firstSm.keyChange ? keyChangeW(firstSm.key.fifths, firstSm.prevFifths) : keyW(firstSm.key.fifths)) * sp;
+    const timeX = keyX + (scroll ? pinKeyW : firstSm.keyChange ? keyChangeW(firstSm.key.fifths, firstSm.prevFifths) : keyW(firstSm.key.fifths)) * sp;
     // Scrolling: one line, each stretch starting where the last ended (clefs and keys stay pinned).
-    const prefixEnd = scroll && gi > 0 ? carryX : left + prefixW(g[0]);
+    const prefixEnd = scroll ? (gi > 0 ? carryX : left + (CLEF_W + pinKeyW + (firstSm.timeChange ? TIME_W : 0) + 0.4) * sp) : left + prefixW(g[0]);
     const widths = g.map((k, idx) => (idx === 0 && (!scroll || gi === 0) ? opening[k] : inner[k]));
     const natural = widths.reduce((acc, w) => acc + w.total, 0);
     const room = left + avail - prefixEnd;

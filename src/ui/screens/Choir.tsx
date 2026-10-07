@@ -384,7 +384,7 @@ export function ChoirAdmin() {
         <NeedLogin code={code} what="Your changes below are kept: log in again, then publish them." />
       )}
       <CyclesPanel code={code} auth={auth} cycles={cycles} selId={selId}
-        onSelect={(id) => { if (id !== selId && !unsaved(`Edit another cycle anyway`)) return; setSelId(id); }}
+        onSelect={(id) => { if (id !== selId && unsaved(`Edit another cycle anyway`)) return; setSelId(id); }}
         onLoaded={gotCycles} onChanged={(r, select) => { gotCycles(r, select); void refresh(); }} />
       {sel && (
         <ProgrammeEditor key={`${info?.code}:${sel.id}:${edVer ?? 0}`} code={code} auth={auth} info={info} cycle={sel} all={cycles?.cycles ?? []}

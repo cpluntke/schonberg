@@ -725,13 +725,16 @@ export function layoutStaff(score: Score, part: Part, m0: number, m1: number, o:
   const groups = scroll ? stretches(sms.length, o.scroll!)
     : breakSystems(opening.map((w, k) => prefixW(k) + w.total), inner.map((w) => w.total), avail, maxBars);
   let carryX = 0;
+  // Scrolling: the pinned start holds the widest key signature of the section (it shows the key in
+  // force as the line moves on).
+  const pinKeyW = Math.max(...sms.map((sm) => keyW(sm.key.fifths)), 0);
   const systems: StaffSystem[] = groups.map((g, gi) => {
     const firstSm = sms[g[0]];
     const clefX = left + 0.3 * sp;
     const keyX = left + CLEF_W * sp;
-    const timeX = keyX + (firstSm.keyChange ? keyChangeW(firstSm.key.fifths, firstSm.prevFifths) : keyW(firstSm.key.fifths)) * sp;
+    const timeX = keyX + (scroll ? pinKeyW : firstSm.keyChange ? keyChangeW(firstSm.key.fifths, firstSm.prevFifths) : keyW(firstSm.key.fifths)) * sp;
     // Scrolling: one line, each stretch starting where the last ended (the clef and key stay pinned).
-    const prefixEnd = scroll && gi > 0 ? carryX : left + prefixW(g[0]);
+    const prefixEnd = scroll ? (gi > 0 ? carryX : left + (CLEF_W + pinKeyW + (firstSm.timeChange ? TIME_W : 0) + 0.4) * sp) : left + prefixW(g[0]);
     const widths = g.map((k, idx) => (idx === 0 && (!scroll || gi === 0) ? opening[k] : inner[k]));
     const natural = widths.reduce((a, w) => a + w.total, 0);
     const room = left + avail - prefixEnd;
@@ -1587,7 +1590,8 @@ export const SCROLL_ANCHOR = 0.33;
 export function scrollOffset(systems: StaffSystem[], beat: number, W: number, sp: number, at?: { tempos: TempoEvent[]; pos: number }): { off: number; px: number; k: number } {
   const k = systemAt(systems, beat);
   const first = systems[0];
-  const xOf = (b: number) => (b < first.startBeat ? first.prefixEnd - 0.2 * sp : xAtBeat(systems[systemAt(systems, b)], b));
+  // (before the first bar, e.g. the count-in: just right of the pinned clef, where it can be seen)
+  const xOf = (b: number) => (b < first.startBeat ? first.prefixEnd + 0.5 * sp : xAtBeat(systems[systemAt(systems, b)], b));
   const px = xOf(beat);
   // The line moves at the speed of the music averaged over about a second (notes aren't spaced in
   // proportion to time: following the playhead exactly, it would crawl through long notes and rush
@@ -1609,20 +1613,19 @@ const SMOOTH_SEC = 1.2;
 const SMOOTH_N = 16;
 
 /** The pinned start of a scrolling line: staff lines, clef and the key (and time) in force at `beat`. */
-export function drawPinned(c: Ctx, g: Pick<SysGeo, 'top' | 'mid'>, layout: Pick<StaffLayout, 'sp' | 'clef'>, first: StaffSystem, cur: StaffSystem, s: Pick<DrawState, 'score' | 'notation'>, showTime: boolean) {
+export function drawPinned(c: Ctx, g: Pick<SysGeo, 'top' | 'mid'>, layout: Pick<StaffLayout, 'sp' | 'clef'>, first: StaffSystem, key: KeySig, s: Pick<DrawState, 'score' | 'notation'>, showTime: boolean, H: number) {
   const sp = layout.sp;
   const w = first.prefixEnd;
   c.fillStyle = COLORS.bg;
-  c.fillRect(0, g.top - 6 * sp, w, 16 * sp);
+  c.fillRect(0, 0, w, H);
   // Soft edge where the music slides under the clef.
   const grad = c.createLinearGradient(w, 0, w + 1.6 * sp, 0);
   grad.addColorStop(0, COLORS.bg);
   grad.addColorStop(1, 'rgba(15,18,38,0)');
   c.fillStyle = grad;
-  c.fillRect(w, g.top - 6 * sp, 1.6 * sp, 16 * sp);
-  const m = cur.measures[0]?.sm;
+  c.fillRect(w, 0, 1.6 * sp, H);
   const pin: StaffSystem = {
-    ...first, cont: false, measures: [], x1: w, key: m?.key ?? first.key, cancelFifths: 0,
+    ...first, cont: false, measures: [], x1: w, key, cancelFifths: 0,
     timeSig: showTime ? (first.measures[0]?.sm.timeSig ?? null) : null,
   };
   drawStaffFrame(c, { sys: pin, top: g.top, mid: g.mid }, layout, s, { barlines: false, numbers: false });
@@ -1737,11 +1740,12 @@ function drawStaffScroll(c: Ctx, W: number, H: number, s: DrawState) {
   c.closePath();
   c.fill();
   if (cur) {
-    drawCountdown(c, cur, s, L, px, yTop);
-    drawBubble(c, cur, s, L, px);
+    drawCountdown(c, cur, s, L, px, yTop, pinned + off + 0.5 * sp);
+    drawBubble(c, cur, s, L, px, off + W - 0.5 * sp);
   }
   c.restore();
-  drawPinned(c, { top, mid: top + 2 * sp }, layout, systems[0], systems[k], s, off < 1);
+  drawPinned(c, { top, mid: top + 2 * sp }, layout, systems[0], keyAtBeat(s.score, beat), s, off < 1, H);
+  void k;
 }
 
 function noteColor(s: DrawState, i: number, v: Vis): string {
@@ -1789,7 +1793,7 @@ export function drawStaffFrame(c: Ctx, g: Pick<SysGeo, 'sys' | 'top' | 'mid'>, l
     c.textBaseline = 'alphabetic';
     c.textAlign = 'left';
     c.fillStyle = INK.barNo;
-    const nx = mi === 0 && !sys.cont ? sys.clefX : m.x0 - 0.2 * sp;
+    const nx = sys.cont ? m.x0 + 0.25 * sp : mi === 0 ? sys.clefX : m.x0 - 0.2 * sp;
     if (o.numbers && m.sm.number !== '0') c.fillText(m.sm.number, nx, top - 1.75 * sp);
     // Where the names' do is (first bar shown) or moves to: "Do = G" next to the bar number.
     const hint = o.numbers && m.sm.nameChange && movesWithKey(s.notation) ? keyHint(s.notation, m.sm.nameKey) : null;
@@ -2271,7 +2275,7 @@ export function drawTrace(c: Ctx, g: SysGeo, s: DrawState, L: Cached, beatNow: n
   }
 }
 
-export function drawBubble(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: number) {
+export function drawBubble(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: number, rightX = g.sys.x1) {
   const sp = L.layout.sp;
   const last = s.samples[s.samples.length - 1];
   if (!last || last.midi == null || s.pos - last.time >= 0.2) return;
@@ -2344,12 +2348,12 @@ export function drawBubble(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: numbe
     return Math.min(base, ink - 13);
   };
   let bx = px + 0.9 * sp;
-  if (bx + bw > g.sys.x1 + 6) bx = px - 0.9 * sp - bw;
+  if (bx + bw > rightX + 6) bx = px - 0.9 * sp - bw;
   let by = place(bx);
   if (by < bandTop) {
     const alt = bx > px ? px - 0.9 * sp - bw : px + 0.9 * sp;
     const by2 = place(alt);
-    if (by2 > by && alt >= 0 && alt + bw <= g.sys.x1 + 6) {
+    if (by2 > by && alt >= 0 && alt + bw <= rightX + 6) {
       bx = alt;
       by = by2;
     }
@@ -2368,7 +2372,7 @@ export function drawBubble(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: numbe
 
 /** Entry countdown when your next note comes after a rest: beside the playhead's head, on the side
  *  already sung (the notes coming up stay clear). */
-export function drawCountdown(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: number, yTop: number) {
+export function drawCountdown(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: number, yTop: number, leftX = g.sys.clefX) {
   if (!s.range) return;
   const sp = L.layout.sp;
   const notes = s.part.notes;
@@ -2387,7 +2391,7 @@ export function drawCountdown(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: nu
         c.font = `800 ${size}px "Bricolage Grotesque", sans-serif`;
         c.textBaseline = 'alphabetic';
         c.fillStyle = COLORS.target;
-        const left = px - 0.8 * sp - size * 0.6 > g.sys.clefX;
+        const left = px - 0.8 * sp - size * 0.6 > leftX;
         c.textAlign = left ? 'right' : 'left';
         c.fillText(String(kk), left ? px - 0.8 * sp : px + 0.8 * sp, yTop + 0.35 * size);
         c.textAlign = 'left';
