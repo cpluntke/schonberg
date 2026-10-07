@@ -2,6 +2,8 @@ import React, { useEffect } from 'react';
 import { releaseTracker } from './play/session';
 import { useRoute, go, type Route } from './router';
 import { useLibrary } from './library';
+import { upgradeAllFullRuns } from './plan';
+import { subscribe } from '../progress/store';
 import { useToast } from './hooks';
 import { IconHome, IconMusic, IconRanks, IconShield, IconSliders } from './icons';
 import { Home } from './screens/Home';
@@ -59,6 +61,15 @@ export function App() {
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);
   }, []);
+  // Progress saved under the earlier level rules (docs/LEVELS.md): once the library is there, and
+  // again whenever progress changes (e.g. pulled from another phone).
+  useEffect(() => {
+    if (!lib.ready) return;
+    upgradeAllFullRuns();
+    let t = 0;
+    const off = subscribe(() => { clearTimeout(t); t = window.setTimeout(upgradeAllFullRuns, 500); });
+    return () => { off(); clearTimeout(t); };
+  }, [lib.ready, lib.version]);
   // Anonymous usage statistics (Settings → Send anonymous usage statistics): daily totals, sent at most once a day.
   useEffect(() => { startUsageStats(); }, []);
   // Progress kept with the choir account: on start and whenever the app comes back, if something

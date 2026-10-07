@@ -154,11 +154,11 @@ export function sectionStatus(sp: SectionProgress | undefined, now: number = Dat
 
 export interface Readiness {
   /**
-   * Share of the way to concert-ready. Levels the piece has earned in a full run count fully;
-   * section levels not yet confirmed by a full run count half.
+   * Share of the way to concert-ready. The piece level counts fully; section levels above it count
+   * half.
    */
   pct: number;
-  /** The piece's level: the highest level passed in one full run-through (see pieceLevel). */
+  /** The piece's level (see pieceLevel). */
   pieceLevel: number;
   /** Lowest section level (practice progress). */
   minLevel: number;
@@ -178,18 +178,19 @@ export interface Readiness {
   /** Sections at the next piece level or above (the progress bar toward it); null at level 5. */
   toward: { level: number; done: number; total: number } | null;
   /**
-   * Sections that slipped in a full run at a level the singer is working toward (see fixTarget):
-   * they must pass on their own before a full run at that level counts. Lowest level first.
+   * Open fix lists: sections that slipped in the full run that opened a level (docs/LEVELS.md).
+   * Once each has passed that level on its own, the piece reaches the level. Lowest level first.
    */
   toFix: { level: number; sectionIds: string[] }[];
-  /** Sections that slipped in a full run above that level: information only (no lock, not in Next up). */
-  laterFixes: { level: number; sectionIds: string[] }[];
+  /** Levels with a clean-run star: a counted full run in which every section held. */
+  clean: number[];
   /** Full runs passed off book so far (days), while the piece isn't memorised yet. */
   offBookDays: number;
 }
 
 /**
- * The piece's level: earned only by a full run-through at that level (stored in `prog.full`).
+ * The piece's level (stored in `prog.full`): a counted full run at that level opened it, and every
+ * section that slipped in that run has since passed the level on its own (docs/LEVELS.md).
  * A piece with a single section has nothing to run through on top: its section level is the piece level.
  */
 export function pieceLevel(sections: Section[], prog: PieceProgress | undefined): number {
@@ -199,46 +200,48 @@ export function pieceLevel(sections: Section[], prog: PieceProgress | undefined)
 }
 
 /**
- * The level the singer is working toward: the next piece level, or the level every section has
- * already reached if that's higher (confirm it with a full run). To-fix lists only lock the full
- * run and drive Next up up to this level; a failed run further ahead (a new singer trying level 5)
- * mustn't take over.
+ * A counted full run of `sections` sections in which `slipped` of them slipped opens its level when
+ * at most half of them slipped (docs/LEVELS.md). More than that, and the run is practice: the fix
+ * list would be most of the piece, which is the sections again, not a run that nearly held.
  */
-export function fixTarget(sections: Section[], prog: PieceProgress | undefined): number {
-  const minSec = sections.length ? Math.min(...sections.map((s) => Math.min(MAX_LEVEL, levelOf(prog, s.id)))) : 0;
-  return Math.min(MAX_LEVEL, Math.max(pieceLevel(sections, prog) + 1, minSec));
+export function runOpensLevel(sections: number, slipped: number): boolean {
+  return sections > 0 && slipped * 2 <= sections;
 }
 
 /**
- * Pending "to fix" sections per level (only sections of this part), lowest level first. `active`
- * (locks the full run at that level, leads Next up): the level is at most fixTarget, or the run
- * that made the list held at that level (FullRunProgress.toFixLocks, decided when it was recorded:
- * see fixListLocks). A beginner's failed run far above their level is information only.
+ * Open fix lists per level (only sections of this part), lowest level first. A list naming more
+ * than half the sections is ignored: that run wouldn't open the level (runOpensLevel). New lists
+ * never do; lists saved under the earlier rules might.
  */
-export function pendingFixes(sections: Section[], prog: PieceProgress | undefined): { level: number; sectionIds: string[]; active: boolean }[] {
+export function pendingFixes(sections: Section[], prog: PieceProgress | undefined): { level: number; sectionIds: string[] }[] {
   const tf = prog?.full?.toFix;
   if (!tf || sections.length < 2) return [];
-  const target = fixTarget(sections, prog);
   const order = [...sections].sort((a, b) => a.index - b.index).map((s) => s.id);
-  const out: { level: number; sectionIds: string[]; active: boolean }[] = [];
+  const out: { level: number; sectionIds: string[] }[] = [];
   for (const k of Object.keys(tf).map(Number).filter((l) => l >= 1 && l <= MAX_LEVEL).sort((a, b) => a - b)) {
     const ids = order.filter((id) => (tf[k] ?? []).includes(id));
-    if (!ids.length) continue;
-    out.push({ level: k, sectionIds: ids, active: k <= target || prog?.full?.toFixLocks?.[k] === true });
+    if (!ids.length || !runOpensLevel(sections.length, ids.length)) continue;
+    out.push({ level: k, sectionIds: ids });
   }
   return out;
 }
 
-/** Sections still to fix before a full run at `level` can count (only levels up to fixTarget lock). */
+/** Sections still to fix at `level` after the full run that opened it. */
 export function fixesBefore(sections: Section[], prog: PieceProgress | undefined, level: number): string[] {
-  return pendingFixes(sections, prog).find((f) => f.level === level && f.active)?.sectionIds ?? [];
+  return pendingFixes(sections, prog).find((f) => f.level === level)?.sectionIds ?? [];
+}
+
+/** Levels with a clean-run star (FullRunProgress.clean), lowest first. */
+export function cleanLevels(prog: PieceProgress | undefined): number[] {
+  const c = prog?.full?.clean;
+  return Array.isArray(c) ? [...new Set(c.filter((l) => Number.isInteger(l) && l >= 1 && l <= MAX_LEVEL))].sort((a, b) => a - b) : [];
 }
 
 export function pieceReadiness(sections: Section[], prog: PieceProgress | undefined): Readiness {
   if (sections.length === 0) {
     return {
       pct: 0, pieceLevel: 0, minLevel: 0, rehearsalReady: false, concertReady: false, memorised: false, memorisedSections: 0,
-      unconfirmed: 0, toward: null, toFix: [], laterFixes: [], offBookDays: 0,
+      unconfirmed: 0, toward: null, toFix: [], clean: [], offBookDays: 0,
     };
   }
   const P = pieceLevel(sections, prog);
@@ -264,8 +267,8 @@ export function pieceReadiness(sections: Section[], prog: PieceProgress | undefi
     memorisedSections: mem,
     unconfirmed: min > P ? min : 0,
     toward: P >= MAX_LEVEL ? null : { level: P + 1, done: towardDone, total: sections.length },
-    toFix: pendingFixes(sections, prog).filter((f) => f.active).map(({ level, sectionIds }) => ({ level, sectionIds })),
-    laterFixes: pendingFixes(sections, prog).filter((f) => !f.active).map(({ level, sectionIds }) => ({ level, sectionIds })),
+    toFix: pendingFixes(sections, prog),
+    clean: cleanLevels(prog),
     offBookDays: P === 4 ? prog?.full?.offBookDays?.length ?? 0 : 0,
   };
 }
@@ -294,24 +297,6 @@ export function sectionAccuracies(
   const out: Record<string, number> = {};
   for (const [id, e] of sum) out[id] = e.s / e.n;
   return out;
-}
-
-/**
- * Whether a full run's fix list at `level` locks that level (and leads Next up) even above the level
- * the singer is working toward. Only for a run that held there: at most half the sections slipped,
- * and either the run passed overall (an experienced singer going straight to level 3, one section
- * slipping), or it came within 10 points of the pass mark while every other section had already
- * passed that level before the run. Never for a beginner's failed run far above their level.
- */
-export function fixListLocks(o: {
-  level: number; accuracy: number; overallPassed: boolean; sections: number; slipped: string[];
-  /** Section levels before the run. */
-  levelsBefore: Record<string, number>;
-}): boolean {
-  if (!o.slipped.length || o.slipped.length * 2 > o.sections) return false;
-  if (o.overallPassed) return true;
-  const others = Object.entries(o.levelsBefore).filter(([id]) => !o.slipped.includes(id));
-  return o.accuracy >= levelSpec(o.level).pass - 0.1 && others.length > 0 && others.every(([, l]) => l >= o.level);
 }
 
 /** Fewer judged notes than this in a section: one weak note shouldn't decide a whole level. */
@@ -377,7 +362,7 @@ export interface NextStep {
   sectionId: string;
   level: number;
   reason: string;
-  /** fix = a section that slipped in a full run; full = a run-through of the whole piece. */
+  /** fix = a section that slipped in the full run that opened a level; full = a run-through of the whole piece. */
   kind: 'fix' | 'review' | 'full' | 'section';
 }
 
@@ -392,14 +377,21 @@ export function nextStep(sections: Section[], prog: PieceProgress | undefined, n
   const P = pieceLevel(sections, prog);
   const today = todayKey(now);
   const label = (id: string) => sections.find((s) => s.id === id)?.label ?? id;
-  // 1. Sections that slipped in a full run at the level being worked toward: fix them on their own
-  // before the next full run. (Slips in a run above that level are information only.)
-  const fix = pendingFixes(sections, prog).find((f) => f.active);
+  // 1. Sections that slipped in the full run that opened a level: fix them on their own and the
+  // piece reaches that level (no second full run).
+  const fix = pendingFixes(sections, prog)[0];
   if (fix) {
     const more = fix.sectionIds.length - 1;
+    // Off book: the days the piece will have been sung from memory once this list is done.
+    const days = new Set([...(prog?.full?.offBookDays ?? []), today]).size;
+    const goal = fix.level <= P
+      ? `: ${levelSpec(fix.level).everyNote ? 'not every note was right' : 'it slipped'} in your full run.`
+      : fix.level === 5 && days < OFF_BOOK_DAYS
+        ? ` to finish the whole piece from memory: day ${days} of ${OFF_BOOK_DAYS}.`
+        : ` to reach level ${fix.level}.`;
     return {
       sectionId: fix.sectionIds[0], level: fix.level, kind: 'fix',
-      reason: `Fix ${label(fix.sectionIds[0])} at level ${fix.level}: ${levelSpec(fix.level).everyNote ? 'not every note was right' : 'it slipped'} in your full run.${more ? ` ${more} more to fix, then` : ' Then'} sing it all again.`,
+      reason: `Fix ${label(fix.sectionIds[0])} at level ${fix.level}${goal}${more ? ` ${more} more to fix after this one.` : ''}`,
     };
   }
   // 2. Review the whole piece once a week.

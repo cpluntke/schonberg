@@ -72,7 +72,7 @@ For every note in your part:
     octave below, a fifth or a sixth off, or anything above the note always count. Each note
   result carries this as `unsure` (`'short'` / `'range'` / `'octave'` / `'tracker'`) and `clearly` (`'silent'` / `'off'`); see
   [LEVELS.md](LEVELS.md).
-- **Sections within a full run.** A run of the whole piece also scores each section (the average grade of its notes). The piece level needs the run *and* every section at the level's pass mark; see [LEVELS.md](LEVELS.md).
+- **Sections within a full run.** A run of the whole piece also scores each section (the average grade of its notes). A section below the level's pass mark within the run is “to fix”: the piece reaches the level once each of those passes on its own (and a run where more than half slipped is practice); see [LEVELS.md](LEVELS.md).
 - **Rhythm.** When each note starts: the first sustained (≥60 ms) sound that is closer to this note than to the previous one. This is judged separately from pitch.
 
 ## Device delay (latency)

@@ -309,12 +309,14 @@ describe('piece levels from full runs (docs/LEVELS.md)', () => {
   const oneSlips: G[] = [...good8, ...half8, ...good8];
   const counted = { counted: true };
 
-  it('a counted full run that passes grants the piece level and credits every section', async () => {
+  it('a clean run grants the piece level at once, with a clean-run star, and credits every section', async () => {
     const { recordFullRun } = await import('./store');
     const { pieceReadiness } = await import('./ladder');
     const now = at(2026, 10, 5);
     const r = recordFullRun('p', 'S', 3, run(allGood), secs, noteStart, { ...counted, now });
-    expect(r).toMatchObject({ counted: true, overallPassed: true, passed: true, prevLevel: 0, newLevel: 3, toFix: [] });
+    expect(r).toMatchObject({ counted: true, opened: true, clean: true, overallPassed: true, passed: true, prevLevel: 0, newLevel: 3, toFix: [] });
+    expect(getProgress('p', 'S')!.full?.clean).toEqual([3]);
+    expect(pieceReadiness(secs, getProgress('p', 'S')).clean).toEqual([3]);
     expect(r.sections.map((x) => x.passed)).toEqual([true, true, true]);
     const prog = getProgress('p', 'S')!;
     expect(prog.full).toMatchObject({ level: 3, attempts: 1, lastPassed: now });
@@ -324,11 +326,12 @@ describe('piece levels from full runs (docs/LEVELS.md)', () => {
     expect(personalBest('p', 'S', 'all', 3)?.accuracy).toBeCloseTo(run(allGood).accuracy);
   });
 
-  it('an overall pass with a section below the mark does not grant the level; the section is to fix', async () => {
+  it('a run with a section below the mark opens the level: the section is to fix, no star', async () => {
     const { recordFullRun } = await import('./store');
     const r = recordFullRun('p', 'S', 3, run(oneSlips), secs, noteStart, counted);
     expect(r.overallPassed).toBe(true);
-    expect(r.passed).toBe(false);
+    expect(r).toMatchObject({ opened: true, clean: false, passed: false });
+    expect(getProgress('p', 'S')!.full?.clean).toEqual([]);
     expect(r.newLevel).toBe(0);
     expect(r.toFix).toEqual(['s1']);
     const prog = getProgress('p', 'S')!;
@@ -338,21 +341,122 @@ describe('piece levels from full runs (docs/LEVELS.md)', () => {
     expect(prog.sections.s1).toBeUndefined();
   });
 
-  it('to-fix sections block the full run until each passes on its own', async () => {
+  it('the last section fixed on its own grants the level: no second full run', async () => {
     const { recordFullRun } = await import('./store');
     recordFullRun('p', 'S', 3, run(oneSlips), secs, noteStart, counted);
-    // A full run at 3 now can't count, however good.
-    const blocked = recordFullRun('p', 'S', 3, run(allGood), secs, noteStart, counted);
-    expect(blocked).toMatchObject({ counted: false, passed: false, newLevel: 0, blocked: ['s1'] });
-    expect(attemptLog().at(-1)?.sectionId).toBe('practice');
     // A failed or lower-level section run doesn't fix it.
     expect(recordAttempt('p', 'S', 's1', 3, res(0.6)).fixed).toBeUndefined();
     expect(recordAttempt('p', 'S', 's1', 2, res(0.95)).fixed).toBeUndefined();
-    // Passing it at level 3 on its own does.
-    expect(recordAttempt('p', 'S', 's1', 3, res(0.9)).fixed).toEqual([{ level: 3, remaining: 0 }]);
+    expect(getProgress('p', 'S')!.full?.level).toBe(0);
+    // Passing it at level 3 on its own does, and the piece reaches level 3.
+    const r = recordAttempt('p', 'S', 's1', 3, res(0.9));
+    expect(r.fixed).toEqual([{ level: 3, remaining: 0 }]);
+    expect(r.reached).toMatchObject({ level: 3, prevLevel: 0, newLevel: 3 });
+    const prog = getProgress('p', 'S')!;
+    expect(prog.full).toMatchObject({ level: 3, clean: [] });
+    expect(prog.full?.toFix).toBeUndefined();
+  });
+
+  // Four sections, eight notes each (note i starts at second i).
+  const secs4: Section[] = [0, 1, 2, 3].map((i) => ({
+    id: `s${i}`, index: i, label: `Bars ${i * 4 + 1}–${i * 4 + 4}`, startMeasure: i * 4, endMeasure: i * 4 + 3, start: i * 8, end: i * 8 + 8,
+  }));
+  const ns4 = (i: number) => (i >= 0 && i < 32 ? i : undefined);
+  const runOf = (...slip: number[]) => run([0, 1, 2, 3].flatMap((i) => (slip.includes(i) ? half8 : good8)));
+
+  it('a run that slips two of four sections, then those two fixed: the level, without a re-run', async () => {
+    const { recordFullRun } = await import('./store');
+    const { nextStep, pieceReadiness } = await import('./ladder');
+    const r = recordFullRun('p', 'S', 2, runOf(1, 3), secs4, ns4, counted);
+    expect(r).toMatchObject({ opened: true, passed: false, newLevel: 0, toFix: ['s1', 's3'] });
+    let prog = getProgress('p', 'S')!;
+    expect(pieceReadiness(secs4, prog).toFix).toEqual([{ level: 2, sectionIds: ['s1', 's3'] }]);
+    const n = nextStep(secs4, prog)!;
+    expect(n).toMatchObject({ sectionId: 's1', level: 2, kind: 'fix' });
+    expect(n.reason).toBe('Fix Bars 5–8 at level 2 to reach level 2. 1 more to fix after this one.');
+    expect(recordAttempt('p', 'S', 's1', 2, res(0.9)).fixed).toEqual([{ level: 2, remaining: 1 }]);
+    expect(getProgress('p', 'S')!.full?.level).toBe(0);
+    expect(nextStep(secs4, getProgress('p', 'S'))!.reason).toBe('Fix Bars 13–16 at level 2 to reach level 2.');
+    // Fixing at a higher level counts too.
+    expect(recordAttempt('p', 'S', 's3', 3, res(0.9)).reached).toMatchObject({ level: 2, newLevel: 2 });
+    prog = getProgress('p', 'S')!;
+    expect(pieceReadiness(secs4, prog)).toMatchObject({ pieceLevel: 2, toFix: [], clean: [] });
+  });
+
+  it('more than half of the sections slipped: practice, nothing changes', async () => {
+    const { recordFullRun } = await import('./store');
+    const { nextStep } = await import('./ladder');
+    // Two of three slipped.
+    const r = recordFullRun('p', 'S', 3, run([...good8, ...half8, ...half8]), secs, noteStart, counted);
+    expect(r).toMatchObject({ counted: true, opened: false, tooMuch: true, passed: false, toFix: [], newLevel: 0 });
+    let prog = getProgress('p', 'S')!;
+    expect(prog.full?.toFix).toBeUndefined();
+    expect(prog.full?.attempts).toBe(0);
+    expect(prog.sections.s0).toBeUndefined(); // practice: the section that held isn't credited either
+    expect(attemptLog().at(-1)?.sectionId).toBe('practice');
+    expect(nextStep(secs, prog)).toMatchObject({ sectionId: 's0', level: 1, kind: 'section' });
+    // Exactly half (two of four) still opens; three of four doesn't.
+    expect(recordFullRun('p', 'S', 2, runOf(0, 1), secs4, ns4, counted).opened).toBe(true);
+    const many = recordFullRun('p', 'S', 2, runOf(0, 1, 2), secs4, ns4, counted);
+    expect(many.tooMuch).toBe(true);
+    // …and leaves the open list from the run before as it was.
+    prog = getProgress('p', 'S')!;
+    expect(prog.full?.toFix).toEqual({ 2: ['s0', 's1'] });
+  });
+
+  it('a new run at the level replaces the open fix list with its own slips', async () => {
+    const { recordFullRun } = await import('./store');
+    recordFullRun('p', 'S', 2, runOf(1, 2), secs4, ns4, counted);
+    recordAttempt('p', 'S', 's1', 2, res(0.9)); // s1 fixed, s2 still to fix
+    expect(getProgress('p', 'S')!.full?.toFix).toEqual({ 2: ['s2'] });
+    // Again: s1 slips this time, s2 holds, s3 slips. s1 is back on the list (it didn't hold again).
+    let r = recordFullRun('p', 'S', 2, runOf(1, 3), secs4, ns4, counted);
+    expect(r.toFix).toEqual(['s1', 's3']);
+    expect(getProgress('p', 'S')!.full?.toFix).toEqual({ 2: ['s1', 's3'] });
+    // And a clean run settles it: the level and the star.
+    r = recordFullRun('p', 'S', 2, runOf(), secs4, ns4, counted);
+    expect(r).toMatchObject({ passed: true, clean: true, newLevel: 2 });
+    expect(getProgress('p', 'S')!.full).toMatchObject({ level: 2, clean: [2] });
     expect(getProgress('p', 'S')!.full?.toFix).toBeUndefined();
-    const r = recordFullRun('p', 'S', 3, run(allGood), secs, noteStart, counted);
-    expect(r).toMatchObject({ counted: true, passed: true, newLevel: 3 });
+  });
+
+  it('never lowers the piece level: slips in a run at or below it are to practise', async () => {
+    const { recordFullRun } = await import('./store');
+    const { nextStep } = await import('./ladder');
+    recordFullRun('p', 'S', 3, runOf(), secs4, ns4, counted);
+    let r = recordFullRun('p', 'S', 3, runOf(2), secs4, ns4, counted);
+    expect(r).toMatchObject({ opened: true, prevLevel: 3, newLevel: 3, toFix: ['s2'] });
+    expect(nextStep(secs4, getProgress('p', 'S'))!.reason).toBe('Fix Bars 9–12 at level 3: it slipped in your full run.');
+    r = recordFullRun('p', 'S', 2, runOf(0, 1), secs4, ns4, counted);
+    expect(r.newLevel).toBe(3);
+    expect(recordAttempt('p', 'S', 's2', 3, res(0.9)).reached).toMatchObject({ level: 3, prevLevel: 3, newLevel: 3 });
+    expect(getProgress('p', 'S')!.full?.level).toBe(3);
+    // Too much slipped at level 1: still level 3.
+    expect(recordFullRun('p', 'S', 1, runOf(0, 1, 2), secs4, ns4, counted).newLevel).toBe(3);
+    expect(getProgress('p', 'S')!.full).toMatchObject({ level: 3, clean: [3] });
+  });
+
+  it('level 5: the off-book run opens it, fixes finish it, and memorised still needs a second day', async () => {
+    const { recordFullRun } = await import('./store');
+    const { pieceReadiness, nextStep } = await import('./ladder');
+    const d1 = at(2026, 10, 5, 18);
+    let r = recordFullRun('p', 'S', 5, runOf(1), secs4, ns4, { ...counted, now: d1 });
+    expect(r).toMatchObject({ opened: true, newLevel: 0, offBookDays: 0, toFix: ['s1'] });
+    expect(nextStep(secs4, getProgress('p', 'S'), d1)!.reason).toBe('Fix Bars 5–8 at level 5 to finish the whole piece from memory: day 1 of 2.');
+    // Fixed the same day: sung from memory on one day, so concert-ready (4).
+    const fix = recordAttempt('p', 'S', 's1', 5, res(0.9), 10, d1 + 3600e3);
+    expect(fix.reached).toMatchObject({ level: 5, prevLevel: 0, newLevel: 4, offBookDays: 1 });
+    expect(pieceReadiness(secs4, getProgress('p', 'S'))).toMatchObject({ pieceLevel: 4, concertReady: true, memorised: false });
+    // Another off-book run the same day, with a slip fixed: still day 1.
+    recordFullRun('p', 'S', 5, runOf(2), secs4, ns4, { ...counted, now: d1 + 2 * 3600e3 });
+    expect(recordAttempt('p', 'S', 's2', 5, res(0.9), 10, d1 + 3 * 3600e3).reached).toMatchObject({ newLevel: 4, offBookDays: 1 });
+    // Day 2 needs the off-book full run again; its fixes then count.
+    const d2 = d1 + DAY;
+    expect(nextStep(secs4, getProgress('p', 'S'), d2)).toMatchObject({ sectionId: 'all', level: 5, kind: 'full' });
+    r = recordFullRun('p', 'S', 5, runOf(3), secs4, ns4, { ...counted, now: d2 });
+    expect(r).toMatchObject({ newLevel: 4, toFix: ['s3'] });
+    expect(recordAttempt('p', 'S', 's3', 5, res(0.9), 10, d2 + 600e3).reached).toMatchObject({ level: 5, prevLevel: 4, newLevel: 5, offBookDays: 2 });
+    expect(pieceReadiness(secs4, getProgress('p', 'S')).memorised).toBe(true);
   });
 
   it('a run at the next level is open while lower fixes are pending, and a pass settles them', async () => {
@@ -378,26 +482,6 @@ describe('piece levels from full runs (docs/LEVELS.md)', () => {
     expect(getProgress('p', 'S')!.full?.toFix).toBeUndefined();
   });
 
-  it('a beginner’s failed high-level run never locks or leads, even when some sections held', async () => {
-    const { recordFullRun } = await import('./store');
-    const { nextStep, fixesBefore } = await import('./ladder');
-    const miss8: G[] = Array(8).fill('miss');
-    const perfect8: G[] = Array(8).fill('perfect');
-    // Two sections at level 4: one perfect, one all missed (50% overall).
-    const two = secs.slice(0, 2);
-    recordFullRun('p', 'S', 4, run([...perfect8, ...miss8]), two, noteStart, counted);
-    let prog = getProgress('p', 'S')!;
-    expect(prog.sections.s0.level).toBe(4); // the section that held is credited…
-    expect(fixesBefore(two, prog, 4)).toEqual([]); // …but its own credit doesn't make the list lock
-    expect(nextStep(two, prog)).toMatchObject({ sectionId: 's1', level: 1, kind: 'section' });
-    // Three sections at level 3, two held, overall 67%: no lock either.
-    _resetAllForTests(); localStorage.clear();
-    recordFullRun('p', 'S', 3, run([...perfect8, ...perfect8, ...miss8]), secs, noteStart, counted);
-    prog = getProgress('p', 'S')!;
-    expect(fixesBefore(secs, prog, 3)).toEqual([]);
-    expect(nextStep(secs, prog)?.kind).toBe('section');
-  });
-
   it('a section with no real score is never credited, slack or not', async () => {
     const { recordFullRun } = await import('./store');
     // s2 has a single missed note.
@@ -407,17 +491,15 @@ describe('piece levels from full runs (docs/LEVELS.md)', () => {
     expect(getProgress('p', 'S')!.sections.s2).toBeUndefined();
   });
 
-  it('a new singer failing a run far above their level gets no lock and keeps their Next up', async () => {
+  it('a new singer whose run far above their level slips everywhere: practice, Next up unchanged', async () => {
     const { recordFullRun } = await import('./store');
-    const { nextStep, fixesBefore } = await import('./ladder');
+    const { nextStep } = await import('./ladder');
     const bad: G[] = [...half8, ...half8, ...half8];
     const r = recordFullRun('p', 'S', 5, run(bad), secs, noteStart, counted);
-    expect(r.toFix).toEqual(['s0', 's1', 's2']);
+    expect(r).toMatchObject({ tooMuch: true, toFix: [] });
+    expect(r.sections.every((x) => !x.passed)).toBe(true);
     const prog = getProgress('p', 'S')!;
-    expect(fixesBefore(secs, prog, 5)).toEqual([]);
     expect(nextStep(secs, prog)).toMatchObject({ sectionId: 's0', level: 1, kind: 'section' });
-    // Trying level 5 again counts (no lock).
-    expect(recordFullRun('p', 'S', 5, run(bad), secs, noteStart, counted).counted).toBe(true);
   });
 
   it('a short section is not failed by one weak note', async () => {
@@ -441,7 +523,9 @@ describe('piece levels from full runs (docs/LEVELS.md)', () => {
   it('late entries fail the run even with the right notes', async () => {
     const { recordFullRun } = await import('./store');
     const r = recordFullRun('p', 'S', 3, run(allGood), secs, noteStart, { counted: true, timingFail: true });
-    expect(r).toMatchObject({ counted: true, overallPassed: false, passed: false, toFix: [] });
+    expect(r).toMatchObject({ counted: true, opened: false, overallPassed: false, passed: false, toFix: [] });
+    expect(r.tooMuch).toBeUndefined();
+    expect(attemptLog().at(-1)?.sectionId).toBe('practice');
     expect(getProgress('p', 'S')!.sections.s0).toBeUndefined();
   });
 
@@ -492,6 +576,78 @@ describe('piece levels from full runs (docs/LEVELS.md)', () => {
     expect(after.sections.s1.level).toBe(4);
     expect(after.sections.all.level).toBe(4); // left alone, ignored
     expect(after.totalAttempts).toBe(11);
+  });
+});
+
+describe('progress saved under the earlier level rules (upgradeFullRuns)', () => {
+  const secs: Section[] = [0, 1, 2, 3].map((i) => ({
+    id: `s${i}`, index: i, label: `Bars ${i * 4 + 1}–${i * 4 + 4}`, startMeasure: i * 4, endMeasure: i * 4 + 3, start: i * 8, end: i * 8 + 8,
+  }));
+  const T0 = at(2026, 9, 20);
+  const sec = (level: number, lastPassed: number) => ({ level, best: { [level]: 0.9 }, attempts: 2, lastPassed, lastPracticed: lastPassed });
+  const entry = (sectionId: string, level: number, t: number, passed: boolean, accuracy = 0.82) =>
+    ({ at: t, pieceId: 'p', partId: 'S', sectionId, level, accuracy, score: 800, passed });
+  const store = (prog: object, log: object[]) => {
+    localStorage.setItem('sh:progress:p:S', JSON.stringify({ pieceId: 'p', partId: 'S', totalAttempts: 5, bestScore: 900, ...prog }));
+    localStorage.setItem('sh:log', JSON.stringify(log));
+  };
+
+  it('a fix list done since the run grants the level (no second run needed any more)', async () => {
+    const { upgradeFullRuns } = await import('./store');
+    // Level-2 run at T0: s1 slipped (overall 82%); the others held (credited at T0). s1 passed level 2 later; the list was cleared.
+    store({
+      sections: { s0: sec(2, T0), s1: sec(2, T0 + DAY), s2: sec(2, T0), s3: sec(3, T0) },
+      full: { level: 1, best: { 1: 0.9, 2: 0.82 }, attempts: 2, lastPracticed: T0, lastPassed: T0 - DAY },
+    }, [entry('all', 1, T0 - DAY, true), entry('all', 2, T0, false), entry('s1', 2, T0 + DAY, true, 0.9)]);
+    expect(upgradeFullRuns('p', 'S', secs)).toBe(true);
+    const full = getProgress('p', 'S')!.full!;
+    expect(full.level).toBe(2);
+    expect(full.lastPassed).toBe(T0 + DAY);
+    // The passed level-1 run is a clean run.
+    expect(full.clean).toEqual([1]);
+    // Idempotent.
+    expect(upgradeFullRuns('p', 'S', secs)).toBe(false);
+  });
+
+  it('not while a section is still to fix, nor from a run far off the mark; never lowers', async () => {
+    const { upgradeFullRuns } = await import('./store');
+    const sections = { s0: sec(3, T0), s1: sec(3, T0 + DAY), s2: sec(3, T0), s3: sec(3, T0) };
+    store({ sections, full: { level: 1, best: { 1: 0.9, 3: 0.84 }, attempts: 2, lastPracticed: T0, toFix: { 3: ['s2'] }, clean: [1] } },
+      [entry('all', 3, T0, false, 0.84)]);
+    expect(upgradeFullRuns('p', 'S', secs)).toBe(false);
+    expect(getProgress('p', 'S')!.full?.level).toBe(1);
+    // That list is open under the new rules: fixing s2 now grants level 3.
+    expect(recordAttempt('p', 'S', 's2', 3, res(0.9), 10, T0 + 2 * DAY).reached).toMatchObject({ level: 3, newLevel: 3 });
+    // A run 30 points under the mark (most of it slipped back then): no level from it.
+    localStorage.clear(); _resetAllForTests();
+    store({ sections, full: { level: 0, best: { 3: 0.5 }, attempts: 1, lastPracticed: T0 } }, [entry('all', 3, T0, false, 0.5)]);
+    upgradeFullRuns('p', 'S', secs);
+    expect(getProgress('p', 'S')!.full?.level).toBe(0);
+    // A piece already above the run's level keeps its level.
+    localStorage.clear(); _resetAllForTests();
+    store({ sections, full: { level: 4, best: { 2: 0.82, 4: 0.9 }, attempts: 3, lastPracticed: T0 } }, [entry('all', 4, T0 - DAY, true), entry('all', 2, T0, false)]);
+    upgradeFullRuns('p', 'S', secs);
+    expect(getProgress('p', 'S')!.full).toMatchObject({ level: 4, clean: [4] });
+  });
+
+  it('clean-run stars from the history, or from the piece level when the log has none', async () => {
+    const { upgradeFullRuns } = await import('./store');
+    const sections = { s0: sec(3, T0), s1: sec(3, T0), s2: sec(3, T0), s3: sec(3, T0) };
+    store({ sections, full: { level: 3, best: { 2: 0.9, 3: 0.88 }, attempts: 2 } }, [entry('all', 2, T0 - DAY, true), entry('all', 3, T0, true)]);
+    upgradeFullRuns('p', 'S', secs);
+    expect(getProgress('p', 'S')!.full?.clean).toEqual([2, 3]);
+    // No log (a new phone, or trimmed): the piece level was a clean run at that level…
+    localStorage.clear(); _resetAllForTests();
+    store({ sections, full: { level: 3, best: { 3: 0.88 }, attempts: 1 } }, []);
+    upgradeFullRuns('p', 'S', secs);
+    expect(getProgress('p', 'S')!.full?.clean).toEqual([3]);
+    // …or at level 5 when the piece was passed off book.
+    localStorage.clear(); _resetAllForTests();
+    store({ sections, full: { level: 4, best: { 5: 0.9 }, attempts: 1, offBookDays: ['2026-09-20'] } }, []);
+    upgradeFullRuns('p', 'S', secs);
+    expect(getProgress('p', 'S')!.full?.clean).toEqual([5]);
+    // A record this version already wrote keeps its stars as they are.
+    expect(upgradeFullRuns('p', 'S', secs)).toBe(false);
   });
 });
 

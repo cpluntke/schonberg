@@ -252,20 +252,86 @@ test('a perfect simulated full run at level 1 grants piece level 1', async ({ pa
   expect(errors).toEqual([]);
 });
 
-// A new singer whose full run far above their level fails: the slips are shown, nothing locks,
-// and the next step is still level 1 of the first section.
-test('a failed full run above the singer’s level does not take over Next up', async ({ page }) => {
+// A new singer whose full run far above their level slips everywhere: too much slipped for it to
+// count (practice), nothing to fix, and the next step is still level 1 of the first section.
+test('a full run where most sections slip is practice and does not take over Next up', async ({ page }) => {
   test.setTimeout(150_000);
   await page.goto('/?simulate=flat#/piece/warmup-chorale');
   await expect(page.getByTestId('full-run-card')).toBeVisible({ timeout: 20_000 });
   await page.getByTestId('full-4').click();
   await page.getByTestId('start').click();
-  await expect(page.getByTestId('pass-banner')).toContainText('Not yet', { timeout: 120_000 });
+  await expect(page.getByTestId('pass-banner')).toContainText('Too much slipped for this run to count', { timeout: 120_000 });
   await expect(page.getByTestId('fix-first')).toHaveCount(0);
+  await expect(page.getByTestId('full-section-fix')).toHaveCount(0);
   await page.goto('/#/piece/warmup-chorale');
   await expect(page.getByTestId('piece-next')).toContainText('level 1');
-  await expect(page.getByTestId('later-fix')).toBeVisible();
+  await expect(page.getByTestId('to-fix')).toHaveCount(0);
   await expect(page.getByTestId('full-4')).toBeEnabled();
+});
+
+/** Section ids and the singer's part of a built-in piece (vite serves the app's own modules). */
+async function pieceInfo(page: import('@playwright/test').Page, pieceId: string) {
+  return page.evaluate(async (id) => {
+    const lib = await import('/src/ui/library.ts');
+    await lib.ensureLoaded();
+    const piece = lib.getPiece(id)!;
+    const partId = lib.chosenPartId(piece, 'S');
+    return { partId, ids: lib.singableSections(piece, partId).map((s) => s.id) };
+  }, pieceId);
+}
+
+// The fix list after a full run (docs/LEVELS.md): fixing the section that slipped on its own
+// reaches the level, with no second full run, and the full run is open all along.
+test('fixing the section that slipped in a full run reaches the piece level without a re-run', async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await page.goto('/#/piece/warmup-chorale');
+  await expect(page.getByTestId('full-run-card')).toBeVisible({ timeout: 20_000 });
+  const { partId, ids } = await pieceInfo(page, 'warmup-chorale');
+  const t = Date.now() - 3_600_000;
+  await page.evaluate(({ partId, ids, t }) => {
+    // A counted level-1 run an hour ago: the second section held, the first slipped.
+    localStorage.setItem(`sh:progress:warmup-chorale:${partId}`, JSON.stringify({
+      pieceId: 'warmup-chorale', partId, totalAttempts: 1, bestScore: 900,
+      sections: { [ids[1]]: { level: 1, best: { 1: 0.95 }, attempts: 0, lastPassed: t, lastPracticed: t } },
+      full: { level: 0, best: { 1: 0.9 }, attempts: 1, lastPracticed: t, toFix: { 1: [ids[0]] }, clean: [] },
+    }));
+  }, { partId, ids, t });
+  await page.goto('/?simulate=perfect#/piece/warmup-chorale');
+  await expect(page.getByTestId('to-fix')).toContainText('No need to sing it all again');
+  await expect(page.getByTestId('piece-next')).toContainText('Fix');
+  await expect(page.getByTestId('full-1')).toBeEnabled();
+  await page.getByTestId('piece-next').click();
+  await page.getByTestId('hp-yes').click();
+  await page.getByTestId('start').click();
+  await expect(page.getByTestId('fixed-banner')).toContainText('Piece level 1 reached', { timeout: 90_000 });
+  await page.goto('/#/piece/warmup-chorale');
+  await expect(page.getByTestId('piece-level')).toHaveText(/Piece level 1/);
+  await expect(page.getByTestId('to-fix')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+// Progress saved under the earlier rules: a fix list already done (the singer still owed the second
+// full run) reaches its level on load, and a passed full run in the history is a clean-run star.
+test('progress saved under the earlier rules is upgraded on load', async ({ page }) => {
+  await page.goto('/#/piece/warmup-chorale');
+  await expect(page.getByTestId('full-run-card')).toBeVisible({ timeout: 20_000 });
+  const { partId, ids } = await pieceInfo(page, 'warmup-chorale');
+  const t = Date.now() - 2 * 86_400_000;
+  await page.evaluate(({ partId, ids, t }) => {
+    const e = (sectionId: string, level: number, at: number, passed: boolean) => ({ at, pieceId: 'warmup-chorale', partId, sectionId, level, accuracy: 0.84, score: 800, passed });
+    localStorage.setItem(`sh:progress:warmup-chorale:${partId}`, JSON.stringify({
+      pieceId: 'warmup-chorale', partId, totalAttempts: 6, bestScore: 900,
+      sections: { [ids[0]]: { level: 2, best: { 2: 0.9 }, attempts: 2, lastPassed: t + 3600e3 }, [ids[1]]: { level: 2, best: { 2: 0.9 }, attempts: 1, lastPassed: t } },
+      full: { level: 1, best: { 1: 0.9, 2: 0.84 }, attempts: 2, lastPracticed: t, lastPassed: t - 86_400_000 },
+    }));
+    localStorage.setItem('sh:log', JSON.stringify([e('all', 1, t - 86_400_000, true), e('all', 2, t, false), e(ids[0], 2, t + 3600e3, true)]));
+  }, { partId, ids, t });
+  await page.reload();
+  await expect(page.getByTestId('piece-level')).toHaveText(/Piece level 2/, { timeout: 20_000 });
+  await expect(page.getByTestId('clean-stars')).toContainText('level 1');
+  await expect(page.getByTestId('star-1')).toBeVisible();
 });
 
 test('a flat simulated singer does not pass level 4', async ({ page }) => {

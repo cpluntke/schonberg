@@ -89,7 +89,7 @@ export function trackPlayRun(r: PlayRun): void {
       timingFail: r.timingFail != null,
       aligned: !!r.alignedMs,
       latency: r.latencyUsedMs != null ? { ms: r.latencyUsedMs, source: r.latencySource === 'measured' ? 'measured' : r.latencySource === 'learned' ? 'learned' : 'est' } : undefined,
-      full: r.full ? { counted: r.full.counted, toFix: r.full.toFix.length, blocked: !!r.full.blocked } : undefined,
+      full: r.full ? { counted: r.full.opened, toFix: r.full.toFix.length, tooMuch: !!r.full.tooMuch } : undefined,
       rehearsalReadyAfterDays: ready,
     });
   } catch { /* statistics never break a run */ }

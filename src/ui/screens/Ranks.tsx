@@ -158,7 +158,7 @@ export function Ranks() {
               <span style={{ width: 36, height: 36, borderRadius: 18, background: 'var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13 }}>{initials(e.name)}</span>
               <div className="grow col" style={{ gap: 0 }}>
                 <span style={{ fontWeight: 600 }}>{isMe ? (profile.name ? `${e.name} (you)` : 'You') : e.name}</span>
-                <span className="tiny muted">{[({ S: 'Soprano', A: 'Alto', T: 'Tenor', B: 'Bass' } as Record<string, string>)[e.voice], e.streak > 0 ? `${e.streak}-day streak` : '', old ? 'older app: readiness not comparable' : ''].filter(Boolean).join(' · ')}</span>
+                <span className="tiny muted">{[({ S: 'Soprano', A: 'Alto', T: 'Tenor', B: 'Bass' } as Record<string, string>)[e.voice], e.streak > 0 ? `${e.streak}-day streak` : '', e.clean ? `★ clean run at level ${e.clean}` : '', old ? 'older app: readiness not comparable' : ''].filter(Boolean).join(' · ')}</span>
               </div>
               <span className="mono" style={{ fontWeight: 600 }}>{metric(e)}</span>
               {!isMe && backend.kind === 'local' && (

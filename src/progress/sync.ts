@@ -14,7 +14,7 @@
 // win, newer dates win.
 
 import {
-  allProgress, getProgress, keysWithPrefix, loadCycle, loadProfile, progressKey, rawGet, rawRemove, rawSet,
+  allProgress, getProgress, keysWithPrefix, loadCycle, loadProfile, progressKey, rawGet, rawRemove, rawSet, reachLevel,
   readinessHistory, readJSON, saveCycle, saveProfile, snapshotReadiness, writeJSON,
   type Cycle, type FullRunProgress, type PieceProgress, type Profile, type SectionProgress,
 } from './store';
@@ -46,7 +46,7 @@ const TIP_KEY = 'sh:accountTip';
 /** A section: level, last passed, last practised, attempts, best % per level 1…5, off-book days. */
 export type SectionC = [number, number, number, number, number[], string[]?];
 /** The full-run record; `pt` = last practised to the millisecond (it decides whose to-fix lists win). */
-export interface FullC { l: number; b: number[]; a: number; lp: number; pr: number; pt?: number; ob?: string[]; fx?: Record<string, string[]>; fk?: number[] }
+export interface FullC { l: number; b: number[]; a: number; lp: number; pr: number; pt?: number; ob?: string[]; fx?: Record<string, string[]>; fk?: number[]; cl?: number[] }
 /**
  * Bars m, m+1, … one character each (0…63 → 0…1, '.' = not sung, `!n!` = n bars not sung): recent
  * accuracy, from memory, off book; `at` = when last sung.
@@ -144,6 +144,8 @@ function encodeFull(f: FullRunProgress, h: number): FullC {
   if (f.toFix && Object.keys(f.toFix).length) out.fx = Object.fromEntries(Object.entries(f.toFix).map(([k, ids]) => [k, ids.slice(0, MAX_SECTIONS)]));
   const locks = Object.keys(f.toFixLocks ?? {}).filter((k) => f.toFixLocks![Number(k)]).map(Number);
   if (locks.length) out.fk = locks;
+  // Clean-run stars (kept even when empty: it marks a record already under the current rules).
+  if (Array.isArray(f.clean)) out.cl = f.clean.filter((l) => Number.isInteger(l) && l >= 1 && l <= 5);
   return out;
 }
 function decodeFull(c: unknown, h: number): FullRunProgress | undefined {
@@ -169,6 +171,7 @@ function decodeFull(c: unknown, h: number): FullRunProgress | undefined {
     for (const k of c.fk) if (typeof k === 'number' && f.toFix[k]) locks[k] = true;
     if (Object.keys(locks).length) f.toFixLocks = locks;
   }
+  if (Array.isArray(c.cl)) f.clean = [...new Set(c.cl.filter((l): l is number => Number.isInteger(l) && l >= 1 && l <= 5))].sort((a, b) => a - b);
   return f;
 }
 
@@ -297,6 +300,8 @@ export function mergeFull(l: FullRunProgress | undefined, r: FullRunProgress | u
     lastPracticed: maxOpt(l.lastPracticed, r.lastPracticed),
     lastPassed: maxOpt(l.lastPassed, r.lastPassed),
     offBookDays: unionDays(l.offBookDays, r.offBookDays),
+    // Stars are only ever earned: the union (absent on both = saved by an earlier version).
+    clean: l.clean || r.clean ? [...new Set([...(l.clean ?? []), ...(r.clean ?? [])])].sort((a, b) => a - b) : undefined,
   });
   const runAt = newer.lastPracticed ?? 0;
   // Both phones know the same latest run: its lists only ever shrink (a section passed on its own),
@@ -305,6 +310,7 @@ export function mergeFull(l: FullRunProgress | undefined, r: FullRunProgress | u
   const olderFix = newer === l ? r.toFix : l.toFix;
   const toFix: Record<number, string[]> = {};
   const locks: Record<number, boolean> = {};
+  const done: { lvl: number; at: number }[] = [];
   for (const [k, ids] of Object.entries(newer.toFix ?? {})) {
     const lvl = Number(k);
     const left = ids.filter((id) => {
@@ -315,10 +321,13 @@ export function mergeFull(l: FullRunProgress | undefined, r: FullRunProgress | u
     if (left.length) {
       toFix[lvl] = left;
       if (newer.toFixLocks?.[lvl]) locks[lvl] = true;
-    }
+    } else if (ids.length) done.push({ lvl, at: Math.max(...ids.map((id) => sections[id]?.lastPassed ?? 0)) });
   }
   if (Object.keys(toFix).length) out.toFix = toFix;
   if (Object.keys(locks).length) out.toFixLocks = locks;
+  // A list whose last sections were fixed on the other phone: the piece reaches its level, as it
+  // would on one phone (docs/LEVELS.md).
+  for (const d of done.sort((a, b) => a.lvl - b.lvl)) { out.clean ??= []; reachLevel(out, d.lvl, d.at); }
   return out;
 }
 

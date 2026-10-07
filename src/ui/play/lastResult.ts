@@ -1,6 +1,6 @@
 import type { AttemptResult } from '../../game/types';
 import type { WordsResult, WordsStage } from '../../game/textrhythm';
-import type { FullRunRecord } from '../../progress/store';
+import type { FullRunRecord, PieceReach } from '../../progress/store';
 
 export interface LastResult {
   pieceId: string;
@@ -46,6 +46,8 @@ export interface LastResult {
   full?: FullRunRecord;
   /** A section pass that cleared it from a full run's to-fix list (level, sections left to fix there). */
   fixed?: { level: number; remaining: number }[];
+  /** That section pass was the last fix at a level: the whole piece reached it. */
+  reached?: PieceReach;
 }
 
 let last: LastResult | null = null;

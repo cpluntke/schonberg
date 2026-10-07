@@ -69,6 +69,19 @@ describe('merging never downgrades', () => {
     expect(mergeFull(newer, older, sections)!.toFix).toEqual({ 2: ['b'], 3: ['c'] });
   });
 
+  it('a fix list finished on the other phone reaches its level; clean-run stars are united', () => {
+    const run: FullRunProgress = { level: 1, best: {}, attempts: 2, lastPracticed: T + DAY, toFix: { 2: ['a'] }, clean: [1] };
+    const other: FullRunProgress = { level: 1, best: {}, attempts: 2, lastPracticed: T, clean: [3] };
+    const sections = { a: sec({ level: 2, lastPassed: T + 2 * DAY }) };
+    const m = mergeFull(other, run, sections)!;
+    expect(m.toFix).toBeUndefined();
+    expect(m.level).toBe(2);
+    expect(m.lastPassed).toBe(T + 2 * DAY);
+    expect(m.clean).toEqual([1, 3]);
+    // Absent on both (earlier versions): stays absent, for the upgrade to work out.
+    expect(mergeFull({ level: 1, best: {}, attempts: 1 }, { level: 1, best: {}, attempts: 1 }, {})!.clean).toBeUndefined();
+  });
+
   it('bars: the more recently sung copy wins, bars only one phone has are kept', () => {
     const l: BarMap = { 1: { ema: 0.9, n: 5, at: T }, 2: { ema: 0.4, n: 2, at: T + DAY } };
     const r: BarMap = { 1: { ema: 0.5, n: 1, at: T - DAY }, 2: { ema: 0.8, n: 1, at: T + 2 * DAY }, 3: { ema: 0.7, n: 1, at: T } };
@@ -102,14 +115,14 @@ describe('compact format', () => {
     const prog = piece({
       sections: { 's0-m1-8': sec({ level: 5, best: { 1: 0.913, 3: 0.8, 5: 0.86 }, attempts: 9, lastPassed: T + 59_999, lastPracticed: T - 5 * DAY, offBookDays: ['2026-09-01', '2026-09-02'] }) },
       totalAttempts: 30, bestScore: 1234.4,
-      full: { level: 2, best: { 1: 0.9, 2: 0.85 }, attempts: 4, lastPracticed: T, lastPassed: T, toFix: { 3: ['s0-m1-8'] }, toFixLocks: { 3: true } },
+      full: { level: 2, best: { 1: 0.9, 2: 0.85 }, attempts: 4, lastPracticed: T, lastPassed: T, toFix: { 3: ['s0-m1-8'] }, toFixLocks: { 3: true }, clean: [1] },
     });
     const pc = encodePiece(prog, {}, { 's0-m1-8': { passed: 1, best: { 1: 0.9 }, at: T } }, ['2026-10-01', 0.4567]);
     const d = decodePiece('p', 'P1', JSON.parse(JSON.stringify(pc)))!;
     const s = d.progress.sections['s0-m1-8'];
     expect(s).toMatchObject({ level: 5, attempts: 9, lastPassed: T, lastPracticed: T - 5 * DAY, offBookDays: ['2026-09-01', '2026-09-02'] });
     expect(s.best).toEqual({ 1: 0.91, 3: 0.8, 5: 0.86 });
-    expect(d.progress.full).toMatchObject({ level: 2, attempts: 4, toFix: { 3: ['s0-m1-8'] }, toFixLocks: { 3: true } });
+    expect(d.progress.full).toMatchObject({ level: 2, attempts: 4, toFix: { 3: ['s0-m1-8'] }, toFixLocks: { 3: true }, clean: [1] });
     expect(d.progress).toMatchObject({ totalAttempts: 30, bestScore: 1234 });
     expect(d.words).toEqual({ 's0-m1-8': 1 });
     expect(d.readiness).toEqual(['2026-10-01', 0.457]);

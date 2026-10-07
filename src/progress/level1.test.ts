@@ -242,35 +242,44 @@ describe('level 1: full runs', () => {
   }));
   const noteStart = (i: number) => (i >= 0 && i < 24 ? i : undefined);
 
-  it('marks exactly the sections with a wrong note as to fix at level 1', () => {
+  it('marks exactly the sections with a wrong note; two of three is too much for the run to count', () => {
     const notes: N[] = good(24);
     notes[3] = { grade: 'miss', cents: -80, hitRatio: 0 }; // s0: a flat long note
     notes[13] = { grade: 'ok', unsure: 'short', hitRatio: 0.4 }; // s1: a short "ok" note, forgiven
     notes[20] = { grade: 'miss', unsure: 'short', clearly: 'off', hitRatio: 0 }; // s2: clearly wrong
     const r = recordFullRun('p', 'S', 1, result(notes), secs, noteStart, { counted: true });
-    expect(r.passed).toBe(false);
-    expect(r.overallPassed).toBe(false);
-    expect(r.toFix).toEqual(['s0', 's2']);
+    expect(r).toMatchObject({ passed: false, overallPassed: false, opened: false, tooMuch: true, toFix: [] });
     expect(r.sections.map((x) => [x.id, x.passed, x.wrong ?? []])).toEqual([['s0', false, [3]], ['s1', true, []], ['s2', false, [20]]]);
+    expect(getProgress('p', 'S')!.full?.toFix).toBeUndefined();
+  });
+
+  it('one section with a wrong note: level 1 is open, and fixing that section on its own reaches it', () => {
+    const notes: N[] = good(24);
+    notes[3] = { grade: 'miss', cents: -80, hitRatio: 0 }; // s0: a flat long note
+    notes[13] = { grade: 'ok', unsure: 'short', hitRatio: 0.4 }; // s1: a short "ok" note, forgiven
+    const r = recordFullRun('p', 'S', 1, result(notes), secs, noteStart, { counted: true });
+    expect(r).toMatchObject({ opened: true, passed: false, clean: false, toFix: ['s0'] });
     const prog = getProgress('p', 'S')!;
-    expect(prog.full?.toFix).toEqual({ 1: ['s0', 's2'] });
+    expect(prog.full?.toFix).toEqual({ 1: ['s0'] });
     expect(prog.full?.level).toBe(0);
-    // The section that held is credited; the next step is fixing s0 at level 1.
+    // The sections that held are credited; the next step is fixing s0 at level 1.
     expect(prog.sections.s1.level).toBe(1);
     expect(nextStep(secs, prog)).toMatchObject({ sectionId: 's0', level: 1, kind: 'fix' });
-    expect(nextStep(secs, prog)!.reason).toMatch(/not every note was right/);
-    // s0 passes on its own (every note right): it comes off the list; s2 is still to fix.
-    expect(recordAttempt('p', 'S', 's0', 1, result(good(8))).fixed).toEqual([{ level: 1, remaining: 1 }]);
+    expect(nextStep(secs, prog)!.reason).toBe('Fix Bars 1–4 at level 1 to reach level 1.');
     // A section attempt with a wrong note doesn't clear it.
-    expect(recordAttempt('p', 'S', 's2', 1, result([...good(7), { grade: 'miss', cents: 90, hitRatio: 0 }])).passed).toBe(false);
-    expect(getProgress('p', 'S')!.full?.toFix).toEqual({ 1: ['s2'] });
+    expect(recordAttempt('p', 'S', 's0', 1, result([...good(7), { grade: 'miss', cents: 90, hitRatio: 0 }])).passed).toBe(false);
+    expect(getProgress('p', 'S')!.full?.toFix).toEqual({ 1: ['s0'] });
+    // Every note right on its own: piece level 1, no second run.
+    const fix = recordAttempt('p', 'S', 's0', 1, result(good(8)));
+    expect(fix).toMatchObject({ fixed: [{ level: 1, remaining: 0 }], reached: { level: 1, newLevel: 1 } });
+    expect(getProgress('p', 'S')!.full?.level).toBe(1);
   });
 
   it('grants piece level 1 only when every section had every note right, in one go', () => {
     expect(recordFullRun('p', 'S', 1, result(good(24)), secs, noteStart, { counted: false }).passed).toBe(false);
     expect(getProgress('p', 'S')!.full?.level ?? 0).toBe(0);
     const r = recordFullRun('p', 'S', 1, result(good(24)), secs, noteStart, { counted: true });
-    expect(r).toMatchObject({ counted: true, passed: true, newLevel: 1, toFix: [] });
+    expect(r).toMatchObject({ counted: true, passed: true, clean: true, newLevel: 1, toFix: [] });
   });
 
   it('the short-section slack doesn’t apply at level 1', () => {

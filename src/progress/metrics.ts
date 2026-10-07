@@ -185,7 +185,8 @@ export interface RunFacts {
   timingFail?: boolean;
   aligned?: boolean;
   latency?: { ms: number; source: 'measured' | 'learned' | 'est' };
-  full?: { counted: boolean; toFix: number; blocked: boolean };
+  /** counted = the run opened its level; tooMuch = more than half slipped (practice); blocked = earlier rules (a fix list locked the run). */
+  full?: { counted: boolean; toFix: number; tooMuch?: boolean; blocked?: boolean };
   /** The piece became rehearsal-ready in this run: calendar days since it was first practised. */
   rehearsalReadyAfterDays?: number;
 }
@@ -223,6 +224,7 @@ export function trackRun(f: RunFacts, now: number = Date.now()): void {
   if (f.latency) trackOnce('lat.', `lat.${f.latency.source}.${latencyBucket(f.latency.ms)}`, now);
   if (f.full) {
     if (f.full.blocked) track('full.blocked', 1, now);
+    else if (f.full.tooMuch) track('full.toomuch', 1, now);
     else if (f.full.counted) track(f.full.toFix ? 'full.tofix' : 'full.clean', 1, now);
   }
   if (f.rehearsalReadyAfterDays != null) track(`t2rr.${daysBucket(f.rehearsalReadyAfterDays)}`, 1, now);

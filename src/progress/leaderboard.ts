@@ -2,7 +2,7 @@
 // Backend is optional: HTTP if VITE_LEADERBOARD_URL is set, else a local (offline) store
 // that holds your own entry plus entries imported from share codes.
 import type { Section, VoiceType } from '../music/types';
-import { pieceReadiness } from './ladder';
+import { cleanLevels, pieceReadiness } from './ladder';
 import {
   attemptLog, getProgress, loadProfile, readJSON, readinessHistory, snapshotReadiness,
   streakDays, writeJSON, dayKey,
@@ -25,6 +25,11 @@ export interface LeaderboardEntry {
    * entries from older app versions (readiness from section levels alone, so not comparable).
    */
   v?: number;
+  /**
+   * Highest level with a clean-run star (a full run with every section right, docs/LEVELS.md).
+   * Optional and not part of readiness; the choir server keeps it only once its validator knows it.
+   */
+  clean?: number;
 }
 
 /** Current readiness formula (see LeaderboardEntry.v). */
@@ -43,7 +48,9 @@ export function computeMyEntry(
   now: number = Date.now(),
 ): LeaderboardEntry {
   const profile = loadProfile();
-  const readiness = pieceReadiness(sections, getProgress(pieceId, partId)).pct;
+  const prog = getProgress(pieceId, partId);
+  const readiness = pieceReadiness(sections, prog).pct;
+  const stars = cleanLevels(prog);
   snapshotReadiness(pieceId, partId, readiness, now);
 
   const since = now - 7 * DAY_MS;
@@ -74,6 +81,7 @@ export function computeMyEntry(
     improved: Math.round(improved * 1000) / 1000,
     updatedAt: now,
     v: READINESS_VERSION,
+    ...(stars.length ? { clean: stars[stars.length - 1] } : {}),
   };
 }
 
@@ -111,6 +119,7 @@ export function sanitizeEntry(v: unknown): LeaderboardEntry | null {
   }
   const e: LeaderboardEntry = { name, voice, pieceId, readiness, weeklyScore: Math.round(weeklyScore), streak: Math.round(streak), improved, updatedAt };
   if (o.v === READINESS_VERSION) e.v = READINESS_VERSION;
+  if (typeof o.clean === 'number' && Number.isInteger(o.clean) && o.clean >= 1 && o.clean <= 5) e.clean = o.clean;
   return e;
 }
 
@@ -136,7 +145,8 @@ function b64urlDecode(s: string): string {
 export function encodeShareCode(e: LeaderboardEntry): string {
   const arr = [
     e.name, e.voice, e.pieceId, Math.round(e.readiness * 1000), Math.round(e.weeklyScore),
-    e.streak, Math.round(e.improved * 1000), Math.round(e.updatedAt / 1000), ...(e.v ? [e.v] : []),
+    e.streak, Math.round(e.improved * 1000), Math.round(e.updatedAt / 1000),
+    ...(e.v || e.clean ? [e.v ?? 0] : []), ...(e.clean ? [e.clean] : []),
   ];
   return SHARE_PREFIX + b64urlEncode(JSON.stringify(arr));
 }
@@ -150,7 +160,7 @@ export function decodeShareCode(str: string): LeaderboardEntry | null {
     if (!Array.isArray(a) || a.length < 8) return null;
     return sanitizeEntry({
       name: a[0], voice: a[1], pieceId: a[2], readiness: a[3] / 1000, weeklyScore: a[4],
-      streak: a[5], improved: a[6] / 1000, updatedAt: a[7] * 1000, v: a[8],
+      streak: a[5], improved: a[6] / 1000, updatedAt: a[7] * 1000, v: a[8], clean: a[9],
     });
   } catch {
     return null;
