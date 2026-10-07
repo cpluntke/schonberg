@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export type Route =
   | { name: 'home' }
@@ -101,10 +101,119 @@ export function href(r: Route): string {
   }
 }
 
+/*
+ * History on the practice screens (Play, Results, the words, the lyrics quiz, the memory map).
+ *
+ * Fixed rule: every practice screen sits one level above its piece's page, and practice screens
+ * replace each other. The history stack is always  … → (Home / Library / …) → Piece → practice screen,
+ * so ←, the browser's back and Android's back button all land on the piece, never on an old Results.
+ *
+ * How: a practice entry carries `history.state.shUp`, the href of the page directly below it.
+ * - Entering a practice screen from its piece pushes one entry (stamped).
+ * - Entering it from anywhere else (Home's "Practise now", a choir insight…) first pushes the piece's
+ *   entry, then the practice screen: back reaches the piece, back again where you were. Both entries
+ *   are added in the same tap, so Chrome's "skip entries added without a gesture" rule leaves them be.
+ * - From one practice screen to another (Play → Results → Again → Play…) the entry is replaced and
+ *   keeps its stamp.
+ * - Leaving to the page below (← / "Back to the piece") steps back in history when the stamp says the
+ *   piece is right below, and otherwise (a link opened cold, an entry from an older version) replaces
+ *   the entry with the piece. Nothing is pushed, so there are no loops.
+ * Practice routes are changed with pushState/replaceState (no hashchange), so the router is told by
+ * an 'sh:route' event; traversals (back/forward) arrive as popstate/hashchange.
+ *
+ * While a run is being sung, a "guard" entry (same URL, `shGuard`) sits on top: the back button pops
+ * it instead of leaving, and the screen pauses (useBackGuard). Any navigation away first drops it.
+ */
+
+const PRACTICE: Route['name'][] = ['play', 'results', 'lyrics', 'memorymap'];
+export const isPractice = (r: Route) => PRACTICE.includes(r.name);
+
+/** The page a practice screen sits on: its piece (a virtual drill's real piece), or expert mode for its drills. */
+export function practiceParent(r: Route): Route | null {
+  if (r.name !== 'play' && r.name !== 'lyrics' && r.name !== 'memorymap') return null;
+  if (/^(row|leaps)-/.test(r.pieceId)) return { name: 'expert' };
+  return { name: 'piece', pieceId: r.pieceId.split('~')[0] };
+}
+
+type HState = { shUp?: string; shGuard?: boolean } | null;
+const hstate = (): HState => {
+  const s = history.state as unknown;
+  return s && typeof s === 'object' ? (s as HState) : null;
+};
+const same = (a: Route, b: Route) => href(a) === href(b);
+const notify = () => window.dispatchEvent(new Event('sh:route'));
+
+let droppingGuard = false;
+/** True while the router itself is popping a run's guard entry (the screen must not treat it as "back"). */
+export const isDroppingGuard = () => droppingGuard;
+
+/** Run `then` once no guard entry is on top (pops it first when there is one). */
+function settle(then: () => void) {
+  if (!hstate()?.shGuard) { then(); return; }
+  droppingGuard = true;
+  let done = false;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    window.removeEventListener('popstate', finish);
+    clearTimeout(t);
+    // (after every popstate listener has seen the flag)
+    setTimeout(() => { droppingGuard = false; }, 0);
+    then();
+  };
+  window.addEventListener('popstate', finish);
+  const t = window.setTimeout(finish, 800);
+  history.back();
+}
+
+/** While a run is sung: an entry the back button pops instead of leaving the screen (call in the tap that starts it). */
+export function pushGuard() {
+  const st = hstate();
+  if (st?.shGuard) return;
+  try { history.pushState({ ...(st ?? {}), shGuard: true }, '', location.href); } catch { /* ignore */ }
+}
+
+/** Drop the run's guard entry, if any (the run ended without leaving the screen). */
+export function dropGuard(then: () => void = () => {}) { settle(then); }
+
 export function go(r: Route, replace = false) {
   const h = href(r);
+  const cur = parseHash(location.hash);
+  if (isPractice(cur) || hstate()?.shGuard) {
+    settle(() => {
+      const up = hstate()?.shUp;
+      if (isPractice(r)) {
+        // Practice screens replace each other, keeping what lies below.
+        const parent = practiceParent(r);
+        history.replaceState({ shUp: parent ? href(parent) : up }, '', h);
+        notify();
+      } else if (up && up === h) {
+        history.back(); // the page below: step back, don't stack it again
+      } else if (replace) location.replace(h);
+      else location.hash = h;
+    });
+    return;
+  }
+  if (isPractice(r)) {
+    const parent = practiceParent(r);
+    if (parent) {
+      // The piece goes right below the practice screen (pushed first when we're not on it).
+      if (!same(cur, parent)) history.pushState(null, '', href(parent));
+      history.pushState({ shUp: href(parent) }, '', h);
+      notify();
+      return;
+    }
+  }
   if (replace) location.replace(h);
   else location.hash = h;
+}
+
+/** ← on a practice screen: to the page below it (its piece), by stepping back when it's there. */
+export function leaveTo(r: Route) {
+  settle(() => {
+    if (hstate()?.shUp === href(r)) history.back();
+    else go(r, true);
+  });
 }
 
 export function back(fallback: Route = { name: 'home' }) {
@@ -117,13 +226,43 @@ export function back(fallback: Route = { name: 'home' }) {
 export function useRoute(): Route {
   const [route, setRoute] = useState(() => parseHash(location.hash));
   useEffect(() => {
+    let last = location.hash;
     const on = () => {
+      // A guard entry (same URL) or a popstate that also fires hashchange: nothing new to show.
+      if (location.hash === last) return;
+      last = location.hash;
       try { sessionStorage.setItem('sh:navd', '1'); } catch { /* storage blocked */ }
       setRoute(parseHash(location.hash));
       window.scrollTo(0, 0);
+      // …and once the new screen is drawn (a taller screen replacing Play could keep an odd offset).
+      requestAnimationFrame(() => window.scrollTo(0, 0));
     };
     window.addEventListener('hashchange', on);
-    return () => window.removeEventListener('hashchange', on);
+    window.addEventListener('popstate', on);
+    window.addEventListener('sh:route', on);
+    return () => {
+      window.removeEventListener('hashchange', on);
+      window.removeEventListener('popstate', on);
+      window.removeEventListener('sh:route', on);
+    };
   }, []);
   return route;
+}
+
+/**
+ * On a screen that sings (Play, the words): the back button popped the run's guard entry and we're
+ * still here. `onBack` pauses a running run (and shows the pause sheet) or leaves for the piece.
+ */
+export function useBackGuard(onBack: () => void) {
+  const ref = useRef(onBack);
+  ref.current = onBack;
+  useEffect(() => {
+    const mine = location.hash;
+    const on = () => {
+      if (droppingGuard || hstate()?.shGuard || location.hash !== mine) return;
+      ref.current();
+    };
+    window.addEventListener('popstate', on);
+    return () => window.removeEventListener('popstate', on);
+  }, []);
 }
