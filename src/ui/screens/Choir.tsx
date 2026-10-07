@@ -327,7 +327,12 @@ export function ChoirAdmin() {
   const [jump, setJump] = useState(0);
   useEffect(() => {
     if (!jump) return;
-    document.querySelector('[data-testid="programme-editor"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const el = document.querySelector('[data-testid="programme-editor"]');
+    // (already in the upper part of the screen, as on a laptop: leave the page where it is)
+    const top = el?.getBoundingClientRect().top ?? 0;
+    if (el && (top < 0 || top > innerHeight * 0.6)) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // …and it lights up briefly either way, so the click always shows where the editing happens.
+    (el as HTMLElement | null)?.animate?.([{ boxShadow: '0 0 0 3px var(--voice)' }, { boxShadow: '0 0 0 0 transparent' }], { duration: 1400, easing: 'ease-out' });
   }, [jump]);
   // The programme editor's unpublished changes (null: none), and how to add a piece to them.
   const draft = useRef<ProgrammeDraft>({ ids: null, add: null });

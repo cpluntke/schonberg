@@ -40,8 +40,11 @@ export function InviteLinkBox({ token, title, hint, onClose }: { token: string; 
   const url = inviteLink(token);
   const ref = React.useRef<HTMLInputElement>(null);
   const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+  // A new link opens at the top of its panel, often above the button that made it (a long People list on a phone).
+  const box = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => { box.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' }); }, [token]);
   return (
-    <div className="notice info col" data-testid="invite-link" style={{ gap: 8 }}>
+    <div ref={box} className="notice info col" data-testid="invite-link" style={{ gap: 8, scrollMarginTop: 12 }}>
       <strong>{title}</strong>
       <input ref={ref} type="text" readOnly value={url} aria-label="Invite link" onFocus={(e) => e.currentTarget.select()} className="mono"
         style={{ ...inputStyle, width: '100%', fontSize: 12 }} />
@@ -175,7 +178,7 @@ export function PeoplePanel({ code, auth, superAdmin = false, onChanged }: { cod
       </div>
       <div className="col" style={{ gap: 2 }} data-testid="members">
         <span className="eyebrow">Members with an account ({members.length}{people.maxMembers ? ` of ${people.maxMembers}` : ''})</span>
-        <span className="tiny muted" data-testid="members-note">
+        <span className="tiny muted" data-testid="members-note" style={{ marginBottom: 6 }}>
           Singers don't need an account: they join with the choir code, a first name and their voice part, and share
           their progress without one (Admin → Sections). An account is optional, for keeping progress on several phones.
         </span>
