@@ -69,6 +69,17 @@ describe('dated cycles', () => {
     expect(choirCycleNow({ cycle: { name: 'X', pieceIds: [] } }, '2027-01-10')?.name).toBe('X');
   });
 
+  it('a cycle runs until its end or the next start: an earlier one never comes back; a same-day tie goes to the later made', () => {
+    const at = (c: ReturnType<typeof cyc>, createdAt: number) => ({ ...c, createdAt });
+    const info = { cycle: null, cycles: [cyc('year', '2026-01-01'), cyc('week', '2026-09-10', '2026-09-15')] };
+    expect(choirCycleNow(info, '2026-09-12')?.id).toBe('week');
+    expect(choirCycleNow(info, '2026-09-20')).toBeNull();
+    // two starting the same day (older cycles without createdAt come first)
+    const tie = { cycle: null, cycles: [at(cyc('b', '2026-11-01'), 20), at(cyc('a', '2026-11-01'), 10), cyc('old', '2026-11-01')] };
+    expect(choirCycleNow(tie, '2026-11-01')?.id).toBe('b');
+    expect(choirCycleNext(tie, '2026-10-01')?.id).toBe('b');
+  });
+
   it('points follow the dated cycle; a count kept under the programme name carries over', () => {
     saveProfile({ ...loadProfile(), choirCode: 'kammerchor' });
     writeJSON('sh:cyclePoints', { k: 'choir:kammerchor:autumn', n: 40, since: 1 });
