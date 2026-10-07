@@ -13,6 +13,7 @@ import { apiBase, cachedChoir, choirCycleNext, choirCycleNow, loadSession, shari
 import { shareMyProgress } from '../play/shareProgress';
 import { LoggedOutCard, SyncNotice } from '../components/AccountSync';
 import { pieceStatus, todaysPlan, type PieceStatus } from '../plan';
+import { usePresence } from '../../progress/presence';
 
 export { pieceStatus, type PieceStatus };
 
@@ -90,6 +91,8 @@ export function Home() {
           <span className="tiny muted">{points.name ? `${points.name} · back to 0 when a new cycle starts` : 'Back to 0 when a new cycle starts'}</span>
         </div>
       </div>
+
+      <PractisingNow />
 
       <Notice />
       <SyncNotice />
@@ -331,3 +334,28 @@ export function levelName(l: number): string {
 }
 
 export { allPieces };
+
+const VOICE_WORD: Record<'S' | 'A' | 'T' | 'B', [string, string]> = {
+  S: ['soprano', 'sopranos'], A: ['alto', 'altos'], T: ['tenor', 'tenors'], B: ['bass', 'basses'],
+};
+
+/** How many others in the choir have the singing screen open right now, per voice part (live, no names). */
+function PractisingNow() {
+  const counts = usePresence();
+  if (!counts) return null;
+  const total = counts.S + counts.A + counts.T + counts.B;
+  const label = total
+    ? `Practising now: ${(['S', 'A', 'T', 'B'] as const).filter((v) => counts[v]).map((v) => `${counts[v]} ${VOICE_WORD[v][counts[v] === 1 ? 0 : 1]}`).join(', ')}`
+    : 'Nobody else is practising right now';
+  return (
+    <div className="row small" style={{ gap: 8, flexWrap: 'wrap', color: 'var(--muted)' }} data-testid="practising-now" aria-label={label} role="status">
+      <span className={total ? 'live-dot on' : 'live-dot'} aria-hidden />
+      <span>Practising now</span>
+      {(['S', 'A', 'T', 'B'] as const).map((v) => (
+        <span key={v} className="mono" style={{ opacity: counts[v] ? 1 : 0.45 }} data-testid={`practising-${v}`}>
+          {v} <strong key={counts[v]} className="pop" style={{ color: counts[v] ? 'var(--text)' : undefined }}>{counts[v]}</strong>
+        </span>
+      ))}
+    </div>
+  );
+}

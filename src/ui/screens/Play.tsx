@@ -9,6 +9,7 @@ import { postBoardEntrySoon } from '../play/boardEntry';
 import { syncProgressSoon, suggestAccount } from '../../progress/sync';
 import { recordAttempt, recordFullRun, getProgress, snapshotReadiness, personalBest, practiceDisplay, loadProfile, streakDays } from '../../progress/store';
 import { addCyclePoints, rightNotes } from '../../progress/points';
+import { startPresence } from '../../progress/presence';
 import { keyAtTimeIn } from '../../music/keymarks';
 import { nameKeysOf } from '../../progress/keymarks';
 import { PracticeSession, estimateLatencyMs } from '../play/session';
@@ -429,6 +430,9 @@ function SingPlay({ route }: { route: PlayRoute }) {
   function listenInstead() {
     go({ ...route, level: 0 }, true);
   }
+
+  // The choir sees this phone among those practising (a count per voice part) while this screen is open.
+  useEffect(() => startPresence(profile.voice), [profile.voice]);
 
   // Render loop.
   useEffect(() => {

@@ -299,6 +299,13 @@ input[type='range'] { accent-color: var(--accent); width: 100%; }
   .play-score .play-controls > .row { flex: 1 1 auto; }
 }
 
+/* Home: "Practising now" (live counts per voice part). */
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--surface-2); flex: none; }
+.live-dot.on { background: var(--good); animation: live-pulse 2s ease-in-out infinite; }
+@keyframes live-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(126, 224, 161, 0.55); } 50% { box-shadow: 0 0 0 5px rgba(126, 224, 161, 0); } }
+.pop { display: inline-block; animation: pop-in 0.45s ease-out; }
+@keyframes pop-in { 0% { transform: scale(1.5); } 100% { transform: scale(1); } }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }

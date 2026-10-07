@@ -14,6 +14,8 @@ section lead (both part of joining a choir), and two things that are the singer'
   be able to work out one singer's detail from the totals, or from how they change after that singer
   practises.
 - **The super admin**: anonymous daily usage totals, never linked to a name.
+- **Everyone in the choir, live**: how many singers of each voice part have the singing screen open right
+  now (counts only, no names; see 0a).
 
 ## 0. The choir's leaderboard (every choir member with a name)
 
@@ -22,6 +24,17 @@ section lead (both part of joining a choir), and two things that are the singer'
   points, streak and the 7-day readiness gain. There is no opt-out: joining a choir with a code puts
   the singer on its board (leave the choir to come off it).
 - **Who sees it**: anyone who opens Ranks with the choir's code, by name.
+
+## 0a. Practising now (every choir member, counts only)
+
+- **Sent** while the singing screen is open (and the app is in the foreground), every 20 seconds, to
+  `POST /schonberg/api/choirs/<code>/presence`: a random id made for this purpose only (not the member
+  token, not the account, no name), the singer's voice part, and whether they are on the screen or just
+  left it.
+- **Who sees it**: anyone with the choir code, on Home, as counts per voice part ("S 2 · A 0 · T 1 · B 0"),
+  updated every few seconds. In a small choir a count of 1 may tell others who it probably is.
+- **Kept** in the server's memory only, never on disk; a heartbeat stops counting after 50 seconds and
+  everything is gone when the server restarts.
 
 ## 1. Anonymous usage statistics (on by default, switch in Settings → Privacy)
 
