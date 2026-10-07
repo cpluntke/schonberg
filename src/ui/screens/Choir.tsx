@@ -12,6 +12,7 @@ import {
   fetchCycles, createCycle, updateCycle, deleteCycle, type ChoirCycle, type CyclesReply, choirCycleNow,
 } from '../../progress/choir';
 import { LibraryPanel, type ProgrammeDraft } from '../components/ChoirLibrary';
+import { ChoirLogoEditor } from '../components/ChoirLogo';
 import { SectionInsights } from '../components/SectionInsights';
 import { fetchSectionInsights, type SectionInsightsView } from '../../progress/insights';
 import { InviteLinkBox, PeoplePanel, roleText, VOICE_NAME, VOICES } from '../components/People';
@@ -394,6 +395,7 @@ export function ChoirAdmin() {
       ) : (
         <NeedLogin code={code} what="Your changes below are kept: log in again, then publish them." />
       )}
+      <ChoirLogoEditor code={code} auth={auth} info={info} onChanged={(i) => setInfo((cur) => (cur ? { ...cur, logo: i.logo } : i))} />
       <CyclesPanel code={code} auth={auth} cycles={cycles} selId={selId}
         onSelect={(id) => { if (id !== selId && unsaved(`Edit another cycle anyway`)) return; setSelId(id); setJump((n) => n + 1); }}
         onLoaded={gotCycles} onChanged={(r, select) => { gotCycles(r, select); void refresh(); }} />

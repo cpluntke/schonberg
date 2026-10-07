@@ -9,7 +9,7 @@ import { rowOfTheDay } from '../../game/twelvetone';
 import { IconFlame, IconPlay, IconMic, IconStar } from '../icons';
 import { cyclePoints, practisedToday } from '../../progress/points';
 import { IntroVideoButton } from '../components/IntroVideo';
-import { apiBase, cachedChoir, choirCycleNext, choirCycleNow, loadSession, sharingNeedsOk, startSharing } from '../../progress/choir';
+import { apiBase, cachedChoir, choirCycleNext, choirCycleNow, choirLogo, loadSession, sharingNeedsOk, startSharing } from '../../progress/choir';
 import { shareMyProgress } from '../play/shareProgress';
 import { LoggedOutCard, SyncNotice } from '../components/AccountSync';
 import { pieceStatus, todaysPlan, type PieceStatus } from '../plan';
@@ -37,6 +37,7 @@ export function Home() {
   const today = practisedToday();
   const points = cyclePoints();
   const choir = profile.choirCode ? cachedChoir() : null;
+  const logo = choir ? choirLogo() : null;
   const betweenCycles = !!choir && choir.code === profile.choirCode && Array.isArray(choir.cycles) && !choirCycleNow(choir);
   const nextCycle = betweenCycles ? choirCycleNext(choir) : null;
   const focusIds = new Set(cycle.focusPieceIds ?? []);
@@ -68,9 +69,15 @@ export function Home() {
         </button>
       </div>
 
-      <div className="col" style={{ gap: 4 }}>
-        <h1 className="hero">{greeting()}{profile.name ? `, ${profile.name.split(' ')[0]}` : ''}</h1>
-        <span className="small muted">{voiceName(profile.voice)}</span>
+      <div className="row" style={{ gap: 12, alignItems: 'center' }}>
+        <div className="col grow" style={{ gap: 4, minWidth: 0 }}>
+          <h1 className="hero">{greeting()}{profile.name ? `, ${profile.name.split(' ')[0]}` : ''}</h1>
+          <span className="small muted">{voiceName(profile.voice)}{logo && choir?.name ? ` · ${choir.name}` : ''}</span>
+        </div>
+        {logo && (
+          <img src={logo} alt={`${choir?.name ?? 'Choir'} logo`} data-testid="choir-logo"
+            style={{ width: 56, height: 56, borderRadius: 14, objectFit: 'contain', background: 'var(--surface-2)', flex: 'none' }} />
+        )}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 10 }} data-testid="stats">

@@ -41,6 +41,8 @@ export interface ChoirInfo {
   legacyLogin?: boolean;
   /** Singers may make their own member account (an admin can close this). */
   signupsOpen?: boolean;
+  /** The choir's logo, if an admin set one (GET …/logo?v=<updatedAt>). */
+  logo?: { updatedAt: number };
 }
 
 /** Cycles in order: by start, then by when they were made (older cycles without `createdAt` first). */
@@ -165,6 +167,57 @@ export async function joinChoir(code: string): Promise<ChoirInfo> {
   saveProfile({ ...p, choirCode: info.code, leaderboardOptIn: true, shareProgress: true });
   rawRemove(SHARE_OFF_KEY);
   writeJSON(CACHE, info);
+  void refreshChoirLogo(info);
+  return info;
+}
+
+// ------------------------------------------------------------------ the choir's logo
+// Kept on the phone as a small data URL, so Home shows it offline too (not in backups: not `sh:`).
+const LOGO_KEY = 'schonberg:choirLogo';
+interface StoredLogo { code: string; v: number; data: string }
+
+/** The logo of the singer's choir, as an image source (null: none, or not loaded yet). */
+export function choirLogo(): string | null {
+  const code = loadProfile().choirCode;
+  const l = readJSON<StoredLogo | null>(LOGO_KEY, null, (v) => !!v && typeof (v as StoredLogo).data === 'string');
+  return l && code && l.code === code.toLowerCase() && l.data.startsWith('data:image/') ? l.data : null;
+}
+
+/** Brings the stored logo in line with the choir's details: downloads a new one, forgets a removed one. */
+export async function refreshChoirLogo(info: ChoirInfo): Promise<void> {
+  const base = apiBase();
+  const l = readJSON<StoredLogo | null>(LOGO_KEY, null);
+  if (!info.logo) {
+    if (l && l.code === info.code) writeJSON(LOGO_KEY, null); // (and Home updates)
+    return;
+  }
+  if (!base || (l && l.code === info.code && l.v === info.logo.updatedAt)) return;
+  try {
+    const r = await fetch(`${base}/choirs/${enc(info.code)}/logo?v=${info.logo.updatedAt}`);
+    const b = r.ok ? await r.blob() : null;
+    if (!b || !/^image\/(png|jpeg|webp)$/.test(b.type) || b.size > 150_000) return;
+    const data = await new Promise<string>((res, rej) => {
+      const fr = new FileReader();
+      fr.onload = () => res(String(fr.result));
+      fr.onerror = () => rej(fr.error);
+      fr.readAsDataURL(b);
+    });
+    writeJSON(LOGO_KEY, { code: info.code, v: info.logo.updatedAt, data } satisfies StoredLogo);
+  } catch { /* offline: the next sync tries again */ }
+}
+
+/** Admins: set the choir's logo (a picture already scaled down by the app) or remove it. */
+export async function setChoirLogo(code: string, auth: Auth, picture: Blob | null): Promise<ChoirInfo> {
+  let info: ChoirInfo;
+  if (picture) {
+    const fd = new FormData();
+    fd.append('file', picture, 'logo');
+    info = await call<ChoirInfo>(`/choirs/${enc(code)}/logo`, { method: 'PUT', auth, body: fd });
+  } else {
+    info = await call<ChoirInfo>(`/choirs/${enc(code)}/logo`, { method: 'DELETE', auth });
+  }
+  if (cachedChoir()?.code === info.code) writeJSON(CACHE, { ...cachedChoir(), logo: info.logo });
+  await refreshChoirLogo(info);
   return info;
 }
 
@@ -233,6 +286,7 @@ export async function syncChoir(importFile: (name: string, data: ArrayBuffer, me
     return { ok: false, newPieces: 0, programme: false, error: (e as Error).message };
   }
   writeJSON(CACHE, info);
+  void refreshChoirLogo(info);
   let newPieces = 0;
   // Scores that downloaded but couldn't be read: not downloaded again on every start, but retried
   // after a day (the app may have learned to read them). A failed download (offline, the page
