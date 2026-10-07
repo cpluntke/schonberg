@@ -1,9 +1,9 @@
 # Realism: before / after the scoring fixes
 
-Generated 2026-10-07T06:38:25.225Z by `npx vitest run --config vitest.realism.config.ts` (files `qa/realism/cmp-*.test.ts`). The same rendered takes are scored by both pipelines:
+Generated 2026-10-07T06:59:20.288Z by `npx vitest run --config vitest.realism.config.ts` (files `qa/realism/cmp-*.test.ts`). The same rendered takes are scored by both pipelines:
 
 - **before** = baseline app (frozen `qa/realism/baseline/`, as in `docs/qa/realism-baseline.md`): N=2048 window, `scoreAttempt`, onset-based delay learning that re-scores the same run, pass = accuracy only, and an uncalibrated estimate of 80 ms.
-- **after** = current app at `323486f`. The analysis window comes from `windowFor(part.low)` (1024 for these alto parts). Then `scoreAttempt` → `scoreAligned`, two-run delay learning and the Android estimate of 130 ms. Play.tsx/session policy detected from the source: LATE_FAIL_MS=250; GUIDE_LEARN_MAX_ABOVE=150; timing gate: measured; liftSubharmonics: true; scoreAligned everyNote: true; scoreAligned voiceOnly (headphones): true; session stores raw samples.
+- **after** = current app at `0a5a2b1`. The analysis window comes from `windowFor(part.low)` (1024 for these alto parts). Then `scoreAttempt` → `scoreAligned`, two-run delay learning and the Android estimate of 130 ms. Play.tsx/session policy detected from the source: LATE_FAIL_MS=250; GUIDE_LEARN_MAX_ABOVE=150; timing gate: measured; liftSubharmonics: true; scoreAligned everyNote: true; scoreAligned voiceOnly (headphones): true; session stores raw samples.
 - **after (80 ms estimate)** = the current app with the old 80 ms estimate (an iPhone-like device). It separates the estimate change from the rest.
 
 Run cells: `grade accuracy%` (✗ = run failed), `al±N` = the voice was shifted N ms for intonation, `→N ms` = the stored delay changed to N, `TF` = failed by the timing gate (median entry in ms), `[…]` = timing/wrong-note tips. Sequences are 3 consecutive runs (new performance each run) on a phone whose stored delay carries over.
