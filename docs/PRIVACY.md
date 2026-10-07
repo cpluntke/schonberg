@@ -29,12 +29,13 @@ section lead (both part of joining a choir), and two things that are the singer'
 
 - **Sent** while the singing screen is open (and the app is in the foreground), every 20 seconds, to
   `POST /schonberg/api/choirs/<code>/presence`: a random id made for this purpose only (not the member
-  token, not the account, no name), the singer's voice part, and whether they are on the screen or just
+  token, not the account, no name; new for each browser tab, kept only while the tab is open), the singer's voice part, and whether they are on the screen or just
   left it.
 - **Who sees it**: anyone with the choir code, on Home, as counts per voice part ("S 2 · A 0 · T 1 · B 0"),
   updated every few seconds. In a small choir a count of 1 may tell others who it probably is.
-- **Kept** in the server's memory only, never on disk; a heartbeat stops counting after 50 seconds and
-  everything is gone when the server restarts.
+- **Kept** in the server's memory only, never on disk by the app; a heartbeat stops counting after 50
+  seconds and everything is gone when the server restarts. The client address is held in memory for a
+  minute for the rate limit; the hosting's request logs may record requests like any other page load.
 
 ## 1. Anonymous usage statistics (on by default, switch in Settings → Privacy)
 

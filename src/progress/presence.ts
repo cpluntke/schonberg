@@ -13,15 +13,16 @@ const ID_KEY = 'sh:presenceId';
 export type Satb = 'S' | 'A' | 'T' | 'B';
 export type PresenceCounts = Record<Satb, number>;
 
-/** A random id for this purpose only (not the member token, not the account). */
+/** A random id for this purpose only (not the member token, not the account), new for each tab: kept in
+ *  sessionStorage, so it survives a reload (the singing screen's goodbye and hello stay one phone) and nothing more. */
 function presenceId(): string {
   try {
-    let id = localStorage.getItem(ID_KEY);
+    let id = sessionStorage.getItem(ID_KEY);
     if (!id || !/^[0-9a-f]{32}$/.test(id)) {
       const a = new Uint8Array(16);
       crypto.getRandomValues(a);
       id = Array.from(a, (b) => b.toString(16).padStart(2, '0')).join('');
-      localStorage.setItem(ID_KEY, id);
+      sessionStorage.setItem(ID_KEY, id);
     }
     return id;
   } catch {
@@ -73,6 +74,7 @@ export function startPresence(voice: string): () => void {
   };
 }
 
+/** The counts, or null when the server didn't answer (offline, 429, the choir was deleted). */
 export async function fetchPresence(): Promise<PresenceCounts | null> {
   const url = choirUrl();
   if (!url) return null;
@@ -94,7 +96,9 @@ export function usePresence(): PresenceCounts | null {
     if (!choirUrl()) return;
     let alive = true;
     let timer: ReturnType<typeof setInterval> | null = null;
-    const look = () => { void fetchPresence().then((c) => { if (alive && c) setCounts(c); }); };
+    let misses = 0;
+    // (one missed answer keeps the last counts; after two the line goes, rather than show stale ones)
+    const look = () => { void fetchPresence().then((c) => { if (!alive) return; misses = c ? 0 : misses + 1; if (c || misses >= 2) setCounts(c); }); };
     const start = () => { if (!timer) { look(); timer = setInterval(look, PRESENCE_POLL); } };
     const stop = () => { if (timer) { clearInterval(timer); timer = null; } };
     const vis = () => (document.visibilityState === 'hidden' ? stop() : start());

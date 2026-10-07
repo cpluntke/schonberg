@@ -15,6 +15,7 @@ const sent = () => calls.filter((c) => c.init.method === 'POST').map((c) => JSON
 
 beforeEach(() => {
   localStorage.clear();
+  sessionStorage.clear();
   _resetAllForTests();
   vi.stubEnv('VITE_CHOIR_URL', '/schonberg/api');
   saveProfile({ ...loadProfile(), choirCode: 'kammerchor', voice: 'A' });
@@ -36,6 +37,7 @@ describe('practising now', () => {
     expect(s.map((x) => x.on)).toEqual([true, true, true, false]);
     expect(s.every((x) => x.voice === 'A' && /^[0-9a-f]{32}$/.test(x.id) && x.id === s[0].id)).toBe(true);
     expect(s[0].id).not.toBe(localStorage.getItem('sh:memberToken'));
+    expect(localStorage.getItem('sh:presenceId')).toBeNull(); // (per tab only)
     expect(calls[0].url).toBe('/schonberg/api/choirs/kammerchor/presence');
     vi.advanceTimersByTime(PRESENCE_BEAT * 3);
     expect(sent()).toHaveLength(4); // stopped for good
