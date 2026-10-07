@@ -311,7 +311,7 @@ function drawFullScroll(c: Ctx, W: number, H: number, s: DrawState, F: FullCache
   const systems = ownRow.L.layout.systems;
   if (!systems.length) return;
   const beat = timeToBeat(s.score.tempos, s.pos);
-  const { off, px, k } = scrollOffset(systems, beat, W, sp);
+  const { off, px, k } = scrollOffset(systems, beat, W, sp, { tempos: s.score.tempos, pos: s.pos });
   const sysTop = Math.round(Math.max(6, (H - F.sysH) / 2));
   const notes = s.part.notes;
   const [ra, rb] = s.range ?? [0, -1];

@@ -8,7 +8,7 @@
 // current key (plus the accidental of the note being sung), so a note sung 30 cents flat sits just
 // below its notehead and a perfectly sung C♮ in D major sits exactly on the C.
 import { F_CLEF, G_CLEF, GLYPH_UNITS_PER_SPACE } from './clefGlyphs';
-import type { KeySig, NoteSpelling, Part, Score } from '../../music/types';
+import type { KeySig, NoteSpelling, Part, Score, TempoEvent } from '../../music/types';
 import type { Grade, PitchSample } from '../../game/types';
 import { beatToTime, timeToBeat } from '../../music/time';
 import { keyHint, movesWithKey, noteLabel, spellNote, type NotationMode } from '../../game/notation';
@@ -605,6 +605,18 @@ export function stretches(n: number, size: number): number[][] {
   return out;
 }
 
+/**
+ * A scrolling line's stretches meet seamlessly: each one's time → x map ends at the next stretch's
+ * first note (not at its own barline, which would make the line jump at every hand-over).
+ */
+export function joinStretches(systems: Pick<StaffSystem, 'bp'>[]): void {
+  for (let i = 0; i + 1 < systems.length; i++) {
+    const bp = systems[i].bp;
+    const next = systems[i + 1].bp[0];
+    if (bp.length && next) bp[bp.length - 1] = { beat: bp[bp.length - 1].beat, x: next.x };
+  }
+}
+
 /** Natural horizontal space after an event (in staff spaces), before lyric/accidental constraints. */
 export function naturalSpace(durBeats: number): number {
   return 1.45 + 1.3 * Math.log2(1 + 2 * durBeats);
@@ -755,6 +767,7 @@ export function layoutStaff(score: Score, part: Part, m0: number, m1: number, o:
       ...(scroll ? { cont: true } : {}),
     };
   });
+  if (scroll) joinStretches(systems);
   return { clef, mid, sp, systems, minStep, maxStep };
 }
 
@@ -1571,16 +1584,29 @@ export const SCROLL_ANCHOR = 0.33;
  * Horizontal offset of a scrolling line at beat `beat`: the playhead stays at SCROLL_ANCHOR of the
  * view while the music moves left; at the start and at the end the line stays put and the playhead moves.
  */
-export function scrollOffset(systems: StaffSystem[], beat: number, W: number, sp: number): { off: number; px: number; k: number } {
+export function scrollOffset(systems: StaffSystem[], beat: number, W: number, sp: number, at?: { tempos: TempoEvent[]; pos: number }): { off: number; px: number; k: number } {
   const k = systemAt(systems, beat);
   const first = systems[0];
-  const px = beat < first.startBeat ? first.prefixEnd - 0.2 * sp : xAtBeat(systems[k], beat);
+  const xOf = (b: number) => (b < first.startBeat ? first.prefixEnd - 0.2 * sp : xAtBeat(systems[systemAt(systems, b)], b));
+  const px = xOf(beat);
+  // The line moves at the speed of the music averaged over about a second (notes aren't spaced in
+  // proportion to time: following the playhead exactly, it would crawl through long notes and rush
+  // through quick ones). The playhead drifts a little around its place instead.
+  let xs = px;
+  if (at) {
+    let acc = 0;
+    for (let i = 0; i < SMOOTH_N; i++) acc += xOf(timeToBeat(at.tempos, at.pos + ((i + 0.5) / SMOOTH_N - 0.5) * SMOOTH_SEC));
+    xs = acc / SMOOTH_N;
+  }
   const pinned = first.prefixEnd;
   const anchor = pinned + (W - pinned) * SCROLL_ANCHOR;
   const end = systems[systems.length - 1].x1;
   const maxOff = Math.max(0, end + 12 - W);
-  return { off: Math.max(0, Math.min(maxOff, px - anchor)), px, k };
+  return { off: Math.max(0, Math.min(maxOff, xs - anchor)), px, k };
 }
+/** Window (score seconds) and samples of the scroll speed's averaging. */
+const SMOOTH_SEC = 1.2;
+const SMOOTH_N = 16;
 
 /** The pinned start of a scrolling line: staff lines, clef and the key (and time) in force at `beat`. */
 export function drawPinned(c: Ctx, g: Pick<SysGeo, 'top' | 'mid'>, layout: Pick<StaffLayout, 'sp' | 'clef'>, first: StaffSystem, cur: StaffSystem, s: Pick<DrawState, 'score' | 'notation'>, showTime: boolean) {
@@ -1675,7 +1701,7 @@ function drawStaffScroll(c: Ctx, W: number, H: number, s: DrawState) {
   const systems = layout.systems;
   if (!systems.length) return;
   const beat = timeToBeat(s.score.tempos, s.pos);
-  const { off, px, k } = scrollOffset(systems, beat, W, sp);
+  const { off, px, k } = scrollOffset(systems, beat, W, sp, { tempos: s.score.tempos, pos: s.pos });
   const top = Math.round(Math.max(4, (H - L.band) / 2) + L.above * sp);
 
   const notes = s.part.notes;

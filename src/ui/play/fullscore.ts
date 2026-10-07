@@ -3,7 +3,7 @@
 // aligned across all staves. Pure layout (unit-tested); fullscore2d.ts draws it.
 import type { Part, Score, ScoreNote, VoiceType } from '../../music/types';
 import {
-  accW, CLEF_W, NAME_GAP, SCROLL_STRETCH, TIME_W, breakSystems, stretches, buildMeasures, clefFor, eventSteps, hasAcc, hasSecond, keyChangeW, keyW,
+  accW, CLEF_W, NAME_GAP, SCROLL_STRETCH, TIME_W, breakSystems, joinStretches, stretches, buildMeasures, clefFor, eventSteps, hasAcc, hasSecond, keyChangeW, keyW,
   middleStep, nameWidths, naturalSpace, type Clef, type NameW, type LaidEvent, type LaidMeasure, type StaffMeasure, type StaffSystem,
 } from './staff2d';
 
@@ -412,5 +412,6 @@ export function layoutFullScore(score: Score, staves: StaffSpec[], m0: number, m
       });
     });
   });
+  if (scroll) for (const fs of out) joinStretches(fs.systems);
   return { sp, left, staves: out, count: groups.length };
 }
