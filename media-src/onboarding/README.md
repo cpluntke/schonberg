@@ -1,11 +1,12 @@
 # Onboarding video source
 
 `public/media/onboarding.{mp4,webm,jpg}` are rendered from these files: a two-voice dialogue
-(Nora = coach, Ben = singer) over animated app screenshots. Current cut: about 2:29 (149 s),
+(Nora = coach, Ben = singer) over animated app screenshots. Current cut: about 2:31 (151 s),
 scenes A title · B voice setup (choir code, range check, delay) · C practice screen (score
 view with a zoom on a flat note, the Score/Highway toggle, the highway, a laptop showing the full
 choir score, the ± cents bubble in every view) · D sections, the level ladder (5 levels) and
-"Sing it all" (level 1 on “doo”, every note right; a piece level = the whole piece in one go; a section that slips is "to fix";
+"Sing it all" (level 1 on “doo”, every note right; a full run opens the level, a section that slips is "to fix" and fixing
+just that bit earns the level, no second run; everything right first time = a clean-run star;
 know it already? sing it all at any level) · E coach notes · F Home · G "try it now" checklist.
 
 1. `script.json`: the dialogue (`say` = spoken text, `show` = subtitle, `scene` = visual group).
@@ -18,8 +19,10 @@ know it already? sing it all at any level) · E coach notes · F Home · G "try 
    level 1, `?simulate=flat`: blue ink just under a note, bubble shows −cents), `practice-highway` (same
    piece and level after tapping Highway), `practice-toggle` (the pre-start card with the Score/Highway
    toggle; render `img/` only), `piece` (Debussy “Dieu!”, alto, fresh user, map collapsed, scrolled so the
-   “Sing it all” card and the sections fill the screen), `piece-tofix` (same view after a perfect full run
-   at level 1 and a flat one at level 2, so the sections are tagged “To fix at level 2”; render `img/`
+   “Sing it all” card and the sections fill the screen), `piece-tofix` (same view after a clean full run
+   at level 1 and a level-2 run where two of the four sections slipped, so level 1 has its ★ and two
+   sections are tagged “To fix at level 2”; the runs can be recorded through the app's own modules
+   under the dev server, e.g. `await import('/src/progress/store.ts')` → `recordFullRun`; render `img/`
    only), `fullscore-laptop` (1280×800 at dpr 1, not a phone shot: Vierne Kyrie, alto, whole piece at
    level 3, `?simulate=flat`, about 14 s into the run), `home`, `results` (plus `results-coach`, a full-page
    results screen of a sloppy run, used in scene E for its coach notes; `practice-2d` is the
