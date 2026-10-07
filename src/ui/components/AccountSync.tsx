@@ -197,7 +197,7 @@ export function AccountSync() {
               {busy ? '…' : mode === 'create' ? `Make my account${choir?.name ? ` in ${choir.name}` : ''}` : 'Log in'}
             </button>
             {err && <span className="small" role="alert" style={{ color: 'var(--accent-text)' }}>{err}</span>}
-            {mode === 'login' && <span className="tiny muted">Forgot your password? Your choir admin can send you a new link.</span>}
+            {mode === 'login' && <span className="tiny muted">Forgot your password? A choir admin can make you a reset link (Admin → Choir → People → Reset password).</span>}
           </form>
         </>
       ) : (

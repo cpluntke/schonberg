@@ -176,8 +176,8 @@ export function PeoplePanel({ code, auth, superAdmin = false, onChanged }: { cod
       <div className="col" style={{ gap: 2 }} data-testid="members">
         <span className="eyebrow">Members with an account ({members.length}{people.maxMembers ? ` of ${people.maxMembers}` : ''})</span>
         <span className="tiny muted" data-testid="members-note">
-          Singers don't need an account: they join with the choir code and a first name, and share their progress
-          without one (see the sections). An account is optional, for keeping progress on several phones.
+          Singers don't need an account: they join with the choir code, a first name and their voice part, and share
+          their progress without one (Admin → Sections). An account is optional, for keeping progress on several phones.
         </span>
         <label className="toggle-row">
           <span>New member accounts<span className="tiny muted" style={{ display: 'block' }}>Singers make their own with the choir code to keep their progress on every phone.</span></span>

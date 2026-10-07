@@ -199,7 +199,7 @@ export function LoginForm({ code, legacy = false }: { code: string; legacy?: boo
       </label>
       <button className="btn primary block" disabled={busy || !name.trim() || !pw} data-testid="login">{busy ? '…' : 'Log in'}</button>
       {err && <span className="small" role="alert" style={errStyle}>{err}</span>}
-      <span className="tiny muted">Forgot your password? A choir admin can make you a reset link (Admin → People → Reset password).</span>
+      <span className="tiny muted">Forgot your password? A choir admin can make you a reset link (Admin → Choir → People → Reset password).</span>
       {legacy && (
         <button type="button" className="linklike small" style={{ alignSelf: 'flex-start', minHeight: 44 }} onClick={() => setClaim(true)} data-testid="claim-open">
           Have the old shared admin or section-lead password? Make it your own account
