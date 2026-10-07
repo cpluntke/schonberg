@@ -3,6 +3,21 @@ import { strFromU8, unzipSync } from 'fflate';
 import type { Score } from './types';
 import { parseMusicXML } from './musicxml';
 import { parseMidi } from './midi';
+import { inferModes } from './mode';
+
+/**
+ * Version of what an import produces. Bump it when an import learns something a stored score
+ * lacks: choir scores stored by an older version are downloaded and imported again (see
+ * syncChoir), other stored scores are brought up to date as far as they can be (upgradeStored).
+ * 2: notes keep their written spelling (MusicXML), the minor mode is inferred.
+ */
+export const PARSE_VERSION = 2;
+
+/** A stored score made by an older importer, brought up to date where that needs no source file. */
+export function upgradeStored(s: Score): Score {
+  if ((s.parseVersion ?? 1) < 2 && Array.isArray(s.keys) && Array.isArray(s.parts)) inferModes(s);
+  return s;
+}
 
 /** Decode XML bytes honouring BOMs (UTF-8, UTF-16 LE/BE) and the encoding declaration. */
 export function decodeXmlBytes(bytes: Uint8Array): string {
@@ -52,6 +67,12 @@ function baseName(name: string): string {
 }
 
 export async function importScoreFile(name: string, data: ArrayBuffer): Promise<Score> {
+  const s = await importAny(name, data);
+  s.parseVersion = PARSE_VERSION;
+  return s;
+}
+
+async function importAny(name: string, data: ArrayBuffer): Promise<Score> {
   const bytes = new Uint8Array(data);
   const ext = (name.match(/\.([^.]+)$/)?.[1] ?? '').toLowerCase();
   if (ext === 'mid' || ext === 'midi' || ext === 'smf' || ext === 'kar') {

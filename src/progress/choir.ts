@@ -184,7 +184,9 @@ export function leaveChoir(): void {
 export async function syncChoir(importFile: (name: string, data: ArrayBuffer, meta: { id: string; title: string; composer: string; credit?: string; choir: string }) => Promise<void>,
   hasPiece: (id: string) => boolean,
   /** Pieces the singer imported on this phone: they stay in the cycle when the choir's programme arrives. */
-  isOwnPiece: (id: string) => boolean = () => false): Promise<{ ok: boolean; newPieces: number; programme: boolean; error?: string }> {
+  isOwnPiece: (id: string) => boolean = () => false,
+  /** Pieces stored by an older importer: downloaded and imported again (not counted as new). */
+  isOutdated: (id: string) => boolean = () => false): Promise<{ ok: boolean; newPieces: number; programme: boolean; error?: string }> {
   const code = loadProfile().choirCode;
   if (!code || !apiBase()) return { ok: false, newPieces: 0, programme: false };
   let info: ChoirInfo;
@@ -208,7 +210,8 @@ export async function syncChoir(importFile: (name: string, data: ArrayBuffer, me
   failed = failed.filter((f) => Date.now() - f.at < RETRY_MS);
   for (const p of info.pieces) {
     const id = localPieceId(info.code, p);
-    if (hasPiece(id) || failed.some((f) => f.id === id)) continue;
+    const had = hasPiece(id);
+    if ((had && !isOutdated(id)) || failed.some((f) => f.id === id)) continue;
     let data: ArrayBuffer;
     try {
       const res = await fetch(`${apiBase()}/choirs/${enc(info.code)}/pieces/${enc(p.id)}/file`);
@@ -220,7 +223,7 @@ export async function syncChoir(importFile: (name: string, data: ArrayBuffer, me
     }
     try {
       await importFile(p.filename || `${p.id}.musicxml`, data, { id, title: p.title, composer: p.composer, credit: p.credit, choir: info.code });
-      newPieces++;
+      if (!had) newPieces++;
     } catch (e) {
       console.warn('choir score', p.id, e);
       failed = [...failed, { id, at: Date.now() }].slice(-50);

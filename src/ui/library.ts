@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Score, Section } from '../music/types';
-import { importScoreFile } from '../music/import';
+import { importScoreFile, PARSE_VERSION, upgradeStored } from '../music/import';
 import { computeSections } from '../music/sections';
 import { loadImportedScores, saveImportedScore, deleteImportedScore, loadCycle, saveCycle, subscribe } from '../progress/store';
 import { syncChoir } from '../progress/choir';
@@ -177,7 +177,7 @@ async function loadAll() {
     const imported = await loadImportedScores();
     // One bad score must not hide the others.
     for (const s of imported) {
-      try { pieces.set(s.id, makePiece(s)); } catch (e) { console.error('Failed to load imported score', s?.id, e); }
+      try { pieces.set(s.id, makePiece(upgradeStored(s))); } catch (e) { console.error('Failed to load imported score', s?.id, e); }
     }
   } catch (e) {
     console.error(e);
@@ -218,6 +218,12 @@ export function syncChoirNow(): Promise<Awaited<ReturnType<typeof syncChoir>>> {
       if (meta.composer) score.composer = meta.composer;
       if (meta.credit) score.credit = meta.credit;
       score.choir = meta.choir;
+      // Imported again by a newer importer: the singer keeps the names they gave it.
+      const old = pieces.get(score.id)?.score;
+      if (old?.choir) {
+        score.title = old.title;
+        score.composer = old.composer;
+      }
       await saveImportedScore(score);
       pieces.set(score.id, makePiece(score));
       emit();
@@ -225,6 +231,11 @@ export function syncChoirNow(): Promise<Awaited<ReturnType<typeof syncChoir>>> {
       // The singer's own imports stay in the cycle when the choir's programme arrives (not the choir's scores).
       const p = pieces.get(id);
       return !!p && !p.builtin && !id.startsWith('choir-') && !p.score.choir;
+    }, (id) => {
+      // A choir score stored by an older importer (e.g. without the notes' written spelling) is
+      // downloaded again; until then (offline) the stored one keeps working.
+      const p = pieces.get(id);
+      return !!p && !p.builtin && !!p.score.choir && (p.score.parseVersion ?? 1) < PARSE_VERSION;
     }).finally(() => { syncing = null; emit(); });
   }
   return syncing;

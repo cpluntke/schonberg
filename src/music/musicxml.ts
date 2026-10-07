@@ -5,9 +5,10 @@
 // - Grace notes and cue notes are ignored.
 // - Tenor parts in treble-8vb clef are already written at sounding octave in MusicXML (octave 3),
 //   so clef-octave-change is NOT applied; only <transpose> (chromatic + octave-change) is.
-import type { Direction, KeySig, Measure, Part, Score, ScoreNote, VoiceType } from './types';
+import type { Direction, KeySig, Measure, NoteSpelling, Part, Score, ScoreNote, VoiceType } from './types';
 import { beatToTime, buildTempoMap, DEFAULT_BPM } from './time';
 import { minMax, monophonize } from './mono';
+import { inferModes } from './mode';
 
 const EPS = 1e-6;
 
@@ -102,6 +103,8 @@ interface RawNote {
   beat: number; // quarter offset from measure start
   dur: number; // quarters
   midi: number | null; // null = rest
+  /** Written spelling (at sounding pitch), when the source's pitch can be spelled. */
+  spelling?: NoteSpelling;
   visible: boolean;
   voice: string;
   staff: string;
@@ -138,6 +141,40 @@ interface RawPart {
 }
 
 const STEP: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+const LETTER_PC = [0, 2, 4, 5, 7, 9, 11];
+const mod = (n: number, m: number) => ((n % m) + m) % m;
+/** <accidental> values → the alteration they print. */
+const ACCIDENTAL: Record<string, number> = {
+  sharp: 1, natural: 0, flat: -1, 'double-sharp': 2, 'sharp-sharp': 2, 'flat-flat': -2, 'double-flat': -2,
+  'natural-sharp': 1, 'natural-flat': -1,
+};
+
+/**
+ * Sounding spelling of a written note. `diatonic` is the <transpose> letter shift (null when the
+ * part transposes by a chromatic interval without saying by how many letters: then the note is
+ * spelled from the key instead). Octave-only transpositions keep the letter.
+ */
+function soundingSpelling(note: Element, step: string, alter: number, midi: number, chromatic: number, diatonic: number | null): NoteSpelling | undefined {
+  const wl = 'CDEFGAB'.indexOf(step);
+  if (wl < 0 || alter !== Math.round(alter)) return undefined;
+  const transposed = mod(chromatic, 12) !== 0;
+  if (transposed && diatonic === null) return undefined;
+  const letter = transposed ? mod(wl + diatonic!, 7) : wl;
+  const alt = mod(midi - LETTER_PC[letter] + 6, 12) - 6;
+  if (Math.abs(alt) > 2) return undefined;
+  const sp: NoteSpelling = { letter, alter: alt };
+  const acc = kid(note, 'accidental');
+  // (a transposed part's printed accidentals belong to its written key: left out)
+  if (acc && !transposed && acc.getAttribute('print-object') !== 'no') {
+    const a = ACCIDENTAL[txt(acc).toLowerCase()];
+    if (a !== undefined && a === alt) {
+      sp.acc = a;
+      const yes = (n: string) => acc.getAttribute(n) === 'yes';
+      if (yes('cautionary') || yes('editorial') || yes('parentheses') || yes('bracket')) sp.courtesy = true;
+    }
+  }
+  return sp;
+}
 const UNIT_BEATS: Record<string, number> = {
   maxima: 32, long: 16, breve: 8, whole: 4, half: 2, quarter: 1, eighth: 0.5,
   '16th': 0.25, '32nd': 0.125, '64th': 0.0625, '128th': 0.03125,
@@ -187,6 +224,7 @@ interface MeasureSrc {
 function parseRawPart(id: string, name: string, srcs: MeasureSrc[]): RawPart {
   let divisions = 1;
   let chromatic = 0;
+  let diatonic: number | null = 0;
   let octaveChange = 0;
   let staves = 1;
   let transposed = false;
@@ -225,6 +263,7 @@ function parseRawPart(id: string, name: string, srcs: MeasureSrc[]): RawPart {
           const tr = kid(c, 'transpose');
           if (tr) {
             chromatic = num(kid(tr, 'chromatic'));
+            diatonic = kid(tr, 'diatonic') ? Math.round(num(kid(tr, 'diatonic'))) : null;
             octaveChange = num(kid(tr, 'octave-change'));
             if (chromatic || octaveChange) transposed = true;
           }
@@ -316,11 +355,14 @@ function parseRawPart(id: string, name: string, srcs: MeasureSrc[]): RawPart {
           const restEl = kid(c, 'rest');
           const pitchEl = kid(c, 'pitch');
           let midi: number | null = null;
+          let spelling: NoteSpelling | undefined;
           if (pitchEl) {
             const step = txt(kid(pitchEl, 'step')).toUpperCase();
-            const alter = Math.round(num(kid(pitchEl, 'alter')));
+            const rawAlter = num(kid(pitchEl, 'alter'));
+            const alter = Math.round(rawAlter);
             const octave = num(kid(pitchEl, 'octave'), 4);
             midi = (octave + 1) * 12 + (STEP[step] ?? 0) + alter + chromatic + 12 * octaveChange;
+            spelling = soundingSpelling(c, step, rawAlter, midi, chromatic, diatonic);
           } else if (!restEl) {
             // unpitched (percussion) → treat as rest
             midi = null;
@@ -342,6 +384,7 @@ function parseRawPart(id: string, name: string, srcs: MeasureSrc[]): RawPart {
             beat: onset,
             dur,
             midi,
+            ...(spelling ? { spelling } : {}),
             visible: c.getAttribute('print-object') !== 'no',
             voice: txt(kid(c, 'voice')) || '1',
             staff: txt(kid(c, 'staff')) || '1',
@@ -412,6 +455,7 @@ interface LaneNote {
   tieStop: boolean;
   lyric?: string;
   syllabic?: ScoreNote['syllabic'];
+  spelling?: NoteSpelling;
 }
 
 function groupOnsets(notes: RawNote[]): RawNote[][] {
@@ -485,6 +529,7 @@ function splitLanes(rp: RawPart, measureStarts: number[]): LaneNote[][] {
           tieStop: n.tieStop,
           lyric: lyr?.lyric,
           syllabic: lyr?.syllabic,
+          spelling: n.spelling,
         });
       }
     }
@@ -716,6 +761,9 @@ export function parseMusicXML(xml: string, opts?: { id?: string }): Score {
       sn.lyric = n.lyric;
       sn.syllabic = n.syllabic ?? 'single';
     }
+    // (a tied note keeps its first note's spelling; octave fixes below keep the letter)
+    const sp = n.spelling;
+    if (sp && mod(n.midi - sp.alter - LETTER_PC[sp.letter], 12) === 0) sn.spelling = { ...sp };
     return sn;
   };
   const directionsOf = (rp: RawPart): Direction[] => {
@@ -774,7 +822,7 @@ export function parseMusicXML(xml: string, opts?: { id?: string }): Score {
       rp.measures.forEach((m, mi) => {
         for (const n of m.notes)
           if (n.midi !== null)
-            ln.push({ start: measureStarts[mi] + n.beat, dur: n.dur, midi: n.midi, measure: mi, tieStart: n.tieStart, tieStop: n.tieStop });
+            ln.push({ start: measureStarts[mi] + n.beat, dur: n.dur, midi: n.midi, measure: mi, tieStart: n.tieStart, tieStop: n.tieStop, spelling: n.spelling });
       });
       parts.push(finishPart(rp.id, rp.name, 'other', mergeTies(ln).map(mkNote)));
       continue;
@@ -887,7 +935,7 @@ export function parseMusicXML(xml: string, opts?: { id?: string }): Score {
   for (const p of parts) for (const n of p.notes) lastEnd = Math.max(lastEnd, n.start + n.dur);
   const duration = Math.max(lastEnd, beatToTime(tempos, totalBeats));
 
-  return {
+  const score: Score = {
     id: opts?.id ?? 'xml-' + hashString(`${idKey}|${noteCount}|${totalBeats.toFixed(3)}`),
     title,
     composer,
@@ -898,4 +946,7 @@ export function parseMusicXML(xml: string, opts?: { id?: string }): Score {
     tempos,
     duration,
   };
+  // Many files say "major" (or nothing) for a piece in the relative minor.
+  inferModes(score);
+  return score;
 }

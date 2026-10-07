@@ -18,6 +18,23 @@ export interface ScoreNote {
   /** Lyric syllable (first verse), without hyphen. */
   lyric?: string;
   syllabic?: 'single' | 'begin' | 'middle' | 'end';
+  /** How the source wrote the note (MusicXML); without it the note is spelled from the key. */
+  spelling?: NoteSpelling;
+}
+
+/**
+ * Spelling of a note at sounding pitch: its letter and alteration (a B♯ stays a B♯, not a C).
+ * `midi - alter` is the letter's natural pitch, which gives the octave.
+ */
+export interface NoteSpelling {
+  /** 0..6 = C D E F G A B. */
+  letter: number;
+  /** Semitones, -2..2 (1 = sharp, -1 = flat). */
+  alter: number;
+  /** The accidental the source printed on the note, as an alteration (0 = natural), if any. */
+  acc?: number;
+  /** That accidental is a cautionary / editorial one (in parentheses or brackets in the source). */
+  courtesy?: boolean;
 }
 
 export interface Part {
@@ -84,6 +101,11 @@ export interface Score {
   tempos: TempoEvent[];
   /** Total length in score seconds. */
   duration: number;
+  /**
+   * Version of the importer that made this score (see PARSE_VERSION in import.ts). Scores stored
+   * by an older version lack newer details (e.g. note spellings); choir scores are downloaded again.
+   */
+  parseVersion?: number;
 }
 
 /** A practice unit: a phrase / group of measures with its own mastery level. */

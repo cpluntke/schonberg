@@ -9,6 +9,7 @@ import type { KeySig, Measure, Part, Score, ScoreNote } from './types';
 import { beatToTime, buildTempoMap } from './time';
 import { guessVoiceType, hashString, voiceTypeFromName } from './musicxml';
 import { minMax, monophonize } from './mono';
+import { inferModes } from './mode';
 
 interface RawMidiNote {
   tick: number;
@@ -208,7 +209,7 @@ export function parseMidi(data: ArrayBuffer | Uint8Array, opts?: { id?: string; 
   const noteCount = parts.reduce((s, p) => s + p.notes.length, 0);
   let duration = Math.max(0, beatToTime(tempos, endBeat));
   for (const p of parts) for (const n of p.notes) duration = Math.max(duration, n.start + n.dur);
-  return {
+  const score: Score = {
     id: opts?.id ?? 'midi-' + hashString(`${title}|${noteCount}|${endTick}`),
     title,
     composer: '',
@@ -219,6 +220,9 @@ export function parseMidi(data: ArrayBuffer | Uint8Array, opts?: { id?: string; 
     tempos,
     duration,
   };
+  // A MIDI key signature's minor flag is often missing: notes are spelled from the key.
+  inferModes(score);
+  return score;
 }
 
 /**

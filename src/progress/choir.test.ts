@@ -350,6 +350,22 @@ describe('choir library pieces', () => {
     vi.restoreAllMocks();
   });
 
+  it('a score stored by an older importer is downloaded and imported again (not counted as new)', async () => {
+    saveProfile({ ...loadProfile(), choirCode: 'kammerchor' });
+    mockFetch((url) => (url.endsWith('/file') ? { body: {} } : {
+      body: info([{ id: 'aaaaaaaaaaaa', title: 'Kyrie', composer: 'Louis Vierne', filename: 'vierne-kyrie.mxl', uploadedAt: 1, size: 9, libraryId: 'vierne-kyrie' }],
+        { name: 'Autumn', pieceIds: ['vierne-kyrie'] }),
+    }));
+    const got: string[] = [];
+    const importer = async (_n: string, _d: ArrayBuffer, meta: { id: string }) => { got.push(meta.id); };
+    // up to date: not fetched
+    expect((await syncChoir(importer, () => true, () => false, () => false)).newPieces).toBe(0);
+    expect(got).toEqual([]);
+    // stored by an older version: fetched and imported again, but it isn't a new score
+    expect((await syncChoir(importer, () => true, () => false, (id) => id === 'vierne-kyrie')).newPieces).toBe(0);
+    expect(got).toEqual(['vierne-kyrie']);
+  });
+
   it('an older phone\'s list of bad scores (bare ids, kept even after a network error) is forgotten', async () => {
     saveProfile({ ...loadProfile(), choirCode: 'kammerchor' });
     localStorage.setItem('sh:choirBadScores', JSON.stringify(['faure-madrigal']));
