@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from '../hooks';
-import { addLibraryPiece, fetchLibrary, type Auth, type ChoirInfo, type LibraryPiece } from '../../progress/choir';
+import { addLibraryPiece, fetchLibrary, type Auth, type ChoirCycle, type ChoirInfo, type LibraryPiece } from '../../progress/choir';
 
 /** The programme editor's unpublished changes: its piece ids (null when there are none) and how to add one. */
 export interface ProgrammeDraft { ids: string[] | null; add: ((id: string) => void) | null }
@@ -10,10 +10,11 @@ const LEVEL: Record<string, string> = { easy: 'Easy', medium: 'Medium', hard: 'H
 /**
  * The choir library: public-domain scores kept on the server (not in the public app) that a choir
  * admin or the super admin adds to a choir with one tap. The server copies the score into the choir's
- * scores and puts it into the published programme; members get both with the next choir sync.
+ * scores and puts it into the programme of `cycle` (the one the admin is editing; without one, the
+ * running cycle); members get both with the next choir sync.
  */
-export function LibraryPanel({ code, auth, info, draft, embedded = false, onAdded, onList }: {
-  code: string; auth: Auth; info?: ChoirInfo | null; draft?: ProgrammeDraft; embedded?: boolean;
+export function LibraryPanel({ code, auth, info, draft, cycle, embedded = false, onAdded, onList }: {
+  code: string; auth: Auth; info?: ChoirInfo | null; draft?: ProgrammeDraft; cycle?: ChoirCycle | null; embedded?: boolean;
   onAdded?: (i: ChoirInfo | null) => void; onList?: (l: LibraryPiece[]) => void;
 }) {
   const [list, setList] = useState<LibraryPiece[] | null>(null);
@@ -34,14 +35,16 @@ export function LibraryPanel({ code, auth, info, draft, embedded = false, onAdde
     const local = !!draft?.ids && !!draft.add;
     setBusy(p.id);
     try {
-      const r = await addLibraryPiece(code, auth, p.id, toProgramme && !local);
+      const r = await addLibraryPiece(code, auth, p.id, toProgramme && !local, cycle?.id);
       if (local && toProgramme) draft!.add!(p.id);
       setList((l) => l?.map((x) => (x.id === p.id ? { ...x, scoreId: r.piece.id, inProgramme: x.inProgramme || r.programme } : x)) ?? l);
       toast(local && toProgramme
         ? `“${p.title}” added to the choir's scores and to the programme above: publish it to send it to the choir`
         : toProgramme && !r.programme
           ? `“${p.title}” added to the choir's scores, but the programme is full: take a piece out of it to make room`
-          : `“${p.title}” added${r.programme ? ' to the programme' : ''}: members get it the next time they open the app`);
+          : cycle
+            ? `“${p.title}” added to the choir's scores${r.programme ? ` and to the programme of ${cycle.name}` : ''}`
+            : `“${p.title}” added${r.programme ? ' to the programme' : ''}: members get it the next time they open the app`);
       onAdded?.(r.choir ?? null);
     } catch (e) {
       toast((e as Error).message);
@@ -54,15 +57,17 @@ export function LibraryPanel({ code, auth, info, draft, embedded = false, onAdde
     <>
       <strong>Library</strong>
       <span className="small muted">
-        Public-domain pieces for choirs. Add to our choir copies the score into the choir's scores and puts it into the programme:
-        members get it the next time they open the app. Only choir admins see this list.
+        Public-domain pieces for choirs. Add to our choir copies the score into the choir's scores and puts it into the programme
+        {cycle ? <> of {cycle.name} (the cycle you're editing above)</> : <>: members get it the next time they open the app</>}. Only choir admins see this list.
       </span>
       {err && <div className="notice" role="alert">{err}</div>}
       {!list && !err && <span className="small muted">Loading…</span>}
       {list && (
         <div className="col" style={{ gap: 0 }}>
           {list.map((p) => {
-            const inProgramme = draft?.ids ? draft.ids.includes(p.id) : p.inProgramme;
+            // (in the cycle being edited: its unsaved programme, else its saved one)
+            const saved = cycle ? cycle.pieceIds.includes(p.id) : p.inProgramme;
+            const inProgramme = draft?.ids ? draft.ids.includes(p.id) : saved;
             return (
               <div key={p.id} className="col" data-testid="library-piece" data-piece={p.id}
                 style={{ gap: 4, padding: '12px 0', borderTop: '1px solid var(--surface-2)' }}>
@@ -83,7 +88,7 @@ export function LibraryPanel({ code, auth, info, draft, embedded = false, onAdde
                     </>
                   ) : inProgramme ? (
                     <span className="small" data-testid="library-added" style={{ color: 'var(--voice)', fontWeight: 600 }}>
-                      ✓ Added · in the programme{draft?.ids && !p.inProgramme ? ' (publish it above)' : ''}
+                      ✓ Added · in the programme{draft?.ids && !saved ? ' (publish it above)' : ''}
                     </span>
                   ) : (
                     <>

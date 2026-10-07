@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { _resetAllForTests, exportBackup, loadCycle, loadProfile, saveProfile } from './store';
+import { _resetAllForTests, exportBackup, loadCycle, loadProfile, saveCycle, saveProfile } from './store';
 import {
   _resetSessionStateForTests, acceptInvite, createInvite, fetchPeople, inviteLink, leaveChoir, loadSession, loggedOutNotice, login, logout,
   LOGGED_OUT_ELSEWHERE, refreshSession, refreshSessionSoon, rememberedInvite, saveSession, sessionFor, superCreate, type Session,
@@ -26,6 +26,8 @@ function mockFetch(reply: (url: string, init: RequestInit) => { status?: number;
   }));
 }
 const headers = (c: Call) => (c.init.headers ?? {}) as Record<string, string>;
+/** A singer's own change to the programme on this phone (kept until the choir changes it). */
+const saveCycleTweak = () => saveCycle({ ...loadCycle(), concertDate: '2001-01-01' });
 
 beforeEach(() => {
   localStorage.clear();
@@ -378,6 +380,57 @@ describe('choir library pieces', () => {
     expect(got).toEqual(['faure-madrigal']);
   });
 
+  it('the programme is applied again only when the running cycle changes, not when other cycles do', async () => {
+    saveProfile({ ...loadProfile(), choirCode: 'kammerchor' });
+    const cyc = (id: string, start: string, updatedAt: number, pieceIds: string[], end?: string) => ({ id, name: id, start, ...(end ? { end } : {}), updatedAt, createdAt: 1, pieceIds });
+    let cycles = [cyc('autumn', '2000-01-01', 7, ['a']), cyc('spring', '2999-01-01', 8, ['b'])];
+    let cu = 8;
+    mockFetch(() => ({ body: { ...info([]), cycle: null, cycles, cycleUpdatedAt: cu } }));
+    const sync = async () => (await syncChoir(async () => {}, () => true)).programme;
+    expect(await sync()).toBe(true);
+    expect(loadCycle()).toMatchObject({ name: 'autumn', pieceIds: ['a'], preset: 'choir:kammerchor' });
+    // a local tweak lasts while only another cycle changes
+    saveCycleTweak();
+    cycles = [cycles[0], cyc('spring', '2999-01-02', 9, ['c'])];
+    cu = 9;
+    expect(await sync()).toBe(false);
+    expect(loadCycle().concertDate).toBe('2001-01-01');
+    // the running cycle is edited: applied again
+    cycles = [cyc('autumn', '2000-01-01', 10, ['a', 'd']), cycles[1]];
+    expect(await sync()).toBe(true);
+    expect(loadCycle().pieceIds).toEqual(['a', 'd']);
+    // it ends: between cycles its programme goes
+    cycles = [cyc('autumn', '2000-01-01', 11, ['a', 'd'], '2000-02-01'), cycles[1]];
+    expect(await sync()).toBe(true);
+    expect(loadCycle().pieceIds).toEqual([]);
+  });
+
+  it('a phone that applied the programme before cycles had dates keeps its tweaks after the update', async () => {
+    saveProfile({ ...loadProfile(), choirCode: 'kammerchor' });
+    const cu = Date.UTC(2020, 5, 1, 12);
+    localStorage.setItem('sh:choirApplied', `kammerchor:${cu}`);
+    saveCycleTweak();
+    let cycles = [{ id: 'first', name: 'autumn', start: '2000-01-01', updatedAt: cu, pieceIds: ['a'] }];
+    mockFetch(() => ({ body: { ...info([], { name: 'autumn', pieceIds: ['a'] }), cycleUpdatedAt: cu, cycles } }));
+    expect((await syncChoir(async () => {}, () => true)).programme).toBe(false);
+    expect(localStorage.getItem('sh:choirApplied')).toBe(`kammerchor:first:${cu}`);
+    expect(loadCycle().concertDate).toBe('2001-01-01');
+    // but a cycle that started (by date) after that change was never applied there: it is now
+    localStorage.setItem('sh:choirApplied', `kammerchor:${cu}`);
+    cycles = [{ id: 'spring', name: 'spring', start: '2021-01-01', updatedAt: cu - 1, pieceIds: ['b'] }];
+    expect((await syncChoir(async () => {}, () => true)).programme).toBe(true);
+    expect(loadCycle()).toMatchObject({ name: 'spring', pieceIds: ['b'] });
+  });
+
+  it('joining another choir that is between cycles drops the old choir\'s programme', async () => {
+    saveProfile({ ...loadProfile(), choirCode: 'kammerchor' });
+    saveCycle({ ...loadCycle(), name: 'Old choir', pieceIds: ['x'], preset: 'choir:otherchoir' });
+    localStorage.setItem('sh:choirApplied', 'otherchoir:3');
+    mockFetch(() => ({ body: { ...info([]), cycles: [{ id: 'spring', name: 'Spring', start: '2999-01-01', pieceIds: ['b'] }] } }));
+    expect((await syncChoir(async () => {}, () => true)).programme).toBe(true);
+    expect(loadCycle()).toMatchObject({ name: '', pieceIds: [], preset: 'choir:kammerchor' });
+  });
+
   it('admins list the library and add a piece with one call (bearer or super-admin password)', async () => {
     mockFetch((url) => (url.endsWith('/library')
       ? { body: { pieces: [{ id: 'faure-madrigal', title: 'Madrigal, Op. 35', composer: 'Gabriel Fauré', size: 9, scoreId: null, inProgramme: false }] } }
@@ -391,6 +444,9 @@ describe('choir library pieces', () => {
     expect(calls[1].init.method).toBe('POST');
     expect(JSON.parse(calls[1].init.body as string)).toEqual({ programme: true });
     expect(headers(calls[1])['X-Super-Admin']).toBe('pw');
+    // into the cycle being edited
+    await addLibraryPiece('kammerchor', { bearer: 'tok' }, 'faure-madrigal', true, 'c1');
+    expect(JSON.parse(calls[2].init.body as string)).toEqual({ programme: true, cycleId: 'c1' });
   });
 });
 

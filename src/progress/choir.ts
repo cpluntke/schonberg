@@ -15,9 +15,15 @@ export interface ChoirPiece {
   /** Key marks set by an admin: where the singers' do moves (see music/keymarks.ts). */
   keys?: { bar: number; fifths?: number; mode?: 'major' | 'minor' }[];
 }
-/** A choir's programme for a stretch of time: from `start` (YYYY-MM-DD) to `end` (or the next cycle). */
+/** A choir's programme for a stretch of time: from `start` (YYYY-MM-DD) to `end` or the next cycle's start, whichever comes first. */
 export type ChoirProgramme = Omit<Cycle, 'preset'> & { name: string };
-export interface ChoirCycle extends ChoirProgramme { id: string; start: string; end?: string }
+export interface ChoirCycle extends ChoirProgramme {
+  id: string; start: string; end?: string;
+  /** When it was made (ms): of two starting the same day, the later made runs. Absent on older cycles. */
+  createdAt?: number;
+  /** Its own last change (ms): members' phones apply the running cycle again only when this changes. */
+  updatedAt?: number;
+}
 export interface ChoirInfo {
   code: string;
   name: string;
@@ -37,17 +43,24 @@ export interface ChoirInfo {
   signupsOpen?: boolean;
 }
 
-/** The choir's cycle running on `today` (this phone's date): the latest started one that hasn't ended. */
-export function choirCycleNow(info: Pick<ChoirInfo, 'cycle' | 'cycles'> | null, today = localDay()): (ChoirProgramme & { id?: string }) | null {
+/** Cycles in order: by start, then by when they were made (older cycles without `createdAt` first). */
+export const byStart = (a: ChoirCycle, b: ChoirCycle): number =>
+  (a.start < b.start ? -1 : a.start > b.start ? 1 : (a.createdAt ?? 0) - (b.createdAt ?? 0));
+/**
+ * The choir's cycle running on `today` (this phone's date): the latest started one, unless it has
+ * ended (then none: an earlier cycle never comes back). The same rule as the server's.
+ */
+export function choirCycleNow(info: Pick<ChoirInfo, 'cycle' | 'cycles'> | null, today = localDay()): (ChoirProgramme & { id?: string; updatedAt?: number }) | null {
   if (!info) return null;
   if (!Array.isArray(info.cycles)) return info.cycle;
-  const run = info.cycles.filter((c) => c.start <= today && !(c.end && c.end < today)).sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
-  return run[run.length - 1] ?? null;
+  const started = info.cycles.filter((c) => c.start <= today).sort(byStart);
+  const cur = started[started.length - 1];
+  return cur && !(cur.end && cur.end < today) ? cur : null;
 }
-/** The next cycle to start after `today`, if any. */
+/** The next cycle to start after `today`, if any (of two starting the same day, the one that will run). */
 export function choirCycleNext(info: Pick<ChoirInfo, 'cycles'> | null, today = localDay()): ChoirCycle | null {
-  const later = (info?.cycles ?? []).filter((c) => c.start > today).sort((a, b) => (a.start < b.start ? -1 : 1));
-  return later[0] ?? null;
+  const later = (info?.cycles ?? []).filter((c) => c.start > today).sort(byStart);
+  return later.filter((c) => c.start === later[0]?.start).pop() ?? null;
 }
 function localDay(d = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -254,16 +267,23 @@ export async function syncChoir(importFile: (name: string, data: ArrayBuffer, me
     }
   }
   try { localStorage.setItem('sh:choirBadScores', JSON.stringify(failed)); } catch { /* ignore */ }
-  // The programme: applied when the choir published a new version or a new cycle started (local
-  // tweaks last until then).
+  // The programme: applied when another cycle starts running (by this phone's date) or an admin
+  // changes the running one (local tweaks last until then). Changes to other cycles don't count.
   let programme = false;
-  // (a new cycle starts by date too: the stamp has the running cycle's id)
   const now = choirCycleNow(info);
-  const stamp = `${info.code}:${info.cycleUpdatedAt ?? info.updatedAt}${Array.isArray(info.cycles) ? `:${now?.id ?? 'none'}` : ''}`;
+  const dated = Array.isArray(info.cycles);
+  const stamp = dated ? `${info.code}:${now?.id ?? 'none'}${now ? `:${now.updatedAt ?? 0}` : ''}` : `${info.code}:${info.cycleUpdatedAt ?? info.updatedAt}`;
   let applied: string | null = null;
   try { applied = localStorage.getItem('sh:choirApplied'); } catch { /* ignore */ }
-  if (!now && Array.isArray(info.cycles) && applied !== stamp && applied?.startsWith(`${info.code}:`)) {
-    // The cycle ended and the next hasn't started: its programme goes (the singer's own pieces stay).
+  // (a phone that applied the programme before cycles had dates, when the choir last changed it: it
+  // has the running cycle already if that one had started by then)
+  const nowStart = info.cycles?.find((c) => c.id === now?.id)?.start;
+  if (nowStart && info.cycleUpdatedAt && applied === `${info.code}:${info.cycleUpdatedAt}` && nowStart <= localDay(new Date(info.cycleUpdatedAt))) applied = stamp;
+  // (joined from another choir: its programme isn't this choir's)
+  const otherChoir = !!loadCycle().preset?.startsWith('choir:') && loadCycle().preset !== `choir:${info.code}`;
+  if (!now && applied !== stamp && ((dated && applied?.startsWith(`${info.code}:`)) || otherChoir)) {
+    // The cycle ended and the next hasn't started (or this choir has none): its programme goes (the
+    // singer's own pieces stay).
     const own = loadCycle().pieceIds.filter((id) => isOwnPiece(id));
     saveCycle({ ...loadCycle(), name: '', pieceIds: own, focusPieceIds: [], rehearsalWeekday: undefined, rehearsalTime: undefined,
       rehearsalDate: undefined, concertDate: undefined, wanted: [], preset: `choir:${info.code}` });
@@ -327,11 +347,13 @@ export interface LibraryPiece {
 export const fetchLibrary = (code: string, auth: Auth) => call<{ pieces: LibraryPiece[] }>(`/choirs/${enc(code)}/library`, { auth });
 /**
  * Add a library piece to the choir's scores (the server copies the file; nothing is uploaded from
- * here). `programme`: also put it into the published programme. Adding it twice is harmless.
+ * here). `programme`: also put it into a cycle's programme: `cycleId` (the one being edited), else
+ * the running one, else the next to come. The reply's `programme`: whether it is in that cycle now.
+ * Adding it twice is harmless.
  */
-export const addLibraryPiece = (code: string, auth: Auth, id: string, programme: boolean) =>
+export const addLibraryPiece = (code: string, auth: Auth, id: string, programme: boolean, cycleId?: string) =>
   call<{ ok: boolean; added: boolean; programme: boolean; piece: ChoirPiece; choir: ChoirInfo }>(
-    `/choirs/${enc(code)}/library/${enc(id)}`, { method: 'POST', auth, ...json({ programme }) });
+    `/choirs/${enc(code)}/library/${enc(id)}`, { method: 'POST', auth, ...json(cycleId ? { programme, cycleId } : { programme }) });
 
 // ------------------------------------------------------------------ section leads
 

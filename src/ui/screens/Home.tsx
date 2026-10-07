@@ -130,20 +130,24 @@ export function Home() {
         </div>
       )}
 
-      <section className="card">
-        <div className="row between">
-          <div className="eyebrow">{cycle.name || 'This cycle'}</div>
-          <button className="btn ghost small" onClick={() => go({ name: 'settings' })}>{noDates ? 'Set dates' : 'Edit dates'}</button>
-        </div>
-        <div className="row" style={{ gap: 16 }}>
-          <Countdown label="Rehearsal" days={toRehearsal} date={nr?.label} raw />
-          <Countdown label="Concert" days={toConcert} date={cycle.concertDate} />
-          <div className="col" style={{ gap: 2, marginLeft: 'auto', alignItems: 'flex-end' }}>
-            <span className="mono" style={{ fontSize: 26, fontWeight: 600 }}>{Math.round(avg * 100)}%</span>
-            <span className="tiny muted">cycle readiness</span>
+      {/* (between the choir's cycles the notice above stands for the cycle: no dates to set; the
+          singer's own pieces still get today's practice) */}
+      {(!betweenCycles || !!focus?.next) && <section className="card" data-testid="cycle-card">
+        {!betweenCycles && <>
+          <div className="row between">
+            <div className="eyebrow">{cycle.name || 'This cycle'}</div>
+            <button className="btn ghost small" onClick={() => go({ name: 'settings' })}>{noDates ? 'Set dates' : 'Edit dates'}</button>
           </div>
-        </div>
-        {focusStatuses.length + focusMissing.length > 0 && nr && nr.days >= 0 && (
+          <div className="row" style={{ gap: 16 }}>
+            <Countdown label="Rehearsal" days={toRehearsal} date={nr?.label} raw />
+            <Countdown label="Concert" days={toConcert} date={cycle.concertDate} />
+            <div className="col" style={{ gap: 2, marginLeft: 'auto', alignItems: 'flex-end' }}>
+              <span className="mono" style={{ fontSize: 26, fontWeight: 600 }}>{Math.round(avg * 100)}%</span>
+              <span className="tiny muted">cycle readiness</span>
+            </div>
+          </div>
+        </>}
+        {!betweenCycles && focusStatuses.length + focusMissing.length > 0 && nr && nr.days >= 0 && (
           <div className="small" data-testid="rehearsal-focus">
             <span className="muted">{nr.days === 0 ? 'Tonight' : `Next rehearsal (${nr.label})`}:</span>{' '}
             {focusStatuses.map((s, i) => (
@@ -156,7 +160,7 @@ export function Home() {
             ))}
           </div>
         )}
-        {concertOver && (
+        {!betweenCycles && concertOver && (
           <div className="notice info small col" style={{ gap: 8 }} data-testid="concert-over">
             <span>{fromChoir
               ? 'The concert is over. Your choir will publish the next programme here; until then, keep your pieces fresh.'
@@ -164,7 +168,7 @@ export function Home() {
             {!fromChoir && <button className="btn small" style={{ alignSelf: 'flex-start' }} onClick={() => go({ name: 'settings' })}>Set new dates</button>}
           </div>
         )}
-        {target && <div className="small" style={{ color: 'var(--accent-text)' }}>{target}</div>}
+        {!betweenCycles && target && <div className="small" style={{ color: 'var(--accent-text)' }}>{target}</div>}
         {focus && focus.next ? (
           <>
             <NextUp status={focus} secondary={!profile.onboarded} />
@@ -186,7 +190,7 @@ export function Home() {
         ) : (
           <div className="notice info">No pieces in this cycle yet. Add some from the Library or import your choir's MusicXML.</div>
         )}
-      </section>
+      </section>}
 
       <section className="col" style={{ gap: 2 }}>
         <div className="row between">

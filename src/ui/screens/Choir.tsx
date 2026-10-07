@@ -9,7 +9,7 @@ import {
   loadSession, loggedOutNotice, login, logout, onSessionChange, refreshSession, refreshSessionSoon, saveChoirCycle, sessionFor, superCreate, superDelete,
   superList, superPurgeMembers, superRename, uploadChoirPiece, withdrawProgress, fetchChoirUsage, mb, type Auth, type ChoirInfo, type ChoirSummary, type ChoirUsage,
   type ServerUsage, type Session, localPieceId, sharingEnded, sharingNeedsOk, startSharing, type LibraryPiece, addLibraryPiece, loadSuperSession, superLogin, superLogout, superLoggedOutNotice,
-  fetchCycles, createCycle, updateCycle, deleteCycle, type ChoirCycle, type CyclesReply,
+  fetchCycles, createCycle, updateCycle, deleteCycle, type ChoirCycle, type CyclesReply, choirCycleNow,
 } from '../../progress/choir';
 import { LibraryPanel, type ProgrammeDraft } from '../components/ChoirLibrary';
 import { SectionInsights } from '../components/SectionInsights';
@@ -109,7 +109,7 @@ export function ChoirScreen() {
             <span className="eyebrow">Choir</span>
             <strong style={{ fontSize: 20 }}>{choir!.name}</strong>
             <span className="small muted">
-              {choir!.cycle ? `Programme: ${choir!.cycle.name} · ` : ''}{choir!.pieces.length} score{choir!.pieces.length === 1 ? '' : 's'} from the choir
+              {choirCycleNow(choir) ? `Programme: ${choirCycleNow(choir)!.name} · ` : ''}{choir!.pieces.length} score{choir!.pieces.length === 1 ? '' : 's'} from the choir
             </span>
             <div className="row wrap">
               <button className="btn small" onClick={async () => {
@@ -333,6 +333,22 @@ export function ChoirAdmin() {
     fetchChoir(code).then((i) => { if (alive) setInfo(i); }).catch(() => { /* keep the cached copy */ });
     return () => { alive = false; };
   }, [code]);
+  const sel = cycles?.cycles.find((c) => c.id === selId) ?? null;
+  // The version of the selected cycle the editor started from: it starts again from the server's copy
+  // when that cycle changed (a save, another admin's edit, a piece from the library), but asks first
+  // when that would drop unsaved changes. Changes to other cycles leave the editor alone.
+  const [edVer, setEdVer] = useState<number | undefined>(undefined);
+  const edFor = useRef<string | null>(null);
+  const justSaved = useRef(false);
+  useEffect(() => {
+    if (!sel || (edFor.current === sel.id && edVer === sel.updatedAt)) return;
+    if (edFor.current === sel.id && !justSaved.current && draft.current.ids
+      && !confirm(`“${sel.name}” was changed meanwhile (by another admin?). Load the new version? Your unsaved changes would be lost.`)) return;
+    justSaved.current = false;
+    edFor.current = sel.id;
+    setEdVer(sel.updatedAt);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sel?.id, sel?.updatedAt]);
   if (!apiBase()) return <><Offline /></>;
   if (!code) return <><div className="notice">Join your choir first (Settings → Your choir).</div></>;
   const auth: Auth | null = token ? { bearer: token } : !session ? lastAuth : null;
@@ -352,12 +368,14 @@ export function ChoirAdmin() {
     setInfo(cachedChoir());
     return r;
   };
+  const unsaved = (what: string) => !!draft.current.ids && !confirm(`Your changes to “${sel?.name ?? 'the programme'}” aren't saved. ${what}? They would be lost.`);
   const gotCycles = (r: CyclesReply, select?: string) => {
     setCycles(r);
     setInfo(r.choir);
-    setSelId((cur) => (select ?? (cur && r.cycles.some((c) => c.id === cur) ? cur : r.current ?? r.cycles[r.cycles.length - 1]?.id ?? null)));
+    const pick = select && select !== selId && !unsaved('Open the new cycle anyway') ? select : null;
+    setSelId((cur) => pick ?? (cur && r.cycles.some((c) => c.id === cur) ? cur : cycleNow(r.cycles)?.id ?? r.cycles[r.cycles.length - 1]?.id ?? null));
   };
-  const sel = cycles?.cycles.find((c) => c.id === selId) ?? null;
+  const reloadCycles = () => { void fetchCycles(code, auth).then((r) => gotCycles(r)).catch(() => {}); };
   return (
     <>
       {session ? (
@@ -365,19 +383,20 @@ export function ChoirAdmin() {
       ) : (
         <NeedLogin code={code} what="Your changes below are kept: log in again, then publish them." />
       )}
-      <CyclesPanel code={code} auth={auth} cycles={cycles} selId={selId} onSelect={setSelId}
+      <CyclesPanel code={code} auth={auth} cycles={cycles} selId={selId}
+        onSelect={(id) => { if (id !== selId && !unsaved(`Edit another cycle anyway`)) return; setSelId(id); }}
         onLoaded={gotCycles} onChanged={(r, select) => { gotCycles(r, select); void refresh(); }} />
       {sel && (
-        <ProgrammeEditor key={`${info?.code}:${sel.id}:${cycles?.cycleUpdatedAt ?? 0}`} code={code} auth={auth} info={info} cycle={sel}
+        <ProgrammeEditor key={`${info?.code}:${sel.id}:${edVer ?? 0}`} code={code} auth={auth} info={info} cycle={sel} all={cycles?.cycles ?? []}
           base={cycles?.cycleUpdatedAt ?? 0} library={library}
           draft={draft.current} onDraft={() => setDraftV((v) => v + 1)}
-          onLibraryAdded={(i) => { if (i) setInfo(i); void refresh(); void fetchCycles(code, auth).then((r) => gotCycles(r)).catch(() => {}); }}
-          onSaved={(r) => { gotCycles(r); void refresh(); }} onConflict={() => { void fetchCycles(code, auth).then((r) => gotCycles(r)).catch(() => {}); }} />
+          onLibraryAdded={(i) => { if (i) setInfo(i); void refresh(); reloadCycles(); }}
+          onSaved={(r) => { justSaved.current = true; gotCycles(r); void refresh(); }} onConflict={reloadCycles} />
       )}
       <ScoresEditor code={code} auth={auth} info={info} onChanged={refresh} />
       {session && (
-        <LibraryPanel code={code} auth={auth} info={info} draft={draft.current} onList={setLibrary}
-          onAdded={(i) => { if (i) setInfo(i); void refresh(); }} />
+        <LibraryPanel code={code} auth={auth} info={info} draft={draft.current} cycle={sel} onList={setLibrary}
+          onAdded={(i) => { if (i) setInfo(i); void refresh(); reloadCycles(); }} />
       )}
       {session && (
         <div className="card" data-testid="people-editor">
@@ -390,8 +409,8 @@ export function ChoirAdmin() {
   );
 }
 
-function ProgrammeEditor({ code, auth, info, cycle, base, library, draft, onDraft, onSaved, onConflict, onLibraryAdded }: {
-  code: string; auth: Auth; info: ChoirInfo | null; cycle: ChoirCycle; base: number; library: LibraryPiece[] | null; draft: ProgrammeDraft; onDraft: () => void;
+function ProgrammeEditor({ code, auth, info, cycle, all, base, library, draft, onDraft, onSaved, onConflict, onLibraryAdded }: {
+  code: string; auth: Auth; info: ChoirInfo | null; cycle: ChoirCycle; all: ChoirCycle[]; base: number; library: LibraryPiece[] | null; draft: ProgrammeDraft; onDraft: () => void;
   onSaved: (r: CyclesReply) => void; onConflict: () => void; onLibraryAdded: (i: ChoirInfo | null) => void;
 }) {
   const start = cycle;
@@ -449,6 +468,8 @@ function ProgrammeEditor({ code, auth, info, cycle, base, library, draft, onDraf
     return { title: id, note: 'members don’t have this score' };
   };
   const toggle = (arr: string[], id: string) => (arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]);
+  // (with the dates as edited here: running, to come or over)
+  const state = cycleState(cycle.id, all.map((c) => (c.id === cycle.id ? { ...c, start: from, end: until || undefined } : c)));
   return (
     <div className="card" data-testid="programme-editor">
       <strong>Programme: {cycle.name}</strong>
@@ -515,6 +536,8 @@ function ProgrammeEditor({ code, auth, info, cycle, base, library, draft, onDraf
       <button className="btn primary block" disabled={busy} data-testid="publish-programme" onClick={async () => {
         setBusy(true);
         try {
+          // The whole programme (with pieceIds the server clears what isn't sent: no concert, no
+          // weekly rehearsal any more).
           const r = await updateCycle(code, auth, cycle.id, {
             name, start: from, end: until || null, pieceIds: ids, focusPieceIds: focus.filter((x) => ids.includes(x)),
             ...(weekday >= 0 ? { rehearsalWeekday: weekday, rehearsalTime: time } : rehearsalDate ? { rehearsalDate } : {}),
@@ -522,16 +545,19 @@ function ProgrammeEditor({ code, auth, info, cycle, base, library, draft, onDraf
             wanted: wanted.filter((w) => w.title.trim()),
             base,
           });
-          const today = todayKey();
-          toast(from > today ? `Saved: members get this programme when the cycle starts (${from})` : 'Programme published: members get it the next time they open the app');
+          const now = cycleState(cycle.id, r.cycles);
+          toast(now === 'running' ? 'Programme published: members get it the next time they open the app'
+            : now === 'future' ? `Saved: members get this programme when the cycle starts (${fmtDay(from)})`
+            : 'Saved. This cycle is over, so members don’t get it.');
           onSaved(r);
         } catch (e) {
           toast((e as Error).message);
-          if (e instanceof ChoirApiError && e.status === 409) onConflict();
+          // (another admin changed or deleted it: load the cycles again)
+          if (e instanceof ChoirApiError && (e.status === 409 || e.status === 404)) onConflict();
         } finally {
           setBusy(false);
         }
-      }}>{cycle.start > todayKey() ? 'Save this cycle' : 'Publish to the choir'}</button>
+      }}>{state === 'running' ? 'Publish to the choir' : state === 'future' ? 'Save this cycle' : 'Save'}</button>
     </div>
   );
 }
@@ -540,6 +566,13 @@ const fmtDay = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString(undef
 function todayKey(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+/** The cycle running by this phone's date (the rule members' phones use). */
+const cycleNow = (all: ChoirCycle[]) => choirCycleNow({ cycle: null, cycles: all }, todayKey()) as ChoirCycle | null;
+/** A cycle by this phone's date: running now, still to come, or over. */
+function cycleState(id: string, all: ChoirCycle[]): 'running' | 'future' | 'over' {
+  const c = all.find((x) => x.id === id);
+  return cycleNow(all)?.id === id ? 'running' : c && c.start > todayKey() ? 'future' : 'over';
 }
 
 /**
@@ -563,9 +596,14 @@ function CyclesPanel({ code, auth, cycles, selId, onSelect, onLoaded, onChanged 
   }, [code]);
   const today = todayKey();
   const list = [...(cycles?.cycles ?? [])].reverse(); // newest first
-  const status = (c: ChoirCycle) => (c.id === cycles?.current ? 'Running now'
-    : c.start > today ? `Starts ${fmtDay(c.start)}` : 'Over');
-  const running = cycles?.cycles.find((c) => c.id === cycles.current);
+  // (all by this phone's date, as members' phones decide)
+  const running = cycleNow(cycles?.cycles ?? []);
+  const status = (c: ChoirCycle) => (c.id === running?.id ? 'Running now' : c.start > today ? `Starts ${fmtDay(c.start)}` : 'Over');
+  // Another admin changed the cycles (or deleted this one): load them again, so the next try works.
+  const failed = (e: unknown) => {
+    toast((e as Error).message);
+    if (e instanceof ChoirApiError && (e.status === 409 || e.status === 404)) fetchCycles(code, auth).then(onLoaded).catch(() => {});
+  };
   const create = async () => {
     if (!form.name.trim()) { toast('Give the cycle a name'); return; }
     setBusy(true);
@@ -575,13 +613,16 @@ function CyclesPanel({ code, auth, cycles, selId, onSelect, onLoaded, onChanged 
         ...(running.rehearsalWeekday != null ? { rehearsalWeekday: running.rehearsalWeekday, rehearsalTime: running.rehearsalTime } : {}),
       } : { pieceIds: [] };
       const r = await createCycle(code, auth, { name: form.name.trim(), start: form.start, ...(form.end ? { end: form.end } : {}), ...keep, base: cycles?.cycleUpdatedAt });
-      const made = r.cycles.find((c) => c.name === form.name.trim() && c.start === form.start);
-      toast(form.start > today ? `${form.name.trim()} starts on ${fmtDay(form.start)}` : `${form.name.trim()} has started: everyone's “notes right this cycle” begin at 0`);
+      const made = r.cycles.filter((c) => c.name === form.name.trim() && c.start === form.start).pop(); // (the last made)
+      const st = made ? cycleState(made.id, r.cycles) : 'over';
+      toast(st === 'future' ? `${form.name.trim()} starts on ${fmtDay(form.start)}`
+        : st === 'running' ? `${form.name.trim()} has started: everyone's “notes right this cycle” begin at 0`
+        : `${form.name.trim()} is saved. It is over, so members don’t get it.`);
       setAdding(false);
       setForm({ name: '', start: todayKey(), end: '', keep: true });
       onChanged(r, made?.id);
     } catch (e) {
-      toast((e as Error).message);
+      failed(e);
     } finally {
       setBusy(false);
     }
@@ -630,8 +671,8 @@ function CyclesPanel({ code, auth, cycles, selId, onSelect, onLoaded, onChanged 
               </div>
               <button className="btn small" aria-pressed={c.id === selId} onClick={() => onSelect(c.id)} data-testid="cycle-edit">{c.id === selId ? 'Editing' : 'Edit'}</button>
               <button className="btn small ghost" aria-label={`Delete ${c.name}`} data-testid="cycle-delete" onClick={async () => {
-                if (!confirm(`Delete the cycle “${c.name}”?${c.id === cycles?.current ? ' It is running now: singers lose its programme.' : ''}`)) return;
-                try { onChanged(await deleteCycle(code, auth, c.id, cycles?.cycleUpdatedAt)); } catch (e) { toast((e as Error).message); }
+                if (!confirm(`Delete the cycle “${c.name}”?${c.id === running?.id ? ' It is running now: singers lose its programme.' : ''}`)) return;
+                try { onChanged(await deleteCycle(code, auth, c.id, cycles?.cycleUpdatedAt)); } catch (e) { failed(e); }
               }}>Delete</button>
             </div>
           );

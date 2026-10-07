@@ -32,14 +32,30 @@ Singers start from scratch but aren't held back (`src/progress/struggle.ts`):
 Home shows the practice streak (consecutive days with any run, listening too) and the **notes sung
 right this cycle** (`src/progress/points.ts`): every sung run adds its notes graded right (practice
 runs too). A choir's **cycles** have dates (Admin → Cycles: start date, optional end date, each with
-its own programme): members get only the cycle running today (by their phone's date) and those to
-come, never past ones; when the next one starts it replaces the programme and everyone's count
-starts again from 0. Between cycles (one ended, the next not started) the choir's programme leaves
-Home and a notice names the next cycle. Admins see every cycle, past ones too, and can start, edit and
-delete them. Without a choir, the singer's own cycle name decides (the starting "Demo cycle" and
-"This cycle" count as one). Results show the run's notes right, the cycle total and the
-streak. Both travel with the choir account's copy (`ProgressSnapshot.pts`, `days`): another phone's
-practice days keep the streak, and the larger count of the same cycle wins.
+its own programme). A cycle runs from its start date until its end date or until the next cycle (by
+start) begins, whichever comes first: on any day the running cycle is the one with the latest start
+up to that day, and only while it hasn't ended. If that one has ended, none runs: an earlier cycle
+never comes back (a deleted cycle is as if it never was). Of two cycles starting the same day, the
+one created later runs (each keeps its `createdAt`; editing a cycle doesn't move it).
+
+Members get only the cycle running by their phone's date and the ones to come, never past ones (the
+server sends the ones running yesterday and today in UTC, for time zones, and all later ones). When
+the next one starts it replaces the programme and everyone's count starts again from 0. A phone
+applies the programme again only when another cycle starts running or an admin changes the running
+one (each cycle has its own `updatedAt`); changes to other cycles leave the singer's own tweaks
+alone. Between cycles (one ended, the next not started) the choir's programme leaves Home, the "This
+cycle" dates card goes, and a notice names the next cycle; the same after joining another choir that
+is between cycles (the old choir's programme goes).
+
+Admins see every cycle, past ones too, labelled Running now / Starts … / Over by the phone's date
+(the members' rule), and can start, edit and delete them. Saving in the programme editor saves the
+whole programme (what it leaves out, e.g. the concert, is cleared); a change of dates alone keeps the
+rest. The library's "Put it in the programme" adds to the cycle being edited. Without a choir, the
+singer's own cycle name decides (the starting "Demo cycle" and "This cycle" count as one).
+
+Results show the run's notes right, the cycle total and the streak. Both travel with the choir
+account's copy (`ProgressSnapshot.pts`, `days`): another phone's practice days keep the streak, and
+the larger count of the same cycle wins.
 
 ## Level 1: the notes, on “doo”
 

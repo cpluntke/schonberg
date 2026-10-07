@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { trackStep } from '../../progress/metrics';
 import { useProfile, useStoreVersion } from '../hooks';
 import { loadCycle, saveCycle, type Profile } from '../../progress/store';
-import { apiBase, cachedChoir, leaveChoir } from '../../progress/choir';
+import { apiBase, cachedChoir, choirCycleNow, leaveChoir } from '../../progress/choir';
 import { JoinChoir } from './Choir';
 import { allPieces } from '../library';
 import { IntroVideoButton, introSeen } from '../components/IntroVideo';
@@ -136,7 +136,7 @@ export function Setup() {
           })()}
           <span className="tiny muted">With dates, Home tells you how many sections to learn per day.</span>
           <div className="col">
-            <span className="small">{cachedChoir()?.cycle && profile.choirCode && loadCycle().preset === `choir:${profile.choirCode}` ? `Pieces ${cachedChoir()!.name} is singing (from the choir; change them any time)` : 'Pieces your choir is singing this cycle'}</span>
+            <span className="small">{choirCycleNow(cachedChoir()) && profile.choirCode && loadCycle().preset === `choir:${profile.choirCode}` ? `Pieces ${cachedChoir()!.name} is singing (from the choir; change them any time)` : 'Pieces your choir is singing this cycle'}</span>
             <div className="chips" role="group" aria-label="Pieces in this cycle">
               {allPieces().map((pc) => {
                 const on = loadCycle().pieceIds.includes(pc.id);
@@ -242,9 +242,9 @@ function ChoirStep({ profile, update, onNext }: { profile: Profile; update: (p: 
         <div className="card" data-testid="setup-choir-joined">
           <span className="eyebrow">Joined</span>
           <strong style={{ fontSize: 20 }}>{choir!.name}</strong>
-          {(choir!.cycle || choir!.pieces.length > 0) && (
+          {(choirCycleNow(choir) || choir!.pieces.length > 0) && (
             <span className="small muted">
-              {choir!.cycle ? `Programme: ${choir!.cycle.name}. ` : ''}{choir!.pieces.length ? (choir!.pieces.length === 1 ? '1 score from the choir is on its way to your phone.' : `${choir!.pieces.length} scores from the choir are on their way to your phone.`) : ''}
+              {choirCycleNow(choir) ? `Programme: ${choirCycleNow(choir)!.name}. ` : ''}{choir!.pieces.length ? (choir!.pieces.length === 1 ? '1 score from the choir is on its way to your phone.' : `${choir!.pieces.length} scores from the choir are on their way to your phone.`) : ''}
             </span>
           )}
           <span className="small" data-testid="setup-share-note">Being in the choir means sharing your practice: your section lead and the admins see which bars are hard for your section (as section totals; in a small section they may still tell which are yours) and your voice range by name, and everyone in the choir sees your first name, voice and readiness on the leaderboard.</span>
