@@ -99,6 +99,16 @@ export function App() {
     }, 60);
     return () => clearTimeout(t);
   }, [route, lib.ready]);
+  // The piece page belongs to the tab it was opened from (Home or Library): that tab stays lit.
+  const [fromTab, setFromTab] = React.useState<Route['name']>(() => {
+    try { return (sessionStorage.getItem('sh:fromTab') as Route['name'] | null) ?? 'library'; } catch { return 'library'; }
+  });
+  useEffect(() => {
+    if (!TABS.some((t) => t.name === route.name)) return;
+    setFromTab(route.name);
+    try { sessionStorage.setItem('sh:fromTab', route.name); } catch { /* storage blocked */ }
+  }, [route.name]);
+  const tab = route.name === 'piece' ? fromTab : route.name;
   const isAdmin = ADMIN_ROUTES.includes(route.name);
   const showNav = ['home', 'library', 'ranks', 'settings', 'piece', 'expert'].includes(route.name) || isAdmin;
 
@@ -139,7 +149,7 @@ export function App() {
         <nav className="nav" aria-label="Main">
           <div className="nav-inner">
             {TABS.map((t) => (
-              <button key={t.name} aria-current={route.name === t.name ? 'page' : undefined} onClick={() => go({ name: t.name } as Route)}>
+              <button key={t.name} aria-current={tab === t.name ? (route.name === t.name ? 'page' : 'true') : undefined} onClick={() => go({ name: t.name } as Route)}>
                 {t.icon}
                 {t.label}
               </button>
