@@ -567,6 +567,11 @@ export interface StaffSystem {
   bp: { beat: number; x: number }[];
   /** Horizontal scale against the natural spacing (< 1: squeezed). */
   squeeze: number;
+  /**
+   * A stretch of one long scrolling line (see `scroll` in LayoutOpts): no clef or signatures of its
+   * own (they stay pinned at the left, at clefX/keyX/timeX), its staff starts at prefixEnd.
+   */
+  cont?: boolean;
 }
 export interface StaffLayout {
   clef: Clef;
@@ -587,6 +592,17 @@ export interface LayoutOpts {
   maxBars?: number;
   left?: number;
   right?: number;
+  /** One long line that scrolls past the playhead, in stretches of this many bars (no line breaks). */
+  scroll?: number;
+}
+
+/** Horizontal scale of a scrolling line against the natural spacing (a little airier than a page). */
+export const SCROLL_STRETCH = 1.12;
+/** Split bars 0..n-1 into consecutive stretches of `size` bars. */
+export function stretches(n: number, size: number): number[][] {
+  const out: number[][] = [];
+  for (let i = 0; i < n; i += size) out.push(Array.from({ length: Math.min(size, n - i) }, (_, j) => i + j));
+  return out;
 }
 
 /** Natural horizontal space after an event (in staff spaces), before lyric/accidental constraints. */
@@ -693,19 +709,23 @@ export function layoutStaff(score: Score, part: Part, m0: number, m1: number, o:
   };
   const inner = sms.map((sm) => measureWidths(sm, sp, o.textW, true, o.nameW));
   const opening = sms.map((sm) => measureWidths(sm, sp, o.textW, false, o.nameW));
-  const groups = breakSystems(opening.map((w, k) => prefixW(k) + w.total), inner.map((w) => w.total), avail, maxBars);
+  const scroll = o.scroll != null && o.scroll > 0;
+  const groups = scroll ? stretches(sms.length, o.scroll!)
+    : breakSystems(opening.map((w, k) => prefixW(k) + w.total), inner.map((w) => w.total), avail, maxBars);
+  let carryX = 0;
   const systems: StaffSystem[] = groups.map((g, gi) => {
     const firstSm = sms[g[0]];
     const clefX = left + 0.3 * sp;
     const keyX = left + CLEF_W * sp;
     const timeX = keyX + (firstSm.keyChange ? keyChangeW(firstSm.key.fifths, firstSm.prevFifths) : keyW(firstSm.key.fifths)) * sp;
-    const prefixEnd = left + prefixW(g[0]);
-    const widths = g.map((k, idx) => (idx === 0 ? opening[k] : inner[k]));
+    // Scrolling: one line, each stretch starting where the last ended (the clef and key stay pinned).
+    const prefixEnd = scroll && gi > 0 ? carryX : left + prefixW(g[0]);
+    const widths = g.map((k, idx) => (idx === 0 && (!scroll || gi === 0) ? opening[k] : inner[k]));
     const natural = widths.reduce((a, w) => a + w.total, 0);
     const room = left + avail - prefixEnd;
-    let f = room / Math.max(1, natural);
+    let f = scroll ? SCROLL_STRETCH : room / Math.max(1, natural);
     const last = gi === groups.length - 1;
-    if (last && f > 1) f = Math.min(f, 1.4);
+    if (!scroll && last && f > 1) f = Math.min(f, 1.4);
     let x = prefixEnd;
     const measures: LaidMeasure[] = [];
     const bp: { beat: number; x: number }[] = [];
@@ -726,11 +746,13 @@ export function layoutStaff(score: Score, part: Part, m0: number, m1: number, o:
     });
     const endBeat = sms[g[g.length - 1]].endBeat;
     bp.push({ beat: endBeat, x });
+    carryX = x;
     return {
       measures, startBeat: firstSm.startBeat, endBeat, key: firstSm.key,
       cancelFifths: firstSm.keyChange ? firstSm.prevFifths : 0,
       timeSig: firstSm.timeChange ? firstSm.timeSig : null,
       clefX, keyX, timeX, prefixEnd, x1: x, bp, squeeze: f,
+      ...(scroll ? { cont: true } : {}),
     };
   });
   return { clef, mid, sp, systems, minStep, maxStep };
@@ -1293,9 +1315,19 @@ export function buildSysDraw(sys: StaffSystem, layout: StaffLayout, notes: Part[
       }
     }
   }
-  // Ties: to the next head of the same note, or over the system's edge when the note goes on.
+  // Ties: to the next head of the same note, or over the system's edge when the note goes on. On a
+  // scrolling line the next stretch carries on right after this one: the tie goes to its head there
+  // (and that stretch draws no tie coming in).
   const ties: TieG[] = [];
   const seenNote = new Set<number>();
+  const si = layout.systems.indexOf(sys);
+  const nextSys = sys.cont ? layout.systems[si + 1] : undefined;
+  const headInNext = (i: number): number | null => {
+    for (const m of nextSys?.measures ?? []) for (const le of m.events) {
+      if (le.ev.noteIndex === i || le.ev.chord?.some((c) => c.noteIndex === i)) return le.x;
+    }
+    return null;
+  };
   for (let q = 0; q < evs.length; q++) {
     const g = evs[q];
     const n = g.heads.length;
@@ -1303,7 +1335,7 @@ export function buildSysDraw(sys: StaffSystem, layout: StaffLayout, notes: Part[
       const side = n > 1 ? (h.dy <= (g.heads.reduce((a, x) => a + x.dy, 0) / n) ? -1 : 1) : g.up ? 1 : -1;
       const dy = h.dy + side * 0.65 * sp;
       const note = notes[h.i];
-      if (h.tieEnd && !seenNote.has(h.i) && note && note.startBeat < sys.startBeat - 1e-6) {
+      if (h.tieEnd && !seenNote.has(h.i) && note && note.startBeat < sys.startBeat - 1e-6 && !(sys.cont && si > 0)) {
         ties.push({ i: h.i, xa: sys.prefixEnd - 0.8 * sp, xb: h.x - 0.75 * sp, dy, side });
       }
       seenNote.add(h.i);
@@ -1311,7 +1343,10 @@ export function buildSysDraw(sys: StaffSystem, layout: StaffLayout, notes: Part[
       let to: HeadG | null = null;
       for (let r = q + 1; r < evs.length && !to; r++) to = evs[r].heads.find((x) => x.i === h.i) ?? null;
       if (to) ties.push({ i: h.i, xa: h.x + 0.75 * sp, xb: to.x - 0.75 * sp, dy, side });
-      else if (note && note.startBeat + note.durBeats > sys.endBeat + 0.03) ties.push({ i: h.i, xa: h.x + 0.75 * sp, xb: sys.x1 + 0.6 * sp, dy, side });
+      else if (note && note.startBeat + note.durBeats > sys.endBeat + 0.03) {
+        const nx = headInNext(h.i);
+        ties.push({ i: h.i, xa: h.x + 0.75 * sp, xb: nx != null ? nx - 0.75 * sp : sys.x1 + 0.6 * sp, dy, side });
+      }
       void hi;
     });
   }
@@ -1423,7 +1458,7 @@ export function staffSpace(W: number, H: number, perSys: number): { sp: number; 
 
 function getLayout(c: Ctx, W: number, H: number, s: DrawState): Cached {
   const names = namesOn(s);
-  const key = `${s.score.id}|${s.part.id}|${s.part.notes.length}|${s.from}|${s.to}|${W}|${H}|${fontGen}|${names ? s.notation : '-'}|${s.notation}|${nameKeysSig(s.score)}`;
+  const key = `${s.score.id}|${s.part.id}|${s.part.notes.length}|${s.from}|${s.to}|${W}|${H}|${fontGen}|${names ? s.notation : '-'}|${s.notation}|${nameKeysSig(s.score)}|${s.scroll ? 'scroll' : 'page'}`;
   if (cache && cache.key === key) return cache;
   const [m0, m1] = measureSpan(s.score, s.from, s.to);
   const clef = clefFor(s.part);
@@ -1453,7 +1488,9 @@ function getLayout(c: Ctx, W: number, H: number, s: DrawState): Cached {
     const nameW = names ? nameMeasure(c, nameFontFor(sp), s.notation) : undefined;
     c.font = lyricFontFor(sp);
     const textW = (t: string) => c.measureText(t).width;
-    layout = layoutStaff(s.score, s.part, m0, m1, { width: W, sp, textW, nameW, maxBars: W < 520 ? 3 : W < 860 ? 4 : 6 });
+    layout = layoutStaff(s.score, s.part, m0, m1, { width: W, sp, textW, nameW, maxBars: W < 520 ? 3 : W < 860 ? 4 : 6, ...(s.scroll ? { scroll: SCROLL_BARS } : {}) });
+    // (a scrolling line is never squeezed: it is as long as it needs to be)
+    if (s.scroll) break;
     let worst = Infinity;
     for (const sy of layout.systems) worst = Math.min(worst, sy.squeeze);
     if (worst >= 0.9 || sp <= floor + 1e-6 || guard >= 6) break;
@@ -1525,9 +1562,50 @@ export interface Vis {
 /** Opacity of a note: notes outside your section are faded (not in another voice's plain staff). */
 const alphaOf = (v: Vis, i: number) => (v.plain || v.inRange(i) ? 1 : 0.35);
 
+/** Bars per stretch of a scrolling line (only the stretches in view are drawn). */
+const SCROLL_BARS = 2;
+/** Where the playhead stays on a scrolling line: this far across the music (after the pinned clef). */
+export const SCROLL_ANCHOR = 0.33;
+
+/**
+ * Horizontal offset of a scrolling line at beat `beat`: the playhead stays at SCROLL_ANCHOR of the
+ * view while the music moves left; at the start and at the end the line stays put and the playhead moves.
+ */
+export function scrollOffset(systems: StaffSystem[], beat: number, W: number, sp: number): { off: number; px: number; k: number } {
+  const k = systemAt(systems, beat);
+  const first = systems[0];
+  const px = beat < first.startBeat ? first.prefixEnd - 0.2 * sp : xAtBeat(systems[k], beat);
+  const pinned = first.prefixEnd;
+  const anchor = pinned + (W - pinned) * SCROLL_ANCHOR;
+  const end = systems[systems.length - 1].x1;
+  const maxOff = Math.max(0, end + 12 - W);
+  return { off: Math.max(0, Math.min(maxOff, px - anchor)), px, k };
+}
+
+/** The pinned start of a scrolling line: staff lines, clef and the key (and time) in force at `beat`. */
+export function drawPinned(c: Ctx, g: Pick<SysGeo, 'top' | 'mid'>, layout: Pick<StaffLayout, 'sp' | 'clef'>, first: StaffSystem, cur: StaffSystem, s: Pick<DrawState, 'score' | 'notation'>, showTime: boolean) {
+  const sp = layout.sp;
+  const w = first.prefixEnd;
+  c.fillStyle = COLORS.bg;
+  c.fillRect(0, g.top - 6 * sp, w, 16 * sp);
+  // Soft edge where the music slides under the clef.
+  const grad = c.createLinearGradient(w, 0, w + 1.6 * sp, 0);
+  grad.addColorStop(0, COLORS.bg);
+  grad.addColorStop(1, 'rgba(15,18,38,0)');
+  c.fillStyle = grad;
+  c.fillRect(w, g.top - 6 * sp, 1.6 * sp, 16 * sp);
+  const m = cur.measures[0]?.sm;
+  const pin: StaffSystem = {
+    ...first, cont: false, measures: [], x1: w, key: m?.key ?? first.key, cancelFifths: 0,
+    timeSig: showTime ? (first.measures[0]?.sm.timeSig ?? null) : null,
+  };
+  drawStaffFrame(c, { sys: pin, top: g.top, mid: g.mid }, layout, s, { barlines: false, numbers: false });
+}
+
 export function drawStaff2D(c: Ctx, W: number, H: number, s: DrawState) {
   c.fillStyle = COLORS.bg;
   c.fillRect(0, 0, W, H);
+  if (s.scroll) { drawStaffScroll(c, W, H, s); return; }
   const L = getLayout(c, W, H, s);
   const { layout } = L;
   const sp = layout.sp;
@@ -1589,6 +1667,57 @@ export function drawStaff2D(c: Ctx, W: number, H: number, s: DrawState) {
   }
 }
 
+/** The single staff as one line scrolling smoothly to the left past a fixed playhead. */
+function drawStaffScroll(c: Ctx, W: number, H: number, s: DrawState) {
+  const L = getLayout(c, W, H, s);
+  const { layout } = L;
+  const sp = layout.sp;
+  const systems = layout.systems;
+  if (!systems.length) return;
+  const beat = timeToBeat(s.score.tempos, s.pos);
+  const { off, px, k } = scrollOffset(systems, beat, W, sp);
+  const top = Math.round(Math.max(4, (H - L.band) / 2) + L.above * sp);
+
+  const notes = s.part.notes;
+  const [ra, rb] = s.range ?? [0, -1];
+  const inRange = (i: number) => s.range != null && i >= ra && i <= rb;
+  const isPast = (i: number) => notes[i].start + notes[i].dur <= s.pos;
+  const isNow = (i: number) => inRange(i) && notes[i].start <= s.pos && s.pos < notes[i].start + notes[i].dur;
+  const vis = (i: number): 'show' | 'letters' | 'none' => ((isPast(i) && inRange(i)) || !s.hide ? 'show' : s.hide(i));
+  const v: Vis = { vis, isPast, isNow, inRange };
+
+  const pinned = systems[0].prefixEnd;
+  const geos: SysGeo[] = [];
+  for (let j = 0; j < systems.length; j++) {
+    const sy = systems[j];
+    if (sy.x1 - off < pinned - 2 * sp || sy.prefixEnd - off > W + 2 * sp) continue;
+    geos.push({ j, sys: sy, sd: sysDraw(L, j, s), top, mid: top + 2 * sp });
+  }
+  c.save();
+  c.translate(-off, 0);
+  for (const g of geos) drawSystem(c, g, layout, L, s, v);
+  updateTrace(s, L);
+  for (const g of geos) drawTrace(c, g, s, L, beat);
+  for (const g of geos) drawOutlines(c, g, s, v, sp);
+  const cur = geos.find((g) => g.j === k) ?? geos[0];
+  const yTop = top - Math.max(1.5, L.above - 1.2) * sp;
+  const yBot = top + (4 + L.lyricOff - 1.4) * sp;
+  c.fillStyle = 'rgba(238,240,255,0.85)';
+  c.fillRect(Math.round(px) - 1, yTop, 2, yBot - yTop);
+  c.beginPath();
+  c.moveTo(px - 0.55 * sp, yTop - 0.6 * sp);
+  c.lineTo(px + 0.55 * sp, yTop - 0.6 * sp);
+  c.lineTo(px, yTop + 0.1 * sp);
+  c.closePath();
+  c.fill();
+  if (cur) {
+    drawCountdown(c, cur, s, L, px, yTop);
+    drawBubble(c, cur, s, L, px);
+  }
+  c.restore();
+  drawPinned(c, { top, mid: top + 2 * sp }, layout, systems[0], systems[k], s, off < 1);
+}
+
 function noteColor(s: DrawState, i: number, v: Vis): string {
   if (v.plain) return v.plain.note;
   if (!v.inRange(i)) return INK.note;
@@ -1611,14 +1740,17 @@ export function drawStaffFrame(c: Ctx, g: Pick<SysGeo, 'sys' | 'top' | 'mid'>, l
   const { sys, top, mid } = g;
   const sp = layout.sp;
   const lw = Math.max(1, Math.round(sp * 0.1));
-  // Staff lines.
+  // Staff lines (a stretch of a scrolling line: from its first bar on, the clef is pinned elsewhere).
   c.fillStyle = INK.staff;
-  for (let l = 0; l < 5; l++) c.fillRect(sys.clefX - 0.3 * sp, Math.round(top + l * sp), sys.x1 - sys.clefX + 0.3 * sp, lw);
+  const x0 = sys.cont ? sys.prefixEnd : sys.clefX - 0.3 * sp;
+  for (let l = 0; l < 5; l++) c.fillRect(x0, Math.round(top + l * sp), sys.x1 - x0, lw);
   // Clef, key (cancelling the old one when it changes here), time.
-  if (layout.clef === 'bass') drawBass(c, sys.clefX, top + sp, sp, INK.clef);
-  else drawTreble(c, sys.clefX, top + 3 * sp, sp, INK.clef, layout.clef === 'treble8');
-  drawKeySig(c, sys.keyX, mid, sp, sys.key.fifths, layout.clef, INK.clef, sys.cancelFifths);
-  if (sys.timeSig) drawTimeSig(c, sys.timeX, mid, sp, sys.timeSig, INK.clef);
+  if (!sys.cont) {
+    if (layout.clef === 'bass') drawBass(c, sys.clefX, top + sp, sp, INK.clef);
+    else drawTreble(c, sys.clefX, top + 3 * sp, sp, INK.clef, layout.clef === 'treble8');
+    drawKeySig(c, sys.keyX, mid, sp, sys.key.fifths, layout.clef, INK.clef, sys.cancelFifths);
+    if (sys.timeSig) drawTimeSig(c, sys.timeX, mid, sp, sys.timeSig, INK.clef);
+  }
 
   // Barlines + numbers.
   const numFont = `600 ${Math.round(Math.max(9, sp * 0.95))}px "JetBrains Mono", monospace`;
@@ -1631,7 +1763,7 @@ export function drawStaffFrame(c: Ctx, g: Pick<SysGeo, 'sys' | 'top' | 'mid'>, l
     c.textBaseline = 'alphabetic';
     c.textAlign = 'left';
     c.fillStyle = INK.barNo;
-    const nx = mi === 0 ? sys.clefX : m.x0 - 0.2 * sp;
+    const nx = mi === 0 && !sys.cont ? sys.clefX : m.x0 - 0.2 * sp;
     if (o.numbers && m.sm.number !== '0') c.fillText(m.sm.number, nx, top - 1.75 * sp);
     // Where the names' do is (first bar shown) or moves to: "Do = G" next to the bar number.
     const hint = o.numbers && m.sm.nameChange && movesWithKey(s.notation) ? keyHint(s.notation, m.sm.nameKey) : null;

@@ -3,7 +3,7 @@
 // aligned across all staves. Pure layout (unit-tested); fullscore2d.ts draws it.
 import type { Part, Score, ScoreNote, VoiceType } from '../../music/types';
 import {
-  accW, CLEF_W, NAME_GAP, TIME_W, breakSystems, buildMeasures, clefFor, eventSteps, hasAcc, hasSecond, keyChangeW, keyW,
+  accW, CLEF_W, NAME_GAP, SCROLL_STRETCH, TIME_W, breakSystems, stretches, buildMeasures, clefFor, eventSteps, hasAcc, hasSecond, keyChangeW, keyW,
   middleStep, nameWidths, naturalSpace, type Clef, type NameW, type LaidEvent, type LaidMeasure, type StaffMeasure, type StaffSystem,
 } from './staff2d';
 
@@ -192,6 +192,8 @@ export interface FullOpts {
   /** Each system starts with the previous one's last bar (one system per screen: turn a bar early). */
   overlap?: boolean;
   right?: number;
+  /** One long line scrolling past the playhead, in stretches of this many bars (no line breaks). */
+  scroll?: number;
 }
 
 export interface FullStaff {
@@ -351,9 +353,11 @@ export function layoutFullScore(score: Score, staves: StaffSpec[], m0: number, m
     const kw = sm.keyChange ? keyChangeW(sm.key.fifths, sm.prevFifths) : keyW(sm.key.fifths);
     return (CLEF_W + kw + (sm.timeChange ? TIME_W : 0) + 0.4) * sp;
   };
-  const groups = nBars && staves.length
-    ? (o.overlap ? breakSystemsOverlap : breakSystems)(opening.map((w, k) => prefixW(k) + w.total), inner.map((w) => w.total), avail, maxBars)
-    : [];
+  const scroll = o.scroll != null && o.scroll > 0;
+  const groups = !nBars || !staves.length ? []
+    : scroll ? stretches(nBars, o.scroll!)
+    : (o.overlap ? breakSystemsOverlap : breakSystems)(opening.map((w, k) => prefixW(k) + w.total), inner.map((w) => w.total), avail, maxBars);
+  let carryX = 0;
   const out: FullStaff[] = staves.map((spec, si) => {
     let minStep = middleStep(spec.clef) - 4;
     let maxStep = middleStep(spec.clef) + 4;
@@ -368,12 +372,13 @@ export function layoutFullScore(score: Score, staves: StaffSpec[], m0: number, m
     const clefX = left + 0.3 * sp;
     const keyX = left + CLEF_W * sp;
     const timeX = keyX + (firstSm.keyChange ? keyChangeW(firstSm.key.fifths, firstSm.prevFifths) : keyW(firstSm.key.fifths)) * sp;
-    const prefixEnd = left + prefixW(g[0]);
-    const widths = g.map((k, idx) => (idx === 0 ? opening[k] : inner[k]));
+    // Scrolling: one line, each stretch starting where the last ended (clefs and keys stay pinned).
+    const prefixEnd = scroll && gi > 0 ? carryX : left + prefixW(g[0]);
+    const widths = g.map((k, idx) => (idx === 0 && (!scroll || gi === 0) ? opening[k] : inner[k]));
     const natural = widths.reduce((acc, w) => acc + w.total, 0);
     const room = left + avail - prefixEnd;
-    let f = room / Math.max(1, natural);
-    if (gi === groups.length - 1 && f > 1) f = Math.min(f, 1.4);
+    let f = scroll ? SCROLL_STRETCH : room / Math.max(1, natural);
+    if (!scroll && gi === groups.length - 1 && f > 1) f = Math.min(f, 1.4);
     // Shared geometry: bar edges and every onset's x.
     let x = prefixEnd;
     const bars: { k: number; x0: number; x1: number; changeX: number | null; xs: number[]; w: JointWidth }[] = [];
@@ -388,6 +393,7 @@ export function layoutFullScore(score: Score, staves: StaffSpec[], m0: number, m
     });
     const endBeat = ref[g[g.length - 1]].endBeat;
     bp.push({ beat: endBeat, x });
+    carryX = x;
     out.forEach((fs, si) => {
       const measures: LaidMeasure[] = bars.map(({ k, x0, x1, changeX, xs, w }) => {
         const sm = sms[si][k];
@@ -402,6 +408,7 @@ export function layoutFullScore(score: Score, staves: StaffSpec[], m0: number, m
         cancelFifths: firstSm.keyChange ? firstSm.prevFifths : 0,
         timeSig: firstSm.timeChange ? firstSm.timeSig : null,
         clefX, keyX, timeX, prefixEnd, x1: x, bp, squeeze: f,
+        ...(scroll ? { cont: true } : {}),
       });
     });
   });

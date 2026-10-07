@@ -9,8 +9,8 @@ import { COLORS, type DrawState } from './highway2d';
 import {
   INK, buildSysDraw, drawBarline, drawBubble, drawCountdown, drawOutlines, drawStaff2D, drawStaffFrame, drawStaffNotes,
   drawTrace, fontGeneration, lyricFontFor, measureSpan, middleStep, nameFontFor, nameMeasure, namesOn, spell, systemAt,
-  textRows, updateTrace, xAtBeat,
-  type Cached, type StaffLayout, type SysGeo, type Vis,
+  scrollOffset, textRows, updateTrace, xAtBeat,
+  type Cached, type StaffLayout, type StaffSystem, type SysGeo, type Vis,
 } from './staff2d';
 import { doublings, layoutFullScore, planStaves, type FullLayout, type StaffShow, type StaffSpec } from './fullscore';
 
@@ -117,7 +117,7 @@ function stripLyrics(p: Part): Part {
 function getFull(c: Ctx, W: number, H: number, s: DrawState, show: StaffShow): FullCache | null {
   const offBook = !!s.hide;
   const names = namesOn(s) ? s.notation : null;
-  const key = `${s.score.id}|${s.part.id}|${s.part.notes.length}|${s.from}|${s.to}|${W}|${H}|${fontGeneration()}|${show}|${offBook}|${names ?? '-'}|${s.notation}|${nameKeysSig(s.score)}`;
+  const key = `${s.score.id}|${s.part.id}|${s.part.notes.length}|${s.from}|${s.to}|${W}|${H}|${fontGeneration()}|${show}|${offBook}|${names ?? '-'}|${s.notation}|${nameKeysSig(s.score)}|${s.scroll ? 'scroll' : 'page'}`;
   if (full && full.key === key) return full;
   if (noFit === key) return null;
   const [m0, m1] = measureSpan(s.score, s.from, s.to);
@@ -137,7 +137,8 @@ function getFull(c: Ctx, W: number, H: number, s: DrawState, show: StaffShow): F
     const U = ex.reduce((a, e) => a + e.above + 4 + e.below, 0);
     return { specs, ex, lyr, n, sp: Math.min(SP_MAX, avail / (n * (U + SYS_GAP))), lyrics, show: sh };
   };
-  const rules: [('all' | 'own'), number, number][] = [
+  // (a scrolling score is one line: all the height for it)
+  const rules: [('all' | 'own'), number, number][] = s.scroll ? [['all', 1, SP_GOOD - 0.5], ['own', 1, SP_GOOD - 0.5]] : [
     ['all', 3, SP_GOOD], ['all', 2, SP_GOOD], ['own', 3, SP_TWO], ['own', 2, SP_TWO], ['all', 1, SP_GOOD - 0.5], ['own', 1, SP_GOOD - 0.5],
   ];
   for (const sh of shows(show, offBook)) {
@@ -172,7 +173,8 @@ function getFull(c: Ctx, W: number, H: number, s: DrawState, show: StaffShow): F
     const textW = (t: string) => c.measureText(t).width;
     const own = specs.find((x) => x.own);
     const nm = names && own ? { id: own.id, w: nameMeasure(c, nameFontFor(sp), names) } : undefined;
-    F = layoutFullScore(s.score, specs, m0, m1, { width: W, sp, textW, lyricIds, names: nm, left, maxBars: 12, overlap: pick.n === 1 });
+    F = layoutFullScore(s.score, specs, m0, m1, { width: W, sp, textW, lyricIds, names: nm, left, maxBars: 12, overlap: pick.n === 1, ...(s.scroll ? { scroll: SCROLL_BARS } : {}) });
+    if (s.scroll) break;
     let worst = Infinity;
     for (const sy of F.staves[0]?.systems ?? []) worst = Math.min(worst, sy.squeeze);
     if (worst >= 0.85 || sp <= SP_MIN + 1e-6 || guard >= 4) break;
@@ -297,7 +299,91 @@ function sysDraw(row: StaffRow, j: number, notes: Part['notes']) {
   return (row.L.sys[j] ??= buildSysDraw(row.L.layout.systems[j], row.L.layout, notes));
 }
 
+/** Bars per stretch of a scrolling score (only the stretches in view are drawn). */
+const SCROLL_BARS = 2;
+
+/** The full score as one line scrolling smoothly to the left past a fixed playhead. */
+function drawFullScroll(c: Ctx, W: number, H: number, s: DrawState, F: FullCache) {
+  c.fillStyle = COLORS.bg;
+  c.fillRect(0, 0, W, H);
+  const { rows, sp } = F;
+  const ownRow = rows[F.own];
+  const systems = ownRow.L.layout.systems;
+  if (!systems.length) return;
+  const beat = timeToBeat(s.score.tempos, s.pos);
+  const { off, px, k } = scrollOffset(systems, beat, W, sp);
+  const sysTop = Math.round(Math.max(6, (H - F.sysH) / 2));
+  const notes = s.part.notes;
+  const [ra, rb] = s.range ?? [0, -1];
+  const inRange = (i: number) => s.range != null && i >= ra && i <= rb;
+  const isPast = (i: number) => notes[i].start + notes[i].dur <= s.pos;
+  const isNow = (i: number) => inRange(i) && notes[i].start <= s.pos && s.pos < notes[i].start + notes[i].dur;
+  const vis = (i: number): 'show' | 'letters' | 'none' => ((isPast(i) && inRange(i)) || !s.hide ? 'show' : s.hide(i));
+  const v: Vis = { vis, isPast, isNow, inRange };
+  const pinned = systems[0].prefixEnd;
+  if (F.layers.size) releaseLayers(F);
+
+  c.save();
+  c.translate(-off, 0);
+  const ownGeos: SysGeo[] = [];
+  for (let j = 0; j < systems.length; j++) {
+    const sy = systems[j];
+    if (sy.x1 - off < pinned - 2 * sp || sy.prefixEnd - off > W + 2 * sp) continue;
+    const geos = systemGeos(F, j, sysTop, s);
+    drawStatic(c, F, geos, s);
+    rows.forEach((r, i) => {
+      const d = r.doubled;
+      if (!d || !r.s) return;
+      const live: Vis = { ...PLAIN, notesOnly: true, vis: (q: number) => (d.has(q) && vis(d.get(q)!) === 'show' ? 'show' : 'none') };
+      drawStaffNotes(c, geos[i], r.L.layout, r.L, r.s, live);
+    });
+    drawStaffNotes(c, geos[F.own], ownRow.L.layout, ownRow.L, s, v);
+    ownGeos.push(geos[F.own]);
+  }
+  updateTrace(s, ownRow.L);
+  for (const g of ownGeos) drawTrace(c, g, s, ownRow.L, beat);
+  for (const g of ownGeos) drawOutlines(c, g, s, v, sp);
+  const cur = ownGeos.find((g) => g.j === k) ?? ownGeos[0];
+  const first = rows[0];
+  const last = rows[rows.length - 1];
+  const yTop = sysTop + (first.y - 1.4) * sp;
+  const yBot = sysTop + (last.y + 4 + Math.min(1.2, last.below)) * sp;
+  c.fillStyle = 'rgba(238,240,255,0.7)';
+  c.fillRect(Math.round(px) - 1, yTop, 2, yBot - yTop);
+  if (cur) {
+    c.fillStyle = 'rgba(238,240,255,0.95)';
+    c.fillRect(Math.round(px) - 1, cur.top - 1.2 * sp, 2, (6.4 + Math.max(0, ownRow.L.lyricOff - 1.6)) * sp);
+  }
+  c.beginPath();
+  c.moveTo(px - 0.6 * sp, yTop - 0.7 * sp);
+  c.lineTo(px + 0.6 * sp, yTop - 0.7 * sp);
+  c.lineTo(px, yTop + 0.1 * sp);
+  c.closePath();
+  c.fill();
+  if (cur) {
+    drawCountdown(c, cur, s, ownRow.L, px, cur.top - Math.max(1.2, ownRow.above - 1.2) * sp);
+    drawBubble(c, cur, s, ownRow.L, px);
+  }
+  c.restore();
+
+  // The pinned start: names, brackets, clefs and the keys in force now, over the music sliding under.
+  c.fillStyle = COLORS.bg;
+  c.fillRect(0, 0, pinned, H);
+  const pinGeos: SysGeo[] = rows.map((r) => {
+    const top = sysTop + r.y * sp;
+    const rs = r.L.layout.systems;
+    const here = rs[Math.min(k, rs.length - 1)];
+    const sys: StaffSystem = {
+      ...rs[0], cont: false, measures: [], x1: pinned, key: here.measures[0]?.sm.key ?? rs[0].key, cancelFifths: 0,
+      timeSig: off < 1 ? (rs[0].measures[0]?.sm.timeSig ?? null) : null,
+    };
+    return { j: -1, sys, sd: { evs: [], beams: [], ties: [], tups: [] }, top, mid: top + 2 * sp };
+  });
+  drawSystemFrame(c, F, pinGeos, s, -1);
+}
+
 function drawFull(c: Ctx, W: number, H: number, s: DrawState, F: FullCache) {
+  if (s.scroll) { drawFullScroll(c, W, H, s, F); return; }
   c.fillStyle = COLORS.bg;
   c.fillRect(0, 0, W, H);
   const { rows, sp } = F;
@@ -399,12 +485,30 @@ function drawSystemFrame(c: Ctx, F: FullCache, geos: SysGeo[], s: DrawState, j: 
   // Your staff: a soft band behind it (from above its notes to below its words).
   const og = geos[F.own];
   const or = rows[F.own];
+  // (a stretch of a scrolling score: its band from its first bar; the start is drawn pinned)
+  const bandX = sys0.cont ? sys0.prefixEnd : left - 2.2 * sp;
   c.fillStyle = OWN_BAND;
-  c.fillRect(left - 2.2 * sp, og.top - (or.above - 0.4) * sp, sys0.x1 - left + 2.6 * sp, (or.above - 0.4 + 4 + or.below + 0.1) * sp);
-  c.fillStyle = COLORS.voice;
-  c.fillRect(left - 2.2 * sp, og.top - (or.above - 0.4) * sp, 3, (or.above - 0.4 + 4 + or.below + 0.1) * sp);
+  c.fillRect(bandX, og.top - (or.above - 0.4) * sp, sys0.x1 - bandX + (sys0.cont ? 0 : 0.4 * sp), (or.above - 0.4 + 4 + or.below + 0.1) * sp);
+  if (!sys0.cont) {
+    c.fillStyle = COLORS.voice;
+    c.fillRect(left - 2.2 * sp, og.top - (or.above - 0.4) * sp, 3, (or.above - 0.4 + 4 + or.below + 0.1) * sp);
+  }
 
   rows.forEach((r, i) => drawStaffFrame(c, geos[i], r.L.layout, s, { barlines: false, numbers: i === 0 }));
+  if (sys0.cont) {
+    // Barlines only (the start with its bracket and names is pinned).
+    const nM0 = s.score.measures.length;
+    const h40 = 4 * sp + lw;
+    let i0 = 0;
+    while (i0 < rows.length) {
+      let i1 = i0;
+      if (rows[i0].spec.acc) while (i1 + 1 < rows.length && rows[i1 + 1].spec.acc) i1++;
+      const ms = geos[i0].sys.measures;
+      ms.forEach((m, mi) => drawBarline(c, m, mi === ms.length - 1, nM0, geos[i0].top, geos[i1].top + h40 - geos[i0].top, sp, lw));
+      i0 = i1 + 1;
+    }
+    return;
+  }
 
   // Barlines: through the accompaniment's grand staff, per staff for the voices (room for words).
   const nM = s.score.measures.length;

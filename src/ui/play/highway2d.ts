@@ -34,6 +34,8 @@ export interface DrawState {
   hide?: (i: number) => 'show' | 'letters' | 'none';
   /** Score view on a wide screen: your staff only, all voices, or all voices + accompaniment. */
   staves?: 'mine' | 'voices' | 'all';
+  /** Score view: one line that scrolls smoothly past the playhead instead of turning pages. */
+  scroll?: boolean;
   /** The words are only for orientation (level 1 is sung on "doo"): draw them dimmed. */
   dimLyrics?: boolean;
 }

@@ -85,6 +85,19 @@ export function Settings() {
           {profile.display === 'highway' ? 'Your notes as bars moving towards a line, with your voice as a line.'
             : `Your part as sheet music, with your voice drawn on the staff${profile.display ? '' : ' (the default at every level)'}.`} You can also switch before each run.
         </span>
+        {profile.display !== 'highway' && (
+          <>
+            <span className="small" id="settings-scroll-label">Sheet music while you sing</span>
+            <div className="seg" role="group" aria-labelledby="settings-scroll-label" data-testid="settings-scroll">
+              <button aria-pressed={!profile.scorePages} onClick={() => update({ scorePages: undefined })}>Scrolls</button>
+              <button aria-pressed={!!profile.scorePages} onClick={() => update({ scorePages: true })}>Turns pages</button>
+            </div>
+            <span className="small muted">
+              {profile.scorePages ? 'Line after line, like a printed page: the next line slides in when you reach the end of one.'
+                : 'One long line gliding past a fixed “now” line, with the clef and key kept at the left: nothing jumps while you sing.'}
+            </span>
+          </>
+        )}
         {wide && profile.display !== 'highway' && (
           <>
             <span className="small" id="settings-staves-label">Sheet music on a wide screen (laptop, tablet in landscape) shows</span>

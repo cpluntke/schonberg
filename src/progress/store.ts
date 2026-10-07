@@ -79,6 +79,8 @@ export interface Profile {
    * voices + accompaniment. Unset = all voices + accompaniment when that stays readable.
    */
   scoreStaves?: 'mine' | 'voices' | 'all';
+  /** Sheet music turns pages (one line after another) instead of scrolling smoothly (the default). */
+  scorePages?: boolean;
   /**
    * Logged in to the choir: keep my progress with my account on the server (src/progress/sync.ts).
    * Unset = on; false = the singer turned it off.

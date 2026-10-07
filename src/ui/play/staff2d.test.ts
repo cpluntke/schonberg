@@ -498,3 +498,28 @@ describe('accidentals: written spelling, carrying, courtesy', () => {
     expect(accW({ ...base, accidental: null })).toBe(0);
   });
 });
+
+describe('scrolling line', () => {
+  it('lays the bars out as one line in stretches, each starting where the last ended', async () => {
+    const { layoutStaff, scrollOffset, SCROLL_STRETCH } = await import('./staff2d');
+    const part = makePart('s', Array.from({ length: 40 }, (_, i) => [60 + (i % 5), 1] as [number, number]));
+    const sc = makeScore([part]);
+    const L = layoutStaff(sc, part, 0, sc.measures.length - 1, { width: 390, sp: 10, textW: (t) => t.length * 6, scroll: 2 });
+    expect(L.systems.length).toBe(Math.ceil(sc.measures.length / 2));
+    for (let i = 1; i < L.systems.length; i++) {
+      expect(L.systems[i].cont).toBe(true);
+      expect(L.systems[i].prefixEnd).toBeCloseTo(L.systems[i - 1].x1, 6);
+      expect(L.systems[i].squeeze).toBe(SCROLL_STRETCH);
+    }
+    // The playhead stays put while the line moves; at the start and the end the line stays put.
+    const W = 390;
+    const at0 = scrollOffset(L.systems, 0, W, 10);
+    expect(at0.off).toBe(0);
+    const mid = scrollOffset(L.systems, L.systems[2].startBeat, W, 10);
+    const mid2 = scrollOffset(L.systems, L.systems[3].startBeat, W, 10);
+    expect(mid.off).toBeGreaterThan(0);
+    expect(mid.px - mid.off).toBeCloseTo(mid2.px - mid2.off, 6);
+    const end = scrollOffset(L.systems, L.systems[L.systems.length - 1].endBeat, W, 10);
+    expect(end.off).toBeCloseTo(L.systems[L.systems.length - 1].x1 + 12 - W, 6);
+  });
+});

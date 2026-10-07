@@ -175,6 +175,8 @@ function SingPlay({ route }: { route: PlayRoute }) {
   const wide = useWide();
   const autoStaves = useMemo(() => (piece && part ? defaultShow(piece.score, part.id) : 'voices'), [piece, part]);
   const staves = profile.scoreStaves ?? autoStaves;
+  // Sheet music scrolls smoothly past the playhead (one long line) unless the singer prefers pages.
+  const scorePages = !!profile.scorePages;
   const others = useMemo(() => (piece && part ? hasOtherStaves(piece.score, part.id) : { voices: false, accompaniment: false }), [piece, part]);
   const fullScore = useMemo(() => wide && display === 'score' && !!piece && !!part && isFullScore(piece.score, part.id, staves),
     [wide, display, piece, part, staves]);
@@ -461,6 +463,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
         lo, hi, from: section.start, to: section.end,
         beatSec: s ? s.beatSec(Math.max(0, pos)) : 60 / tempoAt(piece.score.tempos, Math.max(0, pos)),
         staves,
+        scroll: !scorePages,
         dimLyrics: doo,
         hide: offBook ? (i: number) => {
           // Cold start: nothing of your part before the entry either (it would give the pitch away).
@@ -506,7 +509,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [piece, part, section, route.mode, notation, showNames, rate, tolerance, offBook, cold, display, staves, doo]);
+  }, [piece, part, section, route.mode, notation, showNames, rate, tolerance, offBook, cold, display, staves, doo, scorePages]);
 
   // Seen once a run starts with it on screen (switching display before Start shows the other one's).
   useEffect(() => {
