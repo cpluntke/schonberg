@@ -26,7 +26,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { UpdatePrompt } from './components/UpdatePrompt';
 import { StorageFullNotice } from './components/StorageFullNotice';
 import { flushProgress, onAccountConfirmed, syncProgressSoon } from '../progress/sync';
-import { refreshSuperSessionSoon } from '../progress/choir';
+import { ensureChoirSharing, refreshSuperSessionSoon } from '../progress/choir';
 import { shareMyProgress } from './play/shareProgress';
 
 const TABS: { name: Route['name']; label: string; icon: React.ReactNode }[] = [
@@ -64,6 +64,7 @@ export function App() {
   // Progress kept with the choir account: on start and whenever the app comes back, if something
   // changed (at most once a minute). A new login also moves this phone's shared progress to the account.
   useEffect(() => {
+    ensureChoirSharing();
     syncProgressSoon();
     // A super-admin login the server no longer accepts: its Admin tab goes (checked at most every 20 s).
     refreshSuperSessionSoon();

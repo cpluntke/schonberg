@@ -51,7 +51,8 @@ test('member: level 1 on phone A, account, phone B gets it; lead sees one entry;
   await pa.getByLabel('Choir code').fill(code);
   await pa.getByTestId('join-choir').click();
   await expect(pa.getByTestId('choir-card')).toBeVisible();
-  await pa.getByLabel(/Share my progress with my section lead/).check();
+  // Sharing with the section lead is part of joining (no opt-out): the lead sees Anna straight away.
+  await expect(pa.getByTestId('share-note')).toBeVisible();
   await expect.poll(async () => (await section(request, code, lead)).ranges.map((m) => m.name), { timeout: 15_000 }).toEqual(['Anna']);
 
   await pa.goto('./?simulate=perfect#/');

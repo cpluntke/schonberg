@@ -67,6 +67,7 @@ export function JoinChoir({ onJoined, compact = false }: { onJoined?: (c: ChoirI
       try {
         const c = await joinChoir(code.trim());
         onJoined?.(c);
+        void shareMyProgress(true); // part of being in the choir: the section lead sees this singer from now on
         void syncChoirNow().then((r) => { if (r.newPieces) toast(`${r.newPieces} score${r.newPieces > 1 ? 's' : ''} from ${c.name} added`); });
       } catch (e2) {
         setErr((e2 as Error).message);
@@ -120,14 +121,8 @@ export function ChoirScreen() {
             {syncMsg && <span className="small muted" role="status">{syncMsg}</span>}
           </div>
           <div className="card">
-            <label className="toggle-row"><span>Share my progress with my section lead<span className="tiny muted" style={{ display: 'block' }}>How each bar is going, so they know what to rehearse. Your lead and the admins see bars and levels only as section totals (in a small section they may still tell which are yours), and your voice range by name. The leaderboard already shows everyone in the choir your first name, voice and readiness.</span></span>
-              <input type="checkbox" checked={!!profile.shareProgress} onChange={async (e) => {
-                const on = e.target.checked;
-                update({ shareProgress: on });
-                if (on) void shareMyProgress(true).then(() => update({}));
-                else if (profile.name.trim()) withdrawProgress(profile.choirCode!, profile.name.trim()).catch(() => {});
-              }} />
-            </label>
+            <strong>Shared with your section lead</strong>
+            <span className="small muted" data-testid="share-note">How each bar is going, so they know what to rehearse. It's part of being in the choir. Your lead and the admins see bars and levels only as section totals (in a small section they may still tell which are yours), and your voice range by name. The leaderboard shows everyone in the choir your first name, voice and readiness.</span>
             {!profile.name.trim() && !sessionFor(profile.choirCode) && profile.shareProgress && <span className="small" style={errStyle}>Add your name in Voice setup first.</span>}
             {profile.name.trim() && profile.shareProgress && shareError() && <span className="small" role="alert" style={errStyle}>Not shared yet: {shareError()}</span>}
           </div>

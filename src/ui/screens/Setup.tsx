@@ -245,10 +245,7 @@ function ChoirStep({ profile, update, onNext }: { profile: Profile; update: (p: 
               {choir!.cycle ? `Programme: ${choir!.cycle.name}. ` : ''}{choir!.pieces.length ? (choir!.pieces.length === 1 ? '1 score from the choir is on its way to your phone.' : `${choir!.pieces.length} scores from the choir are on their way to your phone.`) : ''}
             </span>
           )}
-          <label className="row small" style={{ gap: 10, alignItems: 'flex-start' }}>
-            <input type="checkbox" style={{ width: 22, height: 22, flex: 'none', accentColor: 'var(--accent)' }} checked={!!profile.shareProgress} onChange={(e) => update({ shareProgress: e.target.checked })} />
-            <span>Share my progress with my section lead: which bars are hard for me, shown to leads and admins only as section totals (in a small section they may still tell which are mine), plus my voice range by name. You can change this any time under Settings › Your choir.</span>
-          </label>
+          <span className="small" data-testid="setup-share-note">Being in the choir means sharing your practice: your section lead and the admins see which bars are hard for your section (as section totals; in a small section they may still tell which are yours) and your voice range by name, and everyone in the choir sees your first name, voice and readiness on the leaderboard.</span>
           <button className="linklike small" style={{ alignSelf: 'flex-start', minHeight: 44 }} onClick={() => { leaveChoir(); update({}); }}>Wrong choir? Use a different code</button>
         </div>
       ) : (
