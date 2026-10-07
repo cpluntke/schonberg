@@ -8,7 +8,8 @@ import { shareMyProgress } from '../play/shareProgress';
 import { postBoardEntrySoon } from '../play/boardEntry';
 import { syncProgressSoon, suggestAccount } from '../../progress/sync';
 import { recordAttempt, recordFullRun, getProgress, snapshotReadiness, personalBest, practiceDisplay, loadProfile } from '../../progress/store';
-import { keyAtTime } from '../../music/time';
+import { keyAtTimeIn } from '../../music/keymarks';
+import { nameKeysOf } from '../../progress/keymarks';
 import { PracticeSession, estimateLatencyMs } from '../play/session';
 import { medianOnsetMs, scoreAligned } from '../../game/align';
 import { soloTimingInsight } from '../../game/analysis';
@@ -446,7 +447,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
       const st: DrawState = {
         score: piece.score, part, range, pos, rate,
         samples: s?.samples ?? [], live: s?.live ?? null,
-        notation, showNames, key: keyAtTime(piece.score, Math.max(0, pos)), tolerance,
+        notation, showNames, key: keyAtTimeIn(nameKeysOf(piece.score), Math.max(0, pos)), tolerance,
         ghostParts,
         lo, hi, from: section.start, to: section.end,
         beatSec: s ? s.beatSec(Math.max(0, pos)) : 60 / tempoAt(piece.score.tempos, Math.max(0, pos)),

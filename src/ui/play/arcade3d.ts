@@ -1,6 +1,7 @@
 // Canvas renderer for "arcade" mode: notes rush toward you down perspective lanes, one lane per pitch.
 import type { Grade } from '../../game/types';
-import { noteLabel } from '../../game/notation';
+import { keyHint, noteLabel } from '../../game/notation';
+import { nameKeysOf } from '../../progress/keymarks';
 import { COLORS, gradeColor, type DrawState } from './highway2d';
 
 export interface Popup { text: string; color: string; born: number }
@@ -167,6 +168,23 @@ export function drawArcade(c: CanvasRenderingContext2D, W: number, H: number, s:
       c.fillStyle = active ? COLORS.voice : COLORS.label;
       c.fillText(lab, X(i, 0) - tw / 2, strikeY + 14);
     });
+  }
+
+  // The names' do moves soon (or just did): "Do = …" at the top.
+  if (s.showNames) {
+    const nks = nameKeysOf(s.score);
+    for (let k = 1; k < nks.length; k++) {
+      const dt = nks[k].time - s.pos;
+      if (dt < -2 || dt > 4 || nks[k].fifths === nks[k - 1].fifths) continue;
+      const hint = keyHint(s.notation, nks[k]);
+      if (!hint) continue;
+      c.font = '800 15px "Bricolage Grotesque", sans-serif';
+      c.textBaseline = 'top';
+      c.fillStyle = COLORS.targetText;
+      const tw = c.measureText(hint).width;
+      c.fillText(hint, (W - tw) / 2, 10);
+      break;
+    }
   }
 
   // Voice puck.

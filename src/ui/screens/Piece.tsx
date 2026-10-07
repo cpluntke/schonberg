@@ -14,6 +14,7 @@ import { startColdStart } from '../play/cold';
 import { getWords } from '../../progress/words';
 import { STAGE_NAMES } from '../../game/textrhythm';
 import { NotFound } from '../components/NotFound';
+import { KeyMarksCard } from '../components/KeyMarks';
 
 /** First few words of the lyric in a section, to recognise the phrase. */
 function snippet(part: { notes: { start: number; lyric?: string; syllabic?: string }[] }, from: number, to: number): string {
@@ -356,6 +357,8 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
           </div>
         </div>
       )}
+
+      {vocalParts.length > 0 && <KeyMarksCard piece={piece} />}
 
       {piece.credit && <span className="tiny muted">{piece.credit}</span>}
     </main>

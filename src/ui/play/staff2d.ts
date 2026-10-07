@@ -11,7 +11,9 @@ import { F_CLEF, G_CLEF, GLYPH_UNITS_PER_SPACE } from './clefGlyphs';
 import type { KeySig, NoteSpelling, Part, Score } from '../../music/types';
 import type { Grade, PitchSample } from '../../game/types';
 import { beatToTime, timeToBeat } from '../../music/time';
-import { noteLabel, spellNote, type NotationMode } from '../../game/notation';
+import { keyHint, noteLabel, spellNote, type NotationMode } from '../../game/notation';
+import { keyAtBeatIn } from '../../music/keymarks';
+import { nameKeysOf } from '../../progress/keymarks';
 import { COLORS, wordInitial, type DrawState } from './highway2d';
 
 const EPS = 0.01;
@@ -260,6 +262,10 @@ export interface StaffMeasure {
   startBeat: number;
   endBeat: number;
   key: KeySig;
+  /** The key the note names follow here (the key signature, or an admin's key mark). */
+  nameKey: KeySig;
+  /** The names' do moved here (or this is the first bar shown): a "Do = …" hint is printed. */
+  nameChange: boolean;
   timeSig: [number, number];
   /** Key or time signature differ from the previous bar (printed at the bar's start). */
   keyChange: boolean;
@@ -416,9 +422,12 @@ export function buildMeasures(score: Score, part: Part, m0: number, m1: number, 
   const firstOfNote = new Set<number>();
   /** Notes trimmed at an overlap: their later bars are dropped too. */
   const dropped = new Set<number>();
+  const nks = nameKeysOf(score);
   for (let mi = m0; mi <= m1; mi++) {
     const m = ms[mi];
     const key = keyAtBeat(score, m.startBeat);
+    const nameKey = keyAtBeatIn(nks, m.startBeat);
+    const nameChange = mi === m0 || (mi > 0 && keyAtBeatIn(nks, ms[mi - 1].startBeat).fifths !== nameKey.fifths);
     const ts = m.timeSig;
     const a = m.startBeat;
     const b = a + m.durBeats;
@@ -496,7 +505,7 @@ export function buildMeasures(score: Score, part: Part, m0: number, m1: number, 
     const beams = beamGroups(events, origin, beam, mid);
     const tsKey = ts.join('/');
     out.push({
-      index: mi, number: m.number, startBeat: a, endBeat: b, key, timeSig: ts,
+      index: mi, number: m.number, startBeat: a, endBeat: b, key, nameKey, nameChange, timeSig: ts,
       keyChange: prevKey != null && prevKey !== key.fifths, timeChange: prevTs == null || prevTs !== tsKey,
       prevFifths: prevKey ?? key.fifths, doubleBar: !!m.doubleBar || mi === ms.length - 1,
       events, beams, carry,
@@ -624,7 +633,7 @@ export const eventSpelling = (e: Pick<StaffEvent, 'step' | 'alt'>): Pick<NoteSpe
 
 /** Widths of the note names of a bar's events (0 for rests and tied continuations). */
 export function nameWidths(sm: StaffMeasure, nameW: NameW | undefined): number[] {
-  return sm.events.map((e) => (nameW && e.kind === 'note' && e.first && e.midi != null ? nameW(e.midi, sm.key, eventSpelling(e)) : 0));
+  return sm.events.map((e) => (nameW && e.kind === 'note' && e.first && e.midi != null ? nameW(e.midi, sm.nameKey, eventSpelling(e)) : 0));
 }
 
 function measureWidths(sm: StaffMeasure, sp: number, textW: (s: string) => number, inside: boolean, nameW?: NameW) {
@@ -1597,7 +1606,7 @@ function drawSystem(c: Ctx, g: SysGeo, layout: StaffLayout, L: Cached, s: DrawSt
 }
 
 /** Staff lines, clef, key and time signatures (also changes inside the system), barlines, bar numbers. */
-export function drawStaffFrame(c: Ctx, g: Pick<SysGeo, 'sys' | 'top' | 'mid'>, layout: Pick<StaffLayout, 'sp' | 'clef'>, s: Pick<DrawState, 'score'>,
+export function drawStaffFrame(c: Ctx, g: Pick<SysGeo, 'sys' | 'top' | 'mid'>, layout: Pick<StaffLayout, 'sp' | 'clef'>, s: Pick<DrawState, 'score' | 'notation'>,
   o: { barlines: boolean; numbers: boolean }) {
   const { sys, top, mid } = g;
   const sp = layout.sp;
@@ -1624,6 +1633,14 @@ export function drawStaffFrame(c: Ctx, g: Pick<SysGeo, 'sys' | 'top' | 'mid'>, l
     c.fillStyle = INK.barNo;
     const nx = mi === 0 ? sys.clefX : m.x0 - 0.2 * sp;
     if (o.numbers && m.sm.number !== '0') c.fillText(m.sm.number, nx, top - 1.75 * sp);
+    // Where the names' do is (first bar shown) or moves to: "Do = G" next to the bar number.
+    const hint = o.numbers && m.sm.nameChange ? keyHint(s.notation, m.sm.nameKey) : null;
+    if (hint) {
+      const hx = nx + (m.sm.number !== '0' ? c.measureText(m.sm.number).width + 0.5 * sp : 0);
+      c.font = `700 ${Math.round(Math.max(10, sp * 1.05))}px system-ui, sans-serif`;
+      c.fillStyle = COLORS.targetText;
+      c.fillText(hint, hx, top - 1.75 * sp);
+    }
     if (m.changeX != null) {
       let cx = m.changeX;
       if (m.sm.keyChange) {
@@ -1784,7 +1801,7 @@ function drawNames(c: Ctx, g: SysGeo, s: DrawState, L: Cached, v: Vis) {
     if (e.kind !== 'note' || !e.first || e.midi == null) continue;
     const i = e.noteIndex!;
     if (v.vis(i) !== 'show') continue;
-    const lab = noteLabel(notes[i].midi, s.notation, eg.m.sm.key, eventSpelling(e));
+    const lab = noteLabel(notes[i].midi, s.notation, eg.m.sm.nameKey, eventSpelling(e));
     const now = v.isNow(i);
     c.fillStyle = !v.inRange(i) || (v.isPast(i) && !now) ? INK.lyricPast : now ? COLORS.target : COLORS.label;
     c.globalAlpha = alphaOf(v, i);

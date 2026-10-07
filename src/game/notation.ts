@@ -214,3 +214,22 @@ export function keyTonicName(key: Pick<KeySig, 'fifths' | 'mode'>): string {
 export function keyName(key: Pick<KeySig, 'fifths' | 'mode'>): string {
   return `${keyTonicName(key)} ${key.mode}`;
 }
+
+/**
+ * Short hint for where the names start from in a key: "Do = E" (movable do: the relative major's
+ * tonic, also in minor), "1 = E" (jianpu), the key's name otherwise ("C♯ minor", fixed do: "Do♯
+ * minor"). Null in pitch-class notation (no key there).
+ */
+export function keyHint(mode: NotationMode, key: Pick<KeySig, 'fifths' | 'mode'>): string | null {
+  const doName = spellName(fromLof(key.fifths));
+  switch (mode) {
+    case 'movable': return `Do = ${doName}`;
+    case 'jianpu': return `1 = ${doName}`;
+    case 'letter': return keyName(key);
+    case 'fixed': {
+      const t = fromLof(key.fifths + (key.mode === 'minor' ? 3 : 0));
+      return `${FIXED_SYLLABLES[t.letter]}${accidentalSymbol(t.accidental)} ${key.mode}`;
+    }
+    default: return null;
+  }
+}

@@ -8,6 +8,7 @@
 
 import type { KeySig, NoteSpelling, Part, Score, Section } from '../music/types';
 import { beatLength, keyAtTime } from '../music/time';
+import { keyAtTimeIn } from '../music/keymarks';
 import { intervalLongName, keyName, noteLabel, spellNote, type NotationMode } from './notation';
 import { firstLetters, lyricLines, type LyricLine } from './lyrics';
 
@@ -220,6 +221,8 @@ const bpmText = (bpm: number) => `♩ = ${Math.round(bpm)}`;
 
 export interface MemoryMapOptions {
   notation?: NotationMode;
+  /** Keys the note names follow (key signatures with the choir's key marks); default: the key signatures. */
+  nameKeys?: KeySig[];
 }
 
 export function buildMemoryMap(score: Score, sections: Section[], partId: string, opts: MemoryMapOptions = {}): MemoryMap | null {
@@ -231,7 +234,7 @@ export function buildMemoryMap(score: Score, sections: Section[], partId: string
   const others = score.parts.filter((p) => p.id !== part.id && p.notes.length);
   const otherVocal = others.filter(isVocal);
   const instruments = others.filter((p) => !isVocal(p));
-  const keyAt = (t: number) => keyAtTime(score, t);
+  const keyAt = (t: number) => (opts.nameKeys ? keyAtTimeIn(opts.nameKeys, t) : keyAtTime(score, t));
 
   // ---- per-measure facts
   const mine = perMeasure(score, part);

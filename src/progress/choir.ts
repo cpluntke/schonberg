@@ -12,6 +12,8 @@ export interface ChoirPiece {
   libraryId?: string;
   /** Edition / licence credit (library pieces). */
   credit?: string;
+  /** Key marks set by an admin: where the singers' do moves (see music/keymarks.ts). */
+  keys?: { bar: number; fifths?: number; mode?: 'major' | 'minor' }[];
 }
 export interface ChoirInfo {
   code: string;
@@ -260,6 +262,14 @@ export async function uploadChoirPiece(code: string, auth: Auth, file: File, tit
   return call(`/choirs/${enc(code)}/pieces`, { method: 'POST', auth, body: fd });
 }
 export const deleteChoirPiece = (code: string, auth: Auth, id: string) => call(`/choirs/${enc(code)}/pieces/${enc(id)}`, { method: 'DELETE', auth });
+/** Save a piece's key marks (admins); the cached choir details get them at once. */
+export async function setChoirPieceKeys(code: string, auth: Auth, id: string, keys: NonNullable<ChoirPiece['keys']>): Promise<void> {
+  const r = await call<{ keys: ChoirPiece['keys'] }>(`/choirs/${enc(code)}/pieces/${enc(id)}`, { method: 'PATCH', auth, ...json({ keys }) });
+  const info = cachedChoir();
+  if (info && info.code === code) {
+    writeJSON(CACHE, { ...info, pieces: info.pieces.map((p) => (p.id === id ? { ...p, keys: r.keys?.length ? r.keys : undefined } : p)) });
+  }
+}
 
 // ------------------------------------------------------------------ the choir library (admins and the super admin)
 

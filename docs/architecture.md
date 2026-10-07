@@ -84,7 +84,13 @@ export async function measureLatency(ctx: AudioContext, tracker: PitchTracker,
 export type NotationMode = 'letter' | 'fixed' | 'movable' | 'jianpu' | 'pc';
 export interface NoteLabel { text: string; dotsAbove: number; dotsBelow: number }
 export function noteLabel(midi: number, mode: NotationMode, key: KeySig): NoteLabel;
+export function keyHint(mode: NotationMode, key: KeySig): string | null; // "Do = E", "1 = E", "C♯ minor"
 export function intervalName(semitones: number): string;    // "m3", "P4", "TT", "M9"…
+// music/keymarks.ts + progress/keymarks.ts: key marks ("from bar 41, G major") where a score changes key
+// without a new key signature. Note names (movable do, jianpu) and the "Do = …" hints follow
+// nameKeysOf(score): the key signatures with the marks laid over them; the staff keeps the printed
+// signature. A choir piece's marks come with the choir's details (admins set them: PATCH
+// /choirs/<code>/pieces/<id> {keys}); a singer's own import keeps them on the phone.
 // game/scoring.ts
 export interface ScoringContext { score: Score; part: Part; range: [number, number] } // note index range, inclusive
 export function scoreAttempt(ctx: ScoringContext, samples: PitchSample[], opts: ScoringOptions): AttemptResult;

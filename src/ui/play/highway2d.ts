@@ -2,7 +2,9 @@
 import type { Part, Score, KeySig } from '../../music/types';
 import type { PitchSample, Grade } from '../../game/types';
 import type { LiveScorer } from '../../game/scoring';
-import { noteLabel, type NotationMode } from '../../game/notation';
+import { keyHint, noteLabel, type NotationMode } from '../../game/notation';
+import { keyAtTimeIn } from '../../music/keymarks';
+import { nameKeysOf } from '../../progress/keymarks';
 
 export interface DrawState {
   score: Score;
@@ -138,6 +140,36 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
     c.fillText(ms.number, bx + 3, 3);
   }
 
+  // Where the names' do moves (a new key signature or an admin's key mark): a dashed line and "Do = …".
+  const nks = nameKeysOf(s.score);
+  for (let k = 1; k < nks.length; k++) {
+    const kt = nks[k].time;
+    if (kt < tMin - 0.01 || kt > tMax || nks[k].fifths === nks[k - 1].fifths) continue;
+    const hint = keyHint(s.notation, nks[k]);
+    const kx = Math.round(x(kt));
+    c.strokeStyle = COLORS.targetText;
+    c.globalAlpha = 0.7;
+    c.lineWidth = 1.5;
+    c.setLineDash([5, 4]);
+    c.beginPath();
+    c.moveTo(kx + 0.5, top - 4);
+    c.lineTo(kx + 0.5, H);
+    c.stroke();
+    c.setLineDash([]);
+    c.globalAlpha = 1;
+    if (hint) {
+      c.font = '700 12px system-ui, sans-serif';
+      c.textBaseline = 'top';
+      const tw = c.measureText(hint).width;
+      const hx = Math.max(gutter + 2, kx + 4);
+      c.fillStyle = '#0B0D1A';
+      roundRect(c, hx - 3, 16, tw + 8, 17, 5);
+      c.fill();
+      c.fillStyle = COLORS.targetText;
+      c.fillText(hint, hx + 1, 18);
+    }
+  }
+
   // Directions (dynamics, tempo words) along the bottom edge.
   const dirs = [
     ...(s.part.directions ?? []),
@@ -249,6 +281,17 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
       c.strokeStyle = COLORS.target;
       c.lineWidth = 2;
       c.stroke();
+    }
+    // A note past a change of do: the gutter still names the rows in the key at the playhead, so
+    // the note carries its own name until the playhead reaches the change.
+    if (s.showNames && !past && nks.length > 1 && (s.notation === 'movable' || s.notation === 'jianpu')) {
+      const nk = keyAtTimeIn(nks, n.start);
+      if (nk.fifths !== s.key.fifths) {
+        c.font = '700 11px "JetBrains Mono", monospace';
+        c.textBaseline = 'alphabetic';
+        c.fillStyle = COLORS.targetText;
+        c.fillText(noteLabel(n.midi, s.notation, nk, n.spelling).text, nx + 2, ny - 3);
+      }
     }
     if (n.lyric) {
       c.save();
