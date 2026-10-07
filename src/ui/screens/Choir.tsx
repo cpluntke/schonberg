@@ -199,7 +199,7 @@ export function LoginForm({ code, legacy = false }: { code: string; legacy?: boo
       </label>
       <button className="btn primary block" disabled={busy || !name.trim() || !pw} data-testid="login">{busy ? '…' : 'Log in'}</button>
       {err && <span className="small" role="alert" style={errStyle}>{err}</span>}
-      <span className="tiny muted">Forgot your password? Your choir admin can send you a new link.</span>
+      <span className="tiny muted">Forgot your password? A choir admin can make you a reset link (Admin → People → Reset password).</span>
       {legacy && (
         <button type="button" className="linklike small" style={{ alignSelf: 'flex-start', minHeight: 44 }} onClick={() => setClaim(true)} data-testid="claim-open">
           Have the old shared admin or section-lead password? Make it your own account
@@ -323,6 +323,12 @@ export function ChoirAdmin() {
   // The choir's cycles (all of them: admins see past ones too) and the one being edited.
   const [cycles, setCycles] = useState<CyclesReply | null>(null);
   const [selId, setSelId] = useState<string | null>(null);
+  // Edit (or Editing) brings the programme editor into view: it sits below the cycles, often off screen.
+  const [jump, setJump] = useState(0);
+  useEffect(() => {
+    if (!jump) return;
+    document.querySelector('[data-testid="programme-editor"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [jump]);
   // The programme editor's unpublished changes (null: none), and how to add a piece to them.
   const draft = useRef<ProgrammeDraft>({ ids: null, add: null });
   const [, setDraftV] = useState(0);
@@ -384,7 +390,7 @@ export function ChoirAdmin() {
         <NeedLogin code={code} what="Your changes below are kept: log in again, then publish them." />
       )}
       <CyclesPanel code={code} auth={auth} cycles={cycles} selId={selId}
-        onSelect={(id) => { if (id !== selId && unsaved(`Edit another cycle anyway`)) return; setSelId(id); }}
+        onSelect={(id) => { if (id !== selId && unsaved(`Edit another cycle anyway`)) return; setSelId(id); setJump((n) => n + 1); }}
         onLoaded={gotCycles} onChanged={(r, select) => { gotCycles(r, select); void refresh(); }} />
       {sel && (
         <ProgrammeEditor key={`${info?.code}:${sel.id}:${edVer ?? 0}`} code={code} auth={auth} info={info} cycle={sel} all={cycles?.cycles ?? []}
@@ -471,8 +477,8 @@ function ProgrammeEditor({ code, auth, info, cycle, all, base, library, draft, o
   // (with the dates as edited here: running, to come or over)
   const state = cycleState(cycle.id, all.map((c) => (c.id === cycle.id ? { ...c, start: from, end: until || undefined } : c)));
   return (
-    <div className="card" data-testid="programme-editor">
-      <strong>Programme: {cycle.name}</strong>
+    <div className="card" data-testid="programme-editor" style={{ scrollMarginTop: 12 }}>
+      <strong>Editing: {cycle.name}</strong>
       <label className="field"><span>Name</span><input type="text" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} data-testid="programme-name" /></label>
       <div className="row wrap">
         <label className="field"><span>Starts</span><input type="date" value={from} onChange={(e) => setFrom(e.target.value)} data-testid="cycle-start" /></label>
@@ -669,7 +675,7 @@ function CyclesPanel({ code, auth, cycles, selId, onSelect, onLoaded, onChanged 
                 <span className="tiny muted">{fmtDay(c.start)}{c.end ? ` – ${fmtDay(c.end)}` : ' onwards'} · {c.pieceIds.length} piece{c.pieceIds.length === 1 ? '' : 's'}</span>
                 <span className="tiny" style={{ color: st === 'Running now' ? 'var(--voice)' : 'var(--muted)', fontWeight: 600 }}>{st}</span>
               </div>
-              <button className="btn small" aria-pressed={c.id === selId} onClick={() => onSelect(c.id)} data-testid="cycle-edit">{c.id === selId ? 'Editing' : 'Edit'}</button>
+              <button className="btn small" aria-pressed={c.id === selId} onClick={() => onSelect(c.id)} data-testid="cycle-edit">{c.id === selId ? 'Editing ↓' : 'Edit'}</button>
               <button className="btn small ghost" aria-label={`Delete ${c.name}`} data-testid="cycle-delete" onClick={async () => {
                 if (!confirm(`Delete the cycle “${c.name}”?${c.id === running?.id ? ' It is running now: singers lose its programme.' : ''}`)) return;
                 try { onChanged(await deleteCycle(code, auth, c.id, cycles?.cycleUpdatedAt)); } catch (e) { failed(e); }

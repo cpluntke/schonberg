@@ -110,7 +110,7 @@ export function PeoplePanel({ code, auth, superAdmin = false, onChanged }: { cod
         <button className="btn small ghost" disabled={busy} onClick={() => run(async () => {
           const r = await resetPerson(code, auth, a.id);
           setFresh({ token: r.token, title: `New-password link for ${a.name}` });
-        })}>New link</button>
+        })}>Reset password</button>
         {a.role === 'lead' && (
           <button className="btn small ghost" disabled={busy} onClick={() => {
             if (confirm(`Make ${a.name} a choir admin? Admins can change the programme, the scores and the people.`)) void run(() => updatePerson(code, auth, a.id, { role: 'admin' }));
@@ -175,6 +175,10 @@ export function PeoplePanel({ code, auth, superAdmin = false, onChanged }: { cod
       </div>
       <div className="col" style={{ gap: 2 }} data-testid="members">
         <span className="eyebrow">Members with an account ({members.length}{people.maxMembers ? ` of ${people.maxMembers}` : ''})</span>
+        <span className="tiny muted" data-testid="members-note">
+          Singers don't need an account: they join with the choir code and a first name, and share their progress
+          without one (see the sections). An account is optional, for keeping progress on several phones.
+        </span>
         <label className="toggle-row">
           <span>New member accounts<span className="tiny muted" style={{ display: 'block' }}>Singers make their own with the choir code to keep their progress on every phone.</span></span>
           <select aria-label="New member accounts" value={people.signupsOpen === false ? 'closed' : 'open'} disabled={busy} data-testid="signups-open"
