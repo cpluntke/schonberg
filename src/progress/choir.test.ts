@@ -5,7 +5,7 @@ import {
   LOGGED_OUT_ELSEWHERE, refreshSession, refreshSessionSoon, rememberedInvite, saveSession, sessionFor, superCreate, type Session,
   signUp, shareProgress, deleteMyAccount, lastLogout, dismissLogout, syncChoir, choirPieceId, localPieceId, fetchLibrary, addLibraryPiece,
   superLogin, superLogout, loadSuperSession, superAuth, superList, superLoggedOutNotice, refreshSuperSession, refreshSuperSessionSoon,
-  _resetSuperStateForTests, staffRoles, onSessionChange, joinChoir, ensureChoirSharing, endSession, sharingEnded,
+  _resetSuperStateForTests, staffRoles, onSessionChange, joinChoir, ensureChoirSharing, endSession, sharingEnded, sharingNeedsOk, startSharing,
 } from './choir';
 import { buildSnapshot } from './sync';
 import { fetchMetrics } from './insights';
@@ -266,11 +266,27 @@ describe('choir library pieces', () => {
     expect(sharingEnded()).toBe(false);
   });
 
-  it('members who joined while sharing was optional start sharing, once; a later removal stays off', () => {
-    saveProfile({ ...loadProfile(), choirCode: 'kammerchor', shareProgress: false });
+  it('earlier members: switched on silently only when safe (logged in, or never chose); otherwise asked', () => {
+    // Never touched the old box: switched on.
+    saveProfile({ ...loadProfile(), choirCode: 'kammerchor', shareProgress: undefined });
     ensureChoirSharing();
     expect(loadProfile().shareProgress).toBe(true);
-    // Removed from the choir later (endSession turns sharing off): the migration doesn't undo that.
+    // Switched off, not logged in (could also be an account deleted before this version): asked, not switched.
+    localStorage.removeItem('schonberg:shareMandatory');
+    saveProfile({ ...loadProfile(), shareProgress: false });
+    ensureChoirSharing();
+    expect(loadProfile().shareProgress).toBe(false);
+    expect(sharingNeedsOk()).toBe(true);
+    startSharing();
+    expect(loadProfile().shareProgress).toBe(true);
+    expect(sharingNeedsOk()).toBe(false);
+    // Switched off but logged in to the choir (so not removed): switched on.
+    localStorage.removeItem('schonberg:shareMandatory');
+    saveProfile({ ...loadProfile(), shareProgress: false });
+    saveSession(session({ account: { ...account, role: 'member' as const } }));
+    ensureChoirSharing();
+    expect(loadProfile().shareProgress).toBe(true);
+    // Once only: a later switch-off (e.g. a removal) isn't undone by the migration.
     saveProfile({ ...loadProfile(), shareProgress: false });
     ensureChoirSharing();
     expect(loadProfile().shareProgress).toBe(false);

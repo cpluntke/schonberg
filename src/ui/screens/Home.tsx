@@ -8,7 +8,8 @@ import { nextRehearsal } from '../../progress/rehearsal';
 import { rowOfTheDay } from '../../game/twelvetone';
 import { IconFlame, IconPlay, IconMic } from '../icons';
 import { IntroVideoButton } from '../components/IntroVideo';
-import { apiBase, loadSession } from '../../progress/choir';
+import { apiBase, loadSession, sharingNeedsOk, startSharing } from '../../progress/choir';
+import { shareMyProgress } from '../play/shareProgress';
 import { LoggedOutCard, SyncNotice } from '../components/AccountSync';
 import { pieceStatus, todaysPlan, type PieceStatus } from '../plan';
 
@@ -71,6 +72,15 @@ export function Home() {
       <Notice />
       <SyncNotice />
       <LoggedOutCard />
+      {sharingNeedsOk() && (
+        <div className="card" data-testid="share-ask" style={{ gap: 8 }}>
+          <span className="small">Your choir now shares everyone's practice with the section leads: which bars are hard for the section (as totals) and your voice range. Yours isn't shared yet.</span>
+          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            <button className="btn primary small" onClick={() => { startSharing(); void shareMyProgress(true); }}>Start sharing</button>
+            <button className="btn small ghost" onClick={() => go({ name: 'choir' })}>What's shared</button>
+          </div>
+        </div>
+      )}
 
       {!profile.onboarded && (
         <div className="card" style={{ borderColor: 'var(--voice-deep)' }}>

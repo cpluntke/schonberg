@@ -8,7 +8,7 @@ import {
   apiBase, cachedChoir, changePassword, choirPieceId, claimAccount, deleteChoirPiece, fetchChoir, joinChoir, leaveChoir, ChoirApiError,
   loadSession, loggedOutNotice, login, logout, onSessionChange, refreshSession, refreshSessionSoon, saveChoirCycle, sessionFor, superCreate, superDelete,
   superList, superPurgeMembers, superRename, uploadChoirPiece, withdrawProgress, fetchChoirUsage, mb, type Auth, type ChoirInfo, type ChoirSummary, type ChoirUsage,
-  type ServerUsage, type Session, localPieceId, sharingEnded, type LibraryPiece, addLibraryPiece, loadSuperSession, superLogin, superLogout, superLoggedOutNotice,
+  type ServerUsage, type Session, localPieceId, sharingEnded, sharingNeedsOk, startSharing, type LibraryPiece, addLibraryPiece, loadSuperSession, superLogin, superLogout, superLoggedOutNotice,
 } from '../../progress/choir';
 import { LibraryPanel, type ProgrammeDraft } from '../components/ChoirLibrary';
 import { SectionInsights } from '../components/SectionInsights';
@@ -123,6 +123,10 @@ export function ChoirScreen() {
           <div className="card">
             <strong>{profile.shareProgress ? 'Shared with your section lead' : 'Not shared with your section lead'}</strong>
             {!profile.shareProgress && sharingEnded() && <span className="small" role="status" style={errStyle}>Your choir account was removed or deleted, so nothing is sent. Log in again (or leave and rejoin the choir) to share again.</span>}
+            {sharingNeedsOk() && (
+              <button className="btn primary small" style={{ alignSelf: 'flex-start' }} data-testid="start-sharing"
+                onClick={() => { startSharing(); void shareMyProgress(true).then(() => update({})); update({}); }}>Start sharing</button>
+            )}
             <span className="small muted" data-testid="share-note">How each bar is going, so they know what to rehearse. It's part of being in the choir. Your lead and the admins see bars and levels only as section totals (in a small section they may still tell which are yours), and your voice range by name. The leaderboard shows everyone in the choir your first name, voice and readiness.</span>
             {!profile.name.trim() && !sessionFor(profile.choirCode) && profile.shareProgress && <span className="small" style={errStyle}>Add your name in Voice setup first.</span>}
             {profile.name.trim() && profile.shareProgress && shareError() && <span className="small" role="alert" style={errStyle}>Not shared yet: {shareError()}</span>}
