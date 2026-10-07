@@ -1,7 +1,7 @@
 // Today's plan, shared by Home ("Next up") and the intro video's "Try it now" step.
 
 import { chosenPartId, singableSections, getPiece, type PieceInfo } from './library';
-import { getProgress, dueForReview, attemptLog, loadCycle, loadProfile, type Cycle } from '../progress/store';
+import { getProgress, dueForReview, attemptLog, loadCycle, loadProfile, allProgress, upgradeFullRuns, type Cycle } from '../progress/store';
 import { pieceReadiness, nextStep, fullRunDue, type Readiness } from '../progress/ladder';
 import type { Route } from './router';
 
@@ -61,4 +61,17 @@ export function nextUpRoute(): { route: Route; piece: PieceInfo; level: number }
   const s = todaysPlan(statuses, cycle)[0];
   if (!s?.next) return null;
   return { route: { name: 'play', pieceId: s.piece.id, partId: s.partId, sectionId: s.next.sectionId, level: s.next.level, mode: '2d' }, piece: s.piece, level: s.next.level };
+}
+
+/**
+ * Progress saved under the earlier level rules (a second full run after the fixes; no clean-run
+ * stars): bring every piece in the library up to date (store.upgradeFullRuns). Cheap and idempotent:
+ * run when the library is ready and after progress arrives from another phone.
+ */
+export function upgradeAllFullRuns(): void {
+  for (const p of allProgress()) {
+    const piece = p.pieceId ? getPiece(p.pieceId) : undefined;
+    if (!piece || !piece.score.parts.some((x) => x.id === p.partId)) continue;
+    try { upgradeFullRuns(p.pieceId, p.partId, singableSections(piece, p.partId)); } catch (e) { console.error(e); }
+  }
 }

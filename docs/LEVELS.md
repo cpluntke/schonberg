@@ -72,57 +72,105 @@ A section level says "you can sing bars 9–16 at level 2". You can try any leve
 any time, and a pass raises the section's level. Section levels show your practice, but **on their
 own they never make a piece ready**.
 
-## The piece level: sing it all in one go
+## The piece level: sing it all through, then fix what slipped
 
-A piece reaches level N only through a **full run-through at level N**, in one go:
+For every level N = 1…5 (`store.recordFullRun`, `store.recordAttempt`):
 
-- The whole piece, at the level's tempo, support, tolerance and pass mark.
-- **Not stopped early and not paused** (after your first note; a pause in the count-in is fine).
-  A run that was stopped, or paused and carried on, is practice: it is scored and kept in the bar history, but it doesn't count. (Slower than the
-  level's tempo, e.g. the level-1 tempo slider below 70%, is practice too, and so is a level-1 run
-  without headphones, and a level-5 run with bars still showing or a peek. Arcade runs of the whole
-  piece are just for fun and never count.)
-- **Every section is scored within the run** (the same measure as the run's accuracy: the
-  average grade of its notes). Sections with fewer than 8 notes get one weak note of slack (it counts as
-  "good"), so a single "ok" note can't fail a level; a missed note is never forgiven. A section under 50% in the run never counts as held. The level is granted only when the run passes overall **and every
-  section reaches the pass mark**.
-- **At level 1 every note of every section must be right** (as above; no slack). Any section with a
-  note that wasn't right is "to fix at level 1", and piece level 1 is granted only when every
-  section in the run had every note right.
-- A section below the pass mark is **"to fix at level N"**. Until it passes at level N (or higher)
-  as a section on its own, a full run at level N can't count: the piece screen greys out that
-  level's "Sing it all" button and lists the sections to fix. We chose locking over "you can run it
-  but it won't count" because it makes the next step obvious, and nobody sings a five-minute run
-  for nothing. A full run at another level stays open.
-- Fix lists only lock and lead Next up for the level you're working toward (the next piece level, or
-  the level every section has reached), or when the run held at its level: at most half the sections
-  slipped and either the run passed overall, or it came within 10 points of the pass mark while every
-  other section had passed that level before the run. A new singer who tries level 5 and slips everywhere just sees the
-  slips as information ("practise them at level 5 when you get there"); Next up stays level 1.
-- Sections that held within a counted run are credited as section passes at that level (so an
-  experienced singer who sings it all at level 3 straight away also has every section at 3).
-- **The full run is available right away**, at any level: an experienced singer can skip the sections.
+1. **Practise in sections** (above), as much or as little as you like.
+2. **A counted full run at level N opens level N.** Counted means:
+   - the whole piece, at the level's tempo, support, tolerance and pass mark;
+   - **not stopped early and not paused** (after your first note; a pause in the count-in is fine);
+   - at level 1 with headphones on, at level 5 with everything hidden and no peek;
+   - the timing was fine (a run that came in clearly late, with a measured delay, is “Not yet” on timing).
+   A run that was stopped, paused, slower than the level's tempo (e.g. the level-1 tempo slider
+   below 70%), through the speaker at level 1, or off book with bars showing or a peek is practice:
+   it is scored and kept in the bar history, but it changes nothing. Arcade runs of the whole piece
+   are just for fun and never count.
+3. **Every section is scored within the run** (the same measure as the run's accuracy: the average
+   grade of its notes). A section **held** when it reaches the level's pass mark within the run.
+   Sections with fewer than 8 notes get one weak note of slack (it counts as “good”), so a single
+   “ok” note can't fail a level; a missed note is never forgiven, and a section under 50% never
+   holds. **At level 1 a section holds only when every one of its notes was right** (as above; no
+   slack). Sections that held are credited as section passes at that level (so an experienced singer
+   who sings it all at level 3 straight away also has every section at 3). Sections that slipped are
+   **“to fix at level N”**.
+4. **The piece reaches level N as soon as every section that slipped in that run has passed level N
+   on its own** (or above). No second full run: the last fix grants the level, and Results says
+   “Fixed! Piece level N reached”. If nothing slipped, the piece reaches level N at once.
+5. **Too much slipped: practice.** A run in which **more than half of the sections slipped** does
+   not open the level (`ladder.runOpensLevel`: at most half may slip; two of four opens, three of
+   four doesn't; one of three opens, two of three don't). It's practice: nothing is credited and no
+   fix list changes, and Results says “Too much slipped for this run to count. Practise the
+   sections, then sing it all again.” This keeps the full run a real test of the piece, not a
+   formality that turns the whole piece into a list of sections. (It replaces the earlier
+   “the run held” heuristics, which also looked at the overall score and at section levels before
+   the run: one simple rule instead.)
 
-A piece with only one section has nothing to run through on top: its section level is its piece level.
+### The clean-run star
+
+A counted full run at level N in which **every section held** (and the run passed overall) is a
+**clean run**: the piece reaches N at once and earns a ★ for that level (`FullRunProgress.clean`,
+the levels with a star). Getting everything right in one go is hard, so it's a bonus, not a
+requirement. The star shows on the piece screen (“★ Clean run at level 1, 2: every section right
+in one go”, and on that level's “Sing it all” button), on Results (“Clean run! Every section right
+in one go ★”), and on the leaderboard entry (`LeaderboardEntry.clean`, the highest level with a
+star, shown as “★ clean run at level N”). The star is not part of readiness. The leaderboard
+server keeps only fields its validator knows, so until it accepts `clean` the star shows only for
+entries shared by code; the app works either way.
+
+### Running it again: the new run replaces the fix list
+
+The full run is open at any time, at any level, fix list or not. A new counted run at N that opens
+the level **replaces** the fix list at N with its own slips: a section fixed since the last run
+stays off the list only if it held again in the new run, and a section still on the old list comes
+off if it held now. Fair both ways: the list always says what the latest real run of the whole
+piece showed. A run where too much slipped (practice) leaves the list as it was. Sections that
+held also come off the fix lists of lower levels (that can finish a lower level). Reaching a level
+settles the lists below it.
+
+### Slips at or below the piece level
+
+The piece level is never lowered. A run at or below it (a weekly review, or a lower level for fun)
+that opens with slips makes a fix list too: Next up says “Fix bars 9–16 at level 3: it slipped in
+your full run”, and fixing them counts as the review. The piece keeps its level either way.
+
+### Off book: two different days
+
+Level 5 counts once the whole piece **reached level 5 on two different days**: an off-book full run
+that opened level 5 and whose slips were then fixed (or a clean one). The day counted is the day
+level 5 was reached (the clean run, or the last fix). After the first day the piece is
+concert-ready (4). On the second day you sing the whole piece off book again: that run opens level
+5 again, and its fixes then count (fixed on the same day or later). A second completion on the same
+day doesn't count as a second day.
+
+Fix lists only exist for pieces with more than one section. A piece with only one section has
+nothing to run through on top: its section level is its piece level.
 
 ## Readiness
 
 - **Rehearsal-ready** = piece level 3. **Concert-ready** = piece level 4.
-- **Memorised** = the full run at level 5 (off book) passed on **two different days**. After the
-  first day the piece is concert-ready (level 4), as with sections.
+- **Memorised** = piece level 5: level 5 (off book) reached for the whole piece on **two different
+  days** (above). After the first day the piece is concert-ready (level 4), as with sections.
 - The readiness percentage (Home, the leaderboard, the section lead's view) is the way to
   concert-ready: the piece level counts fully, section levels above it count half. So practice
   shows, and confirming it with a full run gives the jump.
+- The definition of the piece level (a level the whole piece has reached) and the formula are
+  unchanged by the fix-list rule, so `READINESS_VERSION` stays 2: a piece reaches a level sooner
+  now (no second run), but what the level means for readiness is the same.
 - Leaderboard entries carry `v: 2` (this formula). Entries from older app versions have no `v` and
   are shown greyed and ranked after current ones on Ranks; Ranks explains the recalculation once.
 
 ## Next up
 
-In order: sections to fix after a full run; a weekly review of the full run (piece level ≥ 3, last
-passed full run more than 7 days ago); section reviews; after the whole piece passed from memory on
-one day, the full run from memory again on a later day (day 2 of 2); the full run when every section has reached
-a level above the piece's ("Level 3 in every section: confirm it with a full run-through"); else the
-weakest section. Home also offers "Know it already? Sing the whole piece at level N".
+In order: open fixes after a full run (“Fix bars 9–16 at level 2 to reach level 2”, lowest level
+first; at level 5 on the first day “…to finish the whole piece from memory: day 1 of 2”); a weekly
+review of the full run (piece level ≥ 3, last passed full run more than 7 days ago); section
+reviews; after the whole piece reached level 5 on one day, the full run from memory again on a
+later day (day 2 of 2); the full run when every section has reached a level above the piece's
+(“Level 3 in every section: confirm it with a full run-through”); else the weakest section. So
+level 1 too gets one complete sing-through before level 2: once every section is at level 1, Next
+up is the full run at level 1, then the sections that slipped in it, in their own (smaller)
+stretches. Home also offers “Know it already? Sing the whole piece at level N”.
 
 ## Singers who practised before piece levels (and before “doo”)
 
@@ -137,3 +185,27 @@ run-through" and Next up suggests exactly that run. Stored data is only added to
 (`PieceProgress.full`). The old `all` record, which mixed in stopped and slower runs, is left alone and
 ignored. The readiness history moved to a new key (`sh:readiness2`), so "most improved" doesn't show
 a false drop.
+
+## Progress saved under the earlier rules (a second full run after the fixes)
+
+Until this change a fix list locked the full run at its level, and once every section on it had
+passed on its own the singer had to sing the whole piece again. Nothing stored is lowered, and the
+app upgrades on load (`store.upgradeFullRuns`, run for every piece when the library is ready and
+again after progress changes, e.g. pulled from another phone):
+
+- **Fix lists already done.** When the latest counted full run at N (in the attempt log) left a fix
+  list, every section has passed N since (on its own, or held within that run), and that run came
+  within 10 points of the pass mark, the piece reaches N. (We can't tell from stored data how many
+  sections slipped then; the 10-point margin is the earlier rules' own “nearly held” test, so a run
+  that slipped almost everywhere doesn't grant a level now.)
+- **Fix lists still open** become open lists under the new rule: fix the rest and the piece reaches
+  the level. A stored list that still names more than half of the sections is ignored (that run
+  wouldn't open the level now); the obsolete `toFixLocks` marks are ignored.
+- **Clean-run stars from history.** Under the earlier rules a counted full run passed only when
+  every section held, so each passed full run in the attempt log is a clean run at its level. When
+  the log has none for the piece (it is trimmed, and isn't kept with a choir account), the piece
+  level is: a star at that level, or at level 5 if the piece was passed off book. A record written
+  by this version always has `clean` (possibly empty), so this runs once.
+- Fix lists from the other phone: when merging, a list whose remaining sections were passed on the
+  other phone reaches its level (`sync.mergeFull`), and stars are united.
+

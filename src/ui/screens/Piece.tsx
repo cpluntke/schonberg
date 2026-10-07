@@ -115,9 +115,14 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
           <span className="mono" style={{ fontSize: 28, fontWeight: 600 }}>{Math.round(r.pct * 100)}%</span>
         </div>
         <div className="bar"><span style={{ width: `${r.pct * 100}%` }} /></div>
+        {multi && r.clean.length > 0 && (
+          <span className="small" data-testid="clean-stars" style={{ color: 'var(--voice)' }}>
+            <span aria-hidden="true">★ </span>Clean run{r.clean.length > 1 ? 's' : ''} at level {r.clean.join(', ')}: every section right in one go
+          </span>
+        )}
         {multi && r.unconfirmed > 0 && !r.toFix.length && (
           <div className="notice info small" data-testid="confirm-note">
-            <strong>Level {r.unconfirmed} in every section.</strong> Confirm it with a full run-through: the piece's level comes from singing it all in one go.
+            <strong>Level {r.unconfirmed} in every section.</strong> Confirm it with a full run-through: the piece's level comes from singing it all through.
           </div>
         )}
         {multi && r.toward && !r.unconfirmed && (
@@ -131,7 +136,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
         )}
         <span className="small muted">
           {multi
-            ? <>The piece's level = the level you've sung the whole piece at, in one go. Rehearsal-ready = 3, concert-ready = 4, memorised = 5 (off book) on two different days.</>
+            ? <>The piece's level: sing the whole piece through at a level, then fix any section that slipped on its own. Rehearsal-ready = 3, concert-ready = 4, memorised = 5 (off book) on two different days.</>
             : <>Rehearsal-ready = level 3 (Independent). Concert-ready = level 4. Memorised = level 5 (off book) on two different days.</>}
         </span>
         {next && (
@@ -145,6 +150,13 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
         </button>
         {showHelp && (
           <div className="col" style={{ gap: 8 }}>
+            {multi && (
+              <span className="small muted" data-testid="levels-help-piece">
+                <strong>The whole piece:</strong> sing it all through at a level, in one go. Sections that slip are to fix on
+                their own: once each passes, the piece reaches the level, with no need to sing it all again. More than half
+                slipped: that run is practice. Every section right first time: a clean-run ★.
+              </span>
+            )}
             {LEVELS.map((l) => (
               <div key={l.level} className="row" style={{ alignItems: 'flex-start' }}>
                 <span className="lvl-btn" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{l.level}</span>
@@ -166,7 +178,8 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
           <div className="col" style={{ gap: 2 }}>
             <strong>Sing it all</strong>
             <span className="small muted">
-              The whole piece in one go, every section scored. Pass at a level and the piece reaches it.
+              The whole piece in one go, every section scored. Sections that slip are to fix on their own: once
+              they pass, the piece reaches the level. Every section right first time earns a clean-run ★.
               Know it already? Go straight to any level: you don't have to do the sections first.
             </span>
           </div>
@@ -174,15 +187,15 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
             {LEVELS.map((L) => {
               const l = L.level;
               const fixes = r.toFix.find((f) => f.level === l)?.sectionIds ?? [];
+              const star = r.clean.includes(l);
               // The suggested run: the level every section has reached, else the next piece level.
               const cls = l <= P ? 'lvl-btn done' : l === (r.unconfirmed || P + 1) && !fixes.length ? 'lvl-btn next' : 'lvl-btn';
               return (
-                <button key={l} className={cls} data-testid={`full-${l}`}
-                  aria-label={`Sing it all at level ${l} ${L.name}${l <= P ? ' (passed)' : ''}${fixes.length ? ` (fix ${fixes.length} section${fixes.length > 1 ? 's' : ''} first)` : ''}`}
-                  disabled={fixes.length > 0}
-                  title={fixes.length ? `Fix ${fixes.map(label).join(', ')} first` : undefined}
-                  onClick={() => play('all', l)} style={fixes.length ? { opacity: 0.45 } : undefined}>
+                <button key={l} className={cls} data-testid={`full-${l}`} style={{ position: 'relative' }}
+                  aria-label={`Sing it all at level ${l} ${L.name}${l <= P ? ' (passed)' : ''}${star ? ' (clean run)' : ''}${fixes.length ? ` (${fixes.length} section${fixes.length > 1 ? 's' : ''} to fix)` : ''}`}
+                  onClick={() => play('all', l)}>
                   {l} <span style={{ fontWeight: 600, fontSize: 11 }}>{SHORT[l]}</span>
+                  {star && <span aria-hidden="true" data-testid={`star-${l}`} style={{ position: 'absolute', top: 1, right: 4, fontSize: 12, color: '#FFD166' }}>★</span>}
                 </button>
               );
             })}
@@ -190,7 +203,10 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
           {r.toFix.map((f) => (
             <div key={f.level} className="col" style={{ gap: 6 }} data-testid="to-fix">
               <span className="small" style={{ color: 'var(--accent-text)' }}>
-                <strong>To fix at level {f.level}</strong> ({levelSpec(f.level).everyNote ? 'not every note was right in your full run' : 'they slipped in your full run'}). Pass {f.sectionIds.length > 1 ? 'each' : 'it'} on {f.sectionIds.length > 1 ? 'its' : 'its'} own, then sing it all at level {f.level} again:
+                <strong>To fix at level {f.level}</strong> ({levelSpec(f.level).everyNote ? 'not every note was right in your full run' : `${f.sectionIds.length > 1 ? 'they' : 'it'} slipped in your full run`}).{' '}
+                {f.level > P
+                  ? <>Pass {f.sectionIds.length > 1 ? 'each' : 'it'} on its own and {f.level === 5 ? 'the whole piece counts as sung from memory today (memorised = on two different days)' : `the piece reaches level ${f.level}`}. No need to sing it all again:</>
+                  : <>Practise {f.sectionIds.length > 1 ? 'each' : 'it'} at level {f.level} on its own:</>}
               </span>
               <div className="row wrap" style={{ gap: 6 }}>
                 {f.sectionIds.map((id) => (
@@ -198,11 +214,6 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
                 ))}
               </div>
             </div>
-          ))}
-          {r.laterFixes.map((f) => (
-            <span key={f.level} className="tiny muted" data-testid="later-fix">
-              In your run at level {f.level}, {f.sectionIds.map(label).join(', ')} slipped: practise {f.sectionIds.length > 1 ? 'them' : 'it'} at level {f.level} when you get there.
-            </span>
           ))}
           {P === 4 && r.offBookDays > 0 && !r.toFix.length && (
             <span className="tiny muted">Whole piece from memory: day {r.offBookDays} of {OFF_BOOK_DAYS}. Sing it all at level 5 again on another day.</span>

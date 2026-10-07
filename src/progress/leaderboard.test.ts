@@ -29,6 +29,12 @@ describe('leaderboard', () => {
     expect(decodeShareCode('SH1.garbage!!')).toBeNull();
     expect(decodeShareCode('hello')).toBeNull();
   });
+  it('a clean-run star travels in the share code (optional, not part of readiness)', () => {
+    const star = { ...entry, v: 2, clean: 3 };
+    expect(decodeShareCode(encodeShareCode(star))).toEqual(star);
+    expect(decodeShareCode(encodeShareCode({ ...entry, clean: 2 }))).toEqual({ ...entry, clean: 2 });
+    expect(decodeShareCode(encodeShareCode({ ...entry, clean: 9 } as LeaderboardEntry))).toEqual(entry);
+  });
   it('imports share codes into the local backend, newer wins', async () => {
     const older = encodeShareCode({ ...entry, readiness: 0.1, updatedAt: entry.updatedAt - 1000 });
     expect(importShareCodes('choir', `${encodeShareCode(entry)}\n${older}`)).toBe(2);

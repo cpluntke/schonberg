@@ -128,7 +128,8 @@ export function UsageInsights() {
             <BarList rows={[
               { label: 'Clean (nothing to fix)', value: sumKeys(days, (k) => k === 'full.clean') },
               { label: 'With a to-fix list', value: sumKeys(days, (k) => k === 'full.tofix') },
-              { label: 'Blocked (fix first)', value: sumKeys(days, (k) => k === 'full.blocked') },
+              { label: 'Too much slipped (practice)', value: sumKeys(days, (k) => k === 'full.toomuch') },
+              { label: 'Blocked (fix first, earlier rules)', value: sumKeys(days, (k) => k === 'full.blocked') },
             ]} format={int} />
           </Section>
           <Section title="Feature usage" note="Install-days using each feature" id="usage-features">

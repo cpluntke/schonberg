@@ -329,6 +329,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
       : undefined;
     const rec = full ?? recordAttempt(piece.id, part.id, recId, level, r, durationSec, Date.now(), { timingFail: timingFail != null });
     const fixed = full ? undefined : (rec as ReturnType<typeof recordAttempt>).fixed;
+    const reached = full ? full.reached : (rec as ReturnType<typeof recordAttempt>).reached;
     const ladder = full ? full.counted : sectionLadder;
     if (ladder) {
       snapshotReadiness(piece.id, part.id, pieceReadiness(secs, getProgress(piece.id, part.id)).pct);
@@ -341,7 +342,6 @@ function SingPlay({ route }: { route: PlayRoute }) {
       ? (partial ? 'stopped early'
         : isFull && arcade ? 'arcade runs of the whole piece are just for fun'
         : isFull && resumed ? 'you paused and carried on (a run of the whole piece counts only in one go)'
-        : full?.blocked ? `first fix ${full.blocked.map((id) => secs.find((s) => s.id === id)?.label ?? id).join(', ')} on ${full.blocked.length > 1 ? 'their' : 'its'} own at level ${level}`
         : offBookPractice ? (peekedN > 0 ? `you peeked at ${peekedN} bar${peekedN > 1 ? 's' : ''}` : 'some bars were still showing (practice mode)')
         : timingUnsure != null ? `your voice reached the app about ${timingUnsure} ms after the beat, and without the delay check the app can't tell whether that's your timing or your phone and headphones. Do the 10-second delay check in Voice setup`
         : !fullTempo ? 'slower than the level’s tempo'
@@ -361,6 +361,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
       full,
       fixed,
       ...(sess?.inputQuality ? { inputQuality: sess.inputQuality } : {}),
+      reached,
       ...(notCounted === SPEAKER_PRACTICE ? { speaker: true } : {}),
       notCounted,
       passed: rec.passed, prevLevel: rec.prevLevel, newLevel: rec.newLevel,
@@ -616,19 +617,20 @@ function SingPlay({ route }: { route: PlayRoute }) {
                   <strong>Sing every note on “doo”.</strong> The words are shown faintly; you sing them from level 2.
                 </div>
               )}
-              {isFullRun && (fullFixes.length ? (
-                <div className="notice" data-testid="full-locked">
-                  <strong>Fix {fullFixes.length === 1 ? 'this section' : 'these sections'} first:</strong>{' '}
-                  {fullFixes.map((id) => fullSecs.find((x) => x.id === id)?.label ?? id).join(', ')} slipped in your last full run at level {level}.
-                  Pass {fullFixes.length === 1 ? 'it' : 'each'} on {fullFixes.length === 1 ? 'its' : 'their'} own at level {level}; until then this run is practice and won't count.
-                </div>
-              ) : (
+              {isFullRun && (
                 <span className="small" data-testid="full-info">
-                  Sing the whole piece in one go: pass it and the piece reaches level {level}. Every section is scored too,{' '}
-                  {levelInfo?.everyNote ? 'and every note in it must be right.' : `and each must reach ${Math.round((levelInfo?.pass ?? 0.8) * 100)}%.`}{' '}
-                  Stopping or pausing makes it a practice run.
+                  Sing the whole piece in one go. Every section is scored{' '}
+                  {levelInfo?.everyNote ? '(every note must be right).' : `(each needs ${Math.round((levelInfo?.pass ?? 0.8) * 100)}%).`}{' '}
+                  All of them right: level {level} is yours at once, with a clean-run ★. A few slipped: fix just those
+                  afterwards and the level is yours. More than half slipped: it’s practice. Stopping or pausing makes it a practice run too.
                 </span>
-              ))}
+              )}
+              {isFullRun && fullFixes.length > 0 && (
+                <span className="small muted" data-testid="full-open-fixes">
+                  Still to fix at level {level} from your last full run: {fullFixes.map((id) => fullSecs.find((x) => x.id === id)?.label ?? id).join(', ')}.
+                  This run counts too: what slips now becomes the list to fix.
+                </span>
+              )}
               {cold && (
                 <span className="small">
                   {coldLeadFrom(piece.score, section.start) != null ? "You'll hear two bars of the other voices, then come in" : 'After a count-in, come in'}{' '}
