@@ -295,7 +295,7 @@ test('fixing the section that slipped in a full run reaches the piece level with
     localStorage.setItem(`sh:progress:warmup-chorale:${partId}`, JSON.stringify({
       pieceId: 'warmup-chorale', partId, totalAttempts: 1, bestScore: 900,
       sections: { [ids[1]]: { level: 1, best: { 1: 0.95 }, attempts: 0, lastPassed: t, lastPracticed: t } },
-      full: { level: 0, best: { 1: 0.9 }, attempts: 1, lastPracticed: t, toFix: { 1: [ids[0]] }, clean: [] },
+      full: { level: 0, best: { 1: 0.9 }, attempts: 1, lastPracticed: t, toFix: { 1: [ids[0]] }, toFixLocks: { 1: true }, clean: [] },
     }));
   }, { partId, ids, t });
   await page.goto('/?simulate=perfect#/piece/warmup-chorale');

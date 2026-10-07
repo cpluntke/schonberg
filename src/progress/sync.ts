@@ -321,12 +321,12 @@ export function mergeFull(l: FullRunProgress | undefined, r: FullRunProgress | u
     if (left.length) {
       toFix[lvl] = left;
       if (newer.toFixLocks?.[lvl]) locks[lvl] = true;
-    } else if (ids.length) done.push({ lvl, at: Math.max(...ids.map((id) => sections[id]?.lastPassed ?? 0)) });
+    } else if (ids.length && newer.toFixLocks?.[lvl]) done.push({ lvl, at: Math.max(...ids.map((id) => sections[id]?.lastPassed ?? 0)) });
   }
   if (Object.keys(toFix).length) out.toFix = toFix;
   if (Object.keys(locks).length) out.toFixLocks = locks;
-  // A list whose last sections were fixed on the other phone: the piece reaches its level, as it
-  // would on one phone (docs/LEVELS.md).
+  // A list (from a run that opened its level) whose last sections were fixed on the other phone:
+  // the piece reaches its level, as it would on one phone (docs/LEVELS.md).
   for (const d of done.sort((a, b) => a.lvl - b.lvl)) { out.clean ??= []; reachLevel(out, d.lvl, d.at); }
   return out;
 }

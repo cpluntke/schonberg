@@ -156,7 +156,11 @@ export interface FullRunProgress {
    * the piece reaches the level. A new run that opens the level replaces the list with its own slips.
    */
   toFix?: Record<number, string[]>;
-  /** Obsolete (fix lists used to lock the full run): ignored, cleared with its list. */
+  /**
+   * level → that fix list came from a run that opened the level (ladder.runOpensLevel); only such
+   * lists count (are shown, lead Next up, and grant the level when done). Earlier versions set it
+   * for a run that "held" (a subset); their other lists are checked once by upgradeFullRuns.
+   */
   toFixLocks?: Record<number, boolean>;
   /**
    * Levels with a clean-run star: a counted full run at that level in which every section held.
@@ -466,16 +470,18 @@ function localDay(now: number): string {
  * Remove a section from the to-fix lists of levels ≤ `level`; returns what was cleared. A list that
  * becomes empty is done: the caller grants its level (reachLevel).
  */
-function clearFix(full: FullRunProgress | undefined, sectionId: string, level: number): { level: number; remaining: number }[] {
-  const out: { level: number; remaining: number }[] = [];
+function clearFix(full: FullRunProgress | undefined, sectionId: string, level: number): { level: number; remaining: number; open: boolean }[] {
+  const out: { level: number; remaining: number; open: boolean }[] = [];
   if (!full?.toFix) return out;
   for (const k of Object.keys(full.toFix).map(Number).sort((a, b) => a - b)) {
     const ids = full.toFix[k] ?? [];
     if (k > level || !ids.includes(sectionId)) continue;
+    // Only a list from a run that opened the level can grant it (a stale one just shrinks).
+    const open = full.toFixLocks?.[k] === true;
     const rest = ids.filter((x) => x !== sectionId);
     if (rest.length) full.toFix[k] = rest;
     else { delete full.toFix[k]; if (full.toFixLocks) delete full.toFixLocks[k]; }
-    out.push({ level: k, remaining: rest.length });
+    out.push({ level: k, remaining: rest.length, open });
   }
   if (!Object.keys(full.toFix).length) delete full.toFix;
   if (full.toFixLocks && !Object.keys(full.toFixLocks).length) delete full.toFixLocks;
@@ -500,7 +506,10 @@ export function reachLevel(full: FullRunProgress, lvl: number, now: number): Pie
     for (const k of Object.keys(full.toFix).map(Number)) if (k <= lvl) delete full.toFix[k];
     if (!Object.keys(full.toFix).length) delete full.toFix;
   }
-  delete full.toFixLocks;
+  if (full.toFixLocks) {
+    for (const k of Object.keys(full.toFixLocks).map(Number)) if (k <= lvl || !full.toFix?.[k]) delete full.toFixLocks[k];
+    if (!Object.keys(full.toFixLocks).length) delete full.toFixLocks;
+  }
   return { level: lvl, prevLevel, newLevel: full.level, ...(lvl === 5 ? { offBookDays: full.offBookDays?.length ?? 0 } : {}) };
 }
 
@@ -563,8 +572,9 @@ export function recordAttempt(
       passSection(sp, lvl, accuracy, now);
       // Passing a section on its own clears it from the full run's to-fix list (at this level and
       // below). The last one to fix at a level: the piece reaches that level.
-      fixed = clearFix(prog.full, sectionId, lvl);
-      for (const f of fixed) {
+      const cleared = clearFix(prog.full, sectionId, lvl).filter((f) => f.open);
+      fixed = cleared.map(({ level, remaining }) => ({ level, remaining }));
+      for (const f of cleared) {
         if (f.remaining !== 0 || !prog.full) continue;
         prog.full.clean ??= [];
         const r = reachLevel(prog.full, f.level, now);
@@ -609,7 +619,7 @@ export interface FullRunRecord {
    * slipped is the new fix list, and the piece reaches the level once each of them passes on its own.
    */
   opened: boolean;
-  /** Counted, but more than half of the sections slipped: practice (ladder.runOpensLevel). */
+  /** Counted, but more than half of the sections slipped or the run was more than 10 points under the mark: practice (ladder.runOpensLevel). */
   tooMuch?: boolean;
   /** Clean run: opened with every section held and the run passed overall (a ★ for this level). */
   clean: boolean;
@@ -631,12 +641,12 @@ export interface FullRunRecord {
  * Record a run-through of the whole piece at `level` (docs/LEVELS.md).
  *
  * A counted run (`counted`: in one go, at the level's tempo, level 1 with headphones, level 5 with
- * everything hidden) opens level N when at most half of the sections slipped (ladder.runOpensLevel)
- * and the timing was fine. Then the sections that held are credited as section passes, the ones that
+ * everything hidden) opens level N when at most half of the sections slipped and the run came within
+ * 10 points of the pass mark (ladder.runOpensLevel), and the timing was fine. Then the sections that held are credited as section passes, the ones that
  * slipped become the fix list at N (replacing any earlier list at N), and the piece reaches N as
  * soon as each of them passes N on its own (recordAttempt). Nothing slipped and the run passed
- * overall: the piece reaches N at once, with a clean-run star. More than half slipped: practice,
- * nothing changes. Level 5 counts once reached on OFF_BOOK_DAYS different days (reachLevel).
+ * overall: the piece reaches N at once, with a clean-run star. More than half slipped, or the run
+ * more than 10 points under the pass mark: practice, nothing changes. Level 5 counts once reached on OFF_BOOK_DAYS different days (reachLevel).
  * Uncounted runs are logged as practice and change nothing.
  */
 export function recordFullRun(
@@ -669,7 +679,8 @@ export function recordFullRun(
   // Level 1: every note of the whole run right (each section's wrong notes make it "to fix").
   const overallPassed = attemptPasses(lvl, { accuracy, notes: result.notes ?? [] }) && !opts.timingFail;
   const slipped = runSections.filter((rs) => !rs.passed).map((rs) => rs.id);
-  const tooMuch = opts.counted && !opts.timingFail && runSections.length > 0 && !runOpensLevel(runSections.length, slipped.length);
+  const tooMuch = opts.counted && !opts.timingFail && runSections.length > 0
+    && !runOpensLevel({ level: lvl, sections: runSections.length, slipped: slipped.length, accuracy });
   const opened = opts.counted && !opts.timingFail && runSections.length > 0 && !tooMuch;
 
   let passed = false;
@@ -691,14 +702,15 @@ export function recordFullRun(
       sp.lastPassed = now;
       prog.sections[rs.id] = sp;
       for (const f of clearFix(full, rs.id, lvl - 1)) {
-        if (f.remaining === 0) reached = reachLevel(full, f.level, now);
+        if (f.remaining === 0 && f.open) reached = reachLevel(full, f.level, now);
       }
     }
     // This run's slips replace the fix list at its level: a section fixed since the last run stays
     // off only if it held again.
     full.toFix = { ...(full.toFix ?? {}) };
-    if (full.toFixLocks) delete full.toFixLocks[lvl];
-    if (slipped.length) full.toFix[lvl] = slipped;
+    full.toFixLocks = { ...(full.toFixLocks ?? {}) };
+    delete full.toFixLocks[lvl];
+    if (slipped.length) { full.toFix[lvl] = slipped; full.toFixLocks[lvl] = true; }
     else {
       delete full.toFix[lvl];
       reachLevel(full, lvl, now);
@@ -733,17 +745,24 @@ export function recordFullRun(
 /**
  * Bring a piece's progress saved under the earlier level rules up to date (docs/LEVELS.md,
  * "Progress saved under the earlier rules"). Idempotent; never lowers a level. Returns true when it
- * changed something (and saved it).
+ * changed something (and saved it). Every grant needs a run that would open the level under the
+ * current rule (ladder.runOpensLevel: at most half of the sections slipped, within 10 points of the
+ * pass mark).
  *
  * - Clean-run stars: under the earlier rules a counted full run passed only when every section held,
  *   so each passed full run in the attempt log is a clean run at its level. Without a log entry (the
  *   log is trimmed, and isn't kept with a choir account), the piece level itself shows one: a clean
  *   run at that level, or at level 5 when the piece was passed off book.
+ * - Fix lists still open: earlier versions wrote one for every counted run, also a beginner's run
+ *   far above their level where everything slipped. A list counts only when its run would open the
+ *   level now: marked as held then (`toFixLocks`), or the latest counted run at that level in the log
+ *   came within 10 points of the mark and the list names at most half of the sections. Any other
+ *   list is dropped (practice, as that run would be now).
  * - Fix lists already done: the earlier rules asked for a second full run after the fixes. When the
- *   latest counted full run at N left a fix list, every section has passed N since (on its own or
- *   in that run), and the run came within 10 points of the pass mark (we can't tell how many
- *   sections slipped back then; a run that far off would most likely not open the level now), the
- *   piece reaches N.
+ *   latest counted full run at N (in the log) would open N now (within 10 points; the sections that
+ *   needed a pass of their own afterwards at most half), and every section has passed N since, on
+ *   its own or held within that run, the piece reaches N. A run that failed on timing credited no
+ *   section, so all of them needed a pass afterwards: it doesn't grant.
  */
 export function upgradeFullRuns(pieceId: string, partId: string, sections: Section[]): boolean {
   const prog = getProgress(pieceId, partId);
@@ -751,6 +770,7 @@ export function upgradeFullRuns(pieceId: string, partId: string, sections: Secti
   if (!prog || !full) return false;
   let changed = false;
   const log = attemptLog().filter((e) => e.pieceId === pieceId && e.partId === partId);
+  const lastRun = (n: number) => { const runs = log.filter((e) => e.sectionId === 'all' && e.level === n); return runs[runs.length - 1]; };
   if (!Array.isArray(full.clean)) {
     const stars = new Set<number>();
     for (const e of log) if (e.sectionId === 'all' && e.passed && e.level >= 1 && e.level <= MAX_LEVEL) stars.add(e.level);
@@ -759,21 +779,38 @@ export function upgradeFullRuns(pieceId: string, partId: string, sections: Secti
     changed = true;
   }
   if (sections.length > 1) {
+    const ids = new Set(sections.map((x) => x.id));
+    // Stored fix lists: keep only those from a run that would open the level now.
+    for (const k of Object.keys(full.toFix ?? {}).map(Number)) {
+      const list = (full.toFix![k] ?? []).filter((id) => ids.has(id));
+      if (!list.length) continue; // another part's sections, or empty: leave alone
+      const run = lastRun(k);
+      const ok = list.length * 2 <= sections.length && (full.toFixLocks?.[k] === true
+        || (!!run && !run.passed && runOpensLevel({ level: k, sections: sections.length, slipped: list.length, accuracy: run.accuracy })));
+      if (ok && full.toFixLocks?.[k] === true) continue;
+      if (ok) full.toFixLocks = { ...(full.toFixLocks ?? {}), [k]: true };
+      else {
+        delete full.toFix![k];
+        if (full.toFixLocks) delete full.toFixLocks[k];
+      }
+      changed = true;
+    }
+    if (full.toFix && !Object.keys(full.toFix).length) delete full.toFix;
+    if (full.toFixLocks && !Object.keys(full.toFixLocks).length) delete full.toFixLocks;
     for (let n = 1; n <= MAX_LEVEL; n++) {
       if ((full.level ?? 0) >= (n === 5 ? 4 : n) || full.toFix?.[n]?.length) continue;
-      const runs = log.filter((e) => e.sectionId === 'all' && e.level === n);
-      const run = runs[runs.length - 1];
-      if (!run || run.passed || full.best?.[n] == null || run.accuracy < levelSpec(n).pass - 0.1) continue;
-      // When each section passed level n after (or held within) that run.
+      const run = lastRun(n);
+      if (!run || run.passed || full.best?.[n] == null) continue;
+      // When each section passed level n after that run (fixed), or held within it (credited then).
       let doneAt = run.at;
+      let fixedAfter = 0;
       const ok = sections.every((sec) => {
         const sp = prog.sections[sec.id];
         const pass = log.find((e) => e.sectionId === sec.id && e.passed && e.level >= n && e.at > run.at);
-        if (pass) { doneAt = Math.max(doneAt, pass.at); return true; }
-        // Held within the run (credited then), or passed later with the entry no longer in the log.
+        if (pass) { doneAt = Math.max(doneAt, pass.at); fixedAfter++; return true; }
         return !!sp && sp.level >= Math.min(n, 4) && (sp.lastPassed ?? 0) >= run.at;
       });
-      if (!ok) continue;
+      if (!ok || !runOpensLevel({ level: n, sections: sections.length, slipped: fixedAfter, accuracy: run.accuracy })) continue;
       reachLevel(full, n, doneAt);
       changed = true;
     }

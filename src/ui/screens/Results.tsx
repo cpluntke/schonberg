@@ -234,7 +234,7 @@ export function Results() {
             {everyNote
               ? 'At level 1 every note of every section must be right. Very short notes the app can’t judge reliably are let off unless clearly wrong.'
               : `Each section needs ${Math.round((spec?.pass ?? 0.8) * 100)}% within the run, like the run as a whole (short sections get one weak note of slack).`}
-            {' '}A run opens the level when at most half of the sections slip; then the ones that slipped are yours to fix on their own.
+            {' '}A run opens the level when at most half of the sections slip and it reaches {Math.round((spec?.pass ?? 0.8) * 100) - 10}% overall; then the ones that slipped are yours to fix on their own.
           </span>
         </div>
       )}
@@ -392,7 +392,7 @@ function FullRunBanner({ lr, full, label }: { lr: LR; full: NonNullable<LR['full
           : full.passed
             ? <><strong>Passed.</strong> The piece keeps level {full.newLevel}.{star}</>
             : full.tooMuch
-              ? <><strong>Too much slipped for this run to count</strong> ({slipped} of {full.sections.length} sections{everyNote ? ' had a note that wasn’t right' : ` were below ${need}%`}). A run opens the level when at most half of the sections slip. Practise the sections, then sing it all again.</>
+              ? <><strong>Too much slipped for this run to count</strong> ({slipped} of {full.sections.length} sections{everyNote ? ' had a note that wasn’t right' : ` were below ${need}%`}, {acc}% overall). A run opens the level when at most half of the sections slip and it reaches {need - 10}% overall. Practise the sections, then sing it all again.</>
               : fixes.length && !reaches
                 ? <><strong>The piece keeps level {full.prevLevel}.</strong> {list} slipped in this run: practise {fixes.length > 1 ? 'each one' : 'it'} at level {lr.level} on its own (marked below).</>
                 : fixes.length && everyNote

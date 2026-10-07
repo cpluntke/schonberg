@@ -404,6 +404,19 @@ describe('piece levels from full runs (docs/LEVELS.md)', () => {
     expect(prog.full?.toFix).toEqual({ 2: ['s0', 's1'] });
   });
 
+  it('a run far under the mark is practice even when at most half of the sections slipped', async () => {
+    const { recordFullRun } = await import('./store');
+    const miss8: G[] = Array(8).fill('miss');
+    // Two of four sections not sung at all: about 48% overall at level 2 (mark 80%, floor 70%).
+    const r = recordFullRun('p', 'S', 2, run([...good8, ...miss8, ...good8, ...miss8]), secs4, ns4, counted);
+    expect(r).toMatchObject({ opened: false, tooMuch: true, toFix: [] });
+    expect(getProgress('p', 'S')!.full?.toFix).toBeUndefined();
+    expect(getProgress('p', 'S')!.sections.s0).toBeUndefined();
+    // Two of four at half marks: 73%, within 10 points, opens.
+    expect(recordFullRun('p', 'S', 2, runOf(1, 3), secs4, ns4, counted)).toMatchObject({ opened: true, toFix: ['s1', 's3'] });
+    expect(getProgress('p', 'S')!.full?.toFixLocks).toEqual({ 2: true });
+  });
+
   it('a new run at the level replaces the open fix list with its own slips', async () => {
     const { recordFullRun } = await import('./store');
     recordFullRun('p', 'S', 2, runOf(1, 2), secs4, ns4, counted);
@@ -614,8 +627,9 @@ describe('progress saved under the earlier level rules (upgradeFullRuns)', () =>
     const sections = { s0: sec(3, T0), s1: sec(3, T0 + DAY), s2: sec(3, T0), s3: sec(3, T0) };
     store({ sections, full: { level: 1, best: { 1: 0.9, 3: 0.84 }, attempts: 2, lastPracticed: T0, toFix: { 3: ['s2'] }, clean: [1] } },
       [entry('all', 3, T0, false, 0.84)]);
+    expect(upgradeFullRuns('p', 'S', secs)).toBe(true); // the list is checked and marked open
+    expect(getProgress('p', 'S')!.full).toMatchObject({ level: 1, toFix: { 3: ['s2'] }, toFixLocks: { 3: true } });
     expect(upgradeFullRuns('p', 'S', secs)).toBe(false);
-    expect(getProgress('p', 'S')!.full?.level).toBe(1);
     // That list is open under the new rules: fixing s2 now grants level 3.
     expect(recordAttempt('p', 'S', 's2', 3, res(0.9), 10, T0 + 2 * DAY).reached).toMatchObject({ level: 3, newLevel: 3 });
     // A run 30 points under the mark (most of it slipped back then): no level from it.
@@ -628,6 +642,42 @@ describe('progress saved under the earlier level rules (upgradeFullRuns)', () =>
     store({ sections, full: { level: 4, best: { 2: 0.82, 4: 0.9 }, attempts: 3, lastPracticed: T0 } }, [entry('all', 4, T0 - DAY, true), entry('all', 2, T0, false)]);
     upgradeFullRuns('p', 'S', secs);
     expect(getProgress('p', 'S')!.full).toMatchObject({ level: 4, clean: [4] });
+  });
+
+  it('a stale list from a run that would not open the level is dropped and never grants it', async () => {
+    const { upgradeFullRuns } = await import('./store');
+    const { pieceReadiness, nextStep } = await import('./ladder');
+    // Piece level 1; an old level-4 run at 40% where all four sections slipped (no lock).
+    const sections = { s0: sec(1, T0 - DAY), s1: sec(1, T0 - DAY), s2: sec(1, T0 - DAY), s3: sec(1, T0 - DAY) };
+    const full = { level: 1, best: { 1: 0.9, 4: 0.4 }, attempts: 2, lastPracticed: T0, toFix: { 4: ['s0', 's1', 's2', 's3'] }, clean: [1] };
+    store({ sections, full }, [entry('all', 1, T0 - DAY, true), entry('all', 4, T0, false, 0.4)]);
+    // Before any upgrade: passing all four at level 4 on their own shrinks the list but grants nothing.
+    for (const id of ['s0', 's1', 's2', 's3']) expect(recordAttempt('p', 'S', id, 4, res(0.9), 10, T0 + DAY).reached).toBeUndefined();
+    expect(getProgress('p', 'S')!.full?.level).toBe(1);
+    // The upgrade drops such a list outright.
+    localStorage.clear(); _resetAllForTests();
+    store({ sections, full }, [entry('all', 1, T0 - DAY, true), entry('all', 4, T0, false, 0.4)]);
+    expect(upgradeFullRuns('p', 'S', secs)).toBe(true);
+    expect(getProgress('p', 'S')!.full?.toFix).toBeUndefined();
+    // Two of four listed but the run was 40%: dropped too; one of four with a run at 78%: kept, open.
+    localStorage.clear(); _resetAllForTests();
+    store({ sections, full: { ...full, best: { 4: 0.78 }, toFix: { 4: ['s1'], 3: ['s0', 's2'] } } },
+      [entry('all', 3, T0 - DAY, false, 0.4), entry('all', 4, T0, false, 0.78)]);
+    upgradeFullRuns('p', 'S', secs);
+    const p = getProgress('p', 'S')!;
+    expect(p.full).toMatchObject({ toFix: { 4: ['s1'] }, toFixLocks: { 4: true } });
+    expect(pieceReadiness(secs, p).toFix).toEqual([{ level: 4, sectionIds: ['s1'] }]);
+    expect(nextStep(secs, p)).toMatchObject({ sectionId: 's1', level: 4, kind: 'fix' });
+  });
+
+  it('a done list from a run that failed on timing (no section credited) grants nothing', async () => {
+    const { upgradeFullRuns } = await import('./store');
+    // Level-3 run at 92% that failed on timing: nothing credited, no list. Later every section passed level 3 on its own.
+    const sections = { s0: sec(3, T0 + DAY), s1: sec(3, T0 + DAY), s2: sec(3, T0 + DAY), s3: sec(3, T0 + DAY) };
+    store({ sections, full: { level: 1, best: { 3: 0.92 }, attempts: 1, lastPracticed: T0, clean: [] } },
+      [entry('all', 3, T0, false, 0.92), ...['s0', 's1', 's2', 's3'].map((id) => entry(id, 3, T0 + DAY, true, 0.9))]);
+    upgradeFullRuns('p', 'S', secs);
+    expect(getProgress('p', 'S')!.full?.level).toBe(1);
   });
 
   it('clean-run stars from the history, or from the piece level when the log has none', async () => {

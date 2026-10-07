@@ -81,7 +81,7 @@ describe('ladder', () => {
     expect(nextStep(one, prog([3]), NOW)).toMatchObject({ sectionId: 's0', level: 4, kind: 'section' });
   });
   it('open fix lists come first in Next up: fixing them reaches the level', () => {
-    const p = withFull(prog([3, 2, 3, 2]), { level: 2, toFix: { 3: ['s3', 's1'] } });
+    const p = withFull(prog([3, 2, 3, 2]), { level: 2, toFix: { 3: ['s3', 's1'] }, toFixLocks: { 3: true } });
     expect(fixesBefore(secs, p, 3)).toEqual(['s1', 's3']);
     expect(fixesBefore(secs, p, 4)).toEqual([]);
     expect(pieceReadiness(secs, p).toFix).toEqual([{ level: 3, sectionIds: ['s1', 's3'] }]);
@@ -89,24 +89,32 @@ describe('ladder', () => {
     expect(n).toMatchObject({ sectionId: 's1', level: 3, kind: 'fix' });
     expect(n.reason).toBe('Fix Bars 5–8 at level 3 to reach level 3. 1 more to fix after this one.');
     // Level 1: the notes.
-    const l1 = withFull(prog([1, 0, 1, 1]), { toFix: { 1: ['s1'] } });
+    const l1 = withFull(prog([1, 0, 1, 1]), { toFix: { 1: ['s1'] }, toFixLocks: { 1: true } });
+    // A list not from a run that opened its level (saved by an earlier version, unchecked) doesn't count.
+    expect(pieceReadiness(secs, withFull(prog([1, 0, 1, 1]), { toFix: { 1: ['s1'] } })).toFix).toEqual([]);
     expect(nextStep(secs, l1, NOW)!.reason).toBe('Fix Bars 5–8 at level 1 to reach level 1.');
     // Ids of other parts' sections are ignored.
     expect(fixesBefore(secs, withFull(prog([1, 1, 1, 1]), { toFix: { 2: ['x9'] } }), 2)).toEqual([]);
   });
-  it('runOpensLevel: at most half of the sections may slip; older lists naming more are ignored', () => {
-    expect(runOpensLevel(4, 0)).toBe(true);
-    expect(runOpensLevel(4, 2)).toBe(true);
-    expect(runOpensLevel(4, 3)).toBe(false);
-    expect(runOpensLevel(3, 1)).toBe(true);
-    expect(runOpensLevel(3, 2)).toBe(false);
-    expect(runOpensLevel(2, 1)).toBe(true);
-    expect(runOpensLevel(0, 0)).toBe(false);
-    // A list saved under the earlier rules (a beginner's run where everything slipped) is not an open list.
-    const p = withFull(prog([0, 0, 0, 0]), { level: 0, toFix: { 3: ['s0', 's1', 's2', 's3'], 5: ['s0', 's1'] } });
+  it('runOpensLevel: at most half of the sections slipped and within 10 points of the mark', () => {
+    const o = (sections: number, slipped: number, accuracy = 0.8, level = 3) => runOpensLevel({ level, sections, slipped, accuracy });
+    expect(o(4, 0)).toBe(true);
+    expect(o(4, 2)).toBe(true);
+    expect(o(4, 3)).toBe(false);
+    expect(o(3, 1)).toBe(true);
+    expect(o(3, 2)).toBe(false);
+    expect(o(2, 1)).toBe(true);
+    expect(o(0, 0)).toBe(false);
+    // The floor: the pass mark minus 10 points (level 3: 70%; level 1: 65%; level 4: 75%).
+    expect(o(4, 1, 0.7)).toBe(true);
+    expect(o(4, 1, 0.69)).toBe(false);
+    expect(o(4, 2, 0.48, 2)).toBe(false); // two of four not sung at all
+    expect(o(4, 1, 0.66, 1)).toBe(true);
+    expect(o(4, 1, 0.74, 4)).toBe(false);
+    // A list naming more than half the sections never counts, marked or not.
+    const p = withFull(prog([0, 0, 0, 0]), { level: 0, toFix: { 3: ['s0', 's1', 's2', 's3'], 5: ['s0', 's1'] }, toFixLocks: { 3: true, 5: true } });
     expect(fixesBefore(secs, p, 3)).toEqual([]);
     expect(pieceReadiness(secs, p).toFix).toEqual([{ level: 5, sectionIds: ['s0', 's1'] }]);
-    expect(nextStep(secs, p, NOW)).toMatchObject({ sectionId: 's0', level: 5, kind: 'fix' });
     // Stars by level.
     expect(pieceReadiness(secs, withFull(prog([2, 2, 2, 2]), { level: 2, clean: [2, 1, 9] })).clean).toEqual([1, 2]);
   });

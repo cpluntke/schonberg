@@ -97,14 +97,15 @@ For every level N = 1…5 (`store.recordFullRun`, `store.recordAttempt`):
 4. **The piece reaches level N as soon as every section that slipped in that run has passed level N
    on its own** (or above). No second full run: the last fix grants the level, and Results says
    “Fixed! Piece level N reached”. If nothing slipped, the piece reaches level N at once.
-5. **Too much slipped: practice.** A run in which **more than half of the sections slipped** does
-   not open the level (`ladder.runOpensLevel`: at most half may slip; two of four opens, three of
-   four doesn't; one of three opens, two of three don't). It's practice: nothing is credited and no
-   fix list changes, and Results says “Too much slipped for this run to count. Practise the
+5. **Too much slipped: practice.** A run opens the level only when **at most half of the sections
+   slipped** and **its overall accuracy came within 10 points of the level's pass mark**
+   (`ladder.runOpensLevel`, `OPEN_MARGIN`: level 1 from 65%, levels 2–3 from 70%, levels 4–5 from
+   75%). Two of four slipping opens, three of four doesn't; one of three opens, two of three don't;
+   two of four not sung at all (about 48%) doesn't. Otherwise it's practice: nothing is credited and
+   no fix list changes, and Results says “Too much slipped for this run to count. Practise the
    sections, then sing it all again.” This keeps the full run a real test of the piece, not a
-   formality that turns the whole piece into a list of sections. (It replaces the earlier
-   “the run held” heuristics, which also looked at the overall score and at section levels before
-   the run: one simple rule instead.)
+   formality that turns the whole piece into a list of sections. (The 10-point floor is the earlier
+   rules' own “nearly held” test; the earlier check of section levels before the run is gone.)
 
 ### The clean-run star
 
@@ -193,19 +194,28 @@ passed on its own the singer had to sing the whole piece again. Nothing stored i
 app upgrades on load (`store.upgradeFullRuns`, run for every piece when the library is ready and
 again after progress changes, e.g. pulled from another phone):
 
+- **Every grant needs a run that would open the level now** (at most half slipped, within 10
+  points of the mark). A fix list counts (is shown, leads Next up, grants its level when done) only
+  when it comes from such a run: `FullRunProgress.toFixLocks[N]` marks it. This version sets the
+  mark on every list it writes; earlier versions set it only for a run that “held”, a stricter test.
+- **Fix lists still open** saved without the mark are checked once: kept (and marked) when the latest
+  counted run at that level in the attempt log came within 10 points of the mark and the list names
+  at most half of the sections; otherwise **dropped**. Earlier versions wrote a list for every counted
+  run, also a beginner's run far above their level where everything slipped; such a list shrank as
+  sections passed, and must never grant the level. An unmarked list is never granted from, even
+  before the check runs.
 - **Fix lists already done.** When the latest counted full run at N (in the attempt log) left a fix
-  list, every section has passed N since (on its own, or held within that run), and that run came
-  within 10 points of the pass mark, the piece reaches N. (We can't tell from stored data how many
-  sections slipped then; the 10-point margin is the earlier rules' own “nearly held” test, so a run
-  that slipped almost everywhere doesn't grant a level now.)
-- **Fix lists still open** become open lists under the new rule: fix the rest and the piece reaches
-  the level. A stored list that still names more than half of the sections is ignored (that run
-  wouldn't open the level now); the obsolete `toFixLocks` marks are ignored.
+  list that is done, the piece reaches N if that run would open N now: within 10 points of the mark,
+  and the sections that needed a pass of their own afterwards (rather than holding within the run)
+  at most half; and every section has passed N since, on its own or held within that run. (We can't
+  tell from stored data exactly how many sections slipped then, so this errs on the strict side.) A
+  run that failed on timing credited no section, so every section needed its own pass afterwards:
+  it grants nothing.
 - **Clean-run stars from history.** Under the earlier rules a counted full run passed only when
   every section held, so each passed full run in the attempt log is a clean run at its level. When
   the log has none for the piece (it is trimmed, and isn't kept with a choir account), the piece
   level is: a star at that level, or at level 5 if the piece was passed off book. A record written
   by this version always has `clean` (possibly empty), so this runs once.
-- Fix lists from the other phone: when merging, a list whose remaining sections were passed on the
-  other phone reaches its level (`sync.mergeFull`), and stars are united.
+- Fix lists from the other phone: when merging, a marked list whose remaining sections were passed
+  on the other phone reaches its level (`sync.mergeFull`), and stars are united.
 

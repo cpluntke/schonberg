@@ -199,19 +199,25 @@ export function pieceLevel(sections: Section[], prog: PieceProgress | undefined)
   return full;
 }
 
+/** How far under the level's pass mark a run's overall accuracy may be and still open the level. */
+export const OPEN_MARGIN = 0.1;
+
 /**
- * A counted full run of `sections` sections in which `slipped` of them slipped opens its level when
- * at most half of them slipped (docs/LEVELS.md). More than that, and the run is practice: the fix
- * list would be most of the piece, which is the sections again, not a run that nearly held.
+ * Whether a counted full run opens its level (docs/LEVELS.md): at most half of its `sections`
+ * slipped, AND its overall accuracy came within OPEN_MARGIN (10 points) of the level's pass mark.
+ * Otherwise the run is practice: the fix list would be most of the piece, or the run as a whole was
+ * far off (e.g. two of four sections not sung at all), which is the sections again, not a run that
+ * nearly held.
  */
-export function runOpensLevel(sections: number, slipped: number): boolean {
-  return sections > 0 && slipped * 2 <= sections;
+export function runOpensLevel(o: { level: number; sections: number; slipped: number; accuracy: number }): boolean {
+  const acc = Number.isFinite(o.accuracy) ? o.accuracy : 0;
+  return o.sections > 0 && o.slipped * 2 <= o.sections && acc >= levelSpec(o.level).pass - OPEN_MARGIN - 1e-9;
 }
 
 /**
- * Open fix lists per level (only sections of this part), lowest level first. A list naming more
- * than half the sections is ignored: that run wouldn't open the level (runOpensLevel). New lists
- * never do; lists saved under the earlier rules might.
+ * Open fix lists per level (only sections of this part), lowest level first. Only lists from a run
+ * that opened the level count (FullRunProgress.toFixLocks; store.upgradeFullRuns checks lists saved
+ * by earlier versions), and never one naming more than half the sections.
  */
 export function pendingFixes(sections: Section[], prog: PieceProgress | undefined): { level: number; sectionIds: string[] }[] {
   const tf = prog?.full?.toFix;
@@ -220,7 +226,7 @@ export function pendingFixes(sections: Section[], prog: PieceProgress | undefine
   const out: { level: number; sectionIds: string[] }[] = [];
   for (const k of Object.keys(tf).map(Number).filter((l) => l >= 1 && l <= MAX_LEVEL).sort((a, b) => a - b)) {
     const ids = order.filter((id) => (tf[k] ?? []).includes(id));
-    if (!ids.length || !runOpensLevel(sections.length, ids.length)) continue;
+    if (!ids.length || ids.length * 2 > sections.length || prog?.full?.toFixLocks?.[k] !== true) continue;
     out.push({ level: k, sectionIds: ids });
   }
   return out;

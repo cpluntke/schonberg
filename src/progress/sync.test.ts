@@ -70,7 +70,7 @@ describe('merging never downgrades', () => {
   });
 
   it('a fix list finished on the other phone reaches its level; clean-run stars are united', () => {
-    const run: FullRunProgress = { level: 1, best: {}, attempts: 2, lastPracticed: T + DAY, toFix: { 2: ['a'] }, clean: [1] };
+    const run: FullRunProgress = { level: 1, best: {}, attempts: 2, lastPracticed: T + DAY, toFix: { 2: ['a'] }, toFixLocks: { 2: true }, clean: [1] };
     const other: FullRunProgress = { level: 1, best: {}, attempts: 2, lastPracticed: T, clean: [3] };
     const sections = { a: sec({ level: 2, lastPassed: T + 2 * DAY }) };
     const m = mergeFull(other, run, sections)!;

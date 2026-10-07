@@ -622,7 +622,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
                   Sing the whole piece in one go. Every section is scored{' '}
                   {levelInfo?.everyNote ? '(every note must be right).' : `(each needs ${Math.round((levelInfo?.pass ?? 0.8) * 100)}%).`}{' '}
                   All of them right: level {level} is yours at once, with a clean-run ★. A few slipped: fix just those
-                  afterwards and the level is yours. More than half slipped: it’s practice. Stopping or pausing makes it a practice run too.
+                  afterwards and the level is yours. More than half slipped, or the run under {Math.round((levelInfo?.pass ?? 0.8) * 100) - 10}% overall: it’s practice. Stopping or pausing makes it a practice run too.
                 </span>
               )}
               {isFullRun && fullFixes.length > 0 && (

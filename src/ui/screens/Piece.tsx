@@ -154,7 +154,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
               <span className="small muted" data-testid="levels-help-piece">
                 <strong>The whole piece:</strong> sing it all through at a level, in one go. Sections that slip are to fix on
                 their own: once each passes, the piece reaches the level, with no need to sing it all again. More than half
-                slipped: that run is practice. Every section right first time: a clean-run ★.
+                slipped, or the run more than 10 points under the level's mark: that run is practice. Every section right first time: a clean-run ★.
               </span>
             )}
             {LEVELS.map((l) => (

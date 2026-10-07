@@ -40,7 +40,7 @@ target, movable/fixed solfège and Chinese numbered notation (jianpu), and an at
   Support is removed step by step: tempo, your part playing along, note names, and the
   starting pitch. Section levels are practice steps: a **piece** reaches a level when you sing
   it all through at that level in one go and then fix, on its own, any section that slipped (more
-  than half slipped = practice). Every section right first time earns a clean-run star (docs/LEVELS.md).
+  than half slipped, or a run far under the mark, = practice). Every section right first time earns a clean-run star (docs/LEVELS.md).
   Rehearsal-ready = piece level 3, concert-ready = 4, memorised = 5 on two days. Reviews come back after 7 days.
 - **Practice mode (2D):** piano-roll highway, live pitch trace, cents readout, other voices as
   ghosts, lyrics, per-voice mixer, slow tempo for level 1.
