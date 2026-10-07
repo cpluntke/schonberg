@@ -125,9 +125,21 @@ export function cachedChoir(): ChoirInfo | null {
 export async function joinChoir(code: string): Promise<ChoirInfo> {
   const info = await fetchChoir(code);
   const p = loadProfile();
-  saveProfile({ ...p, choirCode: info.code, leaderboardOptIn: true });
+  saveProfile({ ...p, choirCode: info.code, leaderboardOptIn: true, shareProgress: true });
   writeJSON(CACHE, info);
   return info;
+}
+
+/**
+ * Sharing progress with the section lead is part of being in a choir, like the leaderboard (no
+ * opt-out). Once per phone: a member who joined while it was optional starts sharing. Later, only a
+ * removed or deleted account turns it off (endSession), and that stays.
+ */
+export function ensureChoirSharing(): void {
+  if (rawGet('schonberg:shareMandatory')) return;
+  const p = loadProfile();
+  if (p.choirCode && !p.shareProgress) saveProfile({ ...p, shareProgress: true });
+  rawSet('schonberg:shareMandatory', '1');
 }
 
 export function leaveChoir(): void {

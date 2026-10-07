@@ -5,7 +5,7 @@ import {
   LOGGED_OUT_ELSEWHERE, refreshSession, refreshSessionSoon, rememberedInvite, saveSession, sessionFor, superCreate, type Session,
   signUp, shareProgress, deleteMyAccount, lastLogout, dismissLogout, syncChoir, choirPieceId, localPieceId, fetchLibrary, addLibraryPiece,
   superLogin, superLogout, loadSuperSession, superAuth, superList, superLoggedOutNotice, refreshSuperSession, refreshSuperSessionSoon,
-  _resetSuperStateForTests, staffRoles, onSessionChange,
+  _resetSuperStateForTests, staffRoles, onSessionChange, joinChoir, ensureChoirSharing,
 } from './choir';
 import { buildSnapshot } from './sync';
 import { fetchMetrics } from './insights';
@@ -244,6 +244,22 @@ describe('choir accounts client', () => {
 describe('choir library pieces', () => {
   const info = (pieces: unknown[], cycle: unknown = null) => ({
     code: 'kammerchor', name: 'Kammerchor', cycle, pieces, updatedAt: 5, cycleUpdatedAt: 5, leads: [],
+  });
+
+  it('joining a choir shares progress with the section lead (no opt-out)', async () => {
+    mockFetch(() => ({ body: info([], null) }));
+    await joinChoir('kammerchor');
+    expect(loadProfile()).toMatchObject({ choirCode: 'kammerchor', shareProgress: true, leaderboardOptIn: true });
+  });
+
+  it('members who joined while sharing was optional start sharing, once; a later removal stays off', () => {
+    saveProfile({ ...loadProfile(), choirCode: 'kammerchor', shareProgress: false });
+    ensureChoirSharing();
+    expect(loadProfile().shareProgress).toBe(true);
+    // Removed from the choir later (endSession turns sharing off): the migration doesn't undo that.
+    saveProfile({ ...loadProfile(), shareProgress: false });
+    ensureChoirSharing();
+    expect(loadProfile().shareProgress).toBe(false);
   });
 
   it('a library piece keeps its library id on the phone (so earlier progress comes back); an upload gets the choir id', async () => {

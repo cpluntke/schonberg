@@ -8,7 +8,7 @@ three things that are the singer's own choice. Settings → Privacy shows a shor
 
 - **Everyone in the choir** (anyone with the choir code): your first name, voice part and readiness for
   each programme piece, with your streak and weekly points, on the choir's leaderboard.
-- **Your section lead and the choir admins**, if you share progress: your voice range, by name. Per-bar
+- **Your section lead and the choir admins** (every choir member shares): your voice range, by name. Per-bar
   detail (hardest bars, level spread, ready counts, trends) only as totals for the section.
 - **In a small section** (three or four singers sharing), a lead who knows who practised what may still
   be able to work out one singer's detail from the totals, or from how they change after that singer
@@ -62,7 +62,7 @@ Purpose: to see how the app is used and where it fails, so it can be improved.
 - **Who sees it**: only the super admin (Admin → Usage), as charts and a CSV of
   daily totals.
 
-## 2. Sharing progress with the choir (off by default, switch in Settings → Your choir)
+## 2. Sharing progress with the choir (part of joining a choir, like the leaderboard; no switch)
 
 - **Sent** after runs (at most once a minute): the singer's name (or account name), voice part, per
   programme piece the readiness, the piece level and how each bar is going, and the voice range from

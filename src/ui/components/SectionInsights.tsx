@@ -133,7 +133,7 @@ export function SectionInsights({ view }: { view: SectionInsightsView }) {
       </div>
       <div className="card" data-testid="section-ranges">
         <strong>Voices in your section</strong>
-        <span className="small muted">Each singer's range from their range check, highest first, for divisi decisions. Singers agreed to show it when they switched on sharing.</span>
+        <span className="small muted">Each singer's range from their range check, highest first, for divisi decisions. Sharing it is part of being in the choir; singers are told when they join.</span>
         <RangeChart ranges={view.ranges} voice={view.voice} part={partRange} label={`${VOICE_NAME[view.voice] ?? view.voice}: voice ranges`} />
       </div>
       {ids.map((id) => <PieceCard key={id} id={id} agg={view.pieces[id]} voice={view.voice} minGroup={view.minGroup} />)}

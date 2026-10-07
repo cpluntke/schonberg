@@ -1,4 +1,4 @@
-// Opt-in: send my per-bar progress on this cycle's pieces to my choir, where my section lead sees
+// Part of being in a choir (no opt-out, like the leaderboard): send my per-bar progress on this cycle's pieces to my choir, where my section lead sees
 // what's hard for the section (aggregated, never by name), plus my voice range
 // (by name, for divisi). Called after each run (debounced) and when sharing is switched on.
 
