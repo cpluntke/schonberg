@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { getPiece, useLibrary } from '../library';
-import { back, go } from '../router';
+import { go, leaveTo, practiceParent, type Route } from '../router';
+import { PracticeBar } from '../components/PracticeBar';
 import { useProfile } from '../hooks';
-import { IconBack } from '../icons';
 import { buildMemoryMap, type MapEntry, type MapSection } from '../../game/memorymap';
 import { nameKeysOf, nameKeysSig } from '../../progress/keymarks';
 import { track } from '../../progress/metrics';
@@ -42,7 +42,8 @@ const CSS = `
   }
   html, body, #root, .app { background: #fff !important; color: #000 !important; }
   .app { max-width: none !important; padding: 0 !important; }
-  nav.nav, .nav, .toast, .mm-noprint { display: none !important; }
+  nav.nav, .nav, .toast, .mm-noprint, .mm-top .icon-btn { display: none !important; }
+  .screen > .practice-bar.mm-top { position: static; margin: 0; padding: 0; border: none; box-shadow: none; }
   .screen.mm { padding: 0 !important; gap: 8px; }
   .mm .card { background: #fff !important; border: 1px solid #999 !important; border-radius: 6px; padding: 8px 10px; gap: 6px; break-inside: avoid; page-break-inside: avoid; }
   .mm .mm-tag { border: 1px solid #999; background: #fff !important; color: #000 !important; }
@@ -52,18 +53,11 @@ const CSS = `
 }
 `;
 
-function Shell({ title, sub, onBack, actions, children }: { title: string; sub?: string; onBack: () => void; actions?: React.ReactNode; children: React.ReactNode }) {
+function Shell({ title, sub, up, actions, children }: { title: string; sub?: string; up: Route; actions?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <main className="screen mm">
+    <main className="screen practice mm">
       <style>{CSS}</style>
-      <div className="topbar">
-        <button className="icon-btn mm-noprint" aria-label="Back to the piece" onClick={onBack}><IconBack /></button>
-        <div className="grow col" style={{ gap: 0 }}>
-          <h1 className="ellipsis" style={{ margin: 0, fontSize: 22 }}>{title}</h1>
-          {sub && <span className="small muted ellipsis">{sub}</span>}
-        </div>
-        {actions}
-      </div>
+      <PracticeBar up={up} heading title={title} sub={sub} className="mm-top" extra={actions} />
       {children}
     </main>
   );
@@ -141,20 +135,21 @@ export function MemoryMap({ pieceId, partId }: { pieceId: string; partId: string
     // (the key marks: a sync or an admin's change re-builds the map)
     [piece, partId, profile.notation, piece ? nameKeysSig(piece.score) : ''],
   );
-  const goBack = () => back({ name: 'piece', pieceId });
+  const up: Route = practiceParent({ name: 'memorymap', pieceId, partId }) ?? { name: 'home' };
+  const goBack = () => leaveTo(up);
 
   if (!piece) {
-    if (!lib.ready) return <Shell title="Memory map" onBack={goBack}><p className="muted" role="status">Loading the piece…</p></Shell>;
-    return <Shell title="Not found" onBack={goBack}><p className="muted">{missingText(pieceId, 'piece')}</p>
-      <button className="btn primary block" onClick={() => go({ name: 'home' }, true)}>Home</button></Shell>;
+    if (!lib.ready) return <Shell title="Memory map" up={up}><p className="muted" role="status">Loading the piece…</p></Shell>;
+    return <Shell title="Not found" up={up}><p className="muted">{missingText(pieceId, 'piece')}</p>
+      <button className="btn primary block" onClick={() => leaveTo({ name: 'home' })}>Home</button></Shell>;
   }
   if (!map || !map.sections.length) {
-    return <Shell title="Memory map" sub={piece.title} onBack={goBack}><p className="muted">This part has no notes to map. Go back and pick your part again.</p></Shell>;
+    return <Shell title={piece.title} sub="Memory map" up={up}><p className="muted">This part has no notes to map. Go back and pick your part again.</p></Shell>;
   }
 
-  const sub = `${piece.title} · ${map.partName}`;
+  const sub = `${map.partName} · Memory map`;
   return (
-    <Shell title="Memory map" sub={sub} onBack={goBack}
+    <Shell title={piece.title} sub={sub} up={up}
       actions={<button className="btn small mm-noprint" onClick={() => window.print()}>Print</button>}>
       <div className="card" style={{ gap: 8 }}>
         <span className="eyebrow">{piece.composer ? `${piece.composer} · ` : ''}{map.partName}</span>

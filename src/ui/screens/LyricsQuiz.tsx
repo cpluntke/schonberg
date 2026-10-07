@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { getPiece, useLibrary } from '../library';
-import { back, go } from '../router';
-import { IconBack, IconCheck, IconRestart } from '../icons';
+import { go, leaveTo, practiceParent, type Route } from '../router';
+import { PracticeBar } from '../components/PracticeBar';
+import { IconCheck, IconRestart } from '../icons';
 import { track } from '../../progress/metrics';
 import { missingText } from '../components/NotFound';
 import {
@@ -37,17 +38,11 @@ const CSS = `
 .lq-miss .txt { overflow-wrap: anywhere; }
 `;
 
-function Shell({ title, sub, onBack, children }: { title: string; sub?: string; onBack: () => void; children: React.ReactNode }) {
+function Shell({ title, sub, up, children }: { title: string; sub?: string; up: Route; children: React.ReactNode }) {
   return (
-    <main className="screen">
+    <main className="screen practice">
       <style>{CSS}</style>
-      <div className="topbar">
-        <button className="icon-btn" aria-label="Back to the piece" onClick={onBack}><IconBack /></button>
-        <div className="grow col" style={{ gap: 0 }}>
-          <h1 className="ellipsis" style={{ margin: 0, fontSize: 22 }}>{title}</h1>
-          {sub && <span className="small muted ellipsis">{sub}</span>}
-        </div>
-      </div>
+      <PracticeBar up={up} heading title={title} sub={sub} />
       {children}
     </main>
   );
@@ -71,7 +66,8 @@ export function LyricsQuiz({ pieceId, partId }: { pieceId: string; partId: strin
   const done = questions.length > 0 && idx >= questions.length;
   const q = questions[idx];
 
-  const goBack = () => back({ name: 'piece', pieceId });
+  const up: Route = practiceParent({ name: 'lyrics', pieceId, partId }) ?? { name: 'home' };
+  const goBack = () => leaveTo(up);
   const next = () => {
     setPicked(null);
     setIdx((i) => i + 1);
@@ -95,17 +91,17 @@ export function LyricsQuiz({ pieceId, partId }: { pieceId: string; partId: strin
   }, [done]);
 
   if (!piece) {
-    if (!lib.ready) return <Shell title="Lyrics quiz" onBack={goBack}><p className="muted" role="status">Loading the piece…</p></Shell>;
-    return <Shell title="Not found" onBack={goBack}><p className="muted">{missingText(pieceId, 'piece')}</p>
-      <button className="btn primary block" onClick={() => go({ name: 'home' }, true)}>Home</button></Shell>;
+    if (!lib.ready) return <Shell title="Lyrics quiz" up={up}><p className="muted" role="status">Loading the piece…</p></Shell>;
+    return <Shell title="Not found" up={up}><p className="muted">{missingText(pieceId, 'piece')}</p>
+      <button className="btn primary block" onClick={() => leaveTo({ name: 'home' })}>Home</button></Shell>;
   }
-  const sub = `${piece.title}${part ? ` · ${part.name}` : ''}`;
+  const sub = `${part ? `${part.name} · ` : ''}Lyrics quiz`;
   if (!part) {
-    return <Shell title="Lyrics quiz" sub={piece.title} onBack={goBack}><p className="muted">This part isn't in the piece. Go back and pick your part again.</p></Shell>;
+    return <Shell title={piece.title} sub="Lyrics quiz" up={up}><p className="muted">This part isn't in the piece. Go back and pick your part again.</p></Shell>;
   }
   if (!hasLyrics(lines)) {
     return (
-      <Shell title="Lyrics quiz" sub={sub} onBack={goBack}>
+      <Shell title={piece.title} sub={sub} up={up}>
         <div className="card">
           <strong style={{ fontSize: 18 }}>This part has no lyrics</strong>
           <span className="muted small">
@@ -121,7 +117,7 @@ export function LyricsQuiz({ pieceId, partId }: { pieceId: string; partId: strin
   if (!questions.length) {
     const distinct = [...new Map(lines.filter((l) => !l.vocalise).map((l) => [l.norm, l])).values()];
     return (
-      <Shell title="Lyrics quiz" sub={sub} onBack={goBack}>
+      <Shell title={piece.title} sub={sub} up={up}>
         <div className="card">
           <strong style={{ fontSize: 18 }}>Too little text for a quiz</strong>
           <span className="muted small">The whole text of this part is short enough to learn at a glance:</span>
@@ -139,7 +135,7 @@ export function LyricsQuiz({ pieceId, partId }: { pieceId: string; partId: strin
     const missed = [...new Map(results.filter((r) => !r.correct).map((r) => [r.q.lineKey, r.q])).values()].sort((a, b) => a.lineIndex - b.lineIndex);
     const best = loadQuizStats(pieceId, partId).bestScore;
     return (
-      <Shell title="Lyrics quiz" sub={sub} onBack={goBack}>
+      <Shell title={piece.title} sub={sub} up={up}>
         <div className="card" style={{ alignItems: 'flex-start' }}>
           <span className="eyebrow">Round complete</span>
           <div className="row" style={{ alignItems: 'baseline', gap: 8 }}>
@@ -192,7 +188,7 @@ export function LyricsQuiz({ pieceId, partId }: { pieceId: string; partId: strin
   })();
 
   return (
-    <Shell title="Lyrics quiz" sub={sub} onBack={goBack}>
+    <Shell title={piece.title} sub={sub} up={up}>
       <div className="col" style={{ gap: 6 }}>
         <div className="steps" aria-hidden="true">
           {questions.map((_, i) => <span key={i} className={i < idx ? 'done' : i === idx ? 'cur' : ''} />)}

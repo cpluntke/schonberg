@@ -6,7 +6,7 @@ import { useProfile, useStoreVersion } from '../hooks';
 import { go, back } from '../router';
 import { getProgress, dueForReview } from '../../progress/store';
 import { LEVELS, OFF_BOOK_DAYS, pieceReadiness, nextStep, sectionStatus, levelSpec, passLabel } from '../../progress/ladder';
-import { IconBack, IconEar, IconCube, IconPlay } from '../icons';
+import { IconBack, IconDown, IconEar, IconCube, IconPlay } from '../icons';
 import { voiceName } from './Home';
 import { PieceMap } from '../components/PieceMap';
 import { getBars } from '../../progress/bars';
@@ -98,7 +98,16 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
       )}
 
       <div className="col" style={{ gap: 8 }}>
-        <span className="eyebrow">Your part</span>
+        <div className="row between">
+          <span className="eyebrow">Your part</span>
+          {/* The section list is far down (after the readiness, the full run and the map). */}
+          {sections.length > 0 && (
+            <button className="linklike jump-link" data-testid="jump-sections"
+              onClick={() => document.getElementById('piece-sections')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+              Jump to sections <IconDown size={16} />
+            </button>
+          )}
+        </div>
         <div className="chips" role="group" aria-label="Part">
           {vocalParts.map((p) => (
             <button key={p.id} className="chip" aria-pressed={p.id === part?.id} onClick={() => pick(p.id)}>{p.name}</button>
@@ -249,7 +258,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
         </details>
       )}
 
-      <section className="ladder" aria-label="Sections">
+      <section className="ladder" aria-label="Sections" id="piece-sections" style={{ scrollMarginTop: 12 }}>
         <h2 style={{ marginBottom: 0 }}>Sections</h2>
         {multi && <span className="tiny muted" style={{ marginBottom: 4 }}>Practice steps: take the piece apart, then put it together in a full run.</span>}
         {sections.map((s) => {

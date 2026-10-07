@@ -5,24 +5,32 @@ import { STAGE_NAMES, WORDS_PASS, type WordsStage } from '../../game/textrhythm'
 import { toast } from '../hooks';
 import { getLastResult, lastRunPiece } from '../play/lastResult';
 import { getPiece, singableSections } from '../library';
-import { go } from '../router';
+import { go, leaveTo, practiceParent, type Route } from '../router';
 import { LEVELS, OFF_BOOK_DAYS, effectiveTolerance, fixesBefore, nextStep, noteVerdict, wrongNotes } from '../../progress/ladder';
 import { inputAdvice, type InputAdvice } from '../../audio/inputQuality';
 import { getProgress, loadProfile, saveProfile } from '../../progress/store';
 import { barRangeLabel } from '../../music/sections';
 import { noteFault } from '../play/noteFault';
-import { IconDown, IconUp, IconClock, IconLoop, IconStar, IconPlay, IconCube, IconEar, IconFlame } from '../icons';
+import { IconDown, IconUp, IconClock, IconLoop, IconStar, IconPlay, IconCube, IconEar, IconFlame, IconRestart, IconList } from '../icons';
 import { STUCK_AFTER, failsInARow, slowRate } from '../../progress/struggle';
 import type { Insight, NoteResult } from '../../game/types';
 import type { PieceInfo } from '../library';
 import { accountTipPending, dismissAccountTip } from '../../progress/sync';
 import { startPresence } from '../../progress/presence';
+import { PracticeBar } from '../components/PracticeBar';
 
-/** Start a run from Results; replace the history entry so "back" from the run doesn't land on stale results. */
+/** Start a run from Results: it takes Results' place in history (router: practice screens replace each other). */
 function goPlay(r: Parameters<typeof go>[0]) {
-  try { sessionStorage.setItem('sh:fromResults', '1'); } catch { /* storage blocked */ }
   go(r, true);
 }
+
+/** The page below a result: the piece (expert mode for its drills). */
+function upOf(pieceId: string): Route {
+  return practiceParent({ name: 'lyrics', pieceId, partId: '' }) ?? { name: 'home' };
+}
+
+/** One step in the sticky footer: the button and the line under it saying why. */
+interface Step { label: React.ReactNode; why?: React.ReactNode; onClick: () => void; testid?: string }
 
 /**
  * The letter from accuracy. At an every-note level (level 1) a run with a wrong note shows at most a
@@ -53,18 +61,18 @@ export function Results() {
     const lastId = lr?.pieceId ?? lastRunPiece();
     const lastPiece = lastId ? getPiece(lastId) : undefined;
     return (
-      <main className="screen" data-testid="no-results">
-        <h1 className="hero">No results to show</h1>
+      <main className="screen practice" data-testid="no-results">
+        <PracticeBar up={lastPiece ? upOf(lastPiece.id) : { name: 'home' }} heading title="No results to show" sub={lastPiece?.title} />
         <span className="small muted">
           {lastPiece ? 'The details of your last run are gone (the app was closed or reloaded), but your progress from it was saved.'
             : 'Sing a section and your results appear here.'}
         </span>
         {lastPiece && (
-          <button className="btn primary block" onClick={() => go({ name: 'piece', pieceId: lastPiece.id }, true)}>
+          <button className="btn primary block" onClick={() => leaveTo(upOf(lastPiece.id))}>
             Open {lastPiece.title}
           </button>
         )}
-        <button className={`btn block${lastPiece ? '' : ' primary'}`} onClick={() => go({ name: 'home' }, true)}>Home</button>
+        <button className={`btn block${lastPiece ? '' : ' primary'}`} onClick={() => leaveTo({ name: 'home' })}>Home</button>
       </main>
     );
   }
@@ -113,7 +121,8 @@ export function Results() {
   // Nor is a level-1 run with a wrong note.
   // Nor a level-1 run through the speaker (practice: "move on to the next level" would be wrong).
   const speakerRun = !!lr.speaker && !!lr.notCounted;
-  const insights = lr.timingFail != null || lr.timingUnsure != null || wrong.length > 0 || speakerRun ? r.insights.filter((i) => i.kind !== 'great') : r.insights;
+  const insights = (lr.timingFail != null || lr.timingUnsure != null || wrong.length > 0 || speakerRun ? r.insights.filter((i) => i.kind !== 'great') : r.insights)
+    .map((i) => (i.kind === 'great' ? { ...i, detail: onwardText(i.detail, lr.sectionId) } : i));
   // Microphone trouble: advice for what the input monitor found (through the speaker, the backing in
   // the mic explains the "distortion"), and at level 1 the notes let off because of it.
   const advice = inputAdvice(lr.inputQuality).filter((a) => !(lr.speaker && a.kind === 'distortion'));
@@ -133,14 +142,72 @@ export function Results() {
   const stuck = offerHelp && failsInARow(piece.id, lr.partId, lr.sectionId, lr.level) >= STUCK_AFTER;
   const slowLabel = `${lr.level === 1 ? 'Sing it slower' : 'Practise slowly'} (${Math.round(slowRate(lr.level) * 100)}%)`;
 
+  // The sticky footer: one next step (with why), then "Again" (or an easier level) and the piece.
+  const up = upOf(piece.id);
+  const toPiece = () => leaveTo(up);
+  const expertDrill = up.name === 'expert';
+  const nextLabel = (n: NonNullable<typeof next>) => `Next: ${n.sectionId === 'all' ? 'the whole piece' : n.kind === 'fix' ? `fix ${label(n.sectionId)}` : label(n.sectionId)}, level ${n.level}`;
+  const fixesLeft = nextFix ? fixesBefore(sections, prog, lr.level).length : 0;
+  const play = (sectionId: string, level: number, mode: '2d' | '3d' = '2d') => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId, level, mode });
+  let primary: Step & { repeats?: boolean };
+  if (lr.slow != null && lr.sectionId !== 'cold') {
+    primary = { label: <><IconPlay size={18} /> Now at full tempo</>, why: 'That was slow practice: now sing it at the level’s tempo.', testid: 'full-tempo', onClick: () => goPlay({ ...same, level: lr.level, mode: lr.mode }) };
+  } else if (lr.sectionId === 'cold') {
+    primary = { label: <><IconPlay size={18} /> Another cold start</>, why: 'A new bar at random: find your way in from memory.', testid: 'cold-again', onClick: () => { startColdStart(piece, lr.partId, lr.from, true); } };
+  } else if (!lr.ladder && !lr.notCounted) {
+    primary = expertDrill
+      ? { label: 'Back to expert mode', onClick: toPiece }
+      : { label: 'Back to the piece', why: 'Drills are practice: they don’t change your levels.', testid: 'back-to-piece', onClick: toPiece };
+  } else if (speakerRun) {
+    primary = {
+      label: <><IconPlay size={18} /> Sing it again with headphones on</>, why: 'Level 1 counts with headphones on.', testid: 'again-headphones', repeats: true,
+      onClick: () => {
+        saveProfile({ ...loadProfile(), headphones: true }); // what the button says
+        play(lr.sectionId, lr.level, lr.mode);
+      },
+    };
+  } else if (stuck) {
+    primary = lr.level === 1
+      ? { label: <><IconEar size={18} color="#0B0D1A" /> Listen again, then sing it</>, why: 'A few misses in a row: hear how it goes first.', testid: 'stuck-listen', onClick: listenAgain }
+      : { label: <><IconPlay size={18} /> {slowLabel}</>, why: 'Slow runs don’t count, but they make the full-tempo run easier.', testid: 'stuck-slow', onClick: singSlowly };
+  } else if (nextFix) {
+    primary = {
+      label: <><IconPlay size={18} /> Fix {label(nextFix)} at level {lr.level}</>, testid: 'fix-first', onClick: () => play(nextFix, lr.level),
+      why: `${fixesLeft > 1 ? `${fixesLeft} sections to fix` : 'One section to fix'} on ${fixesLeft > 1 ? 'their' : 'its'} own: no need to sing it all again.`,
+    };
+  } else if (lr.full?.tooMuch && next) {
+    // Too much slipped for the run to count: the sections first.
+    primary = { label: <><IconPlay size={18} /> {nextLabel(next)}</>, why: 'Too much slipped for the run to count: the sections first.', testid: 'practise-sections', onClick: () => play(next.sectionId, next.level) };
+  } else if (!lr.passed && lr.ladder) {
+    primary = {
+      label: <><IconPlay size={18} /> Try again</>, testid: 'try-again', repeats: true, onClick: () => play(lr.sectionId, lr.level, lr.mode),
+      why: timingOnly ? 'The notes were right: now come in with the beat.'
+        : everyNote ? 'At level 1 every note must be right.'
+          : `Level ${lr.level} needs ${Math.round((spec?.pass ?? 0.8) * 100)}%.`,
+    };
+  } else if (next) {
+    primary = { label: <><IconPlay size={18} /> {nextLabel(next)}</>, why: next.reason, testid: 'next-step', onClick: () => play(next.sectionId, next.level) };
+  } else {
+    primary = {
+      label: <><IconCube size={18} color="#0B0D1A" /> {lr.full?.passed && lr.full.newLevel >= 5 ? 'Memorised!' : 'All done for today!'} Arcade run of the whole piece</>,
+      why: 'Just for fun: arcade runs don’t count for a level.', testid: 'arcade-run', onClick: () => play('all', 4, '3d'),
+    };
+  }
+  // Second row: an easier level after a miss (as before), else the same run again.
+  const again: Step | null = !lr.passed && lr.ladder && lr.level > 1 && !nextFix
+    ? { label: `Easier: level ${lr.level - 1}`, testid: 'easier', onClick: () => play(lr.sectionId, lr.level - 1) }
+    : primary.repeats ? null
+      : {
+        label: <><IconRestart size={16} /> {lr.slow != null ? 'Again, slowly' : 'Again'}</>,
+        // (after a full run that opened its level: allowed any time, a new run replaces the fix list)
+        testid: lr.sectionId === 'all' && nextFix ? 'sing-all-again' : 'again',
+        onClick: () => goPlay({ ...same, level: lr.level, mode: lr.mode, ...(lr.sectionId === 'cold' ? { from: lr.from, to: lr.to } : {}), ...(lr.slow != null ? { rate: lr.slow } : {}) }),
+      };
+
   return (
-    <main className="screen">
-      <div className="col" style={{ gap: 2, paddingTop: 8 }}>
-        <span className="eyebrow">
-          {section?.label ?? (lr.sectionId === 'all' ? 'Whole piece' : lr.sectionId === 'cold' ? 'Cold start' : 'Drill')} · {part?.name} · {spec ? `L${lr.level} ${spec.name}` : ''}
-        </span>
-        <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800 }}>{piece.title}</h1>
-      </div>
+    <main className="screen practice has-foot">
+      <PracticeBar up={up} heading title={piece.title}
+        sub={[part?.name, section?.label ?? (lr.sectionId === 'all' ? 'Whole piece' : lr.sectionId === 'cold' ? 'Cold start' : lr.sectionId === 'entries' ? 'Entry drill' : 'Drill'), spec ? `L${lr.level} ${spec.name}` : ''].filter(Boolean).join(' · ')} />
 
       {lr.alignedMs != null && Math.abs(lr.alignedMs) >= 25 && lr.timingFail == null && lr.timingUnsure == null && (
         <div className="notice info" role="status" data-testid="aligned-note">
@@ -334,80 +401,40 @@ export function Results() {
         </div>
       )}
 
-      <div className="col" style={{ gap: 8, marginTop: 'auto' }}>
-        {lr.slow != null && lr.sectionId !== 'cold' ? (
-          <button className="btn primary block" data-testid="full-tempo" onClick={() => goPlay({ ...same, level: lr.level, mode: lr.mode })}>
-            <IconPlay size={18} /> Now at full tempo
-          </button>
-        ) : lr.sectionId === 'cold' ? (
-          <button className="btn primary block" data-testid="cold-again" onClick={() => {
-            try { sessionStorage.setItem('sh:fromResults', '1'); } catch { /* ignore */ }
-            startColdStart(piece, lr.partId, lr.from, true);
-          }}>
-            <IconPlay size={18} /> Another cold start
-          </button>
-        ) : !lr.ladder && !lr.notCounted ? (
-          /^row-|^leaps-/.test(piece.id) ? (
-            <button className="btn primary block" onClick={() => go({ name: 'expert' })}>Back to expert mode</button>
-          ) : (
-            <button className="btn primary block" onClick={() => go({ name: 'piece', pieceId: piece.id.split('~')[0] })}>
-              Back to {getPiece(piece.id.split('~')[0])?.title ?? 'the piece'}
-            </button>
-          )
-        ) : speakerRun ? (
-          <button className="btn primary block" data-testid="again-headphones" onClick={() => {
-            saveProfile({ ...loadProfile(), headphones: true }); // what the button says
-            goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, level: lr.level, mode: lr.mode });
-          }}>
-            <IconPlay size={18} /> Sing it again with headphones on
-          </button>
-        ) : stuck ? (
-          lr.level === 1
-            ? <button className="btn primary block" data-testid="stuck-listen" onClick={listenAgain}><IconEar size={18} color="#0B0D1A" /> Listen again, then sing it</button>
-            : <button className="btn primary block" data-testid="stuck-slow" onClick={singSlowly}><IconPlay size={18} /> {slowLabel}</button>
-        ) : nextFix ? (
-          <button className="btn primary block" data-testid="fix-first" onClick={() => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: nextFix, level: lr.level, mode: '2d' })}>
-            <IconPlay size={18} /> Fix {label(nextFix)} at level {lr.level}
-          </button>
-        ) : lr.full?.tooMuch && next ? (
-          // Too much slipped for the run to count: the sections first.
-          <button className="btn primary block" data-testid="practise-sections" onClick={() => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: next.sectionId, level: next.level, mode: '2d' })}>
-            <IconPlay size={18} /> Next: {next.sectionId === 'all' ? 'the whole piece' : next.kind === 'fix' ? `fix ${label(next.sectionId)}` : label(next.sectionId)}, level {next.level}
-          </button>
-        ) : !lr.passed && lr.ladder ? (
-          <button className="btn primary block" onClick={() => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, level: lr.level, mode: lr.mode })}>
-            <IconPlay size={18} /> Try again
-          </button>
-        ) : next ? (
-          <button className="btn primary block" onClick={() => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: next.sectionId, level: next.level, mode: '2d' })}>
-            <IconPlay size={18} /> Next: {next.sectionId === 'all' ? 'the whole piece' : next.kind === 'fix' ? `fix ${label(next.sectionId)}` : label(next.sectionId)}, level {next.level}
-          </button>
-        ) : (
-          <button className="btn primary block" onClick={() => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: 'all', level: 4, mode: '3d' })}>
-            <IconCube size={18} color="#0B0D1A" /> {lr.full?.passed && lr.full.newLevel >= 5 ? 'Memorised!' : 'All done for today!'} Arcade run of the whole piece
-          </button>
-        )}
-        <div className="row">
-          {!lr.passed && lr.ladder && lr.level > 1 && !nextFix ? (
-            <button className="btn block" onClick={() => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, level: lr.level - 1, mode: '2d' })}>
-              Easier: level {lr.level - 1}
-            </button>
-          ) : !(!lr.passed && lr.ladder) ? (
-            <button className="btn block" onClick={() => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, level: lr.level, mode: lr.mode, ...(lr.sectionId === 'drill' || lr.sectionId === 'cold' ? { from: lr.from, to: lr.to } : {}), ...(lr.slow != null ? { rate: lr.slow } : {}) })}>{lr.slow != null ? 'Again, slowly' : 'Again'}</button>
-          ) : lr.sectionId === 'all' && nextFix ? (
-            // Allowed any time: a new run replaces the fix list with its own slips.
-            <button className="btn block" data-testid="sing-all-again" onClick={() => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: 'all', level: lr.level, mode: '2d' })}>
-              Sing it all again
-            </button>
-          ) : null}
-          <button className="btn block" onClick={() => go({ name: 'piece', pieceId: piece.id })}>All sections</button>
-        </div>
+      <div className="col" style={{ gap: 8 }}>
         <button className="btn ghost block" onClick={() => go({ name: 'ranks' })}>Leaderboard</button>
         <AccountTip />
         <ShareRecording pieceId={lr.pieceId} partId={lr.partId} />
       </div>
+
+      <ResultsFoot primary={primary} again={again} toPiece={primary.onClick === toPiece ? null : toPiece} />
     </main>
   );
+}
+
+/** The sticky footer of Results: one primary step and why, then up to two secondary buttons. */
+function ResultsFoot({ primary, again, toPiece }: { primary: Step; again: Step | null; toPiece: (() => void) | null }) {
+  return (
+    <div className="results-foot" data-testid="results-foot">
+      <button className="btn primary block" data-testid={primary.testid} onClick={primary.onClick}>{primary.label}</button>
+      {primary.why && <span className="tiny muted why" data-testid="results-why">{primary.why}</span>}
+      {(again || toPiece) && (
+        <div className="row" style={{ gap: 8 }}>
+          {again && <button className="btn small" data-testid={again.testid} onClick={again.onClick}>{again.label}</button>}
+          {toPiece && <button className="btn small" data-testid="to-piece" aria-label="Back to the piece" onClick={toPiece}><IconList size={16} /> Piece</button>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The "excellent run" note says what's next; after a drill or a cold start that isn't a new level. */
+function onwardText(detail: string, sectionId: string): string {
+  const onward = sectionId === 'cold' ? 'Try another cold start, or go back to the piece.'
+    : sectionId === 'drill' ? 'Now sing the whole section.'
+      : sectionId === 'entries' ? 'Come back to the entries now and then to keep them sure.'
+        : null;
+  return onward ? detail.replace(/Move on to the next level or the next section\.?$/, onward) : detail;
 }
 
 const READY: Record<number, string> = { 3: 'The piece is rehearsal-ready.', 4: 'The piece is concert-ready.', 5: 'The piece is memorised.' };
@@ -580,12 +607,10 @@ function WordsResults({ lr, words }: { lr: NonNullable<ReturnType<typeof getLast
   // The words screen opens at the next step that isn't passed yet.
   const again = () => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, level: 0, mode: '2d', words: true });
   const color = { perfect: 'var(--voice)', good: 'var(--voice)', ok: '#E8B86A', miss: '#FF7A45' } as const;
+  const up = upOf(piece.id);
   return (
-    <main className="screen">
-      <div className="col" style={{ gap: 2, paddingTop: 8 }}>
-        <span className="eyebrow">{section?.label ?? 'Whole piece'} · {part?.name} · Words: {STAGE_NAMES[words.stage]}</span>
-        <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800 }}>{piece.title}</h1>
-      </div>
+    <main className="screen practice has-foot">
+      <PracticeBar up={up} heading title={piece.title} sub={`${part?.name ?? ''} · ${section?.label ?? 'Whole piece'} · Words: ${STAGE_NAMES[words.stage]}`} />
       <div className={res.accuracy >= WORDS_PASS ? 'notice info' : 'notice'} role="status" data-testid="words-banner">
         {!words.counted
           ? <><strong>Practice run</strong> (slower tempo or stopped early): do it at 100% tempo to move on.</>
@@ -627,13 +652,14 @@ function WordsResults({ lr, words }: { lr: NonNullable<ReturnType<typeof getLast
         </div>
       )}
       <span className="tiny muted">The app hears when each syllable starts, not which word it is: use the lyrics quiz to check the words themselves.</span>
-      <div className="col" style={{ gap: 8, marginTop: 'auto' }}>
-        <button className="btn primary block" onClick={again}><IconPlay size={18} /> {nextStage != null ? `Next: ${STAGE_NAMES[nextStage]}` : 'Again'}</button>
-        <div className="row">
-          <button className="btn block" onClick={() => go({ name: 'lyrics', pieceId: piece.id, partId: lr.partId })}>Lyrics quiz</button>
-          <button className="btn block" onClick={() => go({ name: 'piece', pieceId: piece.id })}>Back to the piece</button>
-        </div>
-      </div>
+      <ResultsFoot
+        primary={{
+          label: <><IconPlay size={18} /> {nextStage != null ? `Next: ${STAGE_NAMES[nextStage]}` : 'Again'}</>, onClick: again, testid: 'words-again',
+          why: nextStage != null ? (nextStage === 1 ? 'Now with only the first letter of each word.' : 'Now from memory, with nothing shown.')
+            : res.accuracy >= WORDS_PASS ? undefined : `${Math.round(WORDS_PASS * 100)}% of the syllables in time to move on.`,
+        }}
+        again={{ label: 'Lyrics quiz', onClick: () => go({ name: 'lyrics', pieceId: piece.id, partId: lr.partId }), testid: 'lyrics-quiz' }}
+        toPiece={() => leaveTo(up)} />
     </main>
   );
 }
