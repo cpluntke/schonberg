@@ -1,24 +1,7 @@
 {
  "meta": {
-  "head": "c04ca36",
-  "dirty": [
-   "src/audio/pitch.ts",
-   "src/game/align.ts",
-   "src/game/scoring.ts",
-   "src/game/types.ts",
-   "src/ui/components/RangeCheck.tsx",
-   "src/ui/components/Tuner.tsx",
-   "src/ui/play/lastResult.ts",
-   "src/ui/play/runExport.ts",
-   "src/ui/play/session.ts",
-   "src/ui/screens/Diagnostics.tsx",
-   "src/ui/screens/Play.tsx",
-   "src/ui/screens/Results.tsx",
-   "src/ui/screens/Setup.tsx",
-   "src/audio/harmonics.ts",
-   "src/audio/inputFilter.ts",
-   "src/audio/inputQuality.ts"
-  ],
+  "head": "323486f",
+  "dirty": [],
   "policy": [
    "LATE_FAIL_MS=250",
    "GUIDE_LEARN_MAX_ABOVE=150",
