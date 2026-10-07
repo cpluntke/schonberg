@@ -300,6 +300,8 @@ test('fixing the section that slipped in a full run reaches the piece level with
   }, { partId, ids, t });
   await page.goto('/?simulate=perfect#/piece/warmup-chorale');
   await expect(page.getByTestId('to-fix')).toContainText('No need to sing it all again');
+  await expect(page.getByTestId('piece-level')).toHaveText('Level 1 open: fix 1 section to reach it');
+  await expect(page.getByTestId('toward-next')).toHaveCount(0);
   await expect(page.getByTestId('piece-next')).toContainText('Fix');
   await expect(page.getByTestId('full-1')).toBeEnabled();
   await page.getByTestId('piece-next').click();

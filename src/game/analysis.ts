@@ -27,23 +27,25 @@ function median(xs: number[]): number | null {
 
 const mean = (xs: number[]) => (xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : 0);
 
-function barLabel(score: Score, i: number): string {
-  return score.measures[i]?.number ?? String(i + 1);
-}
-
 /** "bar 12" / "bars 12–14" ("upbeat–bar 3" from a pickup bar 0, as the sections are named) */
 export function barsText(score: Score, range: [number, number]): string {
   return barRangeLabel(score, range[0], range[1], true);
 }
 
-/** "bars 3, 7 and 12" (deduplicated, at most `max` listed). */
-function barList(score: Score, measures: number[], max = 4): string {
+/**
+ * "bars 3, 7 and 12" (deduplicated, at most `max` listed). A pickup bar numbered 0 is "the upbeat",
+ * as in the section names and the bar strip (barRangeLabel): "the upbeat and bars 1 and 2".
+ */
+export function barList(score: Score, measures: number[], max = 4): string {
   const uniq = [...new Set(measures)].sort((a, b) => a - b);
-  const shown = uniq.slice(0, max).map((m) => barLabel(score, m));
   const more = uniq.length > max ? ' and elsewhere' : '';
-  if (shown.length === 1) return `bar ${shown[0]}${more}`;
-  const list = shown.length > 1 && !more ? `${shown.slice(0, -1).join(', ')} and ${shown[shown.length - 1]}` : shown.join(', ');
-  return `bars ${list}${more}`;
+  const shownIdx = uniq.slice(0, max);
+  const upbeat = shownIdx[0] === 0 && barRangeLabel(score, 0, 0) === 'Upbeat';
+  const rest = (upbeat ? shownIdx.slice(1) : shownIdx).map((m) => barRangeLabel(score, m, m, true).replace(/^bar /, ''));
+  const join = (xs: string[]) => (xs.length > 1 && !more ? `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}` : xs.join(', '));
+  const bars = rest.length ? `${rest.length === 1 ? 'bar' : 'bars'} ${join(rest)}` : '';
+  if (!upbeat) return `${bars}${more}`;
+  return `${bars ? `the upbeat and ${bars}` : 'the upbeat'}${more}`;
 }
 
 /**

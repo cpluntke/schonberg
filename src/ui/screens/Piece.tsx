@@ -63,6 +63,11 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
   for (const f of [...r.toFix].reverse()) for (const id of f.sectionIds) fixAt.set(id, f.level);
   const multi = sections.length > 1;
   const P = r.pieceLevel;
+  // A full run opened a level above the piece's: the piece was sung through, the fixes are what's left.
+  const open = multi ? r.toFix.find((f) => f.level > P) : undefined;
+  const openText = open
+    ? `Level ${open.level} open: fix ${open.sectionIds.length} section${open.sectionIds.length > 1 ? 's' : ''} to ${open.level === 5 ? 'finish it from memory' : 'reach it'}`
+    : '';
 
   return (
     <main className="screen">
@@ -109,7 +114,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
             <span className="eyebrow">Readiness</span>
             <span style={{ fontWeight: 800, fontSize: 18 }} data-testid="piece-level">
               {r.memorised ? 'Memorised' : r.concertReady ? 'Concert-ready' : r.rehearsalReady ? 'Rehearsal-ready'
-                : P > 0 ? `Piece level ${P}: ${levelSpec(P).name}` : multi ? 'Not sung through yet' : `${sections.length} section to learn`}
+                : P > 0 ? `Piece level ${P}: ${levelSpec(P).name}` : open ? openText : multi ? 'Not sung through yet' : `${sections.length} section to learn`}
             </span>
           </div>
           <span className="mono" style={{ fontSize: 28, fontWeight: 600 }}>{Math.round(r.pct * 100)}%</span>
@@ -125,7 +130,10 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
             <strong>Level {r.unconfirmed} in every section.</strong> Confirm it with a full run-through: the piece's level comes from singing it all through.
           </div>
         )}
-        {multi && r.toward && !r.unconfirmed && (
+        {open && P > 0 && (
+          <span className="small" data-testid="level-open" style={{ color: 'var(--accent-text)' }}>{openText}</span>
+        )}
+        {multi && r.toward && !r.unconfirmed && !open && (
           <div className="col" style={{ gap: 4 }} data-testid="toward-next">
             <span className="small muted">
               Toward piece level {r.toward.level}: {r.toward.done} of {r.toward.total} sections at level {r.toward.level}

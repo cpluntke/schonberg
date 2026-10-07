@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { analyze, worstWindow } from './analysis';
+import { analyze, barList, worstWindow } from './analysis';
 import { scoreAttempt, type ScoringContext } from './scoring';
 import { makePart, makeScore, sampleSinging } from './testutil';
 import type { ScoringOptions } from './types';
+import type { Score } from '../music/types';
 
 const opts: ScoringOptions = { toleranceCents: 25, tuning: 'equal', octaveTolerant: false };
 
@@ -103,5 +104,20 @@ describe('worstWindow', () => {
   it('a single bad bar is widened to two bars', () => {
     expect(worstWindow(new Map([[3, 1]]), [0, 9])).toEqual([3, 4]);
     expect(worstWindow(new Map([[9, 1]]), [0, 9])).toEqual([8, 9]);
+  });
+});
+
+describe('bar lists in coach notes', () => {
+  const score = (nums: string[]) => ({ measures: nums.map((number) => ({ number })) }) as unknown as Score;
+  it('a pickup bar numbered 0 is "the upbeat", as in the bar strip and the section names', () => {
+    const up = score(['0', '1', '2', '3', '4', '5']);
+    expect(barList(up, [2, 0, 1])).toBe('the upbeat and bars 1 and 2');
+    expect(barList(up, [0])).toBe('the upbeat');
+    expect(barList(up, [0, 1])).toBe('the upbeat and bar 1');
+    expect(barList(up, [0, 1, 2, 3, 4])).toBe('the upbeat and bars 1, 2, 3 and elsewhere');
+    expect(barList(up, [3, 5])).toBe('bars 3 and 5');
+    // No pickup: plain numbers.
+    expect(barList(score(['1', '2', '3']), [0, 2])).toBe('bars 1 and 3');
+    expect(barList(score(['1', '2', '3']), [1])).toBe('bar 2');
   });
 });
