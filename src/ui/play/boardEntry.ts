@@ -1,7 +1,7 @@
 // My entry on the choir's leaderboard: posted when Ranks opens on a piece and, so the board doesn't
 // lag behind real practice, after each finished run (at most once a minute per piece).
 
-import { loadCycle, loadProfile, saveProfile } from '../../progress/store';
+import { loadCycle, loadProfile } from '../../progress/store';
 import { computeMyEntry, getLeaderboardBackend, type LeaderboardEntry } from '../../progress/leaderboard';
 import { getPiece, chosenPartId, singableSections, type PieceInfo } from '../library';
 import type { VoiceType } from '../../music/types';
@@ -37,13 +37,4 @@ export function postBoardEntrySoon(pieceId: string): void {
     const piece = getPiece(pieceId);
     if (piece) postBoardEntry(myBoardEntry(piece)).catch((e) => console.warn('leaderboard', e));
   }, wait));
-}
-
-/** Leave or rejoin the choir's leaderboard (Settings → Privacy). Leaving takes my entries off the server. */
-export async function setBoardHidden(hidden: boolean): Promise<void> {
-  const p = loadProfile();
-  saveProfile({ ...p, boardHidden: hidden });
-  const backend = getLeaderboardBackend();
-  if (hidden && p.choirCode && p.name.trim() && backend.remove) await backend.remove(p.choirCode, p.name.trim());
-  if (!hidden) for (const id of loadCycle().pieceIds) postBoardEntrySoon(id);
 }

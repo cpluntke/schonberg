@@ -264,7 +264,8 @@ export function httpBackend(baseUrl: string, fetchImpl: typeof fetch = (...a) =>
 
 function envUrl(): string | undefined {
   try {
-    const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
+    // Written as `import.meta.env` so Vite (and Vitest's stubEnv) can see it.
+    const env = import.meta.env as Record<string, string | undefined> | undefined;
     const v = env?.VITE_LEADERBOARD_URL;
     return v && v.trim() ? v.trim() : undefined;
   } catch {

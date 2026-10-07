@@ -30,6 +30,7 @@ import { StorageFullNotice } from './components/StorageFullNotice';
 import { flushProgress, onAccountConfirmed, syncProgressSoon } from '../progress/sync';
 import { ensureChoirSharing, refreshSuperSessionSoon } from '../progress/choir';
 import { shareMyProgress } from './play/shareProgress';
+import { retryPrivacyRemovals } from './play/privacy';
 
 const TABS: { name: Route['name']; label: string; icon: React.ReactNode }[] = [
   { name: 'home', label: 'Home', icon: <IconHome /> },
@@ -77,9 +78,10 @@ export function App() {
   useEffect(() => {
     ensureChoirSharing();
     syncProgressSoon();
+    void retryPrivacyRemovals(); // (a leaderboard exit or a sharing stop the server didn't confirm yet)
     // A super-admin login the server no longer accepts: its Admin tab goes (checked at most every 20 s).
     refreshSuperSessionSoon();
-    const onBack = () => { if (!document.hidden) { syncProgressSoon(); refreshSuperSessionSoon(); } else flushProgress(); };
+    const onBack = () => { if (!document.hidden) { syncProgressSoon(); refreshSuperSessionSoon(); void retryPrivacyRemovals(); } else flushProgress(); };
     document.addEventListener('visibilitychange', onBack);
     window.addEventListener('focus', onBack);
     window.addEventListener('pagehide', flushProgress);

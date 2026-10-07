@@ -597,6 +597,9 @@ export function applySnapshot(d: unknown, opts: { adoptSettings?: boolean } = {}
     const out: Profile = here.onboarded && remote.onboarded !== true ? mergeProfile(here, d.profile, true) : { ...here, ...remote };
     out.onboarded = here.onboarded || remote.onboarded === true;
     if (!out.name.trim() && here.name.trim()) out.name = here.name;
+    // Not sharing is the singer's choice: a copy that only says "sharing" (from a phone that never saw
+    // the switch, or an older app) doesn't switch it back on; only an explicit shareOptOut: false does.
+    if (out.shareOptOut) out.shareProgress = false;
     saveProfile(out); // also tells the screens
   } else {
     saveProfile(mergeProfile(loadProfile(), d.profile, setUp)); // also tells the screens

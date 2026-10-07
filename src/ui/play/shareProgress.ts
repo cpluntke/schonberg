@@ -32,7 +32,7 @@ async function send(): Promise<void> {
   // phone's progress is known to be the account's (not while a merge question is open).
   const s = sessionFor(p.choirCode);
   const name = s?.account.name ?? p.name.trim();
-  if (!p.choirCode || !p.shareProgress || !name || !apiBase()) return;
+  if (!p.choirCode || !p.shareProgress || p.shareOptOut || !name || !apiBase()) return;
   if (s && !accountConfirmed()) return;
   // Shared with an account before and logged out now: pause (an anonymous entry would clash with it).
   if (!s && loadMeta().account) {

@@ -307,6 +307,16 @@ describe('restoring on a new phone', () => {
     expect(loadProfile()).toMatchObject({ name: 'Clara', voice: 'T', rangeLow: 48, rangeHigh: 74, onboarded: true });
   });
 
+  it("a newer copy that only says 'sharing' doesn't switch a singer's opt-out back on (two set-up phones)", () => {
+    const base = { ...DEFAULT_PROFILE, name: 'Clara', onboarded: true, choirCode: 'kammerchor' };
+    saveProfile({ ...base, shareProgress: false, shareOptOut: true });
+    applySnapshot({ v: 1, p: {}, profile: { ...base, shareProgress: true } } as unknown as ProgressSnapshot, { adoptSettings: true });
+    expect(loadProfile()).toMatchObject({ shareOptOut: true, shareProgress: false });
+    // switched back on, on the other phone: that choice is adopted
+    applySnapshot({ v: 1, p: {}, profile: { ...base, shareProgress: true, shareOptOut: false } } as unknown as ProgressSnapshot, { adoptSettings: true });
+    expect(loadProfile()).toMatchObject({ shareOptOut: false, shareProgress: true });
+  });
+
   it('ignores a programme of the wrong shape, so the next upload can still be built', () => {
     saveCycle({ name: 'Mine', pieceIds: ['x'] });
     const bad: unknown[] = [

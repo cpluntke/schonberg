@@ -83,7 +83,7 @@ Purpose: to see how the app is used and where it fails, so it can be improved.
 - **Switching it off** (Settings → Privacy → "Share my practice with my section lead", after a
   confirmation that explains the totals) withdraws what was shared from the server and stops sending.
   The app then never asks to start again; a new join or login keeps it off; the choice follows a
-  choir account to other phones.
+  choir account to other phones (running the current app version).
 
 - **Sent** after runs (at most once a minute): the singer's name (or account name), voice part, per
   programme piece the readiness, the piece level and how each bar is going, and the voice range from

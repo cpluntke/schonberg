@@ -217,7 +217,8 @@ export async function setChoirLogo(code: string, auth: Auth, picture: Blob | nul
     info = await call<ChoirInfo>(`/choirs/${enc(code)}/logo`, { method: 'DELETE', auth });
   }
   if (cachedChoir()?.code === info.code) writeJSON(CACHE, { ...cachedChoir(), logo: info.logo });
-  await refreshChoirLogo(info);
+  // (a super admin editing another choir's logo keeps this phone's own)
+  if (loadProfile().choirCode?.toLowerCase() === info.code) await refreshChoirLogo(info);
   return info;
 }
 
@@ -250,11 +251,11 @@ export function startSharing(): void {
   const p = loadProfile();
   if (p.choirCode) saveProfile({ ...p, shareProgress: true, shareOptOut: false });
 }
-/** The member's own "Stop sharing" (Settings → Privacy): what was shared is withdrawn from the server. */
-export async function stopSharing(): Promise<void> {
+/** The member's own "Stop sharing" (Settings → Privacy): nothing is sent any more; withdrawing what was
+ *  shared is ui/play/privacy.ts's (retried until the server confirms). */
+export function stopSharing(): void {
   const p = loadProfile();
   saveProfile({ ...p, shareProgress: false, shareOptOut: true });
-  if (p.choirCode && p.name.trim()) await withdrawProgress(p.choirCode, p.name.trim()).catch(() => {});
 }
 /** Sharing was ended by the choir removing this phone's account, or by deleting it (cleared by a new login or leaving). */
 export const sharingEnded = (): boolean => !!rawGet(SHARE_OFF_KEY);
@@ -264,6 +265,7 @@ export function leaveChoir(): void {
   if (p.choirCode && p.shareProgress && p.name.trim()) withdrawProgress(p.choirCode, p.name.trim()).catch(() => {});
   saveProfile({ ...p, choirCode: undefined, shareProgress: false });
   rawRemove(SHARE_OFF_KEY);
+  rawRemove(LOGO_KEY);
   writeJSON(CACHE, null);
   try { localStorage.removeItem('sh:choirApplied'); } catch { /* ignore */ }
   // An admin's or section lead's login belongs to that choir.
