@@ -266,11 +266,12 @@ describe('choir library pieces', () => {
     expect(sharingEnded()).toBe(false);
   });
 
-  it('earlier members: switched on silently only when safe (logged in, or never chose); otherwise asked', () => {
-    // Never touched the old box: switched on.
+  it('earlier members: switched on silently only when logged in to the choir; otherwise asked', () => {
+    // Never touched the old box, not logged in (could be an account deleted before this version): asked.
     saveProfile({ ...loadProfile(), choirCode: 'kammerchor', shareProgress: undefined });
     ensureChoirSharing();
-    expect(loadProfile().shareProgress).toBe(true);
+    expect(loadProfile().shareProgress).toBeFalsy();
+    expect(sharingNeedsOk()).toBe(true);
     // Switched off, not logged in (could also be an account deleted before this version): asked, not switched.
     localStorage.removeItem('schonberg:shareMandatory');
     saveProfile({ ...loadProfile(), shareProgress: false });
