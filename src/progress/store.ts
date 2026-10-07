@@ -57,8 +57,13 @@ export interface Profile {
   onboarded: boolean;
   leaderboardOptIn: boolean;
   choirCode?: string;
-  /** Share per-bar progress with the section lead (opt-in). */
+  /** Share per-bar progress with the section lead (part of joining a choir; see shareOptOut). */
   shareProgress?: boolean;
+  /** Privacy choices (Settings → Privacy): off the choir's leaderboard; not counted in "Practising now";
+   *  not sharing with the section lead (shareProgress then stays off, nothing asks to start it again). */
+  boardHidden?: boolean;
+  presenceHidden?: boolean;
+  shareOptOut?: boolean;
   /**
    * Practice screen (2D): the note highway or sheet music. Unset = Automatic: sheet music at every
    * level.

@@ -51,6 +51,9 @@ describe('practising now', () => {
     vi.stubEnv('VITE_CHOIR_URL', '');
     saveProfile({ ...loadProfile(), choirCode: 'kammerchor' });
     startPresence('A')();
+    saveProfile({ ...loadProfile(), presenceHidden: true });
+    vi.stubEnv('VITE_CHOIR_URL', '/schonberg/api');
+    startPresence('A')(); // (switched off in Settings → Privacy)
     expect(calls).toHaveLength(0);
   });
 

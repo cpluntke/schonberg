@@ -51,7 +51,8 @@ function send(url: string, voice: Satb, on: boolean): void {
 /** While the singing screen is open: counted as practising (paused while the app is in the background). Returns the stop. */
 export function startPresence(voice: string): () => void {
   const url = choirUrl();
-  if (!url || !['S', 'A', 'T', 'B'].includes(voice)) return () => {};
+  // (a singer who chose not to be counted: Settings → Privacy)
+  if (!url || loadProfile().presenceHidden || !['S', 'A', 'T', 'B'].includes(voice)) return () => {};
   const v = voice as Satb;
   let timer: ReturnType<typeof setInterval> | null = null;
   const on = () => {

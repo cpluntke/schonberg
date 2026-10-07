@@ -164,7 +164,7 @@ export function cachedChoir(): ChoirInfo | null {
 export async function joinChoir(code: string): Promise<ChoirInfo> {
   const info = await fetchChoir(code);
   const p = loadProfile();
-  saveProfile({ ...p, choirCode: info.code, leaderboardOptIn: true, shareProgress: true });
+  saveProfile({ ...p, choirCode: info.code, leaderboardOptIn: true, shareProgress: !p.shareOptOut });
   rawRemove(SHARE_OFF_KEY);
   writeJSON(CACHE, info);
   void refreshChoirLogo(info);
@@ -237,18 +237,24 @@ export function ensureChoirSharing(): void {
   // A login or rejoining switches it on too.
   const ended = rawGet(SHARE_OFF_KEY) || lastLogout()?.reason === 'removed';
   const safe = !!sessionFor(p.choirCode);
-  if (p.choirCode && !p.shareProgress && !ended && safe) saveProfile({ ...p, shareProgress: true });
+  if (p.choirCode && !p.shareProgress && !p.shareOptOut && !ended && safe) saveProfile({ ...p, shareProgress: true });
   rawSet('schonberg:shareMandatory', '1');
 }
 /** A choir member who isn't sharing (switched off before sharing became part of the choir): offer to start. */
 export const sharingNeedsOk = (): boolean => {
   const p = loadProfile();
-  return !!p.choirCode && !p.shareProgress && !rawGet(SHARE_OFF_KEY);
+  return !!p.choirCode && !p.shareProgress && !p.shareOptOut && !rawGet(SHARE_OFF_KEY);
 };
 /** The member's own "Start sharing". */
 export function startSharing(): void {
   const p = loadProfile();
-  if (p.choirCode) saveProfile({ ...p, shareProgress: true });
+  if (p.choirCode) saveProfile({ ...p, shareProgress: true, shareOptOut: false });
+}
+/** The member's own "Stop sharing" (Settings → Privacy): what was shared is withdrawn from the server. */
+export async function stopSharing(): Promise<void> {
+  const p = loadProfile();
+  saveProfile({ ...p, shareProgress: false, shareOptOut: true });
+  if (p.choirCode && p.name.trim()) await withdrawProgress(p.choirCode, p.name.trim()).catch(() => {});
 }
 /** Sharing was ended by the choir removing this phone's account, or by deleting it (cleared by a new login or leaving). */
 export const sharingEnded = (): boolean => !!rawGet(SHARE_OFF_KEY);
@@ -555,7 +561,7 @@ function adoptSession(s: Session): void {
   // Logged in to the choir: sharing with the section lead is part of being in it (again, after a removal).
   rawRemove(SHARE_OFF_KEY);
   const p = loadProfile();
-  if (p.choirCode === s.code && !p.shareProgress) saveProfile({ ...p, shareProgress: true });
+  if (p.choirCode === s.code && !p.shareProgress && !p.shareOptOut) saveProfile({ ...p, shareProgress: true });
   if (old && old.token !== s.token) void call('/session', { method: 'DELETE', auth: { bearer: old.token } }).catch(() => {});
 }
 

@@ -5,7 +5,7 @@ import {
   LOGGED_OUT_ELSEWHERE, refreshSession, refreshSessionSoon, rememberedInvite, saveSession, sessionFor, superCreate, type Session,
   signUp, shareProgress, deleteMyAccount, lastLogout, dismissLogout, syncChoir, choirPieceId, localPieceId, fetchLibrary, addLibraryPiece,
   superLogin, superLogout, loadSuperSession, superAuth, superList, superLoggedOutNotice, refreshSuperSession, refreshSuperSessionSoon,
-  _resetSuperStateForTests, staffRoles, onSessionChange, joinChoir, ensureChoirSharing, endSession, sharingEnded, sharingNeedsOk, startSharing,
+  _resetSuperStateForTests, staffRoles, onSessionChange, joinChoir, ensureChoirSharing, endSession, sharingEnded, sharingNeedsOk, startSharing, stopSharing,
 } from './choir';
 import { buildSnapshot } from './sync';
 import { fetchMetrics } from './insights';
@@ -39,6 +39,22 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
+});
+
+describe("sharing with the section lead: the singer's own choice", () => {
+  it('stopping withdraws what was shared, nothing asks to start again, a new join or login keeps it off', async () => {
+    mockFetch(() => ({ body: { code: 'kammerchor', name: 'Kammerchor', cycle: null, pieces: [], updatedAt: 1, leads: [] } }));
+    saveProfile({ ...loadProfile(), name: 'Anna', choirCode: 'kammerchor', shareProgress: true });
+    await stopSharing();
+    expect(calls.some((c) => c.init.method === 'DELETE' && c.url.endsWith('/choirs/kammerchor/progress/Anna'))).toBe(true);
+    expect(loadProfile()).toMatchObject({ shareProgress: false, shareOptOut: true });
+    expect(sharingNeedsOk()).toBe(false);
+    ensureChoirSharing();
+    await joinChoir('kammerchor');
+    expect(loadProfile().shareProgress).toBe(false);
+    startSharing();
+    expect(loadProfile()).toMatchObject({ shareProgress: true, shareOptOut: false });
+  });
 });
 
 describe('choir accounts client', () => {

@@ -143,6 +143,9 @@ export function Ranks() {
         ))}
       </div>
 
+      {profile.boardHidden && profile.choirCode && (
+        <span className="small muted" data-testid="board-hidden">You're off the choir's leaderboard: only you see your own row here (Settings → Privacy).</span>
+      )}
       <div className="col" style={{ gap: 0 }}>
         {ranked.map((e, i) => {
           const isMe = me && e.name === me.name && e.updatedAt === me.updatedAt;

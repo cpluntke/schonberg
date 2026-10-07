@@ -7,8 +7,8 @@ section lead (both part of joining a choir), and two things that are the singer'
 ## In short: who sees what, by name
 
 - **Everyone in the choir** (anyone with the choir code): your first name, voice part and readiness for
-  each programme piece, with your streak and weekly points, on the choir's leaderboard.
-- **Your section lead and the choir admins** (every choir member shares): your voice range, by name. Per-bar
+  each programme piece, with your streak and weekly points, on the choir's leaderboard (unless you switch it off).
+- **Your section lead and the choir admins** (every choir member shares unless they switch it off): your voice range, by name. Per-bar
   detail (hardest bars, level spread, ready counts, trends) only as totals for the section.
 - **In a small section** (three or four singers sharing), a lead who knows who practised what may still
   be able to work out one singer's detail from the totals, or from how they change after that singer
@@ -21,8 +21,9 @@ section lead (both part of joining a choir), and two things that are the singer'
 
 - **Sent** when the singer opens Ranks and after each finished run on a programme piece (at most once a minute per piece), to
   `PUT /schonberg/api/choirs/<code>/entries/<name>`: first name, voice part, piece, readiness, weekly
-  points, streak and the 7-day readiness gain. There is no opt-out: joining a choir with a code puts
-  the singer on its board (leave the choir to come off it).
+  points, streak and the 7-day readiness gain. Joining a choir with a code puts the singer on its board; **Settings → Privacy → "Show me on the
+  choir's leaderboard"** takes them off: the app stops posting and asks the server to delete all
+  entries under their name (`DELETE …/entries/<name>`).
 - **Who sees it**: anyone who opens Ranks with the choir's code, by name.
 
 ## 0a. Practising now (every choir member, counts only)
@@ -31,6 +32,7 @@ section lead (both part of joining a choir), and two things that are the singer'
   `POST /schonberg/api/choirs/<code>/presence`: a random id made for this purpose only (not the member
   token, not the account, no name; new for each browser tab, kept only while the tab is open), the singer's voice part, and whether they are on the screen or just
   left it.
+- **Switch**: Settings → Privacy → "Count me in Practising now" (on by default).
 - **Who sees it**: anyone with the choir code, on Home, as counts per voice part ("S 2 · A 0 · T 1 · B 0"),
   updated every few seconds. In a small choir a count of 1 may tell others who it probably is.
 - **Kept** in the server's memory only, never on disk by the app; a heartbeat stops counting after 50
@@ -76,7 +78,12 @@ Purpose: to see how the app is used and where it fails, so it can be improved.
 - **Who sees it**: only the super admin (Admin → Usage), as charts and a CSV of
   daily totals.
 
-## 2. Sharing progress with the choir (part of joining a choir, like the leaderboard; no switch)
+## 2. Sharing progress with the choir (on when joining a choir; switch in Settings → Privacy)
+
+- **Switching it off** (Settings → Privacy → "Share my practice with my section lead", after a
+  confirmation that explains the totals) withdraws what was shared from the server and stops sending.
+  The app then never asks to start again; a new join or login keeps it off; the choice follows a
+  choir account to other phones.
 
 - **Sent** after runs (at most once a minute): the singer's name (or account name), voice part, per
   programme piece the readiness, the piece level and how each bar is going, and the voice range from

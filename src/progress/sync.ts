@@ -87,6 +87,7 @@ export interface ProgressSnapshot {
 const PROFILE_KEYS = [
   'name', 'voice', 'notation', 'strictness', 'tuning', 'latencyMs', 'beat', 'keepRecording', 'rangeLow', 'rangeHigh',
   'onboarded', 'leaderboardOptIn', 'choirCode', 'shareProgress', 'display', 'displayChosen', 'scoreStaves', 'scorePages',
+  'boardHidden', 'presenceHidden', 'shareOptOut',
 ] as const;
 
 const B64 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_';
@@ -392,6 +393,9 @@ const PROFILE_CHECKS: Record<(typeof PROFILE_KEYS)[number], (v: unknown) => bool
   displayChosen: isBool,
   scoreStaves: oneOf('mine', 'voices', 'all'),
   scorePages: isBool,
+  boardHidden: isBool,
+  presenceHidden: isBool,
+  shareOptOut: isBool,
 };
 
 /** Only the settings the app knows, each of the right type (anything else in a saved copy is ignored). */
@@ -418,6 +422,9 @@ export function mergeProfile(local: Profile, remote: unknown, setUp: boolean): P
     out.leaderboardOptIn = r.leaderboardOptIn ?? local.leaderboardOptIn;
     out.shareProgress = r.shareProgress ?? local.shareProgress;
   }
+  // A privacy choice made on another phone holds here too (the stricter one wins).
+  for (const k of ['boardHidden', 'presenceHidden', 'shareOptOut'] as const) if (r[k] === true) out[k] = true;
+  if (out.shareOptOut) out.shareProgress = false;
   return out;
 }
 

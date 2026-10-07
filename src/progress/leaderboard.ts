@@ -212,6 +212,8 @@ export interface LeaderboardBackend {
   kind: 'http' | 'local';
   list(choirCode: string, pieceId?: string): Promise<LeaderboardEntry[]>;
   put(choirCode: string, entry: LeaderboardEntry): Promise<void>;
+  /** Take all of a name's entries off the board (the singer left it: Settings → Privacy). */
+  remove?(choirCode: string, name: string): Promise<void>;
 }
 
 export const localBackend: LeaderboardBackend = {
@@ -244,6 +246,10 @@ export function httpBackend(baseUrl: string, fetchImpl: typeof fetch = (...a) =>
         if (!p || p.updatedAt <= e.updatedAt) merged.set(entryId(e), e);
       }
       return [...merged.values()];
+    },
+    async remove(code, name) {
+      const res = await fetchImpl(`${choirUrl(code)}/${encodeURIComponent(name)}`, { method: 'DELETE' });
+      if (!res.ok && res.status !== 404) throw new Error(`Could not leave the leaderboard (${res.status})`);
     },
     async put(code, entry) {
       const res = await fetchImpl(`${choirUrl(code)}/${encodeURIComponent(entry.name)}`, {

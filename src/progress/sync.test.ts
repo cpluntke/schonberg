@@ -100,6 +100,14 @@ describe('merging never downgrades', () => {
     expect(kept).toMatchObject({ name: 'Anna', voice: 'T', notation: 'letter', latencyMs: 80, latencySource: 'measured', choirCode: 'kammerchor', shareProgress: true });
   });
 
+  it('privacy choices follow the account; the stricter one wins on a set-up phone', () => {
+    const remote = { ...DEFAULT_PROFILE, onboarded: true, choirCode: 'kammerchor', shareProgress: false, shareOptOut: true, boardHidden: true, presenceHidden: true };
+    expect(mergeProfile({ ...DEFAULT_PROFILE }, remote, false)).toMatchObject({ shareOptOut: true, boardHidden: true, presenceHidden: true, shareProgress: false });
+    const mine = { ...DEFAULT_PROFILE, onboarded: true, choirCode: 'kammerchor', shareProgress: true };
+    expect(mergeProfile(mine, remote, true)).toMatchObject({ shareOptOut: true, boardHidden: true, presenceHidden: true, shareProgress: false });
+    expect(mergeProfile({ ...mine, boardHidden: true }, { ...remote, boardHidden: false }, true).boardHidden).toBe(true);
+  });
+
   it('the "Headphones on?" answer stays on its phone, like the delay', () => {
     saveProfile({ ...DEFAULT_PROFILE, name: 'Anna', onboarded: true, headphones: false });
     expect(buildSnapshot().data.profile).not.toHaveProperty('headphones');
