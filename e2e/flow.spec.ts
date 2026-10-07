@@ -41,9 +41,23 @@ test('level 1 on “doo”: one flat note fails it, and Results says which', asy
   await page.getByTestId('start').click();
   await expect(page.getByTestId('doo-label')).toBeVisible();
   await expect(page.getByTestId('pass-banner')).toContainText(/one note wasn’t right/, { timeout: 90_000 });
+  // "What to fix": the bars around it as a mini score, the note named, a slow loop of those bars.
+  await expect(page.getByTestId('mistake-spot')).toHaveCount(1);
   await expect(page.getByTestId('wrong-bar')).toHaveCount(1);
   await expect(page.getByTestId('wrong-bar')).toContainText(/(Bar \d+|Upbeat):.*note \d+.*was flat \(−\d+¢\)/);
-  await expect(page.getByTestId('wrong-bar').getByRole('button', { name: /Loop (bar \d+|upbeat) slowly/ })).toBeVisible();
+  await expect(page.getByTestId('mistake-snippet').locator('canvas')).toBeVisible();
+  // Zoomed in, and closed again with Escape and with "back".
+  await page.getByTestId('mistake-snippet').click();
+  await expect(page.getByTestId('mistake-zoom')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('mistake-zoom')).toHaveCount(0);
+  await page.getByTestId('mistake-zoom-btn').click();
+  await expect(page.getByTestId('mistake-zoom')).toBeVisible();
+  await page.goBack();
+  await expect(page.getByTestId('mistake-zoom')).toHaveCount(0);
+  await expect(page).toHaveURL(/#\/results/);
+  const practise = page.getByTestId('mistake-spot').getByRole('button', { name: /Practise (upbeat|bars? )[^,]*slowly, at 50% tempo/ });
+  await expect(practise).toBeVisible();
   // 95% accuracy, but a wrong note: the letter doesn't read as a pass.
   await expect(page.getByTestId('grade')).toHaveText('B');
   // The bar holding the wrong note "needs work" in the bar-by-bar strip.
@@ -68,6 +82,23 @@ test('level 1 on “doo”: one flat note fails it, and Results says which', asy
   await page.reload();
   await expect(page.getByTestId('pass-banner')).toContainText('level 1 reached');
   await expect(page.getByTestId('wrong-notes')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+// "Practise slowly" under the mini score: a drill of exactly those bars, at level 1, at half tempo.
+test('What to fix: practising the marked bars starts a slow drill of them', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await page.goto('/?simulate=oneflat#/piece/warmup-chorale');
+  await page.getByLabel('Sections').getByRole('button', { name: /level 1/ }).first().click();
+  await page.getByTestId('hp-yes').click();
+  await page.getByTestId('start').click();
+  await expect(page.getByTestId('pass-banner')).toContainText(/one note wasn’t right/, { timeout: 90_000 });
+  await page.getByTestId('mistake-zoom-btn').click();
+  await page.getByTestId('practise-slow-zoom').click();
+  await expect(page).toHaveURL(/#\/play\/warmup-chorale\/[^/]+\/drill\?level=1&from=[\d.]+&to=[\d.]+&rate=0\.5/);
+  await expect(page.getByTestId('mistake-zoom')).toHaveCount(0);
+  await expect(page.getByTestId('start')).toBeVisible();
   expect(errors).toEqual([]);
 });
 
