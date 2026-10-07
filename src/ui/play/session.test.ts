@@ -55,7 +55,14 @@ function fakeTracker() {
     alive: true,
     listeners: new Set<(p: unknown) => void>(),
     configureFor() {},
+    lowest: [] as (number | null)[],
+    hint: null as ((t: number) => number | null) | null,
+    setLowestNote(m: number | null) { t.lowest.push(m); },
+    setHint(fn: ((t: number) => number | null) | null) { t.hint = fn; },
+    filterPlan: { highpassHz: 90, notches: [60, 120], mainsHz: 60 },
     onPitch(cb: (p: unknown) => void) { t.listeners.add(cb); return () => t.listeners.delete(cb); },
+    raw: new Set<(b: unknown) => void>(),
+    onRawBlock(cb: (b: unknown) => void) { t.raw.add(cb); return () => t.raw.delete(cb); },
     stop() { t.alive = false; },
     sourceNode: {},
     windowN: 2048,
@@ -190,5 +197,34 @@ describe('PracticeSession pause', () => {
     await vi.advanceTimersByTimeAsync(10);
     expect(onDone).toHaveBeenCalledTimes(1);
     expect(s.phase).toBe('done');
+  });
+});
+
+describe('PracticeSession input quality', () => {
+  it('sets the tracker up for the part, flags mic trouble on samples and summarises the input', async () => {
+    const onDone = vi.fn();
+    const { s, player } = session(onDone);
+    await s.start();
+    const t = h.trackers[0] as unknown as { lowest: (number | null)[]; hint: ((x: number) => number | null) | null; raw: Set<(b: unknown) => void> };
+    expect(t.lowest.at(-1)).toBe(60); // the part's lowest note: the input filters sit under it
+    expect(t.hint?.(4.5)).toBe(62); // the note due, for the harmonic check
+    player.position = 0;
+    s.position; // count-in → playing
+    for (const cb of t.raw) cb({ ctxTime: 0.5, hum: { levelDb: -45, family: 60, hz: 59.7, humDb: -48 }, clip: { runs: 0, slots: 0, peak: 0.3 }, slotsTotal: 12.5 });
+    for (let k = 0; k < 200; k++) {
+      const time = 0.1 + k * 0.02;
+      emit({ ...sing(60, time), ...(k % 2 ? { lifted: 3 as const, subDb: -9 } : { subDb: -11 }) });
+    }
+    expect(s.samples.length).toBe(200);
+    expect(s.samples.every((x) => x.mic)).toBe(true);
+    player.fireEnded();
+    await new Promise((r) => setTimeout(r, 0));
+    s.finish();
+    expect(s.inputQuality?.hum).toEqual({ hz: 59.7, db: -48, vsVoiceDb: -28 });
+    expect(s.inputQuality?.problems).toEqual(['hum', 'distortion']);
+    expect(s.inputQuality?.filter).toEqual({ hp: 90, notches: [60, 120] });
+    // The shared tracker is handed back neutral (tuner, range and delay checks).
+    expect(t.hint).toBeNull();
+    expect(t.lowest.at(-1)).toBeNull();
   });
 });

@@ -6,7 +6,8 @@ import { toast } from '../hooks';
 import { getLastResult, lastRunPiece } from '../play/lastResult';
 import { getPiece, singableSections } from '../library';
 import { go } from '../router';
-import { LEVELS, OFF_BOOK_DAYS, effectiveTolerance, fixesBefore, nextStep, wrongNotes } from '../../progress/ladder';
+import { LEVELS, OFF_BOOK_DAYS, effectiveTolerance, fixesBefore, nextStep, noteVerdict, wrongNotes } from '../../progress/ladder';
+import { inputAdvice, type InputAdvice } from '../../audio/inputQuality';
 import { getProgress, loadProfile, saveProfile } from '../../progress/store';
 import { barRangeLabel } from '../../music/sections';
 import { noteFault } from '../play/noteFault';
@@ -110,6 +111,11 @@ export function Results() {
   // Nor a level-1 run through the speaker (practice: "move on to the next level" would be wrong).
   const speakerRun = !!lr.speaker && !!lr.notCounted;
   const insights = lr.timingFail != null || lr.timingUnsure != null || wrong.length > 0 || speakerRun ? r.insights.filter((i) => i.kind !== 'great') : r.insights;
+  // Microphone trouble: advice for what the input monitor found (through the speaker, the backing in
+  // the mic explains the "distortion"), and at level 1 the notes let off because of it.
+  const advice = inputAdvice(lr.inputQuality).filter((a) => !(lr.speaker && a.kind === 'distortion'));
+  const micNotes = everyNote ? r.notes.filter((n) => n.unsure === 'mic' && noteVerdict(n) === 'forgiven') : [];
+  const micBars = [...new Set(micNotes.map((n) => part?.notes[n.index]?.measure).filter((m): m is number => m != null))].sort((a, b) => a - b);
 
   return (
     <main className="screen">
@@ -160,10 +166,16 @@ export function Results() {
                   : <><strong>Not yet:</strong> the notes were right ({Math.round(r.accuracy * 100)}%), but you came in about {lr.timingFail} ms behind the beat. Breathe early and sing with the music, not after it.</>
                 : everyNote && wrong.length
                   ? <><strong>Not yet: {wrong.length === 1 ? 'one note wasn’t' : `${wrong.length} notes weren’t`} right.</strong> At level 1 every note counts. Loop {wrong.length === 1 ? 'its bar' : 'those bars'} slowly (below), then try again.</>
-                  : everyNote
+                  : everyNote && micNotes.length
+                    ? <><strong>Not yet:</strong> {Math.round(r.accuracy * 100)}%: microphone trouble kept the app from hearing {micNotes.length === 1 ? 'one note' : `${micNotes.length} notes`} clearly, so the run can’t count. Fix the microphone (below) and try again.</>
+                    : everyNote
                     ? <><strong>Not yet:</strong> {Math.round(r.accuracy * 100)}%: too many notes were too unclear to judge. Sing every note on “doo”, clearly and steadily, and try again.</>
                     : <><strong>Not yet:</strong> {Math.round(r.accuracy * 100)}% of {Math.round((spec?.pass ?? 0.8) * 100)}% needed. Use the tips below and try again.</>}
         </div>
+      )}
+
+      {(advice.length > 0 || micBars.length > 0) && (
+        <MicAdvice advice={advice} micBars={micBars.map((m) => barRangeLabel(piece.score, m, m, true))} />
       )}
 
       {fixedNote && (
@@ -376,6 +388,32 @@ function FullRunBanner({ lr, full, label }: { lr: LR; full: NonNullable<LR['full
   );
 }
 
+
+/** "a", "a and b", "a, b and c", "a, b, c and 3 more". */
+function listText(xs: string[]): string {
+  if (xs.length > 4) return `${xs.slice(0, 3).join(', ')} and ${xs.length - 3} more`;
+  return xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
+}
+
+/** What the input monitor found wrong with the microphone, in a few concrete steps. */
+function MicAdvice({ advice, micBars }: { advice: InputAdvice[]; micBars: string[] }) {
+  return (
+    <div className="notice" role="status" data-testid="mic-advice">
+      <div className="col" style={{ gap: 8 }}>
+        <strong>Your microphone</strong>
+        {advice.map((a) => (
+          <span key={a.kind} className="small" data-testid={`mic-advice-${a.kind}`}><strong>{a.title}:</strong> {a.text}</span>
+        ))}
+        {micBars.length > 0 && (
+          <span className="small" data-testid="mic-trouble-notes">
+            {advice.length ? 'Because of it, the app' : 'The app'} couldn’t hear {micBars.length === 1 ? 'a note' : 'some notes'} clearly ({listText(micBars)}): {micBars.length === 1 ? 'it isn’t' : 'they aren’t'} counted as wrong.
+            {advice.length ? '' : ' If it keeps happening, unplug the laptop charger or try another mic.'}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
 
 /** Level 1: the notes that weren't right, grouped by bar, each bar with a slow loop to drill it. */
 function WrongNotes({ piece, part, notes, tol, loop }: {

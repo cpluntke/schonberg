@@ -203,3 +203,17 @@ describe('PitchTracker.create', () => {
     }
   });
 });
+
+describe('hum floor', () => {
+  it('with 60 Hz mains the hum (B1 and lower) is not a reading; C2 still is', async () => {
+    const { humFloorHz } = await import('./pitch');
+    expect(humFloorHz(null)).toBe(60);
+    expect(humFloorHz(50)).toBe(60);
+    expect(humFloorHz(59.6)).toBeCloseTo(63.2, 1);
+    const r = (hz: number) => ({ hz, clarity: 0.95, rms: 0.05 });
+    expect(gatePitch(r(60.5), { minHz: humFloorHz(59.6) })).toBeNull();
+    expect(gatePitch(r(61.7), { minHz: humFloorHz(59.6) })).toBeNull();
+    expect(gatePitch(r(65.4), { minHz: humFloorHz(59.6) })).toBeCloseTo(36, 1);
+    expect(gatePitch(r(60.5))).not.toBeNull();
+  });
+});

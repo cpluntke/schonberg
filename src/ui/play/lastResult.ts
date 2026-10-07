@@ -1,6 +1,7 @@
 import type { AttemptResult } from '../../game/types';
 import type { WordsResult, WordsStage } from '../../game/textrhythm';
 import type { FullRunRecord } from '../../progress/store';
+import type { InputQuality } from '../../audio/inputQuality';
 
 export interface LastResult {
   pieceId: string;
@@ -46,6 +47,8 @@ export interface LastResult {
   full?: FullRunRecord;
   /** A section pass that cleared it from a full run's to-fix list (level, sections left to fix there). */
   fixed?: { level: number; remaining: number }[];
+  /** How good the microphone input was (Results gives advice when it found a problem). */
+  inputQuality?: InputQuality | null;
 }
 
 let last: LastResult | null = null;

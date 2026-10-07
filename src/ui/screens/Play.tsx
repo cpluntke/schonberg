@@ -242,6 +242,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
         sess.samples, sess.cfg.scoring,
         {
           rate: sess.cfg.rate, latencyMs: sess.latencyMs, calibrated, liftSubharmonics: !sess.cfg.scoring.octaveTolerant, everyNote: !!spec?.everyNote,
+          voiceOnly: headphonesRef.current === true,
           maxTotalMs: sess.cfg.guide ? Math.max(estimateLatencyMs() + GUIDE_LEARN_MAX_ABOVE, sess.latencyMs + 80) : 450,
         },
       );
@@ -297,7 +298,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
         pieceId: piece.id, pieceTitle: piece.title, partId: part.id, partName: part.name,
         from: sess.cfg.from, to: sess.cfg.to, rate: sess.cfg.rate, level, scoring: sess.cfg.scoring,
         latencyMs: sess.latencyMs, calibrated,
-        alignedMs: alignedMs ?? 0, samples: sess.samples, result: r,
+        alignedMs: alignedMs ?? 0, samples: sess.samples, result: r, inputQuality: sess.inputQuality,
       },
     } : null);
     const realSection = !GENERATED_SECTIONS.has(section.id);
@@ -359,6 +360,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
       offBookDays: rec.offBookDays,
       full,
       fixed,
+      ...(sess?.inputQuality ? { inputQuality: sess.inputQuality } : {}),
       ...(notCounted === SPEAKER_PRACTICE ? { speaker: true } : {}),
       notCounted,
       passed: rec.passed, prevLevel: rec.prevLevel, newLevel: rec.newLevel,

@@ -48,7 +48,11 @@ slowly; that bar shows as “needs work” in the bar strip, and the grade lette
   or replaced (see [SCORING.md](SCORING.md); never an octave low). The end-of-run correction of
   readings an octave under a note (the phone speaker's subharmonics) needs more than half of the
   note at the right octave at level 1 (30% at levels 2–5), so a note sung an octave low with a few
-  right-octave readings (the tracker, or the guide in the mic) still fails.
+  right-octave readings (the tracker, or the guide in the mic) still fails; readings an octave and a
+  fifth or two octaves under it are corrected at level 1 only when 30% of the note was heard at the
+  right pitch, so a bass singing F#2 for a C#4 fails. A note mostly lost to **microphone trouble**
+  (`'mic'`: sung through, right wherever a pitch was heard, with the tracker's evidence of hum
+  intermodulation or distortion on a quarter of it) is let off too, and Results says what to fix.
 - **…unless it was clearly wrong** (`NoteResult.clearly`): **no sound at all** inside the note
   (“not sung”; for both kinds, so a note out of the tracker's range must still be sung), or a very
   short note graded *miss* whose own readings were enough to judge

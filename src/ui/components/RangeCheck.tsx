@@ -89,6 +89,8 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
       const ctx = getAudioContext();
       const tracker = await getTracker();
       tracker.configureFor(null);
+      tracker.setLowestNote(null);
+      tracker.setHint(null);
       const notes = PATTERN.map((x) => top + dir * x);
       const judgeRoot = dir > 0 ? top : top - 4;
       const out = synthBus(ctx);

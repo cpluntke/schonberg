@@ -227,6 +227,24 @@ describe('re-review scenarios', () => {
     expect(level1.notes[5].grade).toBe('miss');
     expect(level1.notes.filter((n) => n.index !== 5 && n.grade !== 'perfect' && n.grade !== 'good')).toEqual([]);
   });
+  it('level 1 on headphones: a note sung an octave and a fifth low stays wrong; flickering ×⅓ readings are still lifted', () => {
+    // Note 5 (A4) sung as D3 (19 semitones low) throughout; elsewhere one reading in 7 at ×⅓.
+    let k = 0;
+    const take = singRealistic(part).map((s) => {
+      if (s.midi === null) return s;
+      k++;
+      const i = part.notes.findIndex((n) => s.time >= n.start && s.time < n.start + n.dur);
+      if (i === 5) return { ...s, midi: s.midi - 19 };
+      return { ...s, midi: k % 7 === 0 ? s.midi - 19 : s.midi };
+    });
+    const run = { rate: 1, latencyMs: 130, calibrated: true, liftSubharmonics: true, everyNote: true };
+    const phones = scoreAligned(ctx, take, strict, { ...run, voiceOnly: true }).result;
+    expect(phones.notes[5].grade).toBe('miss');
+    expect(phones.notes.filter((n) => n.index !== 5 && n.grade !== 'perfect' && n.grade !== 'good')).toEqual([]);
+    // Through the speaker (practice), the backing makes such readings: they are lifted as before.
+    const speaker = scoreAligned(ctx, take, strict, run).result;
+    expect(speaker.notes[5].grade).not.toBe('miss');
+  });
 });
 
 describe('beyond the plausible delay', () => {

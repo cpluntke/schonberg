@@ -145,16 +145,16 @@ function typicalNoteSec(ctx: ScoringContext, rate: number): number {
  * hears that they're late. `calibrated` = that delay was measured with the delay check: then
  * only small corrections are made. `everyNote` = a level where every note must be right (level 1):
  * there, a note is only lifted from an octave below when most of it is at the right octave (see
- * liftSubharmonics).
+ * liftSubharmonics). `voiceOnly` = the singer has headphones on: the mic hears no backing.
  */
 export function scoreAligned(
   ctx: ScoringContext,
   samples: PitchSample[],
   opts: ScoringOptions,
-  run: { rate: number; latencyMs: number; calibrated: boolean; liftSubharmonics?: boolean; everyNote?: boolean; maxTotalMs?: number },
+  run: { rate: number; latencyMs: number; calibrated: boolean; liftSubharmonics?: boolean; everyNote?: boolean; voiceOnly?: boolean; maxTotalMs?: number },
 ): AlignedResult {
   const rate = run.rate > 0 ? run.rate : 1;
-  const prep = (xs: PitchSample[]) => (run.liftSubharmonics ? liftSubharmonics(ctx.part, xs, { everyNote: run.everyNote }) : xs);
+  const prep = (xs: PitchSample[]) => (run.liftSubharmonics ? liftSubharmonics(ctx.part, xs, { everyNote: run.everyNote, voiceOnly: run.voiceOnly }) : xs);
   // Search a plausible range of device delays around the current setting (total ≥ ~20 ms); with a
   // measured delay only a small correction.
   const lo = run.calibrated ? -CALIBRATED_MAX : Math.max(-0.25, -(run.latencyMs - 20) / 1000);
@@ -217,9 +217,13 @@ export const OCTAVE_LIFT_SHARE_EVERY_NOTE = 0.5;
  * `everyNote` (level 1, where one wrong note fails the run): an octave below is only corrected
  * when most of the note's readings are at the right octave (more than OCTAVE_LIFT_SHARE_EVERY_NOTE),
  * so a note sung an octave low with some right-octave readings (the tracker reading a low "oo" an
- * octave up, or the guide bleeding into the mic) is not moved onto the note.
+ * octave up, or the guide bleeding into the mic) is not moved onto the note. With headphones on
+ * (`voiceOnly`: no backing in the mic, and the tracker's harmonic check already lifts its own ⅓
+ * readings) an octave and a fifth or two octaves below is moved only when the note also has
+ * readings at the right pitch (OCTAVE_LIFT_SHARE), so a bass singing F#2 for a C#4 at level 1 reads
+ * as the wrong note it is.
  */
-export function liftSubharmonics(part: Part, samples: PitchSample[], o: { everyNote?: boolean } = {}): PitchSample[] {
+export function liftSubharmonics(part: Part, samples: PitchSample[], o: { everyNote?: boolean; voiceOnly?: boolean } = {}): PitchSample[] {
   const notes = part.notes;
   if (!notes.length) return samples;
   const starts = notes.map((n) => n.start);
@@ -237,12 +241,14 @@ export function liftSubharmonics(part: Part, samples: PitchSample[], o: { everyN
   // Per note: how many readings sit on the note, and an octave below it.
   const onNote = new Map<number, number>();
   const octBelow = new Map<number, number>();
+  const subBelow = new Map<number, number>();
   const idx = samples.map((s) => (s.midi === null ? -1 : at(s.time)));
   samples.forEach((s, k) => {
     const i = idx[k];
     if (i < 0 || s.midi === null) return;
     if (near(s.midi, notes[i].midi)) onNote.set(i, (onNote.get(i) ?? 0) + 1);
     else if (near(s.midi + 12, notes[i].midi)) octBelow.set(i, (octBelow.get(i) ?? 0) + 1);
+    else if (near(s.midi + 19, notes[i].midi) || near(s.midi + 24, notes[i].midi)) subBelow.set(i, (subBelow.get(i) ?? 0) + 1);
   });
   return samples.map((s, k) => {
     const i = idx[k];
@@ -252,7 +258,17 @@ export function liftSubharmonics(part: Part, samples: PitchSample[], o: { everyN
     const prev = i > 0 ? notes[i - 1].midi : null;
     const next = i + 1 < notes.length ? notes[i + 1].midi : null;
     if ((prev !== null && near(s.midi, prev)) || (next !== null && near(s.midi, next))) return s;
-    for (const kk of [19, 24]) if (near(s.midi + kk, due)) return { ...s, midi: s.midi + kk };
+    for (const kk of [19, 24]) {
+      if (!near(s.midi + kk, due)) continue;
+      // Level 1 on headphones: only a note the tracker also heard at the right pitch (it flickers); a
+      // voice that stays an octave and a fifth (or two octaves) under the note is singing it there.
+      if (o.everyNote && o.voiceOnly) {
+        const on = onNote.get(i) ?? 0;
+        const below = subBelow.get(i) ?? 0;
+        if (on < OCTAVE_LIFT_SHARE * (on + below)) return s;
+      }
+      return { ...s, midi: s.midi + kk };
+    }
     if (near(s.midi + 12, due)) {
       const on = onNote.get(i) ?? 0;
       const below = octBelow.get(i) ?? 0;

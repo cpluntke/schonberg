@@ -3,6 +3,10 @@ import { getTracker } from '../play/session';
 import { unlockAudio } from '../../audio/context';
 import { noteLabel, type NotationMode } from '../../game/notation';
 import type { RawPitch } from '../../audio/pitch';
+import { InputMonitor, inputAdvice, type InputAdvice } from '../../audio/inputQuality';
+
+/** The mic check judges the last this many seconds. */
+const CHECK_WINDOW_SEC = 20;
 
 const LETTERS = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'];
 
@@ -26,10 +30,23 @@ export function Tuner({ notation, onReading, autoStart = false }: {
   cbRef.current = onReading;
   const unsubRef = useRef<(() => void) | null>(null);
   const mountedRef = useRef(true);
+  // Mic check: hum, clipping, distortion and level over the last CHECK_WINDOW_SEC (inputQuality.ts).
+  const [advice, setAdvice] = useState<InputAdvice[]>([]);
+  const monitorRef = useRef<InputMonitor | null>(null);
   useEffect(() => {
     mountedRef.current = true;
     return () => { mountedRef.current = false; unsubRef.current?.(); unsubRef.current = null; };
   }, []);
+  useEffect(() => {
+    if (state !== 'on') return;
+    const id = setInterval(() => {
+      const m = monitorRef.current;
+      if (!m) return;
+      const next = inputAdvice(m.summary());
+      setAdvice((cur) => (cur.map((a) => a.kind).join() === next.map((a) => a.kind).join() ? cur : next));
+    }, 1500);
+    return () => clearInterval(id);
+  }, [state]);
 
   async function startMic() {
     setState('starting');
@@ -37,10 +54,20 @@ export function Tuner({ notation, onReading, autoStart = false }: {
       await unlockAudio();
       const t = await getTracker();
       t.configureFor(null); // full window: any voice, down to the bass range
+      t.setLowestNote(null);
+      t.setHint(null);
       if (!mountedRef.current) return;
       unsubRef.current?.();
       let last = 0;
-      unsubRef.current = t.onPitch((p) => {
+      const mon = new InputMonitor();
+      monitorRef.current = mon;
+      const offRaw = t.onRawBlock((b) => {
+        mon.pushBlock(b);
+        mon.trim(b.ctxTime - CHECK_WINDOW_SEC);
+      });
+      const offPitch = t.onPitch((p) => {
+        // No note is due: whatever the singer holds is "the note" (for the level and distortion checks).
+        mon.pushReading({ ctxTime: p.ctxTime, midi: p.midi, rms: p.rms, lifted: p.lifted, subDb: p.subDb, expected: p.midi == null ? null : Math.round(p.midi) });
         cbRef.current?.(p);
         const now = performance.now();
         if (now - last > 60) {
@@ -48,6 +75,7 @@ export function Tuner({ notation, onReading, autoStart = false }: {
           setReading({ midi: p.midi, hz: p.hz, rms: p.rms });
         }
       });
+      unsubRef.current = () => { offPitch(); offRaw(); };
       setState('on');
     } catch (e) {
       setErr(micErrorText(e));
@@ -96,6 +124,13 @@ export function Tuner({ notation, onReading, autoStart = false }: {
             </div>
           </div>
           <div className="bar thin" style={{ width: '100%' }} aria-label="Input level"><span style={{ width: `${Math.min(100, reading.rms * 400)}%` }} /></div>
+          {advice.length > 0 && (
+            <div className="notice" role="status" data-testid="mic-check-advice" style={{ width: '100%' }}>
+              <div className="col" style={{ gap: 6 }}>
+                {advice.map((a) => <span key={a.kind} className="small" data-testid={`mic-advice-${a.kind}`}><strong>{a.title}:</strong> {a.text}</span>)}
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

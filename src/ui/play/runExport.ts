@@ -5,6 +5,7 @@ import { zipSync, strToU8 } from 'fflate';
 import { encodeWav, type Recording } from '../../audio/recorder';
 import type { AttemptResult, PitchSample, ScoringOptions } from '../../game/types';
 import { outputLatencySec, getAudioContext } from '../../audio/context';
+import type { InputQuality } from '../../audio/inputQuality';
 
 export interface RunMeta {
   pieceId: string;
@@ -23,6 +24,8 @@ export interface RunMeta {
   alignedMs: number;
   samples: PitchSample[];
   result: AttemptResult;
+  /** How good the microphone input was (hum, clipping, distortion, level, filters used). */
+  inputQuality?: InputQuality | null;
 }
 
 export interface RunExport {
@@ -41,7 +44,10 @@ export function getLastRun(): RunExport | null {
   return last;
 }
 
-/** run.json: the sidecar format read by qa/realism (version 1), plus context for debugging. */
+/**
+ * run.json: the sidecar format read by qa/realism, plus context for debugging. Version 2 adds
+ * `inputQuality` and a 5th sample field (1 = the tracker flagged input trouble in that frame).
+ */
 export function runJson(r: RunExport): string {
   const { meta, recording } = r;
   let device: Record<string, unknown> = {};
@@ -56,7 +62,7 @@ export function runJson(r: RunExport): string {
   } catch { /* ignore */ }
   const res = meta.result;
   return JSON.stringify({
-    version: 1,
+    version: 2,
     pieceId: meta.pieceId,
     pieceTitle: meta.pieceTitle,
     partId: meta.partId,
@@ -82,8 +88,13 @@ export function runJson(r: RunExport): string {
       notes: res.notes.map((n) => ({ i: n.index, g: n.grade, c: n.cents == null ? null : Math.round(n.cents), hit: +n.hitRatio.toFixed(2), on: n.onsetMs == null ? null : Math.round(n.onsetMs) })),
       insights: res.insights.map((i) => i.kind),
     },
+    inputQuality: meta.inputQuality ?? null,
     // The app's own pitch readings (score time, fractional MIDI) for comparison with offline tracking.
-    samples: meta.samples.map((s) => [+s.time.toFixed(3), s.midi == null ? null : +s.midi.toFixed(3), +s.clarity.toFixed(2), +s.rms.toFixed(4)]),
+    samples: meta.samples.map((s) => {
+      const row: (number | null)[] = [+s.time.toFixed(3), s.midi == null ? null : +s.midi.toFixed(3), +s.clarity.toFixed(2), +s.rms.toFixed(4)];
+      if (s.mic) row.push(1);
+      return row;
+    }),
   });
 }
 

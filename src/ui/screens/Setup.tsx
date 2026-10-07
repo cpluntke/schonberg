@@ -58,6 +58,8 @@ export function Setup() {
       await unlockAudio();
       const t = await getTracker();
       t.configureFor(null); // full window: any voice, down to the bass range
+      t.setLowestNote(null); // input filters for any voice
+      t.setHint(null);
       const res = await measureLatency(getAudioContext(), t, (i) => setLat((l) => ({ ...l, beat: i + 1 })));
       if (res.ok) {
         update({ latencyMs: Math.round(res.latencyMs), latencySource: 'measured' });

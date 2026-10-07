@@ -324,8 +324,11 @@ test('a real-microphone run can be shared as a recording (WAV + run.json)', asyn
   const fs = await import('node:fs');
   const files = unzipSync(new Uint8Array(fs.readFileSync(path!)));
   const meta = JSON.parse(strFromU8(files['run.json']));
-  expect(meta.version).toBe(1);
+  expect(meta.version).toBe(2);
   expect(meta.samples.length).toBeGreaterThan(50);
+  // The input-quality summary (hum, clipping, distortion, level) and the filters in front of the tracker.
+  expect(Array.isArray(meta.inputQuality.problems)).toBe(true);
+  expect(meta.inputQuality.filter.hp).toBeGreaterThan(30);
   expect(typeof meta.scoreTimeAtSample0).toBe('number');
   const wav = files['run.wav'];
   expect(String.fromCharCode(...wav.slice(0, 4))).toBe('RIFF');

@@ -10,6 +10,12 @@ export interface PitchSample {
   clarity: number;
   /** Input RMS level 0..1. */
   rms: number;
+  /**
+   * The tracker saw input trouble in this frame (src/audio/inputQuality.ts micTrouble): it read ½ or
+   * ⅓ of the voice and lifted it, or strong components at ½ / ⅓ of the pitch (hum intermodulation,
+   * distortion). Absent = clean.
+   */
+  mic?: boolean;
 }
 
 export type Grade = 'perfect' | 'good' | 'ok' | 'miss';
@@ -65,10 +71,12 @@ export interface NoteResult {
    * readings are folded down (the tracker's octave error on "oo"; never folded downward),
    * 'tracker' = a note right once a minority of subharmonic readings (18–46 semitones under it and
    * more than 6 semitones from both neighbours: the tracker locking onto a fraction of the pitch)
-   * are replaced by the reading before them.
+   * are replaced by the reading before them,
+   * 'mic' = mic trouble: a note sung through, right wherever the tracker heard a pitch, whose shortfall
+   * comes with the tracker's evidence of input trouble (PitchSample.mic on a good share of the note).
    * Level 1 forgives such a note below "good" unless `clearly` says it was wrong (docs/LEVELS.md).
    */
-  unsure?: 'short' | 'range' | 'octave' | 'tracker';
+  unsure?: 'short' | 'range' | 'octave' | 'tracker' | 'mic';
   /**
    * An unsure note graded below "good" that was still clearly wrong: 'silent' = no sound at all
    * inside the written note (no voiced reading, every reading below the silence level; either kind

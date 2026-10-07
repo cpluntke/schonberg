@@ -7,6 +7,7 @@ import { ScorePlayer, beatGrid, beatsInMeasure, beatSecAt } from '../../audio/pl
 import { exposedBeats } from '../../music/exposure';
 import { LiveScorer, scoreAttempt, type ScoringContext } from '../../game/scoring';
 import { RunRecorder, type Recording } from '../../audio/recorder';
+import { InputMonitor, micTrouble, type InputQuality } from '../../audio/inputQuality';
 
 let sharedTracker: PitchTracker | null = null;
 let trackerPromise: Promise<PitchTracker> | null = null;
@@ -120,6 +121,10 @@ export class PracticeSession {
   private plays = 0;
   /** The run's recording (only for uninterrupted runs), with the score time of its first sample. */
   recording: (Recording & { scoreTimeAtSample0: number; windowN: number }) | null = null;
+  /** How good the microphone input was (hum, clipping, distortion, level), set when the run finishes. */
+  inputQuality: InputQuality | null = null;
+  private monitor: InputMonitor | null = null;
+  private unsubRaw: (() => void) | null = null;
 
   constructor(cfg: SessionConfig, onDone: (r: AttemptResult | null) => void) {
     this.cfg = cfg;
@@ -164,8 +169,7 @@ export class PracticeSession {
         throw e;
       }
       if (this.disposed) return; // the singer left while the permission prompt was open
-      this.tracker.configureFor(this.cfg.lowestMidi ?? null);
-      this.unsubPitch = this.tracker.onPitch((p) => this.onPitch(p));
+      this.listenTo(this.tracker);
       if (this.cfg.record && !this.recorder) {
         this.recorder = await RunRecorder.start(ctx, this.tracker.sourceNode);
         if (this.disposed) { this.recorder?.stop(); this.recorder = null; return; }
@@ -230,12 +234,32 @@ export class PracticeSession {
     return beatSecAt(this.cfg.score, at);
   }
 
+  /**
+   * Set the (shared) tracker up for this run: analysis window, input filters under the lowest note
+   * the singer sings (an octave lower for a singer in another octave), the note due as the harmonic
+   * check's tie-breaker (not for a singer in another octave), and the input-quality monitor.
+   */
+  private listenTo(t: PitchTracker) {
+    t.configureFor(this.cfg.lowestMidi ?? null);
+    t.setLowestNote(this.cfg.part.low - (this.cfg.scoring.octaveTolerant ? 12 : 0));
+    t.setHint(this.cfg.scoring.octaveTolerant ? null : (ctxTime) => this.noteDueAt(this.player.scoreTimeAt(ctxTime - this.latencyMs / 1000)));
+    this.unsubPitch?.();
+    this.unsubRaw?.();
+    this.unsubPitch = t.onPitch((p) => this.onPitch(p));
+    if (!this.monitor) this.monitor = new InputMonitor();
+    this.unsubRaw = t.onRawBlock((b) => {
+      if (this.phase === 'playing' || this.phase === 'countin') this.monitor?.pushBlock(b);
+    });
+  }
+
   private onPitch(p: RawPitch) {
     if (this.phase !== 'playing' && this.phase !== 'countin') return;
     const t = this.player.scoreTimeAt(p.ctxTime - this.latencyMs / 1000);
+    this.monitor?.pushReading({ ctxTime: p.ctxTime, midi: p.midi, rms: p.rms, lifted: p.lifted, subDb: p.subDb, expected: this.noteDueAt(t) });
     // Raw readings are kept (and exported); the end of the run corrects speaker-bleed subharmonics
     // after lining the voice up (game/align.ts). The live display corrects them on the fly.
-    const s: PitchSample = { time: t, midi: p.midi, clarity: p.clarity, rms: p.rms };
+    // Frames where the tracker saw input trouble are marked (scoring: NoteResult.unsure 'mic').
+    const s: PitchSample = { time: t, midi: p.midi, clarity: p.clarity, rms: p.rms, ...(micTrouble(p) ? { mic: true } : {}) };
     const shown = p.midi != null && !this.cfg.scoring.octaveTolerant ? { ...s, midi: fixSubharmonic(p.midi, this.noteDueAt(t)) } : s;
     this.latest = shown;
     this.keep(s, shown);
@@ -372,8 +396,7 @@ export class PracticeSession {
         return 'mic';
       }
       if (stale()) return 'stale';
-      this.tracker.configureFor(this.cfg.lowestMidi ?? null);
-      this.unsubPitch = this.tracker.onPitch((p) => this.onPitch(p));
+      this.listenTo(this.tracker);
     }
     if (this.ended) {
       // Paused while waiting for the last notes: nothing left to play, finish now.
@@ -432,6 +455,7 @@ export class PracticeSession {
     this.player.stop();
     const rec = this.recorder?.stop() ?? null;
     this.recorder = null;
+    this.stopListening();
     // A paused-and-resumed run has two time mappings; only keep uninterrupted recordings.
     if (rec && this.plays === 1 && this.tracker) {
       this.recording = { ...rec, scoreTimeAtSample0: this.player.scoreTimeAt(rec.startCtxTime), windowN: this.tracker.windowN };
@@ -451,6 +475,20 @@ export class PracticeSession {
     this.onDone(result);
   }
 
+  /** Summarise the input quality and hand the shared tracker back in its neutral state. */
+  private stopListening() {
+    if (this.monitor && this.tracker) {
+      const plan = this.tracker.filterPlan;
+      if (plan) this.monitor.filter = { hp: plan.highpassHz, notches: plan.notches };
+      this.inputQuality = this.monitor.summary();
+    }
+    this.monitor = null;
+    this.unsubRaw?.();
+    this.unsubRaw = null;
+    this.tracker?.setHint(null);
+    this.tracker?.setLowestNote(null);
+  }
+
   /** Stop without producing a result (navigating away). */
   dispose() {
     this.disposed = true;
@@ -462,6 +500,7 @@ export class PracticeSession {
     this.releaseWakeLock();
     this.recorder?.stop();
     this.recorder = null;
+    this.stopListening();
     this.unsubPitch?.();
     this.unsubPitch = null;
     this.unsubEnd?.();

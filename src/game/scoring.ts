@@ -100,6 +100,16 @@ export const OCTAVE_UP_HZ = 200;
  */
 export const SUBHARMONIC_HIGH = -1800;
 export const SUBHARMONIC_LOW = -4600;
+/**
+ * Mic trouble (NoteResult.unsure 'mic'): at least this share of the note's body carries the tracker's
+ * evidence of input trouble (PitchSample.mic)…
+ */
+export const MIC_SHARE = 0.25;
+/** …the singer was heard through at least this share of it (a voiced reading, or this loud: SOUND_RMS)… */
+export const MIC_SOUND_SHARE = 0.7;
+export const SOUND_RMS = 0.02;
+/** …and at most this share of its pitched readings were elsewhere (a wrong note is never let off). */
+export const MIC_OFF_SHARE = 0.25;
 
 export const GRADE_POINTS: Record<Grade, number> = { perfect: 100, good: 70, ok: 40, miss: 0 };
 export const GRADE_VALUE: Record<Grade, number> = { perfect: 1, good: 0.85, ok: 0.5, miss: 0 };
@@ -264,6 +274,9 @@ class NoteAcc {
   /** Readings inside the written note, and how many of them had sound (level at or above SILENCE_RMS). */
   inNote = 0;
   loudInNote = 0;
+  /** Body seconds with the tracker's mic-trouble flag, and with sound (voiced or loud). */
+  micTime = 0;
+  soundTime = 0;
   final: NoteResult | null = null;
   constructor(readonly w: NoteWindow) {}
 }
@@ -483,6 +496,10 @@ export class LiveScorer {
     // Body coverage. In-tune is judged on the vibrato-smoothed deviation (mean over the last
     // ~one vibrato cycle of this note's body), so a centred vibrato is not punished.
     const overlap = Math.min(c.to, w.bodyEnd) - Math.max(c.from, w.bodyStart);
+    if (overlap > 0) {
+      if (c.s.mic) a.micTime += overlap;
+      if (dev !== null || c.s.rms >= SOUND_RMS) a.soundTime += overlap;
+    }
     if (overlap > 0 && dev !== null) {
       let smooth = dev;
       if (this.vibWin > 0 && t >= w.bodyStart) {
@@ -604,7 +621,21 @@ export class LiveScorer {
       let last = kept;
       slip = hitOf(jD.map((d) => (isFar(d) ? last : (last = d)))) >= 0.6;
     }
-    const unsure: NoteResult['unsure'] = w.outOfRange ? 'range' : w.short ? 'short' : octaveUp ? 'octave' : slip ? 'tracker' : undefined;
+    // Mic trouble: sung through, right wherever a pitch was heard, and the tracker's evidence of input
+    // trouble (readings it lifted from ½ / ⅓, strong components at ½ / ⅓) on a good share of the note.
+    // A note with pitched readings elsewhere (a wrong note, an octave off: the subharmonic band aside)
+    // is never let off, whatever the input.
+    let mic = false;
+    if (!w.short && !w.outOfRange && !octaveUp && !slip && GRADE_RANK[grade] < GRADE_RANK.good) {
+      const body = Math.max(1e-3, w.bodyEnd - w.bodyStart);
+      const pitched = jD.filter((d) => !(d < SUBHARMONIC_HIGH && d > SUBHARMONIC_LOW));
+      const off = pitched.filter((d) => Math.abs(d) > tolN).length;
+      const med = median(pitched);
+      // (Readings deep under the note may be the tracker's — but not most of them: that is a voice down there.)
+      mic = a.micTime / body >= MIC_SHARE && a.soundTime / body >= MIC_SOUND_SHARE && 2 * (jD.length - pitched.length) < jD.length
+        && pitched.length >= 2 && med !== null && Math.abs(med) <= tolN && off <= MIC_OFF_SHARE * pitched.length;
+    }
+    const unsure: NoteResult['unsure'] = w.outOfRange ? 'range' : w.short ? 'short' : octaveUp ? 'octave' : slip ? 'tracker' : mic ? 'mic' : undefined;
     let clearly: NoteResult['clearly'];
     if (unsure && GRADE_RANK[grade] < GRADE_RANK.good) {
       if (a.inNote > 0 && a.loudInNote === 0) clearly = 'silent';

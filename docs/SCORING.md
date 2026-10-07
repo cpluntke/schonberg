@@ -7,9 +7,11 @@ This page is for singers and testers who want to know what the app is doing.
 | Step | What happens |
 |---|---|
 | Microphone | `getUserMedia` with echo cancellation, noise suppression and auto-gain **off**, so the raw voice reaches the app. |
+| Input filters | Before the detector (only what it analyses; recordings stay raw): a gentle **high-pass** at 0.7 × the frequency of the part's lowest note (at most 90 Hz, so a voice an octave low is still heard; 46 Hz when no part is known, as in the tuner), and **notches** at the mains hum (50 or 60 Hz, measured in the quiet before you sing) and its harmonics below your lowest note. They add about 2 ms of delay at the lowest note, less above. |
 | Algorithm | **McLeod Pitch Method (MPM)**, from the `pitchy` library: a normalised square-difference function (a refined autocorrelation) with peak picking and parabolic interpolation. It is accurate to well under a cent on a steady tone. |
 | Window | The latest **1024 samples** (≈21 ms at 48 kHz) for voices that don't go below about C3 (sopranos, altos, most tenors). Otherwise **2048 samples** (≈43 ms) for basses, because MPM needs about 2 periods of the lowest note. The shorter window halves how much a note change smears. |
 | Hop | A new reading every **20 ms**. |
+| Harmonic check | MPM picks the first strong period of the sound. Hum mixing with the voice in a laptop's input can make that period two or three times the voice's, so a sung C#4 reads as C#3 or F#2. A voice at the reading would have energy at every multiple of it; when the multiples that aren't multiples of 3 are far (9 dB) weaker than those that are, the reading is lifted ×3, and ×2 when the odd ones are 15 dB weaker. Between 3 and 9 dB the note due or the voice's previous reading decide the ×3 lift; the octave never uses a hint. A voice really singing an octave or an octave and a fifth low has its own harmonics and still reads low. |
 | Gates | A reading only counts as sung when the level is above the noise floor, the MPM *clarity* is at least 0.85 (clearly pitched sound, not a consonant or breath) and the pitch is between 60 and 1400 Hz. |
 | Smoothing | Each reading is checked against the one before and the one after it (so it is reported one reading, 20 ms, later). A reading more than 1.5 semitones away from **both** neighbours on the same side (a one-frame octave jump or a wild reading) is replaced by the median of the three. Every other reading is passed on unchanged, so the one or two readings a fast note gets are not flattened. Nothing else: the trace you see is what the detector heard. |
 | Time stamp | Each reading is stamped at the centre of its own window (it is sent one reading later, with that window's level and clarity). The device delay is then subtracted (see below). |
@@ -69,8 +71,15 @@ For every note in your part:
     and more than 6 semitones from both neighbours (the detector locking onto a third, a quarter … of
     the pitch, e.g. on a high soprano note with a wide vibrato). If the note is *good* once each is
     replaced by the reading before it, it is let off. Nothing a voice sings lands there; readings an
-    octave below, a fifth or a sixth off, or anything above the note always count. Each note
-  result carries this as `unsure` (`'short'` / `'range'` / `'octave'` / `'tracker'`) and `clearly` (`'silent'` / `'off'`); see
+    octave below, a fifth or a sixth off, or anything above the note always count.
+  - **Microphone trouble** (`'mic'`): a note sung through (sound in 70% of it) and right wherever
+    the detector heard a pitch, whose shortfall comes with the detector's own evidence of input
+    trouble on at least a quarter of it: readings it lifted from ½ or ⅓, or strong components at ½ / ⅓
+    of the pitch (`PitchSample.mic`). A note with pitched readings elsewhere (a wrong note, an octave
+    off) is never let off, and hum alone excuses nothing. Results names these bars and says what to
+    fix on the microphone; the 75% backstop still applies, so a run mostly lost to the microphone
+    doesn't pass.
+  Each note result carries this as `unsure` (`'short'` / `'range'` / `'octave'` / `'tracker'` / `'mic'`) and `clearly` (`'silent'` / `'off'`); see
   [LEVELS.md](LEVELS.md).
 - **Sections within a full run.** A run of the whole piece also scores each section (the average grade of its notes). The piece level needs the run *and* every section at the level's pass mark; see [LEVELS.md](LEVELS.md).
 - **Rhythm.** When each note starts: the first sustained (≥60 ms) sound that is closer to this note than to the previous one. This is judged separately from pitch.
