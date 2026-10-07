@@ -89,6 +89,9 @@ export async function fetchPresence(): Promise<PresenceCounts | null> {
   }
 }
 
+/** Does this phone see the counts (a choir, and the app talks to a choir server)? */
+export const presenceShown = (): boolean => !!choirUrl();
+
 /** The counts, refreshed every few seconds while the screen is visible (null: no choir or no answer). */
 export function usePresence(): PresenceCounts | null {
   const [counts, setCounts] = useState<PresenceCounts | null>(null);

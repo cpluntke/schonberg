@@ -16,6 +16,7 @@ import { STUCK_AFTER, failsInARow, slowRate } from '../../progress/struggle';
 import type { Insight, NoteResult } from '../../game/types';
 import type { PieceInfo } from '../library';
 import { accountTipPending, dismissAccountTip } from '../../progress/sync';
+import { startPresence } from '../../progress/presence';
 
 /** Start a run from Results; replace the history entry so "back" from the run doesn't land on stale results. */
 function goPlay(r: Parameters<typeof go>[0]) {
@@ -43,6 +44,8 @@ function insightIcon(i: Insight) {
 }
 
 export function Results() {
+  // Results are part of practising: Again, Next… (so a singer doesn't flicker out of the choir's count)
+  React.useEffect(() => startPresence(loadProfile().voice), []);
   const lr = getLastResult();
   const piece = lr ? getPiece(lr.pieceId) : undefined;
   if (!lr || !piece) {
