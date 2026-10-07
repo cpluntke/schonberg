@@ -14,6 +14,7 @@ import { shareMyProgress } from '../play/shareProgress';
 import { LoggedOutCard, SyncNotice } from '../components/AccountSync';
 import { pieceStatus, todaysPlan, type PieceStatus } from '../plan';
 import { presenceShown, usePresence } from '../../progress/presence';
+import { LOGO_TILE } from '../components/ChoirLogo';
 
 export { pieceStatus, type PieceStatus };
 
@@ -76,7 +77,7 @@ export function Home() {
         </div>
         {logo && (
           <img src={logo} alt={`${choir?.name ?? 'Choir'} logo`} data-testid="choir-logo"
-            style={{ width: 56, height: 56, borderRadius: 14, objectFit: 'contain', background: 'var(--surface-2)', flex: 'none' }} />
+            style={{ width: 56, height: 56, borderRadius: 14, objectFit: 'contain', background: LOGO_TILE, padding: 4, boxSizing: 'border-box', flex: 'none' }} />
         )}
       </div>
 
