@@ -784,14 +784,20 @@ export function sungStep(midi: number, key: Pick<KeySig, 'fifths'>, target?: { m
   const d = m - target.midi;
   if (Math.abs(d) < 1e-9) return target.step;
   const dir = d > 0 ? 1 : -1;
-  const nb = target.step + dir;
-  const nl = mod(nb, 7);
-  const nbPitch = (Math.floor(nb / 7) + 1) * 12 + LETTER_PC[nl] + (alts[nl] ?? 0);
-  const gap = (nbPitch - target.midi) * dir; // semitones to the neighbouring letter
+  const letterPitch = (st: number) => (Math.floor(st / 7) + 1) * 12 + LETTER_PC[mod(st, 7)] + (alts[mod(st, 7)] ?? 0);
+  let nb = target.step + dir;
+  let gap = (letterPitch(nb) - target.midi) * dir; // semitones to the neighbouring letter
+  // A written note enharmonic with its neighbour in the key (B♯ with C♮, B♭ in B major): the
+  // letter after that one is the neighbour, else the ink would jump past the notehead.
+  if (gap < 0.5) {
+    nb += dir;
+    gap = (letterPitch(nb) - target.midi) * dir;
+  }
   if (gap < 0.5 || Math.abs(d) >= gap) return midiToStep(m, alts);
-  const s1 = midiToStep(nbPitch, alts);
+  const s1 = midiToStep(letterPitch(nb), alts);
+  const span = Math.max(1, Math.abs(s1 - target.step));
   const u = Math.abs(d) / gap;
-  const k = Math.max(0, MAGNIFY * gap - 1);
+  const k = Math.max(0, (MAGNIFY * gap) / span - 1);
   return target.step + (s1 - target.step) * (((1 + k) * u) / (1 + k * u));
 }
 /** Staff steps per semitone right at the target (plain staff: 0.5 for a whole tone, 1 for a semitone). */

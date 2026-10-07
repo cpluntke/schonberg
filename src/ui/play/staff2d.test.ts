@@ -467,6 +467,30 @@ describe('accidentals: written spelling, carrying, courtesy', () => {
     expect(next.map((e) => [e.accidental, !!e.courtesy])).toEqual([[0, true], [1, true]]);
   });
 
+  it('the ink around a written B♯ (enharmonic with C♮ in the key) stays at the notehead, both sides alike', () => {
+    const E = { fifths: 4 };
+    const t = { midi: 48, step: 20, alt: 1 }; // B♯2, sounding C3
+    const up = sungStep(48.1, E, t);
+    const down = sungStep(47.9, E, t);
+    // ~MAGNIFY steps per semitone at the note: 10 cents ≈ 0.3 step either way, never a jump to the C
+    expect(up - 20).toBeGreaterThan(0.15);
+    expect(up - 20).toBeLessThan(0.35);
+    expect(20 - down).toBeGreaterThan(0.15);
+    expect(20 - down).toBeLessThan(0.35);
+    expect(sungStep(48, E, t)).toBe(20);
+    // monotonic, and exact on the neighbour letter (D♯3 in the key = step 22)
+    let prev = -Infinity;
+    for (let m = 46; m <= 51; m += 0.05) {
+      const st = sungStep(m, E, t);
+      expect(st).toBeGreaterThanOrEqual(prev - 1e-9);
+      prev = st;
+    }
+    expect(sungStep(51, E, t)).toBeCloseTo(22);
+    // B♭ in B major (enharmonic with A♯) mirrors it
+    const bb = { midi: 58, step: 27, alt: -1 };
+    expect(27 - sungStep(57.9, { fifths: 5 }, bb)).toBeLessThan(0.35);
+  });
+
   it('a courtesy accidental takes the room of its parentheses', () => {
     const base: StaffEvent = { kind: 'note', start: 0, dur: 1, base: 1, dots: 0, step: 22, alt: 1, accidental: 1 };
     expect(accW(base)).toBe(ACC_W);

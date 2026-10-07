@@ -224,9 +224,12 @@ export function syncChoirNow(): Promise<Awaited<ReturnType<typeof syncChoir>>> {
         score.title = old.title;
         score.composer = old.composer;
       }
-      await saveImportedScore(score);
+      const saved = await saveImportedScore(score);
       pieces.set(score.id, makePiece(score));
       emit();
+      // A re-import that couldn't be stored (storage full) is used now, but not downloaded again
+      // on every start: failing here puts it on the once-a-day retry list.
+      if (!saved && old) throw new Error('re-imported score kept in memory only');
     }, (id) => pieces.has(id), (id) => {
       // The singer's own imports stay in the cycle when the choir's programme arrives (not the choir's scores).
       const p = pieces.get(id);
@@ -235,7 +238,8 @@ export function syncChoirNow(): Promise<Awaited<ReturnType<typeof syncChoir>>> {
       // A choir score stored by an older importer (e.g. without the notes' written spelling) is
       // downloaded again; until then (offline) the stored one keeps working.
       const p = pieces.get(id);
-      return !!p && !p.builtin && !!p.score.choir && (p.score.parseVersion ?? 1) < PARSE_VERSION;
+      // (MIDI files gain nothing from it: they have no written spelling)
+      return !!p && !p.builtin && !!p.score.choir && p.score.source === 'musicxml' && (p.score.parseVersion ?? 1) < PARSE_VERSION;
     }).finally(() => { syncing = null; emit(); });
   }
   return syncing;
