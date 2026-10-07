@@ -126,6 +126,7 @@ export async function joinChoir(code: string): Promise<ChoirInfo> {
   const info = await fetchChoir(code);
   const p = loadProfile();
   saveProfile({ ...p, choirCode: info.code, leaderboardOptIn: true, shareProgress: true });
+  rawRemove(SHARE_OFF_KEY);
   writeJSON(CACHE, info);
   return info;
 }
@@ -135,17 +136,24 @@ export async function joinChoir(code: string): Promise<ChoirInfo> {
  * opt-out). Once per phone: a member who joined while it was optional starts sharing. Later, only a
  * removed or deleted account turns it off (endSession), and that stays.
  */
+const SHARE_OFF_KEY = 'schonberg:shareOff';
+
 export function ensureChoirSharing(): void {
   if (rawGet('schonberg:shareMandatory')) return;
   const p = loadProfile();
-  if (p.choirCode && !p.shareProgress) saveProfile({ ...p, shareProgress: true });
+  // Not for a phone whose account the choir removed (or that deleted its account): that stays off.
+  const ended = rawGet(SHARE_OFF_KEY) || lastLogout()?.reason === 'removed';
+  if (p.choirCode && !p.shareProgress && !ended) saveProfile({ ...p, shareProgress: true });
   rawSet('schonberg:shareMandatory', '1');
 }
+/** Sharing was ended by the choir removing this phone's account, or by deleting it (cleared by a new login or leaving). */
+export const sharingEnded = (): boolean => !!rawGet(SHARE_OFF_KEY);
 
 export function leaveChoir(): void {
   const p = loadProfile();
   if (p.choirCode && p.shareProgress && p.name.trim()) withdrawProgress(p.choirCode, p.name.trim()).catch(() => {});
   saveProfile({ ...p, choirCode: undefined, shareProgress: false });
+  rawRemove(SHARE_OFF_KEY);
   writeJSON(CACHE, null);
   try { localStorage.removeItem('sh:choirApplied'); } catch { /* ignore */ }
   // An admin's or section lead's login belongs to that choir.
@@ -384,6 +392,7 @@ export function endSession(reason?: string, message?: string): void {
   if (gone) {
     const p = loadProfile();
     if (p.shareProgress) saveProfile({ ...p, shareProgress: false });
+    rawSet(SHARE_OFF_KEY, p.choirCode ?? '1');
     // The account this phone's progress went with (src/progress/sync.ts): forgotten.
     rawRemove('schonberg:syncMeta');
     rawRemove('schonberg:syncAsk');
@@ -396,6 +405,10 @@ function adoptSession(s: Session): void {
   const old = loadSession();
   setLoggedOut(null);
   saveSession(s);
+  // Logged in to the choir: sharing with the section lead is part of being in it (again, after a removal).
+  rawRemove(SHARE_OFF_KEY);
+  const p = loadProfile();
+  if (p.choirCode === s.code && !p.shareProgress) saveProfile({ ...p, shareProgress: true });
   if (old && old.token !== s.token) void call('/session', { method: 'DELETE', auth: { bearer: old.token } }).catch(() => {});
 }
 

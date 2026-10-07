@@ -1,8 +1,8 @@
 # Privacy: what Schönberg Hero sends, who sees it, how long it stays
 
 Practice data lives on the singer's phone. Four things can reach the choir server (the
-messiermarathon Flask app, `/schonberg/api`): the choir's leaderboard (part of joining a choir) and
-three things that are the singer's own choice. Settings → Privacy shows a short version of this page.
+messiermarathon Flask app, `/schonberg/api`): the choir's leaderboard and progress shared with the
+section lead (both part of joining a choir), and two things that are the singer's own choice. Settings → Privacy shows a short version of this page.
 
 ## In short: who sees what, by name
 
