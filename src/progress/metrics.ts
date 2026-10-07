@@ -131,13 +131,13 @@ export function trackOnce(family: string, key: string, now: number = Date.now())
 }
 
 /** A first-time onboarding step (counted once per install). */
-export function trackStep(step: 'setup_started' | 'choir_step' | 'range_done' | 'range_skipped' | 'delay_done' | 'delay_skipped' | 'first_run' | 'first_pass'): void {
+export function trackStep(step: 'setup_started' | 'choir_step' | 'range_done' | 'range_skipped' | 'delay_done' | 'delay_skipped' | 'first_run' | 'first_pass', now: number = Date.now()): void {
   if (!usageStatsOn()) return;
   const d = load();
   if (d.onb?.includes(step)) return;
   d.onb = [...(d.onb ?? []), step];
   save(d);
-  track(`onb.${step}`);
+  track(`onb.${step}`, 1, now);
 }
 
 /** Short stable hash of an error message (the message itself never leaves the phone). */
@@ -197,8 +197,8 @@ export function trackRun(f: RunFacts, now: number = Date.now()): void {
   track(`run.${f.kind}.${L}`, 1, now);
   if (f.passed && f.kind !== 'listen' && f.kind !== 'practice') track(`pass.${f.kind}.${L}`, 1, now);
   if (f.seconds > 0) track('sec.practice', Math.round(f.seconds), now);
-  trackStep('first_run');
-  if (f.passed && f.counted) trackStep('first_pass');
+  trackStep('first_run', now);
+  if (f.passed && f.counted) trackStep('first_pass', now);
   if (f.display) track(`feat.${f.display}`, 1, now);
   if (f.kind === 'arcade') track('feat.arcade', 1, now);
   if (f.kind === 'cold') track('feat.cold', 1, now);
