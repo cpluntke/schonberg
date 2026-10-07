@@ -158,7 +158,7 @@ h2 { margin: 0; font-size: 18px; font-weight: 800; }
   flex: 0 1 76px; min-width: 0; height: 56px; background: none; border: none; color: var(--muted);
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 11px; font-weight: 600;
 }
-.nav button[aria-current='page'] { color: var(--accent); }
+.nav button[aria-current] { color: var(--accent); }
 
 .field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
 .field input[type='text'], .field input[type='password'], .field input[type='email'], .field input[type='date'], .field input[type='time'], .field input[type='number'], .field select, .field textarea {
@@ -206,7 +206,8 @@ input[type='range'] { accent-color: var(--accent); width: 100%; }
 .mixer button.me { border: 2px solid var(--voice); color: var(--voice); background: var(--voice-bg); }
 .mixer button { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* Restart · (Peek) · Finish · Pause: Pause never leaves the screen. */
-.play-actions { gap: 8px; min-width: 0; }
+.play-actions { gap: 8px; min-width: 0; min-height: 60px; }
+/* (Before a run there's no ▶ here: the card's Start is the one. The row keeps its height, so the score doesn't jump.) */
 .play-actions > .btn { flex: none; }
 @media (max-width: 440px) {
   .play-actions.compact .lbl { display: none; }
@@ -216,6 +217,7 @@ input[type='range'] { accent-color: var(--accent); width: 100%; }
   .play-actions .lbl { display: none; }
   .mixer button .you { display: none; }
   .play-actions .big-play { width: 52px; height: 52px; }
+  .play-actions { min-height: 52px; }
   .mixer button { font-size: 12px; }
 }
 .big-play {
@@ -281,6 +283,7 @@ input[type='range'] { accent-color: var(--accent); width: 100%; }
   .mixer button .you { display: none; }
   .lyrics { font-size: 16px; padding-top: 4px; min-height: 26px; }
   .big-play { width: 48px; height: 48px; }
+  .play-actions { min-height: 48px; }
   .play-hud { padding-top: 2px; padding-bottom: 0; }
   .howto { display: none !important; }
   .overlay { align-items: flex-start; overflow-y: auto; }
@@ -317,3 +320,40 @@ h1:focus { outline: none; }
 
 /* A small non-interactive label (Results: streak, cycle points). */
 .pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; background: var(--surface-2); font-size: 13px; font-weight: 600; }
+
+/* The top bar of every practice screen: ← the piece · title / part · section · level · ⌂ Home. */
+.practice-bar { display: flex; align-items: center; gap: 4px; min-height: 52px; }
+.practice-bar-title { gap: 0; }
+.practice-bar-title h1, .practice-bar-title .title { margin: 0; font-size: 16px; font-weight: 800; line-height: 1.3; letter-spacing: 0; }
+/* On screens that scroll (Results, the quiz, the memory map) it stays at the top. */
+.screen > .practice-bar {
+  position: sticky; top: var(--safe-top); z-index: 10; margin: -16px -16px -6px; padding: 4px 6px;
+  background: var(--bg-2); border-bottom: 1px solid var(--surface-2); box-shadow: 0 calc(-1 * var(--safe-top)) 0 var(--bg-2);
+}
+@media (min-width: 700px) { .screen > .practice-bar { margin-left: -24px; margin-right: -24px; } }
+/* A practice screen has no tab bar: no room kept for it at the bottom. */
+.screen.practice { padding-bottom: calc(24px + var(--safe-bottom)); }
+
+/* Results: the next step is always in view (the details scroll above it). */
+.screen.practice.has-foot { padding-bottom: 0; }
+.results-foot {
+  position: sticky; bottom: 0; z-index: 10; margin: auto -16px 0; padding: 10px 16px calc(12px + var(--safe-bottom));
+  background: var(--bg-2); border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px;
+}
+@media (min-width: 700px) { .results-foot { margin-left: -24px; margin-right: -24px; padding-left: 24px; padding-right: 24px; } }
+.results-foot .btn.primary { height: auto; min-height: 52px; padding: 8px 14px; text-align: center; line-height: 1.2; }
+.results-foot .why { margin-top: -2px; text-align: center; }
+.results-foot .row > .btn { flex: 1 1 0; min-width: 0; padding: 0 10px; }
+/* Short screens: the reason line goes, the buttons stay. */
+@media (max-height: 560px) { .results-foot .why { display: none; } }
+
+/* Pause sheet (Play, the words): from the bottom, over the whole screen. */
+.overlay.sheet { position: absolute; inset: 0; align-items: flex-end; padding: 0; z-index: 30; background: rgba(5, 6, 13, 0.7); }
+.overlay.sheet .card {
+  max-width: 560px; border-radius: 20px 20px 0 0; border-bottom: none; padding: 16px 16px calc(16px + var(--safe-bottom)); gap: 8px;
+  max-height: 100%; overflow-y: auto;
+}
+.overlay.sheet .row > .btn { flex: 1 1 0; min-width: 0; padding: 0 8px; }
+
+/* Piece: a shortcut to the section list. */
+.jump-link { align-self: flex-start; color: var(--voice); text-decoration: none; font-weight: 600; font-size: 14px; min-height: 44px; display: inline-flex; align-items: center; gap: 4px; }

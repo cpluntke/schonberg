@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { Route } from '../router';
-import { go, back } from '../router';
+import { go, leaveTo, practiceParent, pushGuard, useBackGuard } from '../router';
 import { getPiece, noteRangeFor, singableSections } from '../library';
 import { useProfile, useWide } from '../hooks';
 import { LEVELS, LISTEN, MAX_LEVEL, OFF_BOOK_DAYS, effectiveTolerance, fixesBefore, fullRunCounts, passLabel, pieceReadiness, sectionRunCounts, speakerPractice } from '../../progress/ladder';
@@ -36,11 +36,12 @@ import { defaultShow, hasOtherStaves, isFullScore } from '../play/fullscore';
 import { drawArcade, lanesFor, newFx } from '../play/arcade3d';
 import { setLastResult } from '../play/lastResult';
 import { useResume } from '../play/useResume';
-import { IconBack, IconEar, IconPause, IconPlay, IconRestart, IconStop } from '../icons';
+import { IconBack, IconEar, IconHome, IconPause, IconPlay, IconRestart, IconStop } from '../icons';
 import { STUCK_AFTER, failsInARow, firstTime, markSeen, slowRate } from '../../progress/struggle';
 import type { AttemptResult } from '../../game/types';
 import type { NotationMode } from '../../game/notation';
 import { NotFound } from '../components/NotFound';
+import { PracticeBar } from '../components/PracticeBar';
 
 type PlayRoute = Extract<Route, { name: 'play' }>;
 
@@ -107,15 +108,6 @@ function SingPlay({ route }: { route: PlayRoute }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const fxRef = useRef(newFx());
-  const fromResultsRef = useRef<boolean | null>(null);
-  if (fromResultsRef.current === null) {
-    try {
-      fromResultsRef.current = sessionStorage.getItem('sh:fromResults') === '1';
-      sessionStorage.removeItem('sh:fromResults');
-    } catch {
-      fromResultsRef.current = false;
-    }
-  }
 
   const range = piece && part && section ? noteRangeFor(piece, part.id, section.start, section.end) : null;
 
@@ -399,6 +391,8 @@ function SingPlay({ route }: { route: PlayRoute }) {
   async function start() {
     if (startingRef.current) return; // double tap
     startingRef.current = true;
+    // While singing, the back button pauses instead of leaving (in the tap, before anything awaits).
+    pushGuard();
     setLastRun(null); // free the previous run's recording
     try {
       await startInner();
@@ -433,6 +427,21 @@ function SingPlay({ route }: { route: PlayRoute }) {
 
   // The choir sees this phone among those practising (a count per voice part) while this screen is open.
   useEffect(() => startPresence(profile.voice), [profile.voice]);
+
+  // ←, ⌂ or the back button while singing: pause and ask (leaving would silently discard the run).
+  // On the ready screen or already paused, ← simply goes back to the piece.
+  const up = practiceParent(route) ?? { name: 'home' as const };
+  const isRunning = () => { const ph = sessionRef.current?.phase; return ph === 'playing' || ph === 'countin'; };
+  function leaveFor(target: Parameters<typeof leaveTo>[0]) {
+    if (isRunning()) {
+      sessionRef.current?.pause();
+      setPhase('paused');
+      return;
+    }
+    sessionRef.current?.dispose();
+    leaveTo(target);
+  }
+  useBackGuard(() => leaveFor(up));
 
   // Render loop.
   useEffect(() => {
@@ -566,13 +575,6 @@ function SingPlay({ route }: { route: PlayRoute }) {
   const fullSecs = isFullRun ? singableSections(piece, part.id) : [];
   const fullFixes = isFullRun ? fixesBefore(fullSecs, getProgress(piece.id, part.id), level) : [];
 
-  /** Leave to the piece (or the screen that launched a generated drill), never to a stale Results. */
-  function leave() {
-    if (fromResultsRef.current || piece!.builtin && /~entries~|^row-|^leaps-/.test(piece!.id)) {
-      go(/^row-|^leaps-/.test(piece!.id) ? { name: 'expert' } : { name: 'piece', pieceId: piece!.id.split('~')[0] }, true);
-    } else back({ name: 'piece', pieceId: piece!.id });
-  }
-
   function togglePart(id: string) {
     const s = sessionRef.current;
     const cur = (s?.partGains ?? gains)[id] ?? 0;
@@ -585,21 +587,15 @@ function SingPlay({ route }: { route: PlayRoute }) {
   return (
     <main className={display === 'score' && route.mode === '2d' ? 'play play-score' : 'play'}>
       <h1 className="sr-only">{piece.title}: {part.name}, {section.label}</h1>
-      <div className="play-hud">
-        <button className="icon-btn" aria-label="Back" onClick={() => { sessionRef.current?.dispose(); leave(); }}><IconBack /></button>
-        <div className="grow col" style={{ gap: 0 }}>
-          <span className="ellipsis" style={{ fontWeight: 800, fontSize: 16 }}>{piece.title}</span>
-          <span className="tiny muted ellipsis">
-            {part.name} · {section.label} · {listenOnly ? 'Listen' : `L${level} ${levelInfo?.name}`}{route.mode === '3d' ? ' · Arcade' : ''}
-          </span>
-        </div>
-        {!listenOnly && (
-          <div className="col" style={{ alignItems: 'flex-end', gap: 0, paddingRight: 6 }}>
+      <PracticeBar className="play-hud" up={up} title={piece.title}
+        sub={<>{part.name} · {section.label} · {listenOnly ? 'Listen' : `L${level} ${levelInfo?.name}`}{route.mode === '3d' ? ' · Arcade' : ''}</>}
+        onBack={() => leaveFor(up)} onHome={() => leaveFor({ name: 'home' })}
+        extra={!listenOnly && (
+          <div className="col" style={{ alignItems: 'flex-end', gap: 0, paddingRight: 2 }}>
             <span className="mono" style={{ fontWeight: 600, fontSize: route.mode === '3d' ? 22 : 17 }} data-testid="score">{hud.score.toLocaleString()}</span>
             <span className="mono tiny" style={{ color: 'var(--accent)', whiteSpace: 'nowrap' }}>{hud.combo > 1 ? `combo ${hud.combo}` : ' '}</span>
           </div>
-        )}
-      </div>
+        )} />
 
       <div className="play-canvas-wrap" ref={wrapRef}>
         <canvas ref={canvasRef} aria-label={display === 'score' ? undefined : route.mode === '3d' ? 'Arcade' : 'Note highway'} role="img" data-display={display} />
@@ -789,19 +785,6 @@ function SingPlay({ route }: { route: PlayRoute }) {
             </div>
           </div>
         )}
-        {phase === 'paused' && (
-          <div className="overlay">
-            <div className="card">
-              <strong style={{ fontSize: 18 }}>Paused</strong>
-              {isFullRun && <span className="small muted">A run of the whole piece counts only in one go: carry on to practise, or restart to sing it through for the level.</span>}
-              {resumeMsg && <span className="small" role="status">{resumeMsg}</span>}
-              <button className="btn primary block" autoFocus disabled={resuming} onClick={() => { void resume(); }}><IconPlay size={18} /> {resuming ? 'Resuming…' : 'Resume'}</button>
-              <button className="btn block" onClick={() => { sessionRef.current?.dispose(); sessionRef.current = null; start(); }}><IconRestart size={18} /> {isFullRun ? 'Restart' : 'Restart section'}</button>
-              {!listenOnly && <button className="btn block" onClick={() => sessionRef.current?.finish()}>Finish &amp; see results</button>}
-              <button className="btn ghost block" onClick={() => { sessionRef.current?.dispose(); leave(); }}>Quit</button>
-            </div>
-          </div>
-        )}
         {phase === 'micError' && (
           <div className="overlay">
             <div className="card" role="alert">
@@ -855,10 +838,28 @@ function SingPlay({ route }: { route: PlayRoute }) {
               <button className="big-play" aria-label="Pause" onClick={() => { sessionRef.current?.pause(); setPhase('paused'); }}><IconPause /></button>
             </>
           ) : (
-            <button className="big-play" aria-label="Start" disabled={phase === 'ready' && headphonesUnanswered} onClick={() => (phase === 'paused' ? void resume() : start())}><IconPlay /></button>
+            // (Ready: the card's Start button is the one to tap.)
+            phase !== 'ready' && <button className="big-play" aria-label="Start" onClick={() => (phase === 'paused' ? (pushGuard(), void resume()) : start())}><IconPlay /></button>
           )}
         </div>
       </div>
+      {phase === 'paused' && (
+        <div className="overlay sheet" data-testid="pause-sheet">
+          <div className="card" role="dialog" aria-label="Paused">
+            <strong style={{ fontSize: 18 }}>Paused</strong>
+            {isFullRun && <span className="small muted">A run of the whole piece counts only in one go: carry on to practise, or restart to sing it through for the level.</span>}
+            {resumeMsg && <span className="small" role="status">{resumeMsg}</span>}
+            <button className="btn primary block" autoFocus disabled={resuming} onClick={() => { pushGuard(); void resume(); }}><IconPlay size={18} /> {resuming ? 'Resuming…' : 'Resume'}</button>
+            <button className="btn block" onClick={() => { sessionRef.current?.dispose(); sessionRef.current = null; start(); }}><IconRestart size={18} /> {isFullRun ? 'Restart' : 'Restart section'}</button>
+            {!listenOnly && <button className="btn block" onClick={() => sessionRef.current?.finish()}>Finish &amp; see results</button>}
+            <div className="row" style={{ gap: 8 }}>
+              <button className="btn block" data-testid="pause-back" onClick={() => leaveFor(up)}><IconBack size={18} /> {up.name === 'expert' ? 'Expert mode' : 'Back to the piece'}</button>
+              <button className="btn block" data-testid="pause-home" onClick={() => leaveFor({ name: 'home' })}><IconHome size={18} /> Home</button>
+            </div>
+            {!listenOnly && <span className="tiny muted" style={{ textAlign: 'center' }}>Leaving discards this run (it doesn’t count).</span>}
+          </div>
+        </div>
+      )}
     </main>
   );
 }

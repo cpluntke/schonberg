@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { Route } from '../router';
-import { go, back } from '../router';
+import { go, leaveTo, practiceParent, pushGuard, useBackGuard } from '../router';
 import { getPiece, noteRangeFor } from '../library';
 import { useProfile } from '../hooks';
 import { PracticeSession } from '../play/session';
@@ -9,11 +9,12 @@ import { setLastResult } from '../play/lastResult';
 import { useResume } from '../play/useResume';
 import { lyricLine, simulateMode } from './Play';
 import { wordInitial } from '../play/highway2d';
-import { IconBack, IconPause, IconPlay, IconRestart, IconStop } from '../icons';
+import { IconBack, IconHome, IconPause, IconPlay, IconRestart, IconStop } from '../icons';
 import { STAGE_NAMES, scoreWords, syllableOnsets, syllableOnsetsWithLevels, syllablesOf, type Syllable, type WordsResult, type WordsStage } from '../../game/textrhythm';
 import { getWords, recordWords } from '../../progress/words';
 import type { AttemptResult } from '../../game/types';
 import { NotFound } from '../components/NotFound';
+import { PracticeBar } from '../components/PracticeBar';
 
 type PlayRoute = Extract<Route, { name: 'play' }>;
 
@@ -104,6 +105,7 @@ export function WordsPlay({ route }: { route: PlayRoute }) {
   async function start() {
     if (startingRef.current) return;
     startingRef.current = true;
+    pushGuard(); // while speaking, the back button pauses (see Play)
     try {
       sessionRef.current?.dispose();
       const s = makeSession();
@@ -163,6 +165,20 @@ export function WordsPlay({ route }: { route: PlayRoute }) {
   }, [section, syl, rate, piece, part, profile.latencyMs, profile.latencySource]);
 
   useEffect(() => () => sessionRef.current?.dispose(), []);
+
+  // ←, ⌂ or the back button mid-run pause and ask; otherwise ← goes back to the piece.
+  const up = practiceParent(route) ?? { name: 'home' as const };
+  function leaveFor(target: Parameters<typeof leaveTo>[0]) {
+    const ph = sessionRef.current?.phase;
+    if (ph === 'playing' || ph === 'countin') {
+      sessionRef.current?.pause();
+      setPhase('paused');
+      return;
+    }
+    sessionRef.current?.dispose();
+    leaveTo(target);
+  }
+  useBackGuard(() => leaveFor(up));
   useEffect(() => {
     const onVis = () => {
       if (document.hidden && sessionRef.current && (sessionRef.current.phase === 'playing' || sessionRef.current.phase === 'countin')) {
@@ -179,18 +195,12 @@ export function WordsPlay({ route }: { route: PlayRoute }) {
     : { ...n, lyric: stage === 1 ? wordInitial(n) || undefined : undefined, syllabic: 'single' as const }));
   const lyric = lyricLine(shown, lyricIdx, range);
   const running = phase === 'running';
-  const leave = () => { sessionRef.current?.dispose(); back({ name: 'piece', pieceId: piece.id }); };
 
   return (
     <main className="play">
       <h1 className="sr-only">{piece.title}: words of {section.label}</h1>
-      <div className="play-hud">
-        <button className="icon-btn" aria-label="Back" onClick={leave}><IconBack /></button>
-        <div className="grow col" style={{ gap: 0 }}>
-          <span className="ellipsis" style={{ fontWeight: 800, fontSize: 16 }}>{piece.title}</span>
-          <span className="tiny muted ellipsis">{part.name} · {section.label} · Words: {STAGE_NAMES[stage]}</span>
-        </div>
-      </div>
+      <PracticeBar className="play-hud" up={up} title={piece.title} sub={`${part.name} · ${section.label} · Words: ${STAGE_NAMES[stage]}`}
+        onBack={() => leaveFor(up)} onHome={() => leaveFor({ name: 'home' })} />
       <div className="play-canvas-wrap" ref={wrapRef}>
         <canvas ref={canvasRef} aria-label="Words lane" role="img" />
         {phase === 'ready' && (
@@ -223,17 +233,6 @@ export function WordsPlay({ route }: { route: PlayRoute }) {
             </div>
           </div>
         )}
-        {phase === 'paused' && (
-          <div className="overlay">
-            <div className="card">
-              <strong style={{ fontSize: 18 }}>Paused</strong>
-              {resumeMsg && <span className="small" role="status">{resumeMsg}</span>}
-              <button className="btn primary block" autoFocus disabled={resuming} onClick={() => { void resume(); }}><IconPlay size={18} /> {resuming ? 'Resuming…' : 'Resume'}</button>
-              <button className="btn block" onClick={() => sessionRef.current?.finish()}>Finish &amp; see results</button>
-              <button className="btn ghost block" onClick={leave}>Quit</button>
-            </div>
-          </div>
-        )}
         {phase === 'micError' && (
           <div className="overlay">
             <div className="card" role="alert">
@@ -248,7 +247,7 @@ export function WordsPlay({ route }: { route: PlayRoute }) {
         <span className="done">{lyric.done}</span><span className="now">{lyric.now}</span><span className="next">{lyric.next}</span>
       </div>
       <div className="play-controls">
-        <div className="row">
+        <div className="row play-actions">
           <button className="btn small" disabled={!running} onClick={() => { sessionRef.current?.dispose(); start(); }}><IconRestart size={16} /> Restart</button>
           <div className="grow" />
           {running ? (
@@ -257,10 +256,27 @@ export function WordsPlay({ route }: { route: PlayRoute }) {
               <button className="big-play" aria-label="Pause" onClick={() => { sessionRef.current?.pause(); setPhase('paused'); }}><IconPause /></button>
             </>
           ) : (
-            <button className="big-play" aria-label="Start" disabled={!syl.length} onClick={() => (phase === 'paused' ? void resume() : start())}><IconPlay /></button>
+            // (Ready: the card's Start button is the one to tap.)
+            phase !== 'ready' && <button className="big-play" aria-label="Start" disabled={!syl.length} onClick={() => (phase === 'paused' ? (pushGuard(), void resume()) : start())}><IconPlay /></button>
           )}
         </div>
       </div>
+      {phase === 'paused' && (
+        <div className="overlay sheet" data-testid="pause-sheet">
+          <div className="card" role="dialog" aria-label="Paused">
+            <strong style={{ fontSize: 18 }}>Paused</strong>
+            {resumeMsg && <span className="small" role="status">{resumeMsg}</span>}
+            <button className="btn primary block" autoFocus disabled={resuming} onClick={() => { pushGuard(); void resume(); }}><IconPlay size={18} /> {resuming ? 'Resuming…' : 'Resume'}</button>
+            <button className="btn block" onClick={() => { sessionRef.current?.dispose(); sessionRef.current = null; start(); }}><IconRestart size={18} /> Restart section</button>
+            <button className="btn block" onClick={() => sessionRef.current?.finish()}>Finish &amp; see results</button>
+            <div className="row" style={{ gap: 8 }}>
+              <button className="btn block" data-testid="pause-back" onClick={() => leaveFor(up)}><IconBack size={18} /> Back to the piece</button>
+              <button className="btn block" data-testid="pause-home" onClick={() => leaveFor({ name: 'home' })}><IconHome size={18} /> Home</button>
+            </div>
+            <span className="tiny muted" style={{ textAlign: 'center' }}>Leaving discards this run (it doesn’t count).</span>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
