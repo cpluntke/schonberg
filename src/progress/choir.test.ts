@@ -5,7 +5,7 @@ import {
   LOGGED_OUT_ELSEWHERE, refreshSession, refreshSessionSoon, rememberedInvite, saveSession, sessionFor, superCreate, type Session,
   signUp, shareProgress, deleteMyAccount, lastLogout, dismissLogout, syncChoir, choirPieceId, localPieceId, fetchLibrary, addLibraryPiece,
   superLogin, superLogout, loadSuperSession, superAuth, superList, superLoggedOutNotice, refreshSuperSession, refreshSuperSessionSoon,
-  _resetSuperStateForTests, staffRoles, onSessionChange, joinChoir, ensureChoirSharing,
+  _resetSuperStateForTests, staffRoles, onSessionChange, joinChoir, ensureChoirSharing, endSession, sharingEnded,
 } from './choir';
 import { buildSnapshot } from './sync';
 import { fetchMetrics } from './insights';
@@ -250,6 +250,20 @@ describe('choir library pieces', () => {
     mockFetch(() => ({ body: info([], null) }));
     await joinChoir('kammerchor');
     expect(loadProfile()).toMatchObject({ choirCode: 'kammerchor', shareProgress: true, leaderboardOptIn: true });
+  });
+
+  it('the one-time switch-on skips a phone whose account the choir removed, and a new login shares again', async () => {
+    saveProfile({ ...loadProfile(), choirCode: 'kammerchor', shareProgress: true });
+    saveSession(session({ account: { ...account, role: 'member' as const } }));
+    endSession('removed');
+    expect(loadProfile().shareProgress).toBe(false);
+    ensureChoirSharing();
+    expect(loadProfile().shareProgress).toBe(false);
+    expect(sharingEnded()).toBe(true);
+    mockFetch(() => ({ body: session({ account: { ...account, role: 'member' as const } }) }));
+    await login('kammerchor', 'Clara', 'password-123');
+    expect(loadProfile().shareProgress).toBe(true);
+    expect(sharingEnded()).toBe(false);
   });
 
   it('members who joined while sharing was optional start sharing, once; a later removal stays off', () => {
