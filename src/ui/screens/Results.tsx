@@ -125,7 +125,8 @@ export function Results() {
   const listenAgain = () => goPlay({ ...same, level: 0, after: lr.level });
   const singSlowly = () => goPlay({ ...same, level: lr.level, rate: slowRate(lr.level) });
   const timingOnly = lr.timingFail != null && r.accuracy >= (spec?.pass ?? 0.8);
-  const offerHelp = lr.ladder && !lr.passed && !lr.full && !speakerRun && !timingOnly && lr.mode === '2d';
+  // (nor when the microphone was the trouble: its advice comes first)
+  const offerHelp = lr.ladder && !lr.passed && !lr.full && !speakerRun && !timingOnly && lr.mode === '2d' && advice.length === 0 && micNotes.length === 0;
   const stuck = offerHelp && failsInARow(piece.id, lr.partId, lr.sectionId, lr.level) >= STUCK_AFTER;
   const slowLabel = `${lr.level === 1 ? 'Sing it slower' : 'Practise slowly'} (${Math.round(slowRate(lr.level) * 100)}%)`;
 
@@ -280,12 +281,12 @@ export function Results() {
       {(lr.points || lr.streak) && (
         <div className="row wrap" style={{ gap: 8 }} data-testid="run-stats">
           {lr.streak && lr.streak.days > 0 && (
-            <span className="chip" style={{ gap: 6 }} data-testid="run-streak">
+            <span className="pill" data-testid="run-streak">
               <IconFlame size={16} color="#FF7A45" /> {lr.streak.days}-day streak{lr.streak.extended ? (lr.streak.days > 1 ? ' · today counts!' : ' · started today!') : ''}
             </span>
           )}
           {lr.points && (
-            <span className="chip" style={{ gap: 6 }} data-testid="run-points">
+            <span className="pill" data-testid="run-points">
               <IconStar size={16} color="#4CC9F0" /> {lr.points.gained > 0 ? `+${lr.points.gained.toLocaleString()} notes right · ` : ''}{lr.points.total.toLocaleString()} {lr.points.gained > 0 ? 'this cycle' : 'notes right this cycle'}
             </span>
           )}
@@ -331,7 +332,11 @@ export function Results() {
       )}
 
       <div className="col" style={{ gap: 8, marginTop: 'auto' }}>
-        {lr.sectionId === 'cold' ? (
+        {lr.slow != null && lr.sectionId !== 'cold' ? (
+          <button className="btn primary block" data-testid="full-tempo" onClick={() => goPlay({ ...same, level: lr.level, mode: lr.mode })}>
+            <IconPlay size={18} /> Now at full tempo
+          </button>
+        ) : lr.sectionId === 'cold' ? (
           <button className="btn primary block" data-testid="cold-again" onClick={() => {
             try { sessionStorage.setItem('sh:fromResults', '1'); } catch { /* ignore */ }
             startColdStart(piece, lr.partId, lr.from, true);
@@ -352,10 +357,6 @@ export function Results() {
             goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, level: lr.level, mode: lr.mode });
           }}>
             <IconPlay size={18} /> Sing it again with headphones on
-          </button>
-        ) : lr.slow != null && lr.sectionId !== 'cold' ? (
-          <button className="btn primary block" data-testid="full-tempo" onClick={() => goPlay({ ...same, level: lr.level, mode: lr.mode })}>
-            <IconPlay size={18} /> Now at full tempo
           </button>
         ) : stuck ? (
           lr.level === 1
@@ -389,7 +390,7 @@ export function Results() {
               Easier: level {lr.level - 1}
             </button>
           ) : !(!lr.passed && lr.ladder) ? (
-            <button className="btn block" onClick={() => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, level: lr.level, mode: lr.mode, ...(lr.sectionId === 'drill' || lr.sectionId === 'cold' ? { from: lr.from, to: lr.to } : {}) })}>Again</button>
+            <button className="btn block" onClick={() => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, level: lr.level, mode: lr.mode, ...(lr.sectionId === 'drill' || lr.sectionId === 'cold' ? { from: lr.from, to: lr.to } : {}), ...(lr.slow != null ? { rate: lr.slow } : {}) })}>{lr.slow != null ? 'Again, slowly' : 'Again'}</button>
           ) : lr.sectionId === 'all' && nextFix ? (
             // Allowed any time: a new run replaces the fix list with its own slips.
             <button className="btn block" data-testid="sing-all-again" onClick={() => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: 'all', level: lr.level, mode: '2d' })}>

@@ -9,7 +9,7 @@ import { rowOfTheDay } from '../../game/twelvetone';
 import { IconFlame, IconPlay, IconMic, IconStar } from '../icons';
 import { cyclePoints, practisedToday } from '../../progress/points';
 import { IntroVideoButton } from '../components/IntroVideo';
-import { apiBase, loadSession, sharingNeedsOk, startSharing } from '../../progress/choir';
+import { apiBase, cachedChoir, choirCycleNext, choirCycleNow, loadSession, sharingNeedsOk, startSharing } from '../../progress/choir';
 import { shareMyProgress } from '../play/shareProgress';
 import { LoggedOutCard, SyncNotice } from '../components/AccountSync';
 import { pieceStatus, todaysPlan, type PieceStatus } from '../plan';
@@ -35,6 +35,9 @@ export function Home() {
   const streak = streakDays();
   const today = practisedToday();
   const points = cyclePoints();
+  const choir = profile.choirCode ? cachedChoir() : null;
+  const betweenCycles = !!choir && choir.code === profile.choirCode && Array.isArray(choir.cycles) && !choirCycleNow(choir);
+  const nextCycle = betweenCycles ? choirCycleNext(choir) : null;
   const focusIds = new Set(cycle.focusPieceIds ?? []);
   const plan = todaysPlan(statuses, cycle);
   const focus = plan[0] ?? null;
@@ -75,7 +78,7 @@ export function Home() {
             <IconFlame size={26} color={streak > 0 && !today ? '#8A6A5C' : '#FF7A45'} />
             <span className="mono" style={{ fontSize: 30, fontWeight: 700, lineHeight: 1 }} data-testid="streak-days">{streak}</span>
           </div>
-          <span className="small" style={{ fontWeight: 700 }}>{streak === 1 ? 'day streak' : 'days streak'}</span>
+          <span className="small" style={{ fontWeight: 700 }}>day streak</span>
           <span className="tiny muted">{today ? 'Practised today ✓' : streak > 0 ? 'Sing today to keep it going' : 'Sing today to start one'}</span>
         </div>
         <div className="card flat" style={{ gap: 2, padding: '12px 14px', minWidth: 0 }} data-testid="points-tile">
@@ -116,6 +119,14 @@ export function Home() {
             <button className="linklike small muted" style={{ alignSelf: 'center', minHeight: 40 }} data-testid="home-account"
               onClick={() => { try { sessionStorage.setItem('sh:openAccount', 'login'); } catch { /* ignore */ } go({ name: 'settings' }); }}>New phone? Log in to your choir account to get your progress back</button>
           )}
+        </div>
+      )}
+
+      {betweenCycles && (
+        <div className="notice info small" data-testid="between-cycles">
+          {nextCycle
+            ? <><strong>{choir?.name ?? 'Your choir'}: the last cycle is over.</strong> Next: {nextCycle.name}, from {formatDate(nextCycle.start)}.</>
+            : <><strong>{choir?.name ?? 'Your choir'}: the last cycle is over.</strong> The next programme comes when your choir starts a new cycle.</>}
         </div>
       )}
 

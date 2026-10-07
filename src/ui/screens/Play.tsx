@@ -36,7 +36,7 @@ import { drawArcade, lanesFor, newFx } from '../play/arcade3d';
 import { setLastResult } from '../play/lastResult';
 import { useResume } from '../play/useResume';
 import { IconBack, IconEar, IconPause, IconPlay, IconRestart, IconStop } from '../icons';
-import { STUCK_AFTER, failsInARow, firstTime, slowRate } from '../../progress/struggle';
+import { STUCK_AFTER, failsInARow, firstTime, markSeen, slowRate } from '../../progress/struggle';
 import type { AttemptResult } from '../../game/types';
 import type { NotationMode } from '../../game/notation';
 import { NotFound } from '../components/NotFound';
@@ -220,6 +220,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
     let r = result;
     setPhase('ready');
     if (!piece || !part || !section) return;
+    if (!GENERATED_SECTIONS.has(section.id) && (r || listenOnly)) markSeen(piece.id, part.id, section.id);
     if (!r || listenOnly) {
       if (listenOnly) {
         recordAttempt(piece.id, part.id, section.id, 0, emptyResult(), section.end - section.start);
@@ -549,10 +550,12 @@ function SingPlay({ route }: { route: PlayRoute }) {
   // first time at level 1 offers to listen first (not required); after misses in a row, both are suggested.
   const helpable = !listenOnly && route.mode === '2d' && !cold && section.id !== 'entries';
   const realSec = !GENERATED_SECTIONS.has(section.id);
-  const firstListen = helpable && level === 1 && realSec && firstTime(getProgress(piece.id, part.id)?.sections[section.id]);
+  const firstListen = helpable && level === 1 && realSec
+    && firstTime(getProgress(piece.id, part.id)?.sections[section.id], { pieceId: piece.id, partId: part.id, sectionId: section.id });
   const fails = helpable && realSec ? failsInARow(piece.id, part.id, section.id, level) : 0;
   const stuck = fails >= STUCK_AFTER ? fails : 0;
-  const listenFirst = () => go({ ...route, level: 0, after: level, rate: undefined }, true);
+  // (a slow practice keeps its tempo: listening slowly, then singing slowly)
+  const listenFirst = () => go({ ...route, level: 0, after: level, ...(rateOverride != null && rateOverride < (spec?.rate ?? 1) ? { rate: rateOverride } : {}) }, true);
   const fullSecs = isFullRun ? singableSections(piece, part.id) : [];
   const fullFixes = isFullRun ? fixesBefore(fullSecs, getProgress(piece.id, part.id), level) : [];
 
@@ -615,6 +618,20 @@ function SingPlay({ route }: { route: PlayRoute }) {
                   {Math.round(rate * 100)}% tempo · ±{tolerance}¢ · pass: {passLabel(levelInfo)} · start: {levelInfo.cue === 'chord' ? 'chord only' : 'your note'}
                 </span>
               )}
+              {askHeadphones && (
+                <div className="col" style={{ gap: 4 }} data-testid="headphones-q">
+                  <span className="small" id="hp-label"><strong>Headphones on?</strong> <span className="tiny muted">(remembered on this phone)</span></span>
+                  <div className="seg" role="group" aria-labelledby="hp-label">
+                    <button aria-pressed={profile.headphones === true} onClick={() => updateProfile({ headphones: true })} data-testid="hp-yes">Yes</button>
+                    <button aria-pressed={profile.headphones === false} onClick={() => updateProfile({ headphones: false })} data-testid="hp-no">No, speaker</button>
+                  </div>
+                  <span className={profile.headphones === false ? 'tiny' : 'tiny muted'} style={profile.headphones === false ? { color: 'var(--accent-text)' } : undefined} data-testid="hp-note">
+                    {profile.headphones === false
+                      ? 'Practice only: level 1 counts with headphones on, because through the speaker the app can’t hear every note reliably.'
+                      : profile.headphones ? 'Level 1 counts with headphones on.' : 'Level 1 counts with headphones on. Choose one to start.'}
+                  </span>
+                </div>
+              )}
               {/* Listen / slow help near the top too: the sticky Start button covers the card's lower part on a phone. */}
               {helpable && (firstListen ? (
                 <div className="notice info small col" style={{ gap: 8 }} data-testid="first-listen">
@@ -643,20 +660,6 @@ function SingPlay({ route }: { route: PlayRoute }) {
                   </div>
                 </div>
               ))}
-              {askHeadphones && (
-                <div className="col" style={{ gap: 4 }} data-testid="headphones-q">
-                  <span className="small" id="hp-label"><strong>Headphones on?</strong> <span className="tiny muted">(remembered on this phone)</span></span>
-                  <div className="seg" role="group" aria-labelledby="hp-label">
-                    <button aria-pressed={profile.headphones === true} onClick={() => updateProfile({ headphones: true })} data-testid="hp-yes">Yes</button>
-                    <button aria-pressed={profile.headphones === false} onClick={() => updateProfile({ headphones: false })} data-testid="hp-no">No, speaker</button>
-                  </div>
-                  <span className={profile.headphones === false ? 'tiny' : 'tiny muted'} style={profile.headphones === false ? { color: 'var(--accent-text)' } : undefined} data-testid="hp-note">
-                    {profile.headphones === false
-                      ? 'Practice only: level 1 counts with headphones on, because through the speaker the app can’t hear every note reliably.'
-                      : profile.headphones ? 'Level 1 counts with headphones on.' : 'Level 1 counts with headphones on. Choose one to start.'}
-                  </span>
-                </div>
-              )}
               {doo && !listenOnly && (
                 <div className="notice info small" data-testid="doo-note">
                   <strong>Sing every note on “doo”.</strong> The words are shown faintly; you sing them from level 2.

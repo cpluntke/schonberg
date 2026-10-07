@@ -9,6 +9,7 @@ import {
   loadSession, loggedOutNotice, login, logout, onSessionChange, refreshSession, refreshSessionSoon, saveChoirCycle, sessionFor, superCreate, superDelete,
   superList, superPurgeMembers, superRename, uploadChoirPiece, withdrawProgress, fetchChoirUsage, mb, type Auth, type ChoirInfo, type ChoirSummary, type ChoirUsage,
   type ServerUsage, type Session, localPieceId, sharingEnded, sharingNeedsOk, startSharing, type LibraryPiece, addLibraryPiece, loadSuperSession, superLogin, superLogout, superLoggedOutNotice,
+  fetchCycles, createCycle, updateCycle, deleteCycle, type ChoirCycle, type CyclesReply,
 } from '../../progress/choir';
 import { LibraryPanel, type ProgrammeDraft } from '../components/ChoirLibrary';
 import { SectionInsights } from '../components/SectionInsights';
@@ -319,6 +320,9 @@ export function ChoirAdmin() {
   useEffect(() => { if (token) setLastAuth({ bearer: token }); }, [token]);
   const [info, setInfo] = useState<ChoirInfo | null>(() => cachedChoir());
   const [library, setLibrary] = useState<LibraryPiece[] | null>(null);
+  // The choir's cycles (all of them: admins see past ones too) and the one being edited.
+  const [cycles, setCycles] = useState<CyclesReply | null>(null);
+  const [selId, setSelId] = useState<string | null>(null);
   // The programme editor's unpublished changes (null: none), and how to add a piece to them.
   const draft = useRef<ProgrammeDraft>({ ids: null, add: null });
   const [, setDraftV] = useState(0);
@@ -348,6 +352,12 @@ export function ChoirAdmin() {
     setInfo(cachedChoir());
     return r;
   };
+  const gotCycles = (r: CyclesReply, select?: string) => {
+    setCycles(r);
+    setInfo(r.choir);
+    setSelId((cur) => (select ?? (cur && r.cycles.some((c) => c.id === cur) ? cur : r.current ?? r.cycles[r.cycles.length - 1]?.id ?? null)));
+  };
+  const sel = cycles?.cycles.find((c) => c.id === selId) ?? null;
   return (
     <>
       {session ? (
@@ -355,10 +365,15 @@ export function ChoirAdmin() {
       ) : (
         <NeedLogin code={code} what="Your changes below are kept: log in again, then publish them." />
       )}
-      <ProgrammeEditor key={`${info?.code}:${info?.cycleUpdatedAt ?? 0}`} code={code} auth={auth} info={info} library={library}
-        draft={draft.current} onDraft={() => setDraftV((v) => v + 1)}
-        onLibraryAdded={(i) => { if (i) setInfo(i); void refresh(); }}
-        onSaved={(i) => { setInfo(i); void refresh(); }} onConflict={(i) => setInfo(i)} />
+      <CyclesPanel code={code} auth={auth} cycles={cycles} selId={selId} onSelect={setSelId}
+        onLoaded={gotCycles} onChanged={(r, select) => { gotCycles(r, select); void refresh(); }} />
+      {sel && (
+        <ProgrammeEditor key={`${info?.code}:${sel.id}:${cycles?.cycleUpdatedAt ?? 0}`} code={code} auth={auth} info={info} cycle={sel}
+          base={cycles?.cycleUpdatedAt ?? 0} library={library}
+          draft={draft.current} onDraft={() => setDraftV((v) => v + 1)}
+          onLibraryAdded={(i) => { if (i) setInfo(i); void refresh(); void fetchCycles(code, auth).then((r) => gotCycles(r)).catch(() => {}); }}
+          onSaved={(r) => { gotCycles(r); void refresh(); }} onConflict={() => { void fetchCycles(code, auth).then((r) => gotCycles(r)).catch(() => {}); }} />
+      )}
       <ScoresEditor code={code} auth={auth} info={info} onChanged={refresh} />
       {session && (
         <LibraryPanel code={code} auth={auth} info={info} draft={draft.current} onList={setLibrary}
@@ -375,13 +390,14 @@ export function ChoirAdmin() {
   );
 }
 
-function ProgrammeEditor({ code, auth, info, library, draft, onDraft, onSaved, onConflict, onLibraryAdded }: {
-  code: string; auth: Auth; info: ChoirInfo | null; library: LibraryPiece[] | null; draft: ProgrammeDraft; onDraft: () => void;
-  onSaved: (i: ChoirInfo) => void; onConflict: (i: ChoirInfo) => void; onLibraryAdded: (i: ChoirInfo | null) => void;
+function ProgrammeEditor({ code, auth, info, cycle, base, library, draft, onDraft, onSaved, onConflict, onLibraryAdded }: {
+  code: string; auth: Auth; info: ChoirInfo | null; cycle: ChoirCycle; base: number; library: LibraryPiece[] | null; draft: ProgrammeDraft; onDraft: () => void;
+  onSaved: (r: CyclesReply) => void; onConflict: () => void; onLibraryAdded: (i: ChoirInfo | null) => void;
 }) {
-  // A new programme starts empty (not from this admin's own phone, which may hold private scores).
-  const start: Partial<NonNullable<ChoirInfo['cycle']>> = info?.cycle ?? { name: 'This cycle', pieceIds: [] };
+  const start = cycle;
   const [name, setName] = useState(start.name ?? 'This cycle');
+  const [from, setFrom] = useState(cycle.start);
+  const [until, setUntil] = useState(cycle.end ?? '');
   const [ids, setIds] = useState<string[]>(start.pieceIds ?? []);
   const [focus, setFocus] = useState<string[]>(start.focusPieceIds ?? []);
   const [weekday, setWeekday] = useState<number>(start.rehearsalWeekday ?? -1);
@@ -392,8 +408,8 @@ function ProgrammeEditor({ code, auth, info, library, draft, onDraft, onSaved, o
   const [busy, setBusy] = useState(false);
   // Unpublished changes (the Library adds to them instead of publishing over them).
   const published = start.pieceIds ?? [];
-  const dirty = JSON.stringify([name, ids, focus, weekday, time, rehearsalDate, concert, wanted])
-    !== JSON.stringify([start.name ?? 'This cycle', published, start.focusPieceIds ?? [], start.rehearsalWeekday ?? -1, start.rehearsalTime ?? '19:30',
+  const dirty = JSON.stringify([name, from, until, ids, focus, weekday, time, rehearsalDate, concert, wanted])
+    !== JSON.stringify([start.name ?? 'This cycle', cycle.start, cycle.end ?? '', published, start.focusPieceIds ?? [], start.rehearsalWeekday ?? -1, start.rehearsalTime ?? '19:30',
       start.rehearsalDate ?? '', start.concertDate ?? '', (start.wanted ?? []).map((w) => ({ ...w, composer: w.composer ?? '' }))]);
   useEffect(() => {
     draft.ids = dirty ? ids : null;
@@ -435,9 +451,12 @@ function ProgrammeEditor({ code, auth, info, library, draft, onDraft, onSaved, o
   const toggle = (arr: string[], id: string) => (arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]);
   return (
     <div className="card" data-testid="programme-editor">
-      <strong>Programme</strong>
+      <strong>Programme: {cycle.name}</strong>
       <label className="field"><span>Name</span><input type="text" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} data-testid="programme-name" /></label>
-      <span className="tiny muted">A new name starts a new cycle: everyone’s “notes right this cycle” go back to 0. Keep the name to carry on counting.</span>
+      <div className="row wrap">
+        <label className="field"><span>Starts</span><input type="date" value={from} onChange={(e) => setFrom(e.target.value)} data-testid="cycle-start" /></label>
+        <label className="field"><span>Ends (optional)</span><input type="date" value={until} min={from} onChange={(e) => setUntil(e.target.value)} data-testid="cycle-end" /></label>
+      </div>
       <span className="small">Pieces (tap to include; ★ = the next rehearsal works on it)</span>
       <div className="col" style={{ gap: 4 }}>
         {choices.map((p) => {
@@ -496,22 +515,128 @@ function ProgrammeEditor({ code, auth, info, library, draft, onDraft, onSaved, o
       <button className="btn primary block" disabled={busy} data-testid="publish-programme" onClick={async () => {
         setBusy(true);
         try {
-          const i = await saveChoirCycle(code, auth, {
-            name, pieceIds: ids, focusPieceIds: focus.filter((x) => ids.includes(x)),
+          const r = await updateCycle(code, auth, cycle.id, {
+            name, start: from, end: until || null, pieceIds: ids, focusPieceIds: focus.filter((x) => ids.includes(x)),
             ...(weekday >= 0 ? { rehearsalWeekday: weekday, rehearsalTime: time } : rehearsalDate ? { rehearsalDate } : {}),
             ...(concert ? { concertDate: concert } : {}),
             wanted: wanted.filter((w) => w.title.trim()),
-            base: info?.cycleUpdatedAt ?? 0,
+            base,
           });
-          toast('Programme published: members get it the next time they open the app');
-          onSaved(i);
+          const today = todayKey();
+          toast(from > today ? `Saved: members get this programme when the cycle starts (${from})` : 'Programme published: members get it the next time they open the app');
+          onSaved(r);
         } catch (e) {
           toast((e as Error).message);
-          if (e instanceof ChoirApiError && e.status === 409) fetchChoir(code).then(onConflict).catch(() => {});
+          if (e instanceof ChoirApiError && e.status === 409) onConflict();
         } finally {
           setBusy(false);
         }
-      }}>Publish to the choir</button>
+      }}>{cycle.start > todayKey() ? 'Save this cycle' : 'Publish to the choir'}</button>
+    </div>
+  );
+}
+
+const fmtDay = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+function todayKey(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * The choir's cycles: each a programme from a start date to an end date (or until the next one
+ * starts). Members only ever get the one running and those to come; admins see them all here, start
+ * a new one, edit any of them and delete them.
+ */
+function CyclesPanel({ code, auth, cycles, selId, onSelect, onLoaded, onChanged }: {
+  code: string; auth: Auth; cycles: CyclesReply | null; selId: string | null; onSelect: (id: string) => void;
+  onLoaded: (r: CyclesReply) => void; onChanged: (r: CyclesReply, select?: string) => void;
+}) {
+  const [err, setErr] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ name: '', start: todayKey(), end: '', keep: true });
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    fetchCycles(code, auth).then((r) => { if (alive) onLoaded(r); }).catch((e) => { if (alive) setErr((e as Error).message); });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code]);
+  const today = todayKey();
+  const list = [...(cycles?.cycles ?? [])].reverse(); // newest first
+  const status = (c: ChoirCycle) => (c.id === cycles?.current ? 'Running now'
+    : c.start > today ? `Starts ${fmtDay(c.start)}` : 'Over');
+  const running = cycles?.cycles.find((c) => c.id === cycles.current);
+  const create = async () => {
+    if (!form.name.trim()) { toast('Give the cycle a name'); return; }
+    setBusy(true);
+    try {
+      const keep = form.keep && running ? {
+        pieceIds: running.pieceIds, focusPieceIds: running.focusPieceIds ?? [], wanted: running.wanted ?? [],
+        ...(running.rehearsalWeekday != null ? { rehearsalWeekday: running.rehearsalWeekday, rehearsalTime: running.rehearsalTime } : {}),
+      } : { pieceIds: [] };
+      const r = await createCycle(code, auth, { name: form.name.trim(), start: form.start, ...(form.end ? { end: form.end } : {}), ...keep, base: cycles?.cycleUpdatedAt });
+      const made = r.cycles.find((c) => c.name === form.name.trim() && c.start === form.start);
+      toast(form.start > today ? `${form.name.trim()} starts on ${fmtDay(form.start)}` : `${form.name.trim()} has started: everyone's “notes right this cycle” begin at 0`);
+      setAdding(false);
+      setForm({ name: '', start: todayKey(), end: '', keep: true });
+      onChanged(r, made?.id);
+    } catch (e) {
+      toast((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="card" data-testid="cycles-panel">
+      <div className="row between">
+        <strong>Cycles</strong>
+        {!adding && <button className="btn small primary" onClick={() => setAdding(true)} data-testid="new-cycle">Start a new cycle</button>}
+      </div>
+      <span className="small muted">
+        A cycle is the programme from its start date to its end (or until the next cycle starts). Singers see only the one running;
+        when the next starts, it replaces it and everyone's “notes right this cycle” begin again at 0.
+      </span>
+      {err && <span className="small" role="alert" style={errStyle}>{err}</span>}
+      {adding && (
+        <div className="col" style={{ gap: 8, background: 'var(--bg-2)', borderRadius: 10, padding: 12 }} data-testid="new-cycle-form">
+          <label className="field"><span>Name</span><input type="text" value={form.name} maxLength={80} placeholder="e.g. Spring 2027" autoFocus
+            onChange={(e) => setForm({ ...form, name: e.target.value })} data-testid="new-cycle-name" /></label>
+          <div className="row wrap">
+            <label className="field"><span>Starts</span><input type="date" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} data-testid="new-cycle-start" /></label>
+            <label className="field"><span>Ends (optional)</span><input type="date" value={form.end} min={form.start} onChange={(e) => setForm({ ...form, end: e.target.value })} data-testid="new-cycle-end" /></label>
+          </div>
+          {running && (
+            <label className="row small" style={{ gap: 8 }}>
+              <input type="checkbox" checked={form.keep} onChange={(e) => setForm({ ...form, keep: e.target.checked })} />
+              Start with the pieces of {running.name}
+            </label>
+          )}
+          <div className="row" style={{ gap: 8 }}>
+            <button className="btn primary small" disabled={busy} onClick={create} data-testid="new-cycle-create">{busy ? '…' : 'Create'}</button>
+            <button className="btn ghost small" onClick={() => setAdding(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+      {cycles && !cycles.cycles.length && !adding && <span className="small">No cycle yet: start the first one.</span>}
+      <div className="col" style={{ gap: 6 }}>
+        {list.map((c) => {
+          const st = status(c);
+          return (
+            <div key={c.id} className="row" style={{ gap: 8, padding: '6px 0', borderTop: '1px solid var(--line)' }} data-testid="cycle-row">
+              <div className="col grow" style={{ gap: 0, minWidth: 0 }}>
+                <span className="small ellipsis" style={{ fontWeight: 700 }}>{c.name}</span>
+                <span className="tiny muted">{fmtDay(c.start)}{c.end ? ` – ${fmtDay(c.end)}` : ' onwards'} · {c.pieceIds.length} piece{c.pieceIds.length === 1 ? '' : 's'}</span>
+                <span className="tiny" style={{ color: st === 'Running now' ? 'var(--voice)' : 'var(--muted)', fontWeight: 600 }}>{st}</span>
+              </div>
+              <button className="btn small" aria-pressed={c.id === selId} onClick={() => onSelect(c.id)} data-testid="cycle-edit">{c.id === selId ? 'Editing' : 'Edit'}</button>
+              <button className="btn small ghost" aria-label={`Delete ${c.name}`} data-testid="cycle-delete" onClick={async () => {
+                if (!confirm(`Delete the cycle “${c.name}”?${c.id === cycles?.current ? ' It is running now: singers lose its programme.' : ''}`)) return;
+                try { onChanged(await deleteCycle(code, auth, c.id, cycles?.cycleUpdatedAt)); } catch (e) { toast((e as Error).message); }
+              }}>Delete</button>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

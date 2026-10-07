@@ -15,10 +15,16 @@ export interface ChoirPiece {
   /** Key marks set by an admin: where the singers' do moves (see music/keymarks.ts). */
   keys?: { bar: number; fifths?: number; mode?: 'major' | 'minor' }[];
 }
+/** A choir's programme for a stretch of time: from `start` (YYYY-MM-DD) to `end` (or the next cycle). */
+export type ChoirProgramme = Omit<Cycle, 'preset'> & { name: string };
+export interface ChoirCycle extends ChoirProgramme { id: string; start: string; end?: string }
 export interface ChoirInfo {
   code: string;
   name: string;
-  cycle: (Omit<Cycle, 'preset'> & { name: string }) | null;
+  /** The cycle running today by the server's clock (UTC); apps choose from `cycles` by their own date. */
+  cycle: ChoirProgramme | null;
+  /** The running cycle and those to come (never a past one). Absent from servers before cycles. */
+  cycles?: ChoirCycle[];
   pieces: ChoirPiece[];
   updatedAt: number;
   /** When an admin last published the programme (score uploads don't change it). */
@@ -29,6 +35,22 @@ export interface ChoirInfo {
   legacyLogin?: boolean;
   /** Singers may make their own member account (an admin can close this). */
   signupsOpen?: boolean;
+}
+
+/** The choir's cycle running on `today` (this phone's date): the latest started one that hasn't ended. */
+export function choirCycleNow(info: Pick<ChoirInfo, 'cycle' | 'cycles'> | null, today = localDay()): (ChoirProgramme & { id?: string }) | null {
+  if (!info) return null;
+  if (!Array.isArray(info.cycles)) return info.cycle;
+  const run = info.cycles.filter((c) => c.start <= today && !(c.end && c.end < today)).sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
+  return run[run.length - 1] ?? null;
+}
+/** The next cycle to start after `today`, if any. */
+export function choirCycleNext(info: Pick<ChoirInfo, 'cycles'> | null, today = localDay()): ChoirCycle | null {
+  const later = (info?.cycles ?? []).filter((c) => c.start > today).sort((a, b) => (a.start < b.start ? -1 : 1));
+  return later[0] ?? null;
+}
+function localDay(d = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 export class ChoirApiError extends Error {
@@ -232,13 +254,23 @@ export async function syncChoir(importFile: (name: string, data: ArrayBuffer, me
     }
   }
   try { localStorage.setItem('sh:choirBadScores', JSON.stringify(failed)); } catch { /* ignore */ }
-  // The programme: applied when the choir published a new version (local tweaks last until then).
+  // The programme: applied when the choir published a new version or a new cycle started (local
+  // tweaks last until then).
   let programme = false;
-  const stamp = `${info.code}:${info.cycleUpdatedAt ?? info.updatedAt}`;
+  // (a new cycle starts by date too: the stamp has the running cycle's id)
+  const now = choirCycleNow(info);
+  const stamp = `${info.code}:${info.cycleUpdatedAt ?? info.updatedAt}${Array.isArray(info.cycles) ? `:${now?.id ?? 'none'}` : ''}`;
   let applied: string | null = null;
   try { applied = localStorage.getItem('sh:choirApplied'); } catch { /* ignore */ }
-  if (info.cycle && applied !== stamp) {
-    const c = info.cycle;
+  if (!now && Array.isArray(info.cycles) && applied !== stamp && applied?.startsWith(`${info.code}:`)) {
+    // The cycle ended and the next hasn't started: its programme goes (the singer's own pieces stay).
+    const own = loadCycle().pieceIds.filter((id) => isOwnPiece(id));
+    saveCycle({ ...loadCycle(), name: '', pieceIds: own, focusPieceIds: [], rehearsalWeekday: undefined, rehearsalTime: undefined,
+      rehearsalDate: undefined, concertDate: undefined, wanted: [], preset: `choir:${info.code}` });
+    programme = true;
+  }
+  if (now && applied !== stamp) {
+    const c = now;
     const own = loadCycle().pieceIds.filter((id) => isOwnPiece(id) && !c.pieceIds.includes(id));
     saveCycle({
       ...loadCycle(), name: c.name, pieceIds: [...c.pieceIds, ...own], focusPieceIds: c.focusPieceIds ?? [],
@@ -254,6 +286,17 @@ export async function syncChoir(importFile: (name: string, data: ArrayBuffer, me
 // ------------------------------------------------------------------ choir admins
 
 export const saveChoirCycle = (code: string, auth: Auth, cycle: unknown) => call<ChoirInfo>(`/choirs/${enc(code)}/cycle`, { method: 'PUT', auth, ...json(cycle) });
+
+/** All of a choir's cycles (admins): past, running and to come. */
+export interface CyclesReply { choir: ChoirInfo; cycles: ChoirCycle[]; current: string | null; cycleUpdatedAt: number }
+export type CycleFields = Partial<ChoirProgramme> & { start?: string; end?: string | null; base?: number };
+export const fetchCycles = (code: string, auth: Auth) => call<CyclesReply>(`/choirs/${enc(code)}/cycles`, { auth });
+export const createCycle = (code: string, auth: Auth, body: CycleFields & { start: string }) =>
+  call<CyclesReply>(`/choirs/${enc(code)}/cycles`, { method: 'POST', auth, ...json(body) });
+export const updateCycle = (code: string, auth: Auth, id: string, body: CycleFields) =>
+  call<CyclesReply>(`/choirs/${enc(code)}/cycles/${enc(id)}`, { method: 'PUT', auth, ...json(body) });
+export const deleteCycle = (code: string, auth: Auth, id: string, base?: number) =>
+  call<CyclesReply>(`/choirs/${enc(code)}/cycles/${enc(id)}`, { method: 'DELETE', auth, ...json(base != null ? { base } : {}) });
 export async function uploadChoirPiece(code: string, auth: Auth, file: File, title: string, composer: string): Promise<{ piece: ChoirPiece }> {
   const fd = new FormData();
   fd.append('file', file);

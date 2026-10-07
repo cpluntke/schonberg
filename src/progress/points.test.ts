@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { _resetAllForTests, loadCycle, saveCycle, loadProfile, saveProfile, recordAttempt, writeJSON, streakDays, addSyncedDays, dayKey } from './store';
 import { addCyclePoints, cyclePoints, mergeSyncedPoints, rightNotes, currentCycle } from './points';
+import { choirCycleNow, choirCycleNext } from './choir';
 import { failsInARow, firstTime } from './struggle';
 import { parseHash, href } from '../ui/router';
 import type { AttemptResult, NoteResult } from '../game/types';
@@ -51,6 +52,33 @@ describe('cycle points', () => {
     mergeSyncedPoints({ k: 'own:autumn', n: -1 });
     mergeSyncedPoints('junk');
     expect(cyclePoints().n).toBe(25);
+  });
+});
+
+describe('dated cycles', () => {
+  const cyc = (id: string, start: string, end?: string) => ({ id, name: id, start, ...(end ? { end } : {}), pieceIds: [] });
+  it('the running cycle is the latest started one that has not ended; between cycles there is none', () => {
+    const info = { cycle: null, cycles: [cyc('autumn', '2026-09-01', '2026-12-20'), cyc('spring', '2027-01-10')] };
+    expect(choirCycleNow(info, '2026-08-31')).toBeNull();
+    expect(choirCycleNow(info, '2026-09-01')?.id).toBe('autumn');
+    expect(choirCycleNow(info, '2026-12-20')?.id).toBe('autumn');
+    expect(choirCycleNow(info, '2026-12-21')).toBeNull();
+    expect(choirCycleNext(info, '2026-12-21')?.id).toBe('spring');
+    expect(choirCycleNow(info, '2027-01-10')?.id).toBe('spring');
+    // an older server: its one programme
+    expect(choirCycleNow({ cycle: { name: 'X', pieceIds: [] } }, '2027-01-10')?.name).toBe('X');
+  });
+
+  it('points follow the dated cycle; a count kept under the programme name carries over', () => {
+    saveProfile({ ...loadProfile(), choirCode: 'kammerchor' });
+    writeJSON('sh:cyclePoints', { k: 'choir:kammerchor:autumn', n: 40, since: 1 });
+    writeJSON('sh:choir', { code: 'kammerchor', name: 'K', cycle: null, cycles: [cyc('autumn', '2000-01-01')], pieces: [], updatedAt: 1, leads: [] });
+    expect(cyclePoints().n).toBe(40);
+    expect(addCyclePoints(2)).toBe(42);
+    expect(currentCycle().key).toBe('choir:kammerchor:#autumn');
+    // the next cycle starts: back to 0
+    writeJSON('sh:choir', { code: 'kammerchor', name: 'K', cycle: null, cycles: [cyc('autumn', '2000-01-01', '2000-02-01'), cyc('winter', '2000-02-02')], pieces: [], updatedAt: 2, leads: [] });
+    expect(cyclePoints()).toEqual({ n: 0, name: 'winter' });
   });
 });
 

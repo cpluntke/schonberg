@@ -31,9 +31,13 @@ Singers start from scratch but aren't held back (`src/progress/struggle.ts`):
 
 Home shows the practice streak (consecutive days with any run, listening too) and the **notes sung
 right this cycle** (`src/progress/points.ts`): every sung run adds its notes graded right (practice
-runs too). A choir's cycle is its programme name: when an admin publishes the programme under a new
-name, everyone's count starts again from 0 (the programme editor says so). Without a choir, the
-singer's own cycle name does the same. Results show the run's notes right, the cycle total and the
+runs too). A choir's **cycles** have dates (Admin → Cycles: start date, optional end date, each with
+its own programme): members get only the cycle running today (by their phone's date) and those to
+come, never past ones; when the next one starts it replaces the programme and everyone's count
+starts again from 0. Between cycles (one ended, the next not started) the choir's programme leaves
+Home and a notice names the next cycle. Admins see every cycle, past ones too, and can start, edit and
+delete them. Without a choir, the singer's own cycle name decides (the starting "Demo cycle" and
+"This cycle" count as one). Results show the run's notes right, the cycle total and the
 streak. Both travel with the choir account's copy (`ProgressSnapshot.pts`, `days`): another phone's
 practice days keep the streak, and the larger count of the same cycle wins.
 

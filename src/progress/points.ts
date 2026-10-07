@@ -1,24 +1,29 @@
 // Cycle points: the notes sung right since the current cycle began (every sung run counts, practice
-// too: it's singing). A choir's cycle is its programme as the admins name it: when they publish a
-// programme under a new name (a new cycle), everyone's points start again from 0. Without a choir,
-// the singer's own cycle name does the same.
+// too: it's singing). A choir's cycles have dates (the admins set them): when the next one starts,
+// everyone's points start again from 0. Without a choir, the singer's own cycle name does the same.
 
 import { noteVerdict } from './ladder';
-import { cachedChoir } from './choir';
-import { attemptLog, dayKey, loadCycle, loadProfile, readJSON, writeJSON } from './store';
+import { cachedChoir, choirCycleNow } from './choir';
+import { dayKey, loadCycle, loadProfile, practiceDays, readJSON, writeJSON } from './store';
 import type { AttemptResult } from '../game/types';
 
 const KEY = 'sh:cyclePoints';
 export interface CyclePoints { k: string; n: number; since: number }
 
-/** Which cycle the singer is in now (and its name as shown). */
-export function currentCycle(): { key: string; name: string } {
+/** Which cycle the singer is in now (and its name as shown); `alias`: its key in an earlier version. */
+export function currentCycle(): { key: string; name: string; alias?: string } {
   const code = loadProfile().choirCode;
   const info = code ? cachedChoir() : null;
-  const name = info && info.code === code && info.cycle?.name?.trim() ? info.cycle.name.trim() : '';
+  const now = info && info.code === code ? choirCycleNow(info) : null;
+  const name = now?.name?.trim() ?? '';
+  // (points counted before cycles had dates were kept under the programme's name)
+  if (now?.id) return { key: `choir:${info!.code}:#${now.id}`, name, alias: `choir:${info!.code}:${name.toLowerCase()}` };
   if (name) return { key: `choir:${info!.code}:${name.toLowerCase()}`, name };
+  if (info && info.code === code && Array.isArray(info.cycles)) return { key: `choir:${info.code}:between`, name: '' };
   const own = loadCycle().name.trim();
-  return { key: `own:${own.toLowerCase()}`, name: own };
+  // (the app renames its starting "Demo cycle" to "This cycle" once dates are set: the same cycle)
+  const k = own.toLowerCase();
+  return { key: `own:${k === 'demo cycle' || k === 'this cycle' ? '' : k}`, name: own };
 }
 
 const stored = (): CyclePoints | null => readJSON<CyclePoints | null>(KEY, null, (v) => {
@@ -27,10 +32,12 @@ const stored = (): CyclePoints | null => readJSON<CyclePoints | null>(KEY, null,
 });
 
 /** Points in the current cycle (0 when a new cycle began since the last run). */
+const same = (s: CyclePoints | null, c: ReturnType<typeof currentCycle>): s is CyclePoints => !!s && (s.k === c.key || (!!c.alias && s.k === c.alias));
+
 export function cyclePoints(): { n: number; name: string } {
   const c = currentCycle();
   const s = stored();
-  return { n: s && s.k === c.key ? Math.round(s.n) : 0, name: c.name };
+  return { n: same(s, c) ? Math.round(s.n) : 0, name: c.name };
 }
 
 /** Notes sung right in a run (level 1's "right"; let-off notes don't count as sung right). */
@@ -40,7 +47,7 @@ export const rightNotes = (r: Pick<AttemptResult, 'notes'>): number => r.notes.f
 export function addCyclePoints(n: number, now = Date.now()): number {
   const c = currentCycle();
   const s = stored();
-  const base = s && s.k === c.key ? s : { k: c.key, n: 0, since: now };
+  const base = same(s, c) ? { ...s, k: c.key } : { k: c.key, n: 0, since: now };
   const out = { ...base, n: base.n + Math.max(0, Math.round(n)) };
   writeJSON(KEY, out);
   return out.n;
@@ -59,12 +66,12 @@ export function mergeSyncedPoints(remote: unknown): void {
     if (r.k === currentCycle().key && (!s || s.k !== r.k)) writeJSON(KEY, { k: r.k, n: Math.round(r.n), since: Number(r.since) || Date.now() }, false);
     return;
   }
-  if (r.n > s.n) writeJSON(KEY, { ...s, n: Math.round(r.n) }, false);
+  // (both phones end up with the same copy: the larger count, the earlier start)
+  const since = Math.min(s.since, Number(r.since) || s.since);
+  if (r.n > s.n || since !== s.since) writeJSON(KEY, { ...s, n: Math.max(s.n, Math.round(r.n)), since }, false);
 }
 
 /** Has the singer practised today (any run, listening too)? */
 export function practisedToday(now = new Date()): boolean {
-  const today = dayKey(now);
-  const log = attemptLog();
-  return log.length > 0 && dayKey(log[log.length - 1].at) === today;
+  return practiceDays(3).includes(dayKey(now));
 }
