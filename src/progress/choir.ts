@@ -141,10 +141,24 @@ const SHARE_OFF_KEY = 'schonberg:shareOff';
 export function ensureChoirSharing(): void {
   if (rawGet('schonberg:shareMandatory')) return;
   const p = loadProfile();
-  // Not for a phone whose account the choir removed (or that deleted its account): that stays off.
+  // Switched on silently only where it is safe: a member logged in to the choir (so not removed), or one
+  // who never chose (the old box was never touched). A member who switched it off, or whose account was
+  // removed or deleted before this version (indistinguishable on the phone), is asked instead (Settings
+  // and Home offer "Start sharing"); a login or rejoining switches it on too.
   const ended = rawGet(SHARE_OFF_KEY) || lastLogout()?.reason === 'removed';
-  if (p.choirCode && !p.shareProgress && !ended) saveProfile({ ...p, shareProgress: true });
+  const safe = !!sessionFor(p.choirCode) || p.shareProgress === undefined;
+  if (p.choirCode && !p.shareProgress && !ended && safe) saveProfile({ ...p, shareProgress: true });
   rawSet('schonberg:shareMandatory', '1');
+}
+/** A choir member who isn't sharing (switched off before sharing became part of the choir): offer to start. */
+export const sharingNeedsOk = (): boolean => {
+  const p = loadProfile();
+  return !!p.choirCode && !p.shareProgress && !rawGet(SHARE_OFF_KEY);
+};
+/** The member's own "Start sharing". */
+export function startSharing(): void {
+  const p = loadProfile();
+  if (p.choirCode) saveProfile({ ...p, shareProgress: true });
 }
 /** Sharing was ended by the choir removing this phone's account, or by deleting it (cleared by a new login or leaving). */
 export const sharingEnded = (): boolean => !!rawGet(SHARE_OFF_KEY);
