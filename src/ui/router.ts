@@ -17,6 +17,8 @@ export type Route =
   | { name: 'ranks' }
   | { name: 'expert' }
   | { name: 'tuner' }
+  /** The intonation lab: its ladder, or one interval's rung (1–5). */
+  | { name: 'intonation'; interval?: 'fifth' | 'third'; rung?: number }
   | { name: 'diagnostics' }
   | { name: 'lyrics'; pieceId: string; partId: string }
   | { name: 'memorymap'; pieceId: string; partId: string }
@@ -69,6 +71,12 @@ export function parseHash(hash: string): Route {
     case 'ranks': return { name: 'ranks' };
     case 'expert': return { name: 'expert' };
     case 'tuner': return { name: 'tuner' };
+    case 'intonation': {
+      const iv = seg[1] === 'fifth' || seg[1] === 'third' ? seg[1] : null;
+      const rung = Math.round(Number(seg[2]));
+      if (iv && rung >= 1 && rung <= 5) return { name: 'intonation', interval: iv, rung };
+      return iv ? { name: 'intonation', interval: iv } : { name: 'intonation' };
+    }
     case 'diagnostics': return { name: 'diagnostics' };
     case 'choir': return { name: 'choir' };
     case 'choiradmin': return { name: 'choiradmin' };
@@ -97,6 +105,7 @@ export function href(r: Route): string {
     case 'lyrics':
     case 'memorymap': return `#/${r.name}/${e(r.pieceId)}/${e(r.partId)}`;
     case 'invite': return r.token ? `#/invite/${e(r.token)}` : '#/invite';
+    case 'intonation': return `#/intonation${r.interval ? `/${r.interval}${r.rung ? `/${r.rung}` : ''}` : ''}`;
     default: return r.name === 'home' ? '#/' : `#/${r.name}`;
   }
 }

@@ -16,6 +16,7 @@ import { Settings } from './screens/Settings';
 import { Ranks } from './screens/Ranks';
 import { Expert } from './screens/Expert';
 import { TunerScreen } from './screens/TunerScreen';
+import { IntonationLab } from './screens/IntonationLab';
 import './generated';
 import { Diagnostics } from './screens/Diagnostics';
 import { LyricsQuiz } from './screens/LyricsQuiz';
@@ -51,7 +52,7 @@ export function App() {
   // Not too eagerly: iOS may ask for permission again every time the mic is reopened, and singers
   // hop between Results, the piece and the next run.
   useEffect(() => {
-    const micScreens = ['play', 'setup', 'tuner', 'diagnostics', 'results', 'piece'];
+    const micScreens = ['play', 'setup', 'tuner', 'diagnostics', 'results', 'piece', 'intonation'];
     if (micScreens.includes(route.name)) return;
     const t = window.setTimeout(() => releaseTracker(), 3 * 60_000);
     return () => clearTimeout(t);
@@ -137,6 +138,7 @@ export function App() {
       case 'ranks': body = <Ranks />; break;
       case 'expert': body = <Expert />; break;
       case 'tuner': body = <TunerScreen />; break;
+      case 'intonation': body = <IntonationLab key={`${route.interval ?? ''}${route.rung ?? ''}`} route={route} />; break;
       case 'diagnostics': body = <Diagnostics />; break;
       case 'lyrics': body = <LyricsQuiz key={route.pieceId + route.partId} pieceId={route.pieceId} partId={route.partId} />; break;
       case 'memorymap': body = <MemoryMap key={route.pieceId + route.partId} pieceId={route.pieceId} partId={route.partId} />; break;

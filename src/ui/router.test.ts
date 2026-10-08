@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { go, leaveTo, practiceParent, pushGuard, isDroppingGuard } from './router';
+import { go, href, leaveTo, parseHash, practiceParent, pushGuard, isDroppingGuard } from './router';
 
 /** history.back() and wait until it has landed. */
 function back(): Promise<void> {
@@ -101,5 +101,15 @@ describe('practice screens sit right above their piece', () => {
     await settle();
     expect(location.hash).toBe('#/piece/p1');
     expect(history.length).toBe(n); // replaced, nothing pushed, nothing stepped out of
+  });
+});
+
+describe('the intonation lab\'s addresses', () => {
+  it('round-trips the ladder and a rung; nonsense falls back to the ladder', () => {
+    for (const r of [{ name: 'intonation' }, { name: 'intonation', interval: 'third' }, { name: 'intonation', interval: 'fifth', rung: 4 }] as const) {
+      expect(parseHash(href(r))).toEqual(r);
+    }
+    expect(parseHash('#/intonation/third/9')).toEqual({ name: 'intonation', interval: 'third' });
+    expect(parseHash('#/intonation/sixth/2')).toEqual({ name: 'intonation' });
   });
 });

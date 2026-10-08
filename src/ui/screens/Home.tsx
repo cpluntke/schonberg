@@ -15,6 +15,9 @@ import { LoggedOutCard, SyncNotice } from '../components/AccountSync';
 import { pieceStatus, todaysPlan, type PieceStatus } from '../plan';
 import { presenceShown, usePresence } from '../../progress/presence';
 import { LOGO_TILE } from '../components/ChoirLogo';
+import { useStaff } from './Admin';
+import { labEnabled } from './IntonationLab';
+import { loadLab } from '../../game/intonation';
 
 export { pieceStatus, type PieceStatus };
 
@@ -45,6 +48,7 @@ export function Home() {
   const plan = todaysPlan(statuses, cycle);
   const focus = plan[0] ?? null;
   const row = rowOfTheDay(new Date());
+  const staff = useStaff();
   const nr = nextRehearsal(cycle);
   const toRehearsal = nr ? nr.days : null;
   const toConcert = daysUntil(cycle.concertDate);
@@ -244,6 +248,8 @@ export function Home() {
         ))}
       </section>
 
+      {labEnabled(staff) && <IntonationCard />}
+
       <button className="card expert" style={{ textAlign: 'left', color: 'inherit' }} onClick={() => go({ name: 'expert' })}>
         <div className="row between">
           <strong>Zwölfton of the day</strong>
@@ -270,6 +276,23 @@ function Notice() {
       <span className="grow small">{msg}</span>
       <button className="btn ghost small" onClick={() => { try { localStorage.removeItem('sh:notice'); } catch { /* blocked */ } setMsg(null); }}>OK</button>
     </div>
+  );
+}
+
+/** The intonation lab (preview: admins only, see labEnabled). */
+function IntonationCard() {
+  const lab = loadLab();
+  const step = (k: 'fifth' | 'third') => (lab[k].rung > 5 ? 'done ✓' : `step ${lab[k].rung} of 5`);
+  return (
+    <button className="card" style={{ textAlign: 'left', color: 'inherit', borderColor: 'var(--voice-deep)' }} data-testid="home-intonation"
+      onClick={() => go({ name: 'intonation' })}>
+      <div className="row between">
+        <strong>Intonation lab</strong>
+        <span className="badge">Preview · admins</span>
+      </div>
+      <span className="small muted">Find the pure fifth and the pure major third by ear: listen, tune by hand, then sing.</span>
+      <span className="tiny mono" style={{ color: 'var(--voice)' }}>Fifth: {step('fifth')} · Third: {step('third')}</span>
+    </button>
   );
 }
 
