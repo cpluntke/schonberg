@@ -71,7 +71,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
     : '';
 
   return (
-    <main className="screen">
+    <main className="screen wide piece-screen">
       <div className="topbar">
         <button className="icon-btn" aria-label="Back" onClick={() => back()}><IconBack /></button>
         <div className="grow col" style={{ gap: 0 }}>
@@ -97,6 +97,9 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
         </form>
       )}
 
+      {/* Wide screens: your part, its readiness, the next step and the map on one side, the sections and the drills on the other. */}
+      <div className="lay piece-cols">
+      <div className="lay piece-side">
       <div className="col" style={{ gap: 8 }}>
         <div className="row between">
           <span className="eyebrow">Your part</span>
@@ -258,6 +261,9 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
         </details>
       )}
 
+      </div>
+
+      <div className="lay piece-main">
       <section className="ladder" aria-label="Sections" id="piece-sections" style={{ scrollMarginTop: 12 }}>
         <h2 style={{ marginBottom: 0 }}>Sections</h2>
         {multi && <span className="tiny muted" style={{ marginBottom: 4 }}>Practice steps: take the piece apart, then put it together in a full run.</span>}
@@ -370,6 +376,8 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
       {vocalParts.length > 0 && <KeyMarksCard piece={piece} />}
 
       {piece.credit && <span className="tiny muted">{piece.credit}</span>}
+      </div>
+      </div>
     </main>
   );
 }

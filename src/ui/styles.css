@@ -463,3 +463,16 @@ html:has(.results-foot) { scroll-padding-bottom: 170px; }
 @media (hover: hover) and (pointer: fine) and (min-width: 900px) {
   .lib-piece:hover { border-color: #4a5288; }
 }
+
+/* Piece: your part, readiness, the full run and the map on the left; the sections and the drills on the right. */
+@media (min-width: 900px) {
+  .piece-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+  .piece-side, .piece-main { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+  /* (the sections are in view beside the readiness: no need to jump down to them) */
+  .piece-screen .jump-link { display: none; }
+  .piece-screen .ladder { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 16px 20px 6px; }
+  .piece-screen .ladder-row:last-child { border-bottom: none; }
+}
+@media (min-width: 1200px) {
+  .piece-cols { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 28px; }
+}
