@@ -93,6 +93,45 @@ export function rankEntries(entries: LeaderboardEntry[], by: RankBy): Leaderboar
   return [...entries].sort((a, b) => old(a) - old(b) || key(b) - key(a) || b.readiness - a.readiness || a.name.localeCompare(b.name));
 }
 
+/** The pieceId of a singer's entry combined over all pieces (combineEntries). */
+export const ALL_PIECES = '*all';
+
+/**
+ * One entry per singer over the programme's pieces (`pieceIds`): readiness and 7-day gain averaged
+ * over all of them (a piece not started counts 0), this week's points added up, the longest streak.
+ * Singers are matched by name (case and spaces ignored); voice and name from their newest entry.
+ * Comparable (v) only when every piece's entry is. Entries for other pieces are left out.
+ */
+export function combineEntries(entries: LeaderboardEntry[], pieceIds: string[]): LeaderboardEntry[] {
+  if (!pieceIds.length) return [];
+  const programme = new Set(pieceIds);
+  const by = new Map<string, Map<string, LeaderboardEntry>>();
+  for (const e of entries) {
+    if (!programme.has(e.pieceId)) continue;
+    const k = e.name.trim().toLowerCase();
+    const m = by.get(k) ?? new Map<string, LeaderboardEntry>();
+    const had = m.get(e.pieceId);
+    if (!had || e.updatedAt > had.updatedAt) m.set(e.pieceId, e);
+    by.set(k, m);
+  }
+  const n = pieceIds.length;
+  return [...by.values()].map((m) => {
+    const es = [...m.values()];
+    const newest = es.reduce((a, e) => (e.updatedAt > a.updatedAt ? e : a));
+    return {
+      name: newest.name.trim(),
+      voice: newest.voice,
+      pieceId: ALL_PIECES,
+      readiness: es.reduce((a, e) => a + e.readiness, 0) / n,
+      improved: es.reduce((a, e) => a + e.improved, 0) / n,
+      weeklyScore: es.reduce((a, e) => a + e.weeklyScore, 0),
+      streak: Math.max(...es.map((e) => e.streak)),
+      updatedAt: newest.updatedAt,
+      ...(es.every((e) => e.v === READINESS_VERSION) ? { v: READINESS_VERSION } : {}),
+    };
+  });
+}
+
 // ---------------------------------------------------------------- validation
 
 function clampStr(v: unknown, max: number): string | null {

@@ -4,6 +4,7 @@ import { useProfile, useStoreVersion, toast, initials } from '../hooks';
 import { attemptLog, loadCycle } from '../../progress/store';
 import {
   rankEntries, READINESS_VERSION, getLeaderboardBackend, encodeShareCode, importShareCodes, removeLocalEntry, decodeShareCode,
+  combineEntries, ALL_PIECES,
   type LeaderboardEntry, type RankBy,
 } from '../../progress/leaderboard';
 import { IconShare } from '../icons';
@@ -24,10 +25,13 @@ export function Ranks() {
   const cycle = loadCycle();
   const pieces = cycle.pieceIds.map((id) => getPiece(id)).filter(Boolean) as PieceInfo[];
   useLibrary(); // redraw when the choir's scores arrive
-  const [chosen, setPieceId] = useState(pieces[0]?.id ?? '');
+  // "All pieces" first (the default): each singer over the whole programme; or one piece.
+  const [chosen, setPieceId] = useState(ALL_PIECES);
   // The programme's scores may arrive after this screen opened (a new phone, or #/ranks opened first):
-  // until a piece is chosen that is there, show the first one (and fetch its board).
-  const pieceId = pieces.some((p) => p.id === chosen) ? chosen : (pieces[0]?.id ?? '');
+  // until a piece is chosen that is there, show all of them.
+  const overAll = chosen === ALL_PIECES || !pieces.some((p) => p.id === chosen);
+  const pieceId = !pieces.length ? '' : overAll ? ALL_PIECES : chosen;
+  const programme = pieces.map((p) => p.id);
   const [by, setBy] = useState<RankBy>('readiness');
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [allEntries, setAllEntries] = useState<LeaderboardEntry[]>([]);
@@ -37,20 +41,23 @@ export function Ranks() {
   const [codeDraft, setCodeDraft] = useState(profile.choirCode ?? '');
   const backend = getLeaderboardBackend();
   const choir = profile.choirCode || 'local';
-  const piece = getPiece(pieceId);
+  const piece = overAll ? undefined : getPiece(pieceId);
 
   const computeMyEntryCached = (pc: PieceInfo) => myBoardEntry(pc, profile.voice);
-  const me: LeaderboardEntry | null = piece ? myBoardEntry(piece, profile.voice) : null;
+  const myEntries = overAll ? pieces.map((pc) => computeMyEntryCached(pc)) : [];
+  const me: LeaderboardEntry | null = piece ? myBoardEntry(piece, profile.voice)
+    : overAll && myEntries.length ? combineEntries(myEntries, programme)[0] ?? null : null;
 
   useEffect(() => {
     let alive = true;
     if (!pieceId) return;
     (async () => {
       try {
-        // Named entries on a real (server) board only (see postBoardEntry).
-        if (me) await postBoardEntry(me);
-        const list = await backend.list(choir, pieceId);
+        // Named entries on a real (server) board only (see postBoardEntry). All pieces: each of mine.
+        if (overAll) for (const e of myEntries) await postBoardEntry(e);
+        else if (me) await postBoardEntry(me);
         const everything = await backend.list(choir);
+        const list = overAll ? combineEntries(everything, programme) : await backend.list(choir, pieceId);
         if (alive) { setEntries(list); setAllEntries(everything); setErr(null); }
       } catch (e) {
         if (alive) setErr((e as Error).message);
@@ -58,9 +65,9 @@ export function Ranks() {
     })();
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pieceId, choir, profile.choirCode, profile.name, refresh]);
+  }, [pieceId, choir, profile.choirCode, profile.name, refresh, programme.join(',')]);
 
-  const others = entries.filter((e) => !(me && e.name === me.name && e.pieceId === me.pieceId));
+  const others = entries.filter((e) => !(me && e.name.trim().toLowerCase() === me.name.trim().toLowerCase() && e.pieceId === me.pieceId));
   const all = me ? [...others, { ...me, name: me.name }] : others;
   const ranked = rankEntries(all, by);
   // Averages only use entries with the current readiness formula (older app versions report
@@ -116,6 +123,7 @@ export function Ranks() {
         {pieces.length > 0 && (
           <select aria-label="Piece" value={pieceId} onChange={(e) => setPieceId(e.target.value)}
             style={{ maxWidth: 190, minHeight: 40, borderRadius: 20, background: 'var(--surface)', border: '1px solid var(--line)', padding: '0 10px', fontWeight: 600 }}>
+            <option value={ALL_PIECES}>All pieces</option>
             {pieces.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
           </select>
         )}
@@ -146,6 +154,11 @@ export function Ranks() {
       </div>
 
       <div className="lay ranks-board">
+      {overAll && pieces.length > 1 && (
+        <span className="tiny muted" data-testid="ranks-all-note">
+          All {pieces.length} pieces of the programme: readiness and the 7-day gain are averaged (a piece not started counts 0), this week's points added up, the longest streak.
+        </span>
+      )}
       {profile.boardHidden && profile.choirCode && (
         <span className="small muted" data-testid="board-hidden">You're off the choir's leaderboard: only you see your own row here (Settings → Privacy).</span>
       )}
@@ -168,7 +181,10 @@ export function Ranks() {
               </div>
               <span className="mono" style={{ fontWeight: 600 }}>{metric(e)}</span>
               {!isMe && backend.kind === 'local' && (
-                <button className="icon-btn" aria-label={`Remove ${e.name}`} title="Remove" onClick={() => { removeLocalEntry(choir, e.name, e.pieceId); setRefresh((x) => x + 1); }}>
+                <button className="icon-btn" aria-label={`Remove ${e.name}`} title="Remove" onClick={() => {
+                  for (const id of e.pieceId === ALL_PIECES ? programme : [e.pieceId]) removeLocalEntry(choir, e.name, id);
+                  setRefresh((x) => x + 1);
+                }}>
                   <span aria-hidden="true" style={{ fontSize: 18, color: 'var(--muted)' }}>×</span>
                 </button>
               )}
