@@ -103,7 +103,6 @@ export function Home() {
           </div>
           <span className="small" style={{ fontWeight: 700 }}>notes right this cycle</span>
           {points.name && <span className="tiny muted">{points.name}</span>}
-          {points.since && <span className="tiny muted" data-testid="points-since">counted since {new Date(points.since).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span>}
         </div>
       </div>
 
