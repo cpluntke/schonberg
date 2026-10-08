@@ -77,8 +77,11 @@ function CheatSheets({ piece, part, agg }: { piece: PieceInfo; part: Part; agg: 
   // (a part this phone's copy of the score doesn't have is left out: its note numbers mean nothing here)
   const parts = Object.entries(agg.noteParts ?? {})
     .map(([id, g]) => ({ p: piece.score.parts.find((x) => x.id === id), singers: g.singers, notes: g.notes }))
+    .map((x) => ({ ...x, notes: x.p ? x.notes.filter((n) => x.p!.notes[n.i] != null) : [] }))
     .filter((x): x is { p: Part; singers: number; notes: NoteAgg[] } => !!x.p && x.notes.length > 0);
   const total = parts.reduce((a, x) => a + x.notes.length, 0);
+  // (a part is named unless it's the only one and the card's own: never Bass II's notes under "Bass I")
+  const named = parts.length > 1 || parts.some((x) => x.p.id !== part.id);
   return (
     <details className="cheat" data-testid="cheat-details" onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}>
       <summary className="small" style={{ cursor: 'pointer', fontWeight: 700 }}>
@@ -87,10 +90,10 @@ function CheatSheets({ piece, part, agg }: { piece: PieceInfo; part: Part; agg: 
       {/* (drawn only while open) */}
       {open && (
         <div className="col" style={{ marginTop: 8, gap: 14 }}>
-          {parts.length ? parts.map(({ p, singers, notes }) => (
+          {parts.length ? parts.map(({ p, singers, notes }, k) => (
             <div key={p.id} className="col" style={{ gap: 6 }}>
-              {parts.length > 1 && <strong className="small">{p.name}</strong>}
-              <CheatSheet piece={piece} part={p} notes={notes} singers={singers} />
+              {named && <strong className="small" data-testid="cheat-part">{p.name}</strong>}
+              <CheatSheet piece={piece} part={p} notes={notes} singers={singers} intro={k === 0} />
             </div>
           )) : <CheatSheet piece={piece} part={part} notes={[]} singers={agg.singers} />}
         </div>

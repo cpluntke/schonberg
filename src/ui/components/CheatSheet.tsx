@@ -26,7 +26,7 @@ const MAX_SPOTS = 24;
 const mainKind = (n: NoteAgg): FaultKind => (Object.entries(n.kinds).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'missed') as FaultKind;
 const kindsText = (n: NoteAgg) => Object.entries(n.kinds).sort((a, b) => b[1] - a[1]).map(([k, c]) => `${WORDS[k as FaultKind] ?? k} ${c}`).join(', ');
 
-export function CheatSheet({ piece, part, notes, singers }: { piece: PieceInfo; part: Part; notes: NoteAgg[]; singers: number }) {
+export function CheatSheet({ piece, part, notes, singers, intro = true }: { piece: PieceInfo; part: Part; notes: NoteAgg[]; singers: number; intro?: boolean }) {
   const fonts = useFontsLoaded();
   const wrapRef = useRef<HTMLDivElement>(null);
   const width = useWidth(wrapRef);
@@ -51,7 +51,7 @@ export function CheatSheet({ piece, part, notes, singers }: { piece: PieceInfo; 
           No note yet that two or more singers keep getting wrong (it shows for a part once three or more of its singers share). It fills in as
           the section practises with the current app version: earlier runs didn't keep notes.
         </span>
-      ) : (
+      ) : intro && (
         <span className="tiny muted">
           In score order. Each marked note: what usually goes wrong · how many of the part's {singers} singers sharing keep getting it wrong (recent runs count most).
           Counted together, never by name; in a small section a change right after someone's run may still hint at whose it was.
