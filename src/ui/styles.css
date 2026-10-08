@@ -336,6 +336,8 @@ h1:focus { outline: none; }
 
 /* Results: the next step is always in view (the details scroll above it). */
 .screen.practice.has-foot { padding-bottom: 0; }
+/* (keyboard focus scrolls into view above the footer, not behind it) */
+html:has(.results-foot) { scroll-padding-bottom: 170px; }
 .results-foot {
   position: sticky; bottom: 0; z-index: 10; margin: auto -16px 0; padding: 10px 16px calc(12px + var(--safe-bottom));
   background: var(--bg-2); border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px;

@@ -148,7 +148,13 @@ const LOAD = Math.random().toString(36).slice(2);
 const guarded = () => hstate()?.shGuard === LOAD;
 try {
   const st = hstate();
-  if (st?.shGuard) history.replaceState({ ...st, shGuard: undefined, shDup: true }, '', location.href);
+  if (st?.shGuard) {
+    history.replaceState({ ...st, shGuard: undefined, shDup: true }, '', location.href);
+    // Step down onto the real Play entry right away (one more quick load of the same screen), so the
+    // back button later lands on the piece, not on this leftover. If that can't happen, ← still
+    // skips it (shDup).
+    if (history.length > 1) history.back();
+  }
 } catch { /* ignore */ }
 const same = (a: Route, b: Route) => href(a) === href(b);
 const notify = () => window.dispatchEvent(new Event('sh:route'));
