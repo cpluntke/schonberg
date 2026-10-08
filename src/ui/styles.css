@@ -395,7 +395,7 @@ html:has(.results-foot) { scroll-padding-bottom: 170px; }
   .screen.wide { max-width: calc(var(--content-max) + 2 * var(--gutter)); }
   .topbar { min-height: 52px; }
   .topbar h1 { font-size: 28px; }
-  .card { padding: 18px 20px; }
+  .screen .card { padding: 18px 20px; }
 
   /* The sidebar: the app's name, the tabs, the choir. */
   .nav {
@@ -418,8 +418,8 @@ html:has(.results-foot) { scroll-padding-bottom: 170px; }
   .nav-choir img { width: 40px; height: 40px; border-radius: 10px; object-fit: contain; padding: 3px; flex: none; }
   .nav-choir-name { font-weight: 700; font-size: 14px; line-height: 1.25; overflow-wrap: anywhere; }
 
-  .toast { bottom: 24px; }
-  .app.has-nav .toast { left: calc(50% + var(--side-w) / 2); }
+  /* (no tab bar under it any more; Play keeps its toasts above its controls) */
+  .app.has-nav .toast { bottom: 24px; left: calc(50% + var(--side-w) / 2); }
 }
 @media (min-width: 1200px) {
   :root { --side-w: 248px; --gutter: 40px; --content-max: 1200px; }
