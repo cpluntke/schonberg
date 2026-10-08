@@ -102,7 +102,7 @@ export function Home() {
             <span className="mono" style={{ fontSize: 30, fontWeight: 700, lineHeight: 1 }} data-testid="cycle-points">{points.n.toLocaleString()}</span>
           </div>
           <span className="small" style={{ fontWeight: 700 }}>notes right this cycle</span>
-          <span className="tiny muted">{points.name ? `${points.name} · back to 0 when a new cycle starts` : 'Back to 0 when a new cycle starts'}</span>
+          {points.name && <span className="tiny muted">{points.name}</span>}
         </div>
       </div>
 
