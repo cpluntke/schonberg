@@ -45,4 +45,13 @@ On middle C, the piano's third pulses about 10 times a second. On a lower do it 
   otherwise S D4, A A3, T D3, B A2.
 - **Headphones:** the singing steps need them, so the drone doesn't reach the microphone.
 
+"3 of the last 4" also passes after the first 3 tries if all 3 are pure.
+
+The pulse on screen and its words ("still", "almost still", "pulsing", "fast buzz") follow the cents
+off pure, drawn as the pulse would be on a do of D3. The real pulse is faster on a higher do, but
+this way every voice sees the same picture for the same tolerance (`shownBeats`, `wobbleWord`).
+
+In "tune it by hand", pure sits at a different place on the slider every round (a hidden shift of up
+to ±25¢), so it can only be found by ear.
+
 Progress stays on the phone (`sh:intonation`, not synced).

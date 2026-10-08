@@ -13,12 +13,14 @@ interface Tone { osc: OscillatorNode; env: GainNode }
 export class Drone {
   private tones = new Map<string, Tone>();
   private out: GainNode;
+  private lp: BiquadFilterNode;
   private wave: PeriodicWave;
+  private closed = false;
 
   constructor(private ctx: AudioContext, gain = 0.5) {
     this.out = ctx.createGain();
     this.out.gain.value = gain;
-    const lp = ctx.createBiquadFilter();
+    const lp = this.lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
     lp.frequency.value = 4000;
     lp.Q.value = 0.3;
@@ -31,6 +33,7 @@ export class Drone {
 
   /** Sound exactly these tones (id → Hz): new ones fade in, missing ones fade out, the rest glide. */
   set(tones: Record<string, number>, level = 0.16) {
+    if (this.closed) return;
     const now = this.ctx.currentTime;
     for (const [id, t] of this.tones) {
       if (id in tones) continue;
@@ -59,6 +62,14 @@ export class Drone {
     const now = this.ctx.currentTime;
     for (const t of this.tones.values()) this.release(t, now);
     this.tones.clear();
+  }
+
+  /** Silence for good: a late call (a timer, an awaited promise) can't bring it back. */
+  dispose() {
+    if (this.closed) return;
+    this.stop();
+    this.closed = true;
+    window.setTimeout(() => { this.out.disconnect(); this.lp.disconnect(); }, (RELEASE + 0.2) * 1000);
   }
 
   get playing() { return this.tones.size > 0; }

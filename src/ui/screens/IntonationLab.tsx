@@ -15,7 +15,7 @@ import { getTracker } from '../play/session';
 import { micErrorText } from '../components/Tuner';
 import {
   CHECK_PASS, CHECK_ROUNDS, HOLD_SEC, HoldDetector, INTERVAL_DEGREE, PASS, ROUNDS, RUNGS, RUNG_NAMES, RATIO, TOL_HAND, TOL_SING,
-  centsAbove, loadLab, logRound, median, pianoCents, pureCents, rootFor, saveLab, wobble, wobbleWord,
+  centsAbove, loadLab, logRound, median, pianoCents, pureCents, rootFor, saveLab, shownBeats, wobbleWord,
   type Degree, type LabInterval, type LabProgress,
 } from '../../game/intonation';
 
@@ -105,11 +105,11 @@ function Ladder({ iv, lab }: { iv: LabInterval; lab: LabProgress }) {
                 }}>{done ? <IconCheck size={16} /> : n}</span>
                 {n < RUNGS && <span style={{ width: 2, flex: 1, minHeight: 12, background: done ? 'var(--good)' : 'var(--line)' }} />}
               </div>
-              <button className="list-row grow" disabled={!open} data-testid={`lab-rung-${n}`}
+              <button className="list-row grow" disabled={!open} data-testid={`lab-rung-${n}`} aria-current={now ? 'step' : undefined}
                 style={{ textAlign: 'left', alignItems: 'flex-start', padding: '4px 0 14px', opacity: open ? 1 : 0.55, flexDirection: 'column', gap: 2 }}
                 onClick={() => go({ name: 'intonation', interval: iv, rung: n })}>
                 <span className="row between" style={{ width: '100%' }}>
-                  <strong style={{ color: now ? 'var(--accent-text)' : undefined }}>{name}</strong>
+                  <strong style={{ color: now ? 'var(--accent-text)' : undefined }}>{name}<span className="sr-only">{done ? ' (done)' : now ? ' (next)' : !open ? ' (locked)' : ''}</span></strong>
                   <span className="tiny muted mono">{RUNG_HELP[i]}</span>
                 </span>
                 <span className="small muted">{RUNG_SUB[i]}{!open ? ' (opens after the step before)' : ''}</span>
@@ -144,15 +144,24 @@ function RungTop({ iv, rung, title, children }: { iv: LabInterval; rung: number;
   );
 }
 
-/** The app's held notes for this screen; silent when the screen goes. */
-function useDrone(): () => Promise<Drone> {
+/**
+ * The app's held notes for this screen, silent for good when the screen goes. `get` resolves null
+ * once the screen is gone (anything awaited before must then do nothing); `alive` says so too.
+ */
+function useDrone() {
   const ref = useRef<Drone | null>(null);
-  useEffect(() => () => { ref.current?.stop(); ref.current = null; }, []);
-  return async () => {
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => { alive.current = false; ref.current?.dispose(); ref.current = null; };
+  }, []);
+  const get = async (): Promise<Drone | null> => {
     await unlockAudio();
+    if (!alive.current) return null;
     if (!ref.current) ref.current = new Drone(getAudioContext());
     return ref.current;
   };
+  return { get, alive };
 }
 
 const toneHz = (root: number, d: Degree, offsetCents = 0) => midiToHz(root) * (RATIO[d][0] / RATIO[d][1]) * 2 ** (offsetCents / 1200);
@@ -196,7 +205,7 @@ function Landed({ deg, value, tol }: { deg: Degree; value: number; tol: number }
         <text x={x(piano)} y={16} textAnchor="middle" fontSize={12} fill="var(--muted)">piano {piano}</text>
       </>}
       <circle cx={x(value)} cy={56} r={8} fill="var(--voice)" stroke="var(--bg)" strokeWidth={3} />
-      <text x={x(value)} y={96} textAnchor="middle" fontSize={13} fontWeight={800} fill="var(--voice)">
+      <text x={Math.max(40, Math.min(280, x(value)))} y={96} textAnchor="middle" fontSize={13} fontWeight={800} fill="var(--voice)">
         you {Math.round(value)}{value < lo ? ' ◂' : value > hi ? ' ▸' : ''}
       </text>
     </svg>
@@ -214,7 +223,7 @@ function verdict(deg: Degree, off: number, tol: number): { title: string; good: 
 function Rounds({ results, tol, total = ROUNDS }: { results: number[]; tol: number; total?: number }) {
   const last = results.slice(-total);
   return (
-    <div className="row" style={{ gap: 6 }} aria-label={`${last.filter((v) => Math.abs(v) <= tol).length} of the last ${last.length} pure`}>
+    <div className="row" style={{ gap: 6 }} role="img" aria-label={`${last.filter((v) => Math.abs(v) <= tol).length} of the last ${last.length} pure`}>
       {Array.from({ length: total }, (_, i) => {
         const v = last[i];
         const bg = v == null ? 'var(--line)' : Math.abs(v) <= tol ? 'var(--good)' : 'var(--bad)';
@@ -226,12 +235,14 @@ function Rounds({ results, tol, total = ROUNDS }: { results: number[]; tol: numb
 
 function PassedNote({ iv, rung }: { iv: LabInterval; rung: number }) {
   const next = rung < RUNGS ? rung + 1 : null;
+  const other: LabInterval = iv === 'fifth' ? 'third' : 'fifth';
+  const otherOpen = loadLab()[other].rung <= RUNGS;
   return (
     <div className="notice info col" style={{ gap: 8 }} data-testid="lab-passed">
       <strong>{next ? `Step ${rung} done. “${RUNG_NAMES[next - 1]}” is open.` : `${IV_NAME[iv]}: the whole ladder is done.`}</strong>
       <button className="btn primary small" style={{ alignSelf: 'flex-start' }}
-        onClick={() => go(next ? { name: 'intonation', interval: iv, rung: next } : { name: 'intonation', interval: iv === 'fifth' ? 'third' : 'fifth' }, true)}>
-        {next ? `Go to step ${next}` : iv === 'fifth' ? 'On to the third' : 'Back to the ladder'}
+        onClick={() => go(next ? { name: 'intonation', interval: iv, rung: next } : { name: 'intonation', interval: otherOpen ? other : iv }, true)}>
+        {next ? `Go to step ${next}` : otherOpen ? `On to the ${other}` : 'Back to the ladder'}
       </button>
     </div>
   );
@@ -261,7 +272,8 @@ function ListenRung({ iv, root, lab, record }: RungProps) {
   useEffect(() => () => clearTimeout(stopTimer.current), []);
 
   async function play(key: string | null, tones: Record<string, number>, sec = 6) {
-    const d = await drone();
+    const d = await drone.get();
+    if (!d) return;
     clearTimeout(stopTimer.current);
     if (!key) { d.stop(); setPlaying(null); return; }
     d.stop();
@@ -292,7 +304,7 @@ function ListenRung({ iv, root, lab, record }: RungProps) {
                 <span className="small muted">do + {DEG_NAME[deg]}{e.off ? ` ${e.off > 0 ? '+' : ''}${Math.round(e.off)}¢` : ''}</span>
               </div>
             </div>
-            <Wave beats={wobble(hz, deg, rootHz, ['do'])} height={44} colour={e.off === 0 ? 'var(--good)' : 'var(--voice)'} label={`${e.title}: ${wobbleWord(wobble(hz, deg, rootHz, ['do']))}`} />
+            <Wave beats={shownBeats(e.off, deg, ['do'])} height={44} colour={e.off === 0 ? 'var(--good)' : 'var(--voice)'} label={`${e.title}: ${wobbleWord(e.off)}`} />
             <span className="small">{e.hear}</span>
           </div>
         );
@@ -381,26 +393,33 @@ function newCheck(iv: LabInterval) {
 function TuneRung({ iv, root, lab, record }: RungProps) {
   const deg = INTERVAL_DEGREE[iv];
   const drone = useDrone();
-  const [off, setOff] = useState(randomStart);
+  // The slider's position is the offset from pure plus a hidden shift that changes every round:
+  // pure is never in the same place, so only the ear can find it.
+  const [round, setRound] = useState(newTuneRound);
+  const [pos, setPos] = useState(round.start);
+  const off = pos - round.shift;
   const [on, setOn] = useState(false);
   const [done, setDone] = useState<number | null>(null);
   const [passed, setPassed] = useState(false);
+  const lockedAt = useRef(0);
   const rootHz = midiToHz(root);
   const hz = toneHz(root, deg, off);
-  const beats = wobble(hz, deg, rootHz, ['do']);
   // While it sounds, the moving note follows the slider.
-  useEffect(() => { if (on) void drone().then((d) => d.set({ do: rootHz, x: hz })); }, [on, hz]); // eslint-disable-line react-hooks/exhaustive-deps
-  const set = (v: number) => { setOff(Math.max(-50, Math.min(50, v))); setDone(null); };
-  async function start() { setOn(true); (await drone()).set({ do: rootHz, x: hz }); }
+  useEffect(() => { if (on) void drone.get().then((d) => d?.set({ do: rootHz, x: hz })); }, [on, hz]); // eslint-disable-line react-hooks/exhaustive-deps
+  const set = (v: number) => setPos(Math.max(-SLIDER, Math.min(SLIDER, v)));
+  async function start() { setOn(true); (await drone.get())?.set({ do: rootHz, x: hz }); }
   function lock() {
+    if (done != null) return;
+    lockedAt.current = Date.now();
     setDone(off);
     if (record(iv, 2, off)) setPassed(true);
   }
   async function next() {
-    const o = randomStart();
-    setOff(o); setDone(null);
+    if (Date.now() - lockedAt.current < 600) return; // (a double tap on "That's it")
+    const r = newTuneRound();
+    setRound(r); setPos(r.start); setDone(null);
     setOn(true);
-    (await drone()).set({ do: rootHz, x: toneHz(root, deg, o) });
+    (await drone.get())?.set({ do: rootHz, x: toneHz(root, deg, r.start - r.shift) });
   }
   const v = done != null ? verdict(deg, done, TOL_HAND) : null;
   return (
@@ -412,28 +431,28 @@ function TuneRung({ iv, root, lab, record }: RungProps) {
       <div className="card" style={{ gap: 8 }}>
         <div className="row between">
           <strong className="small">What you hear</strong>
-          <span className="mono small" style={{ color: beats < 0.7 ? 'var(--good)' : 'var(--muted)' }} data-testid="lab-word">{on ? wobbleWord(beats) : '–'}</span>
+          <span className="mono small" style={{ color: Math.abs(off) <= TOL_HAND ? 'var(--good)' : 'var(--muted)' }} data-testid="lab-word">{on ? wobbleWord(off) : '–'}</span>
         </div>
-        <Wave beats={on ? beats : null} label={`Pulse: ${wobbleWord(beats)}`} />
+        <Wave beats={on ? shownBeats(off, deg, ['do']) : null} label={on ? `Pulse: ${wobbleWord(off)}` : 'Not playing'} />
         <span className="tiny muted">One second of sound. A slower pulse means closer.</span>
       </div>
       {!on ? (
         <button className="btn primary block" data-testid="lab-start" onClick={() => void start()}>Play do and {DEG_NAME[deg]}</button>
       ) : (
         <>
-          <label className="field">
-            <span className="small" style={{ fontWeight: 600 }}>Move {DEG_NAME[deg]}</span>
+          <div className="field">
+            <span className="small" style={{ fontWeight: 600 }} aria-hidden="true">Move {DEG_NAME[deg]}</span>
             <div className="row">
-              <span className="small muted">lower</span>
-              <input type="range" className="grow" min={-50} max={50} step={0.5} value={off} disabled={done != null}
-                data-testid="lab-slider" aria-valuetext="no numbers: use your ears"
+              <span className="small muted" aria-hidden="true">lower</span>
+              <input type="range" className="grow" min={-SLIDER} max={SLIDER} step={0.5} value={pos} disabled={done != null}
+                data-testid="lab-slider" aria-label={`Move ${DEG_NAME[deg]}: left is lower, right is higher`} aria-valuetext="no numbers: use your ears"
                 onChange={(e) => set(Number(e.target.value))} style={{ height: 44, accentColor: 'var(--accent)' }} />
-              <span className="small muted">higher</span>
+              <span className="small muted" aria-hidden="true">higher</span>
             </div>
-          </label>
+          </div>
           <div className="row" style={{ gap: 10 }}>
-            <button className="btn grow" disabled={done != null} data-testid="lab-lower" onClick={() => set(off - 1)}>A touch lower</button>
-            <button className="btn grow" disabled={done != null} data-testid="lab-higher" onClick={() => set(off + 1)}>A touch higher</button>
+            <button className="btn grow" disabled={done != null} data-testid="lab-lower" onClick={() => set(pos - 1)}>A touch lower</button>
+            <button className="btn grow" disabled={done != null} data-testid="lab-higher" onClick={() => set(pos + 1)}>A touch higher</button>
           </div>
         </>
       )}
@@ -453,10 +472,13 @@ function TuneRung({ iv, root, lab, record }: RungProps) {
   );
 }
 
-/** A starting point clearly off (15–40¢), above or below at random: no slider position to learn. */
-function randomStart() {
+/** The slider's half-range (cents). */
+const SLIDER = 80;
+/** A round: pure sits `shift` from the slider's middle (±25¢); the start is clearly off (15–40¢ above or below). */
+function newTuneRound() {
+  const shift = Math.round((Math.random() * 50 - 25) * 2) / 2;
   const m = 15 + Math.random() * 25;
-  return Math.round((Math.random() < 0.5 ? -m : m) * 2) / 2;
+  return { shift, start: shift + Math.round((Math.random() < 0.5 ? -m : m) * 2) / 2 };
 }
 
 // ---------- 3–5 · singing ----------
@@ -471,13 +493,16 @@ function SingRung({ iv, root, lab, record, rung }: RungProps & { rung: number })
   const drone = useDrone();
   const [state, setState] = useState<'off' | 'starting' | 'on' | 'error'>('off');
   const [err, setErr] = useState('');
-  const [beats, setBeats] = useState<number | null>(null);
+  /** How far the voice is from pure now (cents; null = nothing heard). */
+  const [offNow, setOffNow] = useState<number | null>(null);
   const [held, setHeld] = useState(0);
   const [result, setResult] = useState<{ value: number; counted: boolean } | null>(null);
   const [passed, setPassed] = useState(false);
   const [hinting, setHinting] = useState(false);
   const unsub = useRef<(() => void) | null>(null);
-  const live = useRef({ hold: new HoldDetector(), recent: [] as { t: number; hz: number }[], paused: false, shown: 0 });
+  const hintTimer = useRef(0);
+  const lockedAt = useRef(0);
+  const live = useRef({ hold: new HoldDetector(), recent: [] as { t: number; hz: number }[], paused: false, locked: false, shown: 0 });
   const rootHz = midiToHz(root);
   const target = pureCents(deg);
   const tol = TOL_SING;
@@ -486,21 +511,25 @@ function SingRung({ iv, root, lab, record, rung }: RungProps & { rung: number })
   const cur = useRef({ deg, others, target, showWobble, record });
   cur.current = { deg, others, target, showWobble, record };
 
-  useEffect(() => () => { unsub.current?.(); unsub.current = null; }, []);
-  // The chord's notes follow the chosen part.
+  useEffect(() => () => { unsub.current?.(); unsub.current = null; clearTimeout(hintTimer.current); }, []);
+  // The chord's notes follow the chosen part; a new part is a new round.
   useEffect(() => {
     if (state !== 'on') return;
-    void drone().then((d) => d.set(Object.fromEntries(others.map((o) => [o, toneHz(root, o)]))));
-    live.current.hold.reset();
-    setResult(null);
+    void drone.get().then((d) => d?.set(Object.fromEntries(others.map((o) => [o, toneHz(root, o)]))));
+    clearTimeout(hintTimer.current);
+    setHinting(false);
+    again(true);
   }, [part]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function start() {
     setState('starting');
     try {
-      const d = await drone();
+      const d = await drone.get();
+      if (!d) return;
       const t = await getTracker();
-      const lowest = root + Math.round(target / 100) - 4;
+      if (!drone.alive.current) return; // (left while the mic opened)
+      // (under do, whichever part is sung: the chord's part can change)
+      const lowest = root - 5;
       t.configureFor(lowest);
       t.setLowestNote(lowest);
       t.setHint(() => root + cur.current.target / 100);
@@ -516,12 +545,12 @@ function SingRung({ iv, root, lab, record, rung }: RungProps & { rung: number })
           L.recent.push({ t: now, hz });
           L.recent = L.recent.filter((r) => r.t > now - 0.3);
         } else if (L.recent.length && now - L.recent[L.recent.length - 1].t > 0.3) L.recent = [];
-        const { deg: dg, others: os, target: tg } = cur.current;
+        const { target: tg } = cur.current;
         const locked = L.hold.push(now, hz != null ? centsAbove(hz, rootHz, tg) : null);
         // (the screen at most ~15 times a second)
         if (performance.now() - L.shown > 66) {
           L.shown = performance.now();
-          setBeats(L.recent.length ? wobble(median(L.recent.map((r) => r.hz)), dg, rootHz, os) : null);
+          setOffNow(L.recent.length ? centsAbove(median(L.recent.map((r) => r.hz)), rootHz, tg) - tg : null);
           setHeld(L.hold.held());
         }
         if (locked != null) onLock(locked);
@@ -537,6 +566,8 @@ function SingRung({ iv, root, lab, record, rung }: RungProps & { rung: number })
   function onLock(c: number) {
     const L = live.current;
     L.paused = true;
+    L.locked = true;
+    lockedAt.current = Date.now();
     setHeld(0);
     const { target: tg, showWobble: sw, record: rec } = cur.current;
     const offBy = c - tg;
@@ -546,25 +577,33 @@ function SingRung({ iv, root, lab, record, rung }: RungProps & { rung: number })
     if (counted && rec(iv, rung, offBy)) setPassed(true);
   }
 
-  function again() {
+  /** A new round (`force`: also right after a lock, e.g. the chord's part changed). */
+  function again(force = false) {
+    if (!force && Date.now() - lockedAt.current < 600) return; // (a double tap on the lock)
     const L = live.current;
     L.hold.reset();
     L.recent = [];
     L.paused = false;
+    L.locked = false;
+    setOffNow(null);
     setResult(null);
   }
 
   async function hint() {
-    const d = await drone();
+    const d = await drone.get();
+    if (!d) return;
     const L = live.current;
     L.paused = true;
     L.hold.reset();
     setHinting(true);
     d.set({ ...Object.fromEntries(others.map((o) => [o, toneHz(root, o)])), hint: toneHz(root, deg) });
-    window.setTimeout(() => {
-      d.set(Object.fromEntries(others.map((o) => [o, toneHz(root, o)])));
+    clearTimeout(hintTimer.current);
+    hintTimer.current = window.setTimeout(() => {
+      if (!drone.alive.current) return;
+      d.set(Object.fromEntries(cur.current.others.map((o) => [o, toneHz(root, o)])));
       setHinting(false);
-      L.paused = false;
+      L.recent = [];
+      if (!L.locked) L.paused = false;
     }, 2500);
   }
 
@@ -591,7 +630,7 @@ function SingRung({ iv, root, lab, record, rung }: RungProps & { rung: number })
           </div>
           <label className="toggle-row">
             <span className="small" style={{ fontWeight: 600 }}>Show the wobble{showWobble ? ' (practice: rounds count with it off)' : ''}</span>
-            <input type="checkbox" checked={showWobble} data-testid="lab-wobble-toggle" onChange={(e) => { setShowWobble(e.target.checked); again(); }} />
+            <input type="checkbox" checked={showWobble} data-testid="lab-wobble-toggle" onChange={(e) => { setShowWobble(e.target.checked); again(true); }} />
           </label>
         </>
       )}
@@ -614,9 +653,9 @@ function SingRung({ iv, root, lab, record, rung }: RungProps & { rung: number })
             <>
               <div className="row between">
                 <strong className="small">The wobble</strong>
-                <span className="mono small" style={{ color: beats != null && beats < 0.7 ? 'var(--good)' : 'var(--muted)' }} data-testid="lab-word">{wobbleWord(beats)}</span>
+                <span className="mono small" style={{ color: offNow != null && Math.abs(offNow) <= tol ? 'var(--good)' : 'var(--muted)' }} data-testid="lab-word">{wobbleWord(offNow)}</span>
               </div>
-              <Wave beats={beats} label={`Your voice against the drone: ${wobbleWord(beats)}`} />
+              <Wave beats={offNow == null ? null : shownBeats(offNow, deg, others)} label={`Your voice against the drone: ${wobbleWord(offNow)}`} />
               <span className="tiny muted">Shows how much it pulses, never which way. Which way to move is for your ear.</span>
             </>
           ) : (
@@ -643,8 +682,8 @@ function SingRung({ iv, root, lab, record, rung }: RungProps & { rung: number })
       {passed && <PassedNote iv={iv} rung={rung} />}
       {state === 'on' && (
         <div className="row" style={{ gap: 10 }}>
-          {rung === 3 && <button className="btn grow" disabled={hinting} data-testid="lab-hint" onClick={() => void hint()}>{hinting ? 'Listen…' : 'Hear it once'}</button>}
-          {result && <button className="btn primary grow" data-testid="lab-next" onClick={again}>Next round</button>}
+          {rung === 3 && <button className="btn grow" disabled={hinting || !!result} data-testid="lab-hint" onClick={() => void hint()}>{hinting ? 'Listen…' : 'Hear it once'}</button>}
+          {result && <button className="btn primary grow" data-testid="lab-next" onClick={() => again()}>Next round</button>}
         </div>
       )}
       <span className="tiny muted">To pass: {PASS} of the last {ROUNDS} within {tol}¢ of pure{chordRung ? ', with the wobble off' : ''}. Hold it {HOLD_SEC} s, straight tone (no vibrato).</span>
@@ -661,7 +700,7 @@ function HoldRing({ held }: { held: number }) {
   const C = 2 * Math.PI * 30;
   return (
     <div className="row" style={{ gap: 14 }}>
-      <svg width={72} height={72} viewBox="0 0 72 72" aria-label={`Held ${held.toFixed(1)} of ${HOLD_SEC} seconds`} data-testid="lab-hold">
+      <svg width={72} height={72} viewBox="0 0 72 72" role="img" aria-label={`Held ${held.toFixed(1)} of ${HOLD_SEC} seconds`} data-testid="lab-hold">
         <circle cx={36} cy={36} r={30} fill="none" stroke="var(--line)" strokeWidth={7} />
         <circle cx={36} cy={36} r={30} fill="none" stroke="var(--accent)" strokeWidth={7} strokeLinecap="round"
           strokeDasharray={`${(C * f).toFixed(1)} ${C.toFixed(1)}`} transform="rotate(-90 36 36)" />

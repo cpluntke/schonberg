@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  HoldDetector, HOLD_SEC, beatHz, centsAbove, loadLab, logRound, pairRatio, pianoCents, pureCents, rootFor, rungPassed, saveLab, wobble, wobbleWord,
+  HoldDetector, HOLD_SEC, beatHz, shownBeats, centsAbove, loadLab, logRound, pairRatio, pianoCents, pureCents, rootFor, rungPassed, saveLab, wobble, wobbleWord,
 } from './intonation';
 
 const hz = (rootHz: number, c: number) => rootHz * 2 ** (c / 1200);
@@ -41,9 +41,20 @@ describe('intonation lab: the physics', () => {
     expect(wobble(hz(d3, 8), 'do', d3, ['mi', 'sol'])).toBeGreaterThan(2);
   });
 
-  it('words for the pulse', () => {
-    expect(wobbleWord(0.2)).toBe('still');
-    expect(wobbleWord(10)).toBe('fast buzz');
+  it('a pure tone sung an octave off still reads as pure, whichever side of the app\'s notes it lands', () => {
+    const d3 = 146.83;
+    for (const [deg, others] of [['sol', ['do']], ['mi', ['do']], ['mi', ['do', 'sol']], ['do', ['mi', 'sol']]] as const) {
+      for (const oct of [-1, 1]) expect(wobble(hz(d3, pureCents(deg) + 1200 * oct), deg, d3, [...others])).toBeLessThan(1e-6);
+    }
+  });
+
+  it('the shown pulse and its words follow the cents, the same for every voice', () => {
+    expect(shownBeats(0, 'mi', ['do', 'sol'])).toBeLessThan(1e-6);
+    expect(shownBeats(8, 'mi', ['do'])).toBeCloseTo(shownBeats(-8, 'mi', ['do']), 0);
+    expect(wobbleWord(1)).toBe('still');
+    expect(wobbleWord(-7)).toBe('almost still');
+    expect(wobbleWord(14)).toBe('pulsing');
+    expect(wobbleWord(30)).toBe('fast buzz');
     expect(wobbleWord(null)).toBe('listening…');
   });
 
@@ -124,6 +135,12 @@ describe('ladder progress', () => {
     expect(loadLab().fifth.rung).toBe(6);
     localStorage.setItem('sh:intonation', 'not json');
     expect(loadLab().third.rung).toBe(1);
+    // Damaged logs: kept only as lists of numbers.
+    localStorage.setItem('sh:intonation', '{"fifth":{"rung":2,"logs":null},"third":{"rung":3,"logs":{"2":5,"3":[1,"x",null,2]}}}');
+    const d = loadLab();
+    expect(d.fifth.logs).toEqual({});
+    expect(d.third.logs).toEqual({ 3: [1, 2] });
+    expect(() => logRound(d, 'third', 2, 0)).not.toThrow();
     localStorage.removeItem('sh:intonation');
   });
 });

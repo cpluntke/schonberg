@@ -9,6 +9,7 @@
 // sing blind, sing it in a chord.
 
 import type { VoiceType } from '../music/types';
+import { rawGet, rawSet } from '../progress/store';
 
 export type LabInterval = 'fifth' | 'third';
 /** A chord tone, as scale degrees of a major triad. */
@@ -61,27 +62,37 @@ export function pairRatio(a: Degree, b: Degree): [number, number] {
 
 /** A tone at `hz` meant as `deg`, against the others of the chord, pure on `rootHz` (do). */
 export function wobble(hz: number, deg: Degree, rootHz: number, others: Degree[]): number {
+  // An octave slip still means this chord tone: fold it to its place in the chord first.
+  const want = rootHz * RATIO[deg][0] / RATIO[deg][1];
+  let h = hz;
+  while (h > want * Math.SQRT2) h /= 2;
+  while (h < want / Math.SQRT2) h *= 2;
   let worst = 0;
   for (const o of others) {
     if (o === deg) continue;
     const ohz = rootHz * RATIO[o][0] / RATIO[o][1];
     const [n, m] = pairRatio(deg, o);
-    // Which one is the higher of the pair decides which partial each one gives.
-    const lo = Math.min(hz, ohz), hi = Math.max(hz, ohz);
-    // (an octave apart from the pure pair still beats the same way: fold `hi` into the pair's octave)
-    let h = hi;
-    const want = lo * n / m;
-    while (h > want * Math.SQRT2) h /= 2;
-    while (h < want / Math.SQRT2) h *= 2;
-    worst = Math.max(worst, beatHz(lo, h, [n, m]));
+    worst = Math.max(worst, beatHz(Math.min(h, ohz), Math.max(h, ohz), [n, m]));
   }
   return worst;
 }
 
-/** How a pulse rate reads (beats per second). */
-export function wobbleWord(b: number | null): string {
-  if (b == null) return 'listening…';
-  return b < 0.7 ? 'still' : b < 2.5 ? 'slow pulse' : b < 6 ? 'pulsing' : 'fast buzz';
+/**
+ * The pulse to show for a tone `offCents` from pure: as it would beat on a do of D3, whatever the
+ * singer's do. (The real rate grows with the pitch; the screen and its words follow the cents, so a
+ * soprano and a bass within the same tolerance see the same.)
+ */
+export const SHOW_ROOT_HZ = 146.83;
+export function shownBeats(offCents: number, deg: Degree, others: Degree[]): number {
+  const hz = SHOW_ROOT_HZ * RATIO[deg][0] / RATIO[deg][1] * 2 ** (offCents / 1200);
+  return wobble(hz, deg, SHOW_ROOT_HZ, others);
+}
+
+/** How far from pure reads, in words (cents; null = nothing heard). */
+export function wobbleWord(offCents: number | null): string {
+  if (offCents == null) return 'listening…';
+  const a = Math.abs(offCents);
+  return a <= 2.5 ? 'still' : a <= TOL_SING ? 'almost still' : a <= 20 ? 'pulsing' : 'fast buzz';
 }
 
 /** Cents of `hz` above `rootHz`, folded to the octave nearest `target` (an octave slip still counts). */
@@ -180,19 +191,25 @@ const fresh = (): LabProgress => ({ fifth: { rung: 1, logs: {} }, third: { rung:
 
 export function loadLab(): LabProgress {
   try {
-    const raw = JSON.parse(localStorage.getItem(KEY) ?? 'null') as Partial<LabProgress> | null;
+    const raw = JSON.parse(rawGet(KEY) ?? 'null') as Partial<LabProgress> | null;
     const p = fresh();
     for (const k of ['fifth', 'third'] as const) {
       const t = raw?.[k];
-      if (t && typeof t.rung === 'number') p[k] = { rung: Math.max(1, Math.min(RUNGS + 1, Math.round(t.rung))), logs: t.logs && typeof t.logs === 'object' ? t.logs : {} };
+      if (!t || typeof t.rung !== 'number' || !Number.isFinite(t.rung)) continue;
+      const logs: Record<number, number[]> = {};
+      if (t.logs && typeof t.logs === 'object') {
+        for (const [r, v] of Object.entries(t.logs)) {
+          if (Array.isArray(v)) logs[Number(r)] = v.filter((x): x is number => typeof x === 'number' && Number.isFinite(x));
+        }
+      }
+      p[k] = { rung: Math.max(1, Math.min(RUNGS + 1, Math.round(t.rung))), logs };
     }
     return p;
   } catch { return fresh(); }
 }
 
-export function saveLab(p: LabProgress) {
-  try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* storage full or blocked: the lab still works */ }
-}
+/** (store.ts keeps it in memory when the phone's storage is full or blocked) */
+export function saveLab(p: LabProgress) { rawSet(KEY, JSON.stringify(p)); }
 
 /**
  * Log one round's result (how far from pure, cents; for the listening check 0 = right, 1 = wrong)

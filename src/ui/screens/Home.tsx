@@ -17,7 +17,7 @@ import { presenceShown, usePresence } from '../../progress/presence';
 import { LOGO_TILE } from '../components/ChoirLogo';
 import { useStaff } from './Admin';
 import { labEnabled } from './IntonationLab';
-import { loadLab } from '../../game/intonation';
+import { loadLab, RUNGS } from '../../game/intonation';
 
 export { pieceStatus, type PieceStatus };
 
@@ -282,7 +282,7 @@ function Notice() {
 /** The intonation lab (preview: admins only, see labEnabled). */
 function IntonationCard() {
   const lab = loadLab();
-  const step = (k: 'fifth' | 'third') => (lab[k].rung > 5 ? 'done ✓' : `step ${lab[k].rung} of 5`);
+  const step = (k: 'fifth' | 'third') => (lab[k].rung > RUNGS ? 'done ✓' : `step ${lab[k].rung} of ${RUNGS}`);
   return (
     <button className="card" style={{ textAlign: 'left', color: 'inherit', borderColor: 'var(--voice-deep)' }} data-testid="home-intonation"
       onClick={() => go({ name: 'intonation' })}>

@@ -53,10 +53,11 @@ export function App() {
   // hop between Results, the piece and the next run.
   useEffect(() => {
     const micScreens = ['play', 'setup', 'tuner', 'diagnostics', 'results', 'piece', 'intonation'];
-    if (micScreens.includes(route.name)) return;
+    // (the lab's ladder doesn't listen: only its steps do)
+    if (micScreens.includes(route.name) && !(route.name === 'intonation' && !route.rung)) return;
     const t = window.setTimeout(() => releaseTracker(), 3 * 60_000);
     return () => clearTimeout(t);
-  }, [route.name]);
+  }, [route.name, route.name === 'intonation' && !!route.rung]);
   useEffect(() => {
     let hiddenAt = 0;
     const onVis = () => {
