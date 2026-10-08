@@ -183,7 +183,7 @@ function SingersCard({ singers }: { singers: ChoirSinger[] }) {
     .filter((g) => g.list.length);
   return (
     <details className="card" data-testid="choir-singers">
-      <summary style={{ minHeight: 44, display: 'flex', alignItems: 'center', cursor: 'pointer' }}><strong>Singers using the app ({singers.length})</strong></summary>
+      <summary style={{ minHeight: 44, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}><strong className="grow">Singers using the app ({singers.length})</strong><span className="small muted">Show ▾</span></summary>
       <span className="small muted">
         Singers who joined with your choir code and a first name and share with the section leads or are on the leaderboard.
         "Last active" is from the leaderboard (what every member sees there). Singers who switched both off in Settings → Privacy don't appear.

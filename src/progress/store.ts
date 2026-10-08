@@ -348,7 +348,7 @@ export function keysWithPrefix(prefix: string): string[] {
   return allKeys().filter((k) => k.startsWith(prefix));
 }
 
-function allKeys(): string[] {
+export function allKeys(): string[] {
   const out = new Set<string>(memStorage.keys());
   const s = ls();
   if (s) {

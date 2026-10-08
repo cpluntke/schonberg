@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { releaseTracker } from './play/session';
 import { useRoute, go, type Route } from './router';
-import { useLibrary } from './library';
+import { adoptLibraryIds, useLibrary } from './library';
 import { upgradeAllFullRuns } from './plan';
 import { subscribe } from '../progress/store';
 import { useToast } from './hooks';
@@ -70,8 +70,10 @@ export function App() {
   useEffect(() => {
     if (!lib.ready) return;
     upgradeAllFullRuns();
+    void adoptLibraryIds();
     let t = 0;
-    const off = subscribe(() => { clearTimeout(t); t = window.setTimeout(upgradeAllFullRuns, 500); });
+    // (also after an account copy arrives: it may hold progress under a choir score's old id)
+    const off = subscribe(() => { clearTimeout(t); t = window.setTimeout(() => { upgradeAllFullRuns(); void adoptLibraryIds(); }, 500); });
     return () => { off(); clearTimeout(t); };
   }, [lib.ready, lib.version]);
   // Anonymous usage statistics (Settings → Send anonymous usage statistics): daily totals, sent at most once a day.
