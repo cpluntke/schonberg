@@ -146,6 +146,19 @@ describe('LiveScorer', () => {
     expect(live.finish()).toEqual(scoreAttempt(ctx, samples, opts));
   });
 
+  it('rightSoFar: the notes over so far and sung right (a run left early)', () => {
+    const live = new LiveScorer(ctx, opts);
+    const final = scoreAttempt(ctx, samples, opts);
+    const right = (k: number) => final.notes.slice(0, k).filter((n) => n.grade === 'perfect' || n.grade === 'good').length;
+    expect(live.rightSoFar()).toBe(0);
+    const half = samples.filter((s) => s.time < melody.notes[5].start);
+    for (const s of half) live.push(s);
+    const done = [0, 1, 2, 3, 4, 5].filter((i) => live.noteGrade(i) !== undefined).length;
+    expect(done).toBeGreaterThan(2);
+    expect(live.rightSoFar()).toBe(right(done));
+    expect(live.rightSoFar()).toBeLessThan(done); // (note 3 wasn't sung)
+  });
+
   it('handles slightly out-of-order samples', () => {
     const jittered = [...samples];
     for (let i = 5; i < jittered.length - 1; i += 7) [jittered[i], jittered[i + 1]] = [jittered[i + 1], jittered[i]];

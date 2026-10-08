@@ -406,7 +406,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
   async function startInner() {
     // The "Headphones on?" answer as the run starts (level 1 counts only with headphones).
     headphonesRef.current = loadProfile().headphones;
-    sessionRef.current?.dispose();
+    disposeSession(sessionRef.current);
     fxRef.current = newFx();
     const s = makeSession();
     if (!s) return;
@@ -441,7 +441,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
       setPhase('paused');
       return;
     }
-    sessionRef.current?.dispose();
+    disposeSession(sessionRef.current);
     leaveTo(target);
   }
   useBackGuard(() => leaveFor(up));
@@ -554,7 +554,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
     document.addEventListener('visibilitychange', onVis);
     return () => {
       document.removeEventListener('visibilitychange', onVis);
-      sessionRef.current?.dispose();
+      disposeSession(sessionRef.current);
     };
   }, []);
 
@@ -840,7 +840,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
         </div>
         {/* With Peek too, Restart and Finish show only their icons on a phone (Pause always fits). */}
         <div className={`row play-actions${offBook && running && hiddenRef.current.size > 0 ? ' compact' : ''}`}>
-          <button className="btn small" aria-label="Restart" disabled={!running} onClick={() => { sessionRef.current?.dispose(); sessionRef.current = null; start(); }}>
+          <button className="btn small" aria-label="Restart" disabled={!running} onClick={() => { disposeSession(sessionRef.current); sessionRef.current = null; start(); }}>
             <IconRestart size={16} /> <span className="lbl">Restart</span>
           </button>
           <div className="grow" />
@@ -870,7 +870,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
             {isFullRun && <span className="small muted">A run of the whole piece counts only in one go: carry on to practise, or restart to sing it through for the level.</span>}
             {resumeMsg && <span className="small" role="status">{resumeMsg}</span>}
             <button className="btn primary block" autoFocus disabled={resuming} onClick={() => { pushGuard(); void resume(); }}><IconPlay size={18} /> {resuming ? 'Resuming…' : 'Resume'}</button>
-            <button className="btn block" onClick={() => { sessionRef.current?.dispose(); sessionRef.current = null; start(); }}><IconRestart size={18} /> {isFullRun ? 'Restart' : 'Restart section'}</button>
+            <button className="btn block" onClick={() => { disposeSession(sessionRef.current); sessionRef.current = null; start(); }}><IconRestart size={18} /> {isFullRun ? 'Restart' : 'Restart section'}</button>
             {!listenOnly && <button className="btn block" onClick={() => sessionRef.current?.finish()}>Finish &amp; see results</button>}
             <div className="row" style={{ gap: 8 }}>
               <button className="btn block" data-testid="pause-back" onClick={() => leaveFor(up)}><IconBack size={18} /> {up.name === 'expert' ? 'Expert mode' : 'Back to the piece'}</button>
@@ -902,6 +902,21 @@ function coldLeadFrom(score: { measures: { start: number; dur: number }[] }, fro
   const lead = leadInFrom(score as never, Math.max(0, bar));
   // Less than a bar of lead-in (the start of the piece, or just a pickup): use a normal count-in.
   return bar > 0 && from - lead >= score.measures[bar].dur * 0.99 ? lead : undefined;
+}
+
+const credited = new WeakSet<PracticeSession>();
+/**
+ * End a session. A run left before its end (restart, leaving the screen) still counts the notes
+ * sung right so far for "notes right this cycle" (a finished run counts them on Results).
+ */
+function disposeSession(s: PracticeSession | null): void {
+  if (!s) return;
+  if (s.phase !== 'done' && !s.cfg.listenOnly && s.live && !credited.has(s)) {
+    credited.add(s);
+    const n = s.live.rightSoFar();
+    if (n > 0) addCyclePoints(n);
+  }
+  s.dispose();
 }
 
 function sessionStartTarget(s: PracticeSession, sectionStart: number): number {

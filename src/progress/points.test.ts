@@ -18,7 +18,7 @@ describe('cycle points', () => {
     expect(rightNotes(result([note('perfect'), note('good'), note('ok'), note('miss'), note('ok', { unsure: 'mic' })]))).toBe(2);
     addCyclePoints(5);
     expect(addCyclePoints(3)).toBe(8);
-    expect(cyclePoints()).toEqual({ n: 8, name: 'Autumn' });
+    expect(cyclePoints()).toMatchObject({ n: 8, name: 'Autumn' });
     saveCycle({ ...loadCycle(), name: 'Spring' });
     expect(cyclePoints().n).toBe(0);
     // Renamed back before singing: nothing was lost yet.
@@ -37,7 +37,7 @@ describe('cycle points', () => {
     expect(currentCycle()).toEqual({ key: 'choir:kammerchor:advent 2026', name: 'Advent 2026' });
     addCyclePoints(4);
     writeJSON('sh:choir', { code: 'kammerchor', name: 'K', cycle: { name: 'Spring 2027', pieceIds: [] }, pieces: [], updatedAt: 2, leads: [] });
-    expect(cyclePoints()).toEqual({ n: 0, name: 'Spring 2027' });
+    expect(cyclePoints()).toMatchObject({ n: 0, name: 'Spring 2027' });
   });
 
   it('the account copy keeps the larger count of the same cycle, and only takes the current cycle', () => {
@@ -89,7 +89,7 @@ describe('dated cycles', () => {
     expect(currentCycle().key).toBe('choir:kammerchor:#autumn');
     // the next cycle starts: back to 0
     writeJSON('sh:choir', { code: 'kammerchor', name: 'K', cycle: null, cycles: [cyc('autumn', '2000-01-01', '2000-02-01'), cyc('winter', '2000-02-02')], pieces: [], updatedAt: 2, leads: [] });
-    expect(cyclePoints()).toEqual({ n: 0, name: 'winter' });
+    expect(cyclePoints()).toMatchObject({ n: 0, name: 'winter' });
   });
 });
 

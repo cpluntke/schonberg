@@ -381,6 +381,13 @@ export class LiveScorer {
     return this.byIndex.get(i)?.final?.grade;
   }
 
+  /** Notes over so far and sung right (graded perfect or good): what a run left early still sang. */
+  rightSoFar(): number {
+    let n = 0;
+    for (let j = 0; j < this.cur; j++) { const g = this.accs[j].final?.grade; if (g === 'perfect' || g === 'good') n++; }
+    return n;
+  }
+
   /** Live result of note `i` once it is over. */
   noteResult(i: number): NoteResult | undefined {
     return this.byIndex.get(i)?.final ?? undefined;

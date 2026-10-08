@@ -34,10 +34,11 @@ const stored = (): CyclePoints | null => readJSON<CyclePoints | null>(KEY, null,
 /** Points in the current cycle (0 when a new cycle began since the last run). */
 const same = (s: CyclePoints | null, c: ReturnType<typeof currentCycle>): s is CyclePoints => !!s && (s.k === c.key || (!!c.alias && s.k === c.alias));
 
-export function cyclePoints(): { n: number; name: string } {
+/** Points in the current cycle, and since when this phone (or the account) has been counting them. */
+export function cyclePoints(): { n: number; name: string; since: number | null } {
   const c = currentCycle();
   const s = stored();
-  return { n: same(s, c) ? Math.round(s.n) : 0, name: c.name };
+  return same(s, c) ? { n: Math.round(s.n), name: c.name, since: s.since || null } : { n: 0, name: c.name, since: null };
 }
 
 /** Notes sung right in a run (level 1's "right"; let-off notes don't count as sung right). */
