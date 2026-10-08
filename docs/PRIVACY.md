@@ -98,8 +98,9 @@ Purpose: to see how the app is used and where it fails, so it can be improved.
   singer's detail (for example the only singer who practised this week, or the change in the totals
   after someone's run). The 3-singer rule hides one or two singers' numbers, not more.
 - **Choir admins: who uses the app.** Admin → Sections lists each singer who shares or is on the
-  leaderboard by first name and voice part, with the day they last practised (from the same data;
-  nothing more is sent for it). Section leads don't see this list.
+  leaderboard by first name and voice part (as the voice ranges already do), and for singers on the
+  leaderboard when their entry there last changed (as every member can see on the board). Nothing
+  more is sent for it. Section leads don't see this list.
 - **By name**: the voice range, so leads can plan divisi. A lead sees the ranges of the sections
   they lead, an admin all sections; members see none.
 - Trend snapshots: one per day of the section totals (no names), kept 28 days in

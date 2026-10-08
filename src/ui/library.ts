@@ -3,7 +3,7 @@ import type { Score, Section } from '../music/types';
 import { importScoreFile, PARSE_VERSION, upgradeStored } from '../music/import';
 import { computeSections } from '../music/sections';
 import { loadImportedScores, saveImportedScore, deleteImportedScore, loadCycle, saveCycle, subscribe } from '../progress/store';
-import { syncChoir } from '../progress/choir';
+import { cachedChoir, choirPieceId, localPieceId, syncChoir } from '../progress/choir';
 
 export interface PieceInfo {
   id: string;
@@ -240,9 +240,52 @@ export function syncChoirNow(): Promise<Awaited<ReturnType<typeof syncChoir>>> {
       const p = pieces.get(id);
       // (MIDI files gain nothing from it: they have no written spelling)
       return !!p && !p.builtin && !!p.score.choir && p.score.source === 'musicxml' && (p.score.parseVersion ?? 1) < PARSE_VERSION;
-    }).finally(() => { syncing = null; emit(); });
+    }).then(async (r) => { await adoptLibraryIds(); return r; }).finally(() => { syncing = null; emit(); });
   }
   return syncing;
+}
+
+/**
+ * A choir score that came from the choir library is kept under its library id (choir.ts localPieceId).
+ * A phone that stored it earlier under its choir-score id ("choir-<code>-<id>") has it twice once the
+ * library copy arrives: the singer's progress moves over to the library copy (where the programme, the
+ * leaderboard and the section lead look for it) and the old copy goes.
+ */
+async function adoptLibraryIds(): Promise<void> {
+  const info = cachedChoir();
+  if (!info) return;
+  for (const p of info.pieces) {
+    const to = localPieceId(info.code, p);
+    const from = choirPieceId(info.code, p.id);
+    if (to === from || !pieces.has(from) || !pieces.has(to)) continue;
+    try {
+      const moves: [string, string][] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k) continue;
+        for (const pre of ['sh:progress:', 'sh:bars:', 'sh:words:', 'sh:lyricsQuiz:']) {
+          if (k.startsWith(`${pre}${from}:`)) moves.push([k, `${pre}${to}:${k.slice(pre.length + from.length + 1)}`]);
+        }
+        if (k === `sh:part:${from}`) moves.push([k, `sh:part:${to}`]);
+      }
+      // (what the singer did on the library copy already stays: only gaps are filled)
+      for (const [a, b] of moves) {
+        if (localStorage.getItem(b) == null) localStorage.setItem(b, localStorage.getItem(a)!);
+        localStorage.removeItem(a);
+      }
+      const raw = localStorage.getItem('sh:log');
+      const log: unknown = raw ? JSON.parse(raw) : null;
+      if (Array.isArray(log) && log.some((e) => e && e.pieceId === from)) {
+        localStorage.setItem('sh:log', JSON.stringify(log.map((e) => (e && e.pieceId === from ? { ...e, pieceId: to } : e))));
+      }
+      const c = loadCycle();
+      if (c.pieceIds.includes(from)) {
+        c.pieceIds = [...new Set(c.pieceIds.map((x) => (x === from ? to : x)))];
+        saveCycle(c);
+      }
+    } catch { /* storage unavailable: tried again at the next sync */ continue; }
+    await removeImported(from);
+  }
 }
 
 export function ensureLoaded(): Promise<void> {

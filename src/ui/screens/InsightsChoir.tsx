@@ -85,7 +85,6 @@ export function ChoirInsights() {
   return (
     <>
       <span className="small muted">{session?.account.name} · progress shown per section, never per singer · sections with fewer than {view.minGroup} singers sharing a piece show counts only</span>
-      {view.singers && <SingersCard singers={view.singers} />}
       <div className="card flat" data-testid="choir-summary">
         <strong>{sharing} singer{sharing === 1 ? '' : 's'} sharing · {VOICE_ORDER.map((v) => `${SHORT[v]} ${view.sections[v]?.sharing ?? 0}`).join(' · ')}</strong>
         {needs.length ? (
@@ -164,42 +163,43 @@ export function ChoirInsights() {
           </div>
         ))}
       </div>
+      {view.singers && <SingersCard singers={view.singers} />}
       <button className="btn small ghost" onClick={() => go({ name: 'section' })}>One section in detail (bar map)</button>
     </>
   );
 }
 
-/** "Last practised": today, yesterday, N days ago, or the date. */
-function lastPractised(ms: number): string {
-  if (!ms) return 'not yet';
+/** "Last active": today, yesterday, N days ago, or the date (with the year once it's another year). */
+function lastActive(ms: number): string {
+  if (!ms) return '';
   const day = (t: number) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
   const n = Math.round((day(Date.now()) - day(ms)) / 86_400_000);
-  return n <= 0 ? 'today' : n === 1 ? 'yesterday' : n < 14 ? `${n} days ago` : new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  return n <= 0 ? 'today' : n === 1 ? 'yesterday' : n < 14 ? `${n} days ago` : new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short', ...(new Date(ms).getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) });
 }
 
-/** Admins: the singers who use the app, by voice part, with when they last practised. */
+/** Admins: the singers who use the app, by voice part, with when their leaderboard entry last changed. */
 function SingersCard({ singers }: { singers: ChoirSinger[] }) {
   const groups = [...VOICE_ORDER, 'other'].map((v) => ({ v, list: singers.filter((s) => ((VOICE_ORDER as readonly string[]).includes(s.voice) ? s.voice : 'other') === v) }))
     .filter((g) => g.list.length);
   return (
-    <div className="card" data-testid="choir-singers">
-      <strong>Singers using the app ({singers.length})</strong>
+    <details className="card" data-testid="choir-singers">
+      <summary style={{ minHeight: 44, display: 'flex', alignItems: 'center', cursor: 'pointer' }}><strong>Singers using the app ({singers.length})</strong></summary>
       <span className="small muted">
-        Everyone who has sung a programme piece with your choir code and a first name (from what they share with the section
-        leads and the leaderboard). Singers who switched both off in Settings → Privacy, or set no name, don't appear.
+        Singers who joined with your choir code and a first name and share with the section leads or are on the leaderboard.
+        "Last active" is from the leaderboard (what every member sees there). Singers who switched both off in Settings → Privacy don't appear.
       </span>
       {!singers.length && <span className="small">Nobody yet.</span>}
       {groups.map(({ v, list }) => (
         <div key={v} className="col" style={{ gap: 2 }}>
           <span className="eyebrow">{VOICE_NAME[v] ?? 'Other'} ({list.length})</span>
           {list.map((s) => (
-            <div key={s.name} className="row between small" style={{ padding: '4px 0', borderBottom: '1px solid var(--surface-2)' }} data-testid="choir-singer">
+            <div key={`${s.name}|${s.voice}`} className="row between small" style={{ padding: '4px 0', borderBottom: '1px solid var(--surface-2)' }} data-testid="choir-singer">
               <span style={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{s.name}</span>
-              <span className="muted tiny" style={{ textAlign: 'right' }}>last practised {lastPractised(s.lastAt)}</span>
+              {s.lastAt > 0 && <span className="muted tiny" style={{ textAlign: 'right' }}>last active {lastActive(s.lastAt)}</span>}
             </div>
           ))}
         </div>
       ))}
-    </div>
+    </details>
   );
 }
