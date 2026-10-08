@@ -97,6 +97,11 @@ export interface NoteResult {
    * octave up on a note under 200 Hz (the tracker's octave error on "oo").
    */
   clearly?: 'off' | 'silent';
+  /**
+   * A real consonant (scoring's CONSONANT_FLOOR rules: headphones, fricative, short) ran straight into
+   * the vowel: its length (ms). The note's timing (onsetMs) then counts from the consonant's start.
+   */
+  consonantMs?: number;
 }
 
 export type InsightKind =
@@ -114,6 +119,7 @@ export type InsightKind =
   | 'quiet'
   | 'octave'
   | 'tempo-drift'
+  | 'consonant-on-beat'
   | 'great';
 
 export interface Insight {

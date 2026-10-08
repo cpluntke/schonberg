@@ -34,6 +34,19 @@ describe('analyze', () => {
     expect(ins!.measures![1] - ins!.measures![0]).toBeLessThanOrEqual(3);
   });
 
+  it('consonants on the beat: a gentle tip (it counts as on time), only when it keeps happening', () => {
+    const r = scoreAttempt(ctx, sampleSinging(part, (n) => n.midi), opts);
+    const withCons = (idx: number[]) => r.notes.map((n) => (idx.includes(n.index) ? { ...n, consonantMs: 200, onsetMs: 20 } : n));
+    const tip = analyze(ctx, withCons([1, 3, 5, 8])).find((i) => i.kind === 'consonant-on-beat');
+    expect(tip).toBeDefined();
+    expect(tip!.detail).toMatch(/about 200 ms later/);
+    expect(tip!.severity).toBe(1);
+    // Twice is not a habit; a consonant before the beat (short on the beat) isn't either.
+    expect(analyze(ctx, withCons([1, 3])).some((i) => i.kind === 'consonant-on-beat')).toBe(false);
+    const short = r.notes.map((n) => ([1, 3, 5, 8].includes(n.index) ? { ...n, consonantMs: 60, onsetMs: 0 } : n));
+    expect(analyze(ctx, short).some((i) => i.kind === 'consonant-on-beat')).toBe(false);
+  });
+
   it('detects rising long notes', () => {
     const samples = sampleSinging(part, (n, t) => (n.dur >= 4 ? n.midi + 0.3 * (t / n.dur) : n.midi));
     expect(scoreAttempt(ctx, samples, opts).insights.map((i) => i.kind)).toContain('sharp-long-notes');

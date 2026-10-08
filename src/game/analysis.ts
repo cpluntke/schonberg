@@ -10,6 +10,9 @@ const GRADE_VALUE: Record<Grade, number> = { perfect: 1, good: 0.85, ok: 0.5, mi
 const LONG_NOTE_SEC = 1.2;
 const DRIFT_CENTS = 15;
 const ENTRY_REST_SEC = 0.5;
+/** A consonant this long (ms) sung on the beat (starting within CONS_ON_BEAT_MS of it) counts for the tip. */
+const CONS_TIP_MS = 120;
+const CONS_ON_BEAT_MS = 80;
 const LATE_MS = 180;
 const LEAP_SEMITONES = 5;
 
@@ -190,6 +193,26 @@ export function analyze(ctx: ScoringContext, notes: NoteResult[], samples?: Pitc
           weight: early.length * 10,
         });
       }
+    }
+  }
+
+  // 3a. Consonants sung on the beat (an s or sh heard running into the vowel, see NoteResult.consonantMs):
+  // counted as on time, but the vowel lands late; the choir habit is the consonant just before the beat.
+  {
+    const onBeat = notes.filter((n) => (n.consonantMs ?? 0) >= CONS_TIP_MS && n.onsetMs !== null && n.onsetMs <= CONS_ON_BEAT_MS);
+    const withCons = notes.filter((n) => n.consonantMs !== undefined);
+    if (onBeat.length >= 3 && onBeat.length >= 0.4 * withCons.length) {
+      const bad = new Map<number, number>();
+      for (const n of onBeat) addTo(bad, noteOf(n).measure, 1);
+      const ms = Math.round(mean(onBeat.map((n) => n.consonantMs!)) / 10) * 10;
+      out.push({
+        kind: 'consonant-on-beat',
+        title: 'Consonants on the beat',
+        detail: `Your s/sh landed on the beat (${barList(score, onBeat.map((n) => noteOf(n).measure))}), so the vowel came about ${ms} ms later. It counts as on time, but try placing the consonant just before the beat, so the vowel sits on it, as the choir will.`,
+        measures: window(bad),
+        severity: 1,
+        weight: onBeat.length * 3,
+      });
     }
   }
 

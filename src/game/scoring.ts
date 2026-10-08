@@ -135,6 +135,8 @@ export const CONSONANT_MIN_VOICED = 0.35;
 export const CONSONANT_SETTLE = 0.1;
 /** A run of consonant readings longer than this (real seconds) is a sustained hiss or breath, not a consonant. */
 export const CONSONANT_RUN_MAX = 0.25;
+/** The vowel's onset may come this long after the voice is first heard (ms, real time) for the timing to count from the consonant. */
+const CONSONANT_ONSET_SLACK_MS = 120;
 /** Quiet this short inside a consonant cluster (a stop's closure: "st", "sc") doesn't end it (real seconds). */
 const CONSONANT_GAP = 0.07;
 /** Unpitched readings this far from any note (real seconds) measure the noise floor. */
@@ -279,6 +281,8 @@ class NoteAcc {
   consStart: number | null = null;
   consLast: number | null = null;
   consVoice: number | null = null;
+  /** …and where that consonant started. */
+  consFrom: number | null = null;
   consDone = false;
   /** Consonant readings overlapping the body (time, covered seconds of the body). */
   cT: number[] = [];
@@ -537,7 +541,7 @@ export class LiveScorer {
       return;
     }
     if (a.consStart !== null && t - a.consLast! <= gap) {
-      if (t - a.consStart <= CONSONANT_RUN_MAX * this.rate) a.consVoice = t;
+      if (t - a.consStart <= CONSONANT_RUN_MAX * this.rate) { a.consVoice = t; a.consFrom = a.consStart; }
       a.consDone = true;
     } else if (t > cap) a.consDone = true;
     a.consStart = null;
@@ -657,6 +661,14 @@ export class LiveScorer {
     const budget = Math.min(CONSONANT_MAX * this.rate, CONSONANT_SHARE * w.note.dur);
     const consOn = !!this.opts.consonants && a.noteVoiced >= CONSONANT_MIN_VOICED * w.note.dur;
     if (consOn && a.consVoice !== null) a.consCap = Math.min(Math.max(plainCap, a.consVoice + CONSONANT_SETTLE * this.rate), plainCap + budget);
+    // Timing from the consonant's start when it ran straight into the vowel (the vowel's onset came
+    // with the voice, not later): a singer with the s on the beat is on time, not late.
+    let consonantMs: number | undefined;
+    if (consOn && a.consVoice !== null && a.consFrom !== null && a.onsetMs !== null
+      && a.onsetMs <= (a.consVoice - w.start) * 1000 + CONSONANT_ONSET_SLACK_MS * this.rate) {
+      consonantMs = Math.round((a.consVoice - a.consFrom) * 1000);
+      a.onsetMs = Math.max(0, (a.consFrom - w.start) * 1000);
+    }
     const judged = judgedSpan(a, tolN, this.opts.octaveTolerant);
     const { k0, k1, from, to } = judged;
     const bodyDur = Math.max(1e-3, to - from);
@@ -817,7 +829,7 @@ export class LiveScorer {
     // Report deviation from the written (just-intonation: pure) target.
     const cents = medDev === null ? null : medDev - (w.targetOffset / 2 - 0);
     a.final = {
-      index: w.index, grade, cents, hitRatio, voicedRatio, onsetMs: a.onsetMs, drift, scoop,
+      index: w.index, grade, cents, hitRatio, voicedRatio, onsetMs: a.onsetMs, ...(consonantMs !== undefined ? { consonantMs } : {}), drift, scoop,
       targetOffset: w.targetOffset, points, ...(octave ? { octave: true } : {}),
       ...(unsure ? { unsure } : {}), ...(clearly ? { clearly } : {}),
     };

@@ -48,6 +48,23 @@ describe('consonants (ScoringOptions.consonants)', () => {
     expect(note1(take(legato, 150, onBeat(hiss, 0.24)), plain).hitRatio).toBeCloseTo(silent.hitRatio, 9);
   });
 
+  it('timing counts from a real consonant on the beat (the vowel after it is not late); else from the vowel', () => {
+    // Detached quarter notes at 100 bpm (0.6 s), a 0.24 s s on the beat of note 1, then the vowel.
+    const det: [number | null, number][] = [[60, 1], [null, 1], [62, 1], [null, 1], [64, 1]];
+    const s = (gap: Heard) => (i: number, dt: number, m: number): Heard => (i !== 1 ? m : dt < 0.24 ? gap : m);
+    const n = (t: { ctx: ScoringContext; s: PitchSample[] }, o = opts) => scoreAttempt(t.ctx, t.s, o).notes[1];
+    const withS = n(take(det, 100, s(hiss)));
+    expect(withS.consonantMs).toBeGreaterThanOrEqual(200);
+    expect(withS.onsetMs!).toBeLessThan(60);
+    // Without headphones (option off), or with silence before the vowel: timed from the vowel, late.
+    expect(n(take(det, 100, s(hiss)), plain).onsetMs!).toBeGreaterThanOrEqual(220);
+    expect(n(take(det, 100, s(hiss)), plain).consonantMs).toBeUndefined();
+    expect(n(take(det, 100, s(quiet))).onsetMs!).toBeGreaterThanOrEqual(220);
+    // A hiss longer than a consonant (a late singer hissing from the beat): timed from the vowel.
+    const late = (i: number, dt: number, m: number): Heard => (i !== 1 ? m : dt < 0.32 ? hiss : m);
+    expect(n(take(det, 100, late)).onsetMs!).toBeGreaterThanOrEqual(300);
+  });
+
   it('room noise, hum or the backing (loud but not fricative) is no consonant', () => {
     const silent = note1(take(legato, 150, onBeat(quiet, 0.26)));
     for (const rms of [0.006, 0.02, 0.05]) expect(note1(take(legato, 150, onBeat({ rms }, 0.26)))).toEqual(silent);

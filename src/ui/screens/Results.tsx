@@ -45,7 +45,7 @@ function insightIcon(i: Insight) {
   switch (i.kind) {
     case 'flat-long-notes': case 'flat-overall': return <IconDown size={20} color="#FF7A45" />;
     case 'sharp-long-notes': case 'sharp-overall': return <IconUp size={20} color="#FF7A45" />;
-    case 'late-entries': case 'early-entries': case 'behind-beat': return <IconClock size={20} color="#FF7A45" />;
+    case 'late-entries': case 'early-entries': case 'behind-beat': case 'consonant-on-beat': return <IconClock size={20} color="#FF7A45" />;
     case 'great': return <IconStar size={20} color="#4CC9F0" />;
     default: return <IconLoop size={20} color="#FF7A45" />;
   }
