@@ -7,6 +7,7 @@ import { go } from '../router';
 import { loadCycle } from '../../progress/store';
 import type { BarMap } from '../../progress/bars';
 import type { PieceAgg, SectionInsightsView } from '../../progress/insights';
+import type { Part } from '../../music/types';
 import { PieceMap } from './PieceMap';
 import { CheatSheet } from './CheatSheet';
 import { LevelBar, RangeChart } from './InsightCharts';
@@ -70,6 +71,29 @@ export function loopBars(piece: PieceInfo, partId: string, a: number, b: number)
   go({ name: 'play', pieceId: piece.id, partId, sectionId: 'drill', level: 1, mode: '2d', from: from.start, to: to.start + to.dur });
 }
 
+/** The rehearsal cheat sheet of a piece: one per part the section sings it in (divisi apart). */
+function CheatSheets({ piece, part, agg }: { piece: PieceInfo; part: Part; agg: PieceAgg }) {
+  const parts = Object.entries(agg.noteParts ?? {})
+    .map(([id, notes]) => ({ p: (id && piece.score.parts.find((x) => x.id === id)) || part, notes }))
+    .filter((x) => x.notes.length);
+  const total = parts.reduce((a, x) => a + x.notes.length, 0);
+  return (
+    <details className="cheat" data-testid="cheat-details">
+      <summary className="small" style={{ cursor: 'pointer', fontWeight: 700 }}>
+        Rehearsal cheat sheet{total ? ` · ${total} note${total === 1 ? '' : 's'}` : ''}
+      </summary>
+      <div className="col" style={{ marginTop: 8, gap: 14 }}>
+        {parts.length ? parts.map(({ p, notes }) => (
+          <div key={p.id} className="col" style={{ gap: 6 }}>
+            {parts.length > 1 && <strong className="small">{p.name}</strong>}
+            <CheatSheet piece={piece} part={p} notes={notes} singers={agg.singers} />
+          </div>
+        )) : <CheatSheet piece={piece} part={part} notes={[]} singers={agg.singers} />}
+      </div>
+    </details>
+  );
+}
+
 function PieceCard({ id, agg, voice, minGroup }: { id: string; agg: PieceAgg; voice: string; minGroup: number }) {
   const piece = getPiece(id);
   const part = piece ? sectionPart(piece, voice) : null;
@@ -108,14 +132,7 @@ function PieceCard({ id, agg, voice, minGroup }: { id: string; agg: PieceAgg; vo
               </div>
             </div>
           ) : <span className="small muted">No bar where most of the section struggles.</span>}
-          {piece && part && (
-            <details className="cheat" data-testid="cheat-details">
-              <summary className="small" style={{ cursor: 'pointer', fontWeight: 700 }}>
-                Rehearsal cheat sheet{agg.notes?.length ? ` · ${agg.notes.length} note${agg.notes.length === 1 ? '' : 's'}` : ''}
-              </summary>
-              <div style={{ marginTop: 8 }}><CheatSheet piece={piece} part={part} notes={agg.notes ?? []} singers={agg.singers} /></div>
-            </details>
-          )}
+          {piece && part && <CheatSheets piece={piece} part={part} agg={agg} />}
           {piece && part && agg.bars && (
             <PieceMap score={piece.score} part={part} sections={singableSections(piece, part.id)}
               bars={Object.fromEntries(Object.entries(agg.bars).map(([m, b]) => [Number(m), { ema: b.mean, n: b.n, at: 0 }])) as BarMap}

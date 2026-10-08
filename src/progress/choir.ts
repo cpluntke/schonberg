@@ -432,12 +432,13 @@ export const fetchSection = (code: string, voice: string, auth: Auth) => call<Se
  * account's (under its name, from any phone); this phone's anonymous entry moves to it.
  */
 export function shareProgress(code: string, name: string, voice: string,
-  pieces: Record<string, { readiness: number; level: number; bars: BarMap; notes?: Record<string, [number, string]> }>, range?: SharedRange) {
-  const body: Record<string, { readiness: number; level: number; bars: Record<string, number>; notes?: Record<string, [number, string]> }> = {};
+  pieces: Record<string, { readiness: number; level: number; bars: BarMap; notes?: Record<string, [number, string]>; notesPart?: string }>, range?: SharedRange) {
+  const body: Record<string, { readiness: number; level: number; bars: Record<string, number>; notes?: Record<string, [number, string]>; notesPart?: string }> = {};
   for (const [id, p] of Object.entries(pieces)) {
     const bars: Record<string, number> = {};
     for (const [m, s] of Object.entries(p.bars)) bars[m] = Math.round(s.ema * 100) / 100;
-    body[id] = { readiness: p.readiness, level: p.level, bars, ...(p.notes ? { notes: p.notes } : {}) };
+    // (notes are numbered within the part sung: divisi parts apart)
+    body[id] = { readiness: p.readiness, level: p.level, bars, ...(p.notes ? { notes: p.notes, notesPart: p.notesPart } : {}) };
   }
   const s = sessionFor(code);
   return call<{ ok: boolean; name?: string }>(`/choirs/${enc(code)}/progress/${enc(s?.account.name ?? name)}`,

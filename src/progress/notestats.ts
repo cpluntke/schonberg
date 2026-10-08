@@ -29,7 +29,7 @@ const KIND_DECAY = 0.7;
 const MAX_NOTES = 600;
 /** Shared: notes wrong in at least this share of recent runs, at most this many per piece. */
 export const SHARE_MIN = 0.25;
-export const SHARE_MAX = 300;
+export const SHARE_MAX = 150; // (the server keeps at most 150 per piece)
 
 export const notesKey = (pieceId: string, partId: string) => `sh:notes:${pieceId}:${partId}`;
 const isMap = (v: unknown) => typeof v === 'object' && v !== null && !Array.isArray(v);

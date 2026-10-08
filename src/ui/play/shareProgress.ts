@@ -48,7 +48,7 @@ async function send(): Promise<void> {
     setShareError('Your name can’t contain / \\ ? # or %. Change it in Voice setup.');
     return;
   }
-  const pieces: Record<string, { readiness: number; level: number; bars: BarMap; notes?: Record<string, [number, string]> }> = {};
+  const pieces: Record<string, { readiness: number; level: number; bars: BarMap; notes?: Record<string, [number, string]>; notesPart?: string }> = {};
   for (const id of loadCycle().pieceIds.slice(0, 30)) {
     const piece = getPiece(id);
     if (!piece) continue;
@@ -60,7 +60,7 @@ async function send(): Promise<void> {
     // level = the piece level (sung through in one go at that level), not the weakest section.
     // (and the notes that keep going wrong, with how: the section's rehearsal cheat sheet)
     const notes = sharedNotes(id, partId);
-    pieces[id] = { readiness: Math.round(r.pct * 100) / 100, level: r.pieceLevel, bars, ...(Object.keys(notes).length ? { notes } : {}) };
+    pieces[id] = { readiness: Math.round(r.pct * 100) / 100, level: r.pieceLevel, bars, ...(Object.keys(notes).length ? { notes, notesPart: partId } : {}) };
   }
   last = Date.now();
   try {
