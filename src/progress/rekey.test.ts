@@ -17,6 +17,8 @@ describe('a piece moving to its library id', () => {
     localStorage.setItem(`sh:progress:${NEW}:P1`, JSON.stringify({ pieceId: NEW, partId: 'P1', sections: { s0: sec(1, 1) } }));
     localStorage.setItem(`sh:progress:${OLD}:P1`, JSON.stringify({ pieceId: OLD, partId: 'P1', sections: { s0: sec(4, 1000), s1: sec(2, 900) } }));
     localStorage.setItem(`sh:part:${OLD}`, 'P1');
+    localStorage.setItem(`sh:notes:${OLD}:P1`, JSON.stringify({ 3: { n: 5, w: 0.8, at: 9 }, 7: { n: 1, w: 0.4, at: 9 } }));
+    localStorage.setItem(`sh:notes:${NEW}:P1`, JSON.stringify({ 3: { n: 2, w: 0.1, at: 1 }, 8: { n: 4, w: 0.6, at: 1 } }));
     localStorage.setItem(`sh:words:${OLD}:P1`, JSON.stringify({ s0: { passed: 2, best: { 0: 0.9, 2: 0.8 }, at: 5 } }));
     localStorage.setItem(`sh:words:${NEW}:P1`, JSON.stringify({ s0: { passed: 0, best: { 0: 0.95 }, at: 1 } }));
     localStorage.setItem('sh:readiness2', JSON.stringify({ [`${OLD}|P1`]: { '2026-10-07': 30 }, [`${NEW}|P1`]: { '2026-03-01': 5 } }));
@@ -34,6 +36,9 @@ describe('a piece moving to its library id', () => {
     expect(prog).toMatchObject({ pieceId: NEW, partId: 'P1' });
     expect(localStorage.getItem(`sh:progress:${OLD}:P1`)).toBeNull();
     expect(localStorage.getItem(`sh:part:${NEW}`)).toBe('P1');
+    // Per-note history: per note, the one from more runs.
+    expect(JSON.parse(localStorage.getItem(`sh:notes:${NEW}:P1`)!)).toEqual({ 3: { n: 5, w: 0.8, at: 9 }, 7: { n: 1, w: 0.4, at: 9 }, 8: { n: 4, w: 0.6, at: 1 } });
+    expect(localStorage.getItem(`sh:notes:${OLD}:P1`)).toBeNull();
     expect(JSON.parse(localStorage.getItem(`sh:words:${NEW}:P1`)!).s0).toEqual({ passed: 2, best: { 0: 0.95, 2: 0.8 }, at: 5 });
     expect(JSON.parse(localStorage.getItem('sh:readiness2')!)).toEqual({ [`${NEW}|P1`]: { '2026-03-01': 5, '2026-10-07': 30 } });
     expect(JSON.parse(localStorage.getItem('sh:log')!).map((e: { pieceId: string }) => e.pieceId)).toEqual([NEW, 'other']);

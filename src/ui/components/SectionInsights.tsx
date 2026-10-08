@@ -1,12 +1,12 @@
 // The section lead's picture of their section: aggregated progress (no names, distributions from
 // three singers on) and, by name, each sharing singer's voice range.
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { getPiece, defaultPartId, singableSections, type PieceInfo } from '../library';
 import { go } from '../router';
 import { loadCycle } from '../../progress/store';
 import type { BarMap } from '../../progress/bars';
-import type { PieceAgg, SectionInsightsView } from '../../progress/insights';
+import type { NoteAgg, PieceAgg, SectionInsightsView } from '../../progress/insights';
 import type { Part } from '../../music/types';
 import { PieceMap } from './PieceMap';
 import { CheatSheet } from './CheatSheet';
@@ -73,23 +73,28 @@ export function loopBars(piece: PieceInfo, partId: string, a: number, b: number)
 
 /** The rehearsal cheat sheet of a piece: one per part the section sings it in (divisi apart). */
 function CheatSheets({ piece, part, agg }: { piece: PieceInfo; part: Part; agg: PieceAgg }) {
+  const [open, setOpen] = useState(false);
+  // (a part this phone's copy of the score doesn't have is left out: its note numbers mean nothing here)
   const parts = Object.entries(agg.noteParts ?? {})
-    .map(([id, notes]) => ({ p: (id && piece.score.parts.find((x) => x.id === id)) || part, notes }))
-    .filter((x) => x.notes.length);
+    .map(([id, g]) => ({ p: piece.score.parts.find((x) => x.id === id), singers: g.singers, notes: g.notes }))
+    .filter((x): x is { p: Part; singers: number; notes: NoteAgg[] } => !!x.p && x.notes.length > 0);
   const total = parts.reduce((a, x) => a + x.notes.length, 0);
   return (
-    <details className="cheat" data-testid="cheat-details">
+    <details className="cheat" data-testid="cheat-details" onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}>
       <summary className="small" style={{ cursor: 'pointer', fontWeight: 700 }}>
         Rehearsal cheat sheet{total ? ` · ${total} note${total === 1 ? '' : 's'}` : ''}
       </summary>
-      <div className="col" style={{ marginTop: 8, gap: 14 }}>
-        {parts.length ? parts.map(({ p, notes }) => (
-          <div key={p.id} className="col" style={{ gap: 6 }}>
-            {parts.length > 1 && <strong className="small">{p.name}</strong>}
-            <CheatSheet piece={piece} part={p} notes={notes} singers={agg.singers} />
-          </div>
-        )) : <CheatSheet piece={piece} part={part} notes={[]} singers={agg.singers} />}
-      </div>
+      {/* (drawn only while open) */}
+      {open && (
+        <div className="col" style={{ marginTop: 8, gap: 14 }}>
+          {parts.length ? parts.map(({ p, singers, notes }) => (
+            <div key={p.id} className="col" style={{ gap: 6 }}>
+              {parts.length > 1 && <strong className="small">{p.name}</strong>}
+              <CheatSheet piece={piece} part={p} notes={notes} singers={singers} />
+            </div>
+          )) : <CheatSheet piece={piece} part={part} notes={[]} singers={agg.singers} />}
+        </div>
+      )}
     </details>
   );
 }

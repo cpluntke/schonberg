@@ -12,20 +12,23 @@ const silent = (i: number) => note(i, { grade: 'miss', cents: null, voicedRatio:
 beforeEach(() => { localStorage.clear(); _resetAllForTests(); });
 
 describe('per-note history (the section cheat sheet)', () => {
-  it('keeps how often a note went wrong lately and how; notes sung right drop out', () => {
+  it('keeps how often a note went wrong lately and how; one wrong run (sight-reading) is not shared; notes sung right drop out', () => {
     recordNotes('p', 'P1', { notes: [note(0), flat(1), silent(2)] }, 35, 1);
+    expect(sharedNotes('p', 'P1')).toEqual({}); // (once is not "keeps going wrong")
     recordNotes('p', 'P1', { notes: [note(0), flat(1), note(2)] }, 35, 2);
     const m = getNoteStats('p', 'P1');
     expect(m[0]).toBeUndefined();
-    expect(m[1]).toMatchObject({ n: 2, w: 1, at: 2 });
+    expect(m[1]).toMatchObject({ n: 2, at: 2 });
+    expect(m[1].w).toBeCloseTo(0.64);
     expect(mainFault(m[1])).toBe('flat');
-    expect(m[2].w).toBeCloseTo(0.6);
+    expect(m[2].w).toBeCloseTo(0.24);
     expect(mainFault(m[2])).toBe('missed');
+    expect(sharedNotes('p', 'P1')).toEqual({ 1: [0.64, 'flat'] });
     // Fixed: sung right a few times, it fades and is no longer shared, then dropped.
-    for (let t = 3; t < 6; t++) recordNotes('p', 'P1', { notes: [note(1)] }, 35, t);
-    expect(getNoteStats('p', 'P1')[1].w).toBeLessThan(0.25);
-    expect(Object.keys(sharedNotes('p', 'P1'))).toEqual(['2']);
-    for (let t = 6; t < 14; t++) recordNotes('p', 'P1', { notes: [note(1)] }, 35, t);
+    for (let t = 3; t < 5; t++) recordNotes('p', 'P1', { notes: [note(1)] }, 35, t);
+    expect(getNoteStats('p', 'P1')[1].w).toBeLessThan(0.5);
+    expect(sharedNotes('p', 'P1')).toEqual({});
+    for (let t = 5; t < 14; t++) recordNotes('p', 'P1', { notes: [note(1)] }, 35, t);
     expect(getNoteStats('p', 'P1')[1]).toBeUndefined();
   });
   it('the usual fault follows recent runs; a note the tracker could not judge says nothing', () => {
@@ -34,6 +37,7 @@ describe('per-note history (the section cheat sheet)', () => {
     expect(mainFault(getNoteStats('p', 'P1')[4])).toBe('flat');
     recordNotes('p', 'P1', { notes: [note(5, { grade: 'miss', unsure: 'range' as never })] }, 35);
     expect(getNoteStats('p', 'P1')[5]).toBeUndefined();
-    expect(sharedNotes('p', 'P1')).toEqual({ 4: [1, 'flat'] });
+    expect(Object.keys(sharedNotes('p', 'P1'))).toEqual(['4']);
+    expect(sharedNotes('p', 'P1')[4][1]).toBe('flat');
   });
 });

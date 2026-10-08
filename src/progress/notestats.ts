@@ -26,9 +26,10 @@ const NEW_WEIGHT = 0.4;
 /** Older fault kinds fade by this much with each new wrong run of the note. */
 const KIND_DECAY = 0.7;
 /** Notes kept per piece and part (the most often wrong). */
-const MAX_NOTES = 600;
-/** Shared: notes wrong in at least this share of recent runs, at most this many per piece. */
-export const SHARE_MIN = 0.25;
+const MAX_NOTES = 300;
+/** Shared: notes wrong in at least this share of recent runs (the server's mark for "keeps going wrong"), sung in at least SHARE_RUNS runs, at most SHARE_MAX per piece. */
+export const SHARE_MIN = 0.5;
+export const SHARE_RUNS = 2;
 export const SHARE_MAX = 150; // (the server keeps at most 150 per piece)
 
 export const notesKey = (pieceId: string, partId: string) => `sh:notes:${pieceId}:${partId}`;
@@ -47,7 +48,8 @@ export function recordNotes(pieceId: string, partId: string, result: Pick<Attemp
     const wrong = v === 'wrong' ? 1 : 0;
     const old = map[note.index];
     const s: NoteStat = old ? { ...old, k: old.k ? { ...old.k } : undefined } : { n: 0, w: 0, at: now };
-    s.w = s.n === 0 ? wrong : NEW_WEIGHT * wrong + (1 - NEW_WEIGHT) * s.w;
+    // (from 0: one wrong run, e.g. sight-reading, isn't "keeps going wrong"; two in a row are)
+    s.w = NEW_WEIGHT * wrong + (1 - NEW_WEIGHT) * s.w;
     s.n++;
     s.at = now;
     if (wrong) {
@@ -85,7 +87,7 @@ export function sharedNotes(pieceId: string, partId: string): Record<string, [nu
   const out: [string, [number, FaultKind]][] = [];
   for (const [i, s] of Object.entries(map)) {
     const kind = mainFault(s);
-    if (kind && s.w >= SHARE_MIN) out.push([i, [Math.round(s.w * 100) / 100, kind]]);
+    if (kind && s.w >= SHARE_MIN && s.n >= SHARE_RUNS) out.push([i, [Math.round(s.w * 100) / 100, kind]]);
   }
   out.sort((a, b) => b[1][0] - a[1][0]);
   return Object.fromEntries(out.slice(0, SHARE_MAX));

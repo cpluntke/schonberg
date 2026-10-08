@@ -24,8 +24,8 @@ export interface PieceAgg {
   readiness?: number;
   bars?: Record<string, BarAgg>;
   hardest?: (BarAgg & { bar: number })[];
-  /** The rehearsal cheat sheet, per part (divisi parts number their notes apart; "": not said), most struggled first. */
-  noteParts?: Record<string, NoteAgg[]>;
+  /** The rehearsal cheat sheet, per part with at least minGroup singers in it (divisi parts number their notes apart): the part's singers, its notes most struggled first. */
+  noteParts?: Record<string, { singers: number; notes: NoteAgg[] }>;
   trend?: PieceTrend;
 }
 export interface SingerRange { name: string; measured: boolean; lo?: number; hi?: number; reachLo?: number; reachHi?: number; at?: number }

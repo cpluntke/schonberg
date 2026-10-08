@@ -97,13 +97,16 @@ Purpose: to see how the app is used and where it fails, so it can be improved.
 - **Sent** after runs (at most once a minute): the singer's name (or account name), voice part, per
   programme piece the readiness, the piece level, how each bar is going, the notes that keep going
   wrong (note number, how often lately, the usual kind: flat, sharp, a wrong note, not sung, too short,
-  an octave off or unsteady; at most 150 per piece, from `src/progress/notestats.ts`), and the voice
+  an octave off or unsteady; only notes wrong in half the recent runs or more, after at least two runs; at
+  most 150 per piece and 1200 in all, from `src/progress/notestats.ts`) with the id of the part sung, and the voice
   range from the range check (steady range, wider reach, date measured).
 - **Section leads and admins see progress only aggregated** (`utils/schonberg_insights.py`): per
   section how many share and were active this week; per piece the level distribution, rehearsal- and
   concert-ready counts, average readiness, hardest bars, the trend versus a week ago and the
-  **rehearsal cheat sheet**: the notes at least two singers keep getting wrong (wrong in half their
-  recent runs or more), how many, and their usual faults counted together. Distributions,
+  **rehearsal cheat sheet**: per part (divisi parts apart) with at least 3 singers sharing in it, the
+  notes at least two of them keep getting wrong, how many, and their usual faults counted together. It
+  is computed when viewed, so in a small section a change right after one singer's run may hint at
+  that singer's notes (as with the other totals, see below). Distributions,
   bars and trends appear only when **at least 3 singers** share that piece (a bar only when 3 have
   sung it); below that only the counts. These views show no name next to bars, levels or readiness.
   (Readiness by name is on the choir's leaderboard anyway, see above.)

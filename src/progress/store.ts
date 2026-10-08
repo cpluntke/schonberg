@@ -297,6 +297,13 @@ function freeSpace(s: Storage, except: string): boolean {
   try {
     if (except !== 'sh:errors' && s.getItem('sh:errors') != null) { s.removeItem('sh:errors'); freed = true; }
   } catch { /* ignore */ }
+  // The per-note histories (the section's cheat sheet) give way before real progress does.
+  try {
+    for (let i = s.length - 1; i >= 0; i--) {
+      const k = s.key(i);
+      if (k && k !== except && k.startsWith('sh:notes:')) { s.removeItem(k); freed = true; }
+    }
+  } catch { /* ignore */ }
   if (except !== K.log) {
     try {
       const raw = memStorage.get(K.log) ?? s.getItem(K.log);

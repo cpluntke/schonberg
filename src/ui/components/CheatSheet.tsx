@@ -20,7 +20,7 @@ const WORDS: Record<FaultKind, string> = {
   missed: 'not sung', octave: 'an octave off', wrong: 'a wrong note', flat: 'flat', sharp: 'sharp', short: 'too short (late or cut off)', unsteady: 'not steady',
 };
 const SP: [number, number] = [6.5, 8.5];
-/** Excerpts at most (the notes most struggled with first; shown in score order). */
+/** Excerpts at most (the bars with the most problem notes first; shown in score order). */
 const MAX_SPOTS = 24;
 
 const mainKind = (n: NoteAgg): FaultKind => (Object.entries(n.kinds).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'missed') as FaultKind;
@@ -44,12 +44,19 @@ export function CheatSheet({ piece, part, notes, singers }: { piece: PieceInfo; 
     return { spots, marks, byIndex };
   }, [piece, part, notes, singers]);
   const opts: MistakeOpts = { sp: SP, fitWidth: width, notation, names: true };
-  if (!spots.length) return <span className="small muted" data-testid="cheat-empty">No note yet that two or more singers keep getting wrong. It fills in as the section practises with the current app version (from 8 Oct 2026; earlier runs didn't keep notes).</span>;
   return (
     <div ref={wrapRef} className="col" style={{ gap: 12 }} data-testid="cheat-sheet">
-      <span className="tiny muted">
-        In score order. Each marked note: what usually goes wrong · how many of the {singers} singers sharing keep getting it wrong (recent runs count most). Section totals only, never who.
-      </span>
+      {!spots.length ? (
+        <span className="small muted" data-testid="cheat-empty">
+          No note yet that two or more singers keep getting wrong (it shows for a part once three or more of its singers share). It fills in as
+          the section practises with the current app version: earlier runs didn't keep notes.
+        </span>
+      ) : (
+        <span className="tiny muted">
+          In score order. Each marked note: what usually goes wrong · how many of the part's {singers} singers sharing keep getting it wrong (recent runs count most).
+          Counted together, never by name; in a small section a change right after someone's run may still hint at whose it was.
+        </span>
+      )}
       {spots.map((s, k) => (
         <div key={`${s.m0}-${s.m1}`} className="col" style={{ gap: 4 }}>
           <strong className="small">{barRangeLabel(piece.score, s.m0, s.m1)}</strong>

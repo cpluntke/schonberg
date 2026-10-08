@@ -25,6 +25,8 @@ function setShareError(msg: string | null) {
   } catch { /* ignore */ }
 }
 let last = 0;
+/** Shared notes over all pieces at most (~22 bytes each). */
+const NOTES_BUDGET = 1200;
 let timer: ReturnType<typeof setTimeout> | null = null;
 
 async function send(): Promise<void> {
@@ -58,9 +60,16 @@ async function send(): Promise<void> {
     if (!prog && Object.keys(bars).length === 0) continue;
     const r = pieceReadiness(singableSections(piece, partId), prog);
     // level = the piece level (sung through in one go at that level), not the weakest section.
-    // (and the notes that keep going wrong, with how: the section's rehearsal cheat sheet)
+    // (and the notes that keep going wrong, with how: the section's rehearsal cheat sheet; the part
+    // always, so the part's singers are counted for its minimum group)
     const notes = sharedNotes(id, partId);
-    pieces[id] = { readiness: Math.round(r.pct * 100) / 100, level: r.pieceLevel, bars, ...(Object.keys(notes).length ? { notes, notesPart: partId } : {}) };
+    pieces[id] = { readiness: Math.round(r.pct * 100) / 100, level: r.pieceLevel, bars, notesPart: partId, ...(Object.keys(notes).length ? { notes } : {}) };
+  }
+  // Notes over all pieces within a budget (the server takes 96 KB in all): the most often wrong stay.
+  const all = Object.entries(pieces).flatMap(([id, pc]) => Object.entries(pc.notes ?? {}).map(([i, v]) => ({ id, i, w: v[0] })));
+  if (all.length > NOTES_BUDGET) {
+    all.sort((a, b) => a.w - b.w);
+    for (const x of all.slice(0, all.length - NOTES_BUDGET)) delete pieces[x.id].notes![x.i];
   }
   last = Date.now();
   try {

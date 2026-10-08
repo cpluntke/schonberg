@@ -438,7 +438,7 @@ export function shareProgress(code: string, name: string, voice: string,
     const bars: Record<string, number> = {};
     for (const [m, s] of Object.entries(p.bars)) bars[m] = Math.round(s.ema * 100) / 100;
     // (notes are numbered within the part sung: divisi parts apart)
-    body[id] = { readiness: p.readiness, level: p.level, bars, ...(p.notes ? { notes: p.notes, notesPart: p.notesPart } : {}) };
+    body[id] = { readiness: p.readiness, level: p.level, bars, ...(p.notesPart ? { notesPart: p.notesPart } : {}), ...(p.notes && Object.keys(p.notes).length ? { notes: p.notes } : {}) };
   }
   const s = sessionFor(code);
   return call<{ ok: boolean; name?: string }>(`/choirs/${enc(code)}/progress/${enc(s?.account.name ?? name)}`,
