@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  _resetUsageForTests, attemptsBucket, browserSaysDoNotTrack, daysBucket, durationBucket, errorHash, flushUsage, installId, latencyBucket,
-  localDay, pendingDays, setUsageStats, track, trackError, trackRun, trackStep, usageSnapshot, usageStatsOn,
+  LIVE_EVERY, _resetUsageForTests, attemptsBucket, browserSaysDoNotTrack, daysBucket, durationBucket, errorHash, flushLive, flushUsage, installId, latencyBucket,
+  localDay, pendingDays, setUsageStats, track, trackError, trackOnce, trackRun, trackStep, usageSnapshot, usageStatsOn, utcHour,
 } from './metrics';
 import { memberToken } from './choir';
 import { exportBackup } from './store';
@@ -24,6 +24,51 @@ describe('anonymous usage statistics', () => {
     vi.stubGlobal('fetch', fetchMock);
   });
   afterEach(() => { vi.unstubAllGlobals(); setDnt(null); });
+
+  it('sends what was counted since the last live send, by UTC hour, at most every few minutes; a lost answer resends the same batch', async () => {
+    const H = 3_600_000;
+    track('run.section.L1', 1, T0);
+    track('sec.practice', 30, T0);
+    trackOnce('lat.', 'lat.est.100', T0);
+    track('run.full.L2', 1, T0 + H);
+    expect(await flushLive(T0 + H, BASE)).toBe(true);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${BASE}/metrics/live`);
+    const body = JSON.parse(String(init.body));
+    expect(body.id).toBe(installId());
+    expect(body.batch).toMatch(/^[0-9a-f]{16}$/);
+    expect(body.hours).toEqual([
+      { hour: utcHour(T0), c: { 'run.section.L1': 1, 'sec.practice': 30, 'lat.est.100': 1 } },
+      { hour: utcHour(T0 + H), c: { 'run.full.L2': 1 } },
+    ]);
+    // Within a few minutes: kept for the next send; the daily summary is untouched by all this.
+    track('run.section.L1', 1, T0 + H + 1000);
+    expect(await flushLive(T0 + H + 60_000, BASE)).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(usageSnapshot(T0 + H).today['run.section.L1']).toBe(2);
+    // The answer is lost: the same batch goes again (the server counts it once), then the new counts.
+    fetchMock.mockImplementationOnce(async () => { throw new Error('offline'); });
+    const t2 = T0 + H + LIVE_EVERY;
+    expect(await flushLive(t2, BASE)).toBe(false);
+    const lost = JSON.parse(String((fetchMock.mock.calls[1] as [string, RequestInit])[1].body));
+    expect(lost.hours).toEqual([{ hour: utcHour(T0 + H), c: { 'run.section.L1': 1 } }]);
+    track('run.section.L1', 1, t2 + 1000);
+    expect(await flushLive(t2 + LIVE_EVERY, BASE)).toBe(true);
+    expect(JSON.parse(String((fetchMock.mock.calls[2] as [string, RequestInit])[1].body)).batch).toBe(lost.batch);
+    expect(await flushLive(t2 + 2 * LIVE_EVERY, BASE)).toBe(true);
+    const next = JSON.parse(String((fetchMock.mock.calls[3] as [string, RequestInit])[1].body));
+    expect(next.batch).not.toBe(lost.batch);
+    expect(next.hours).toEqual([{ hour: utcHour(t2 + 1000), c: { 'run.section.L1': 1 } }]);
+    expect(await flushLive(t2 + 3 * LIVE_EVERY, BASE)).toBe(false); // nothing new
+    // Switched off: nothing is counted or sent, and what was pending is gone.
+    track('run.section.L1', 1, t2 + 3 * LIVE_EVERY);
+    setUsageStats(false);
+    track('run.section.L1', 1, t2 + 3 * LIVE_EVERY);
+    expect(await flushLive(t2 + 5 * LIVE_EVERY, BASE)).toBe(false);
+    setUsageStats(true);
+    expect(await flushLive(t2 + 6 * LIVE_EVERY, BASE)).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
 
   it('batches a day of events into one summary and sends finished days at most once a day', async () => {
     track('run.section.L1', 1, T0);

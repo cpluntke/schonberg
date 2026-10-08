@@ -111,6 +111,10 @@ export interface MetricsDay {
 }
 export interface MetricsView { days: MetricsDay[]; today: string; acceptDays: number }
 export const fetchMetrics = (auth: Auth, days: number) => get<MetricsView>(`/super/metrics?days=${days}`, auth);
+/** The last 24 hours (UTC hours, the current one so far last); `total` counts each install once. */
+export interface LiveHour { hour: string; installs: number; c: Record<string, number>; jserr: Record<string, number> }
+export interface LiveView { hours: LiveHour[]; total: MetricsDay; now: string }
+export const fetchLiveMetrics = (auth: Auth) => get<LiveView>('/super/metrics/live', auth);
 
 /** Sum of the counters whose key matches. */
 export function sumKeys(days: MetricsDay[], match: (k: string) => boolean, field: 'c' | 'u' | 'tech' = 'c'): number {

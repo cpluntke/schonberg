@@ -1,7 +1,7 @@
 // Wires the anonymous usage statistics (src/progress/metrics.ts) into the app: what a finished run
 // tells them, and the once-a-day facts (choir account, sync, sharing, joining a choir).
 
-import { installUsageStats, track, trackOnce, trackRun, type RunKind } from '../progress/metrics';
+import { flushLive, installUsageStats, track, trackOnce, trackRun, type RunKind } from '../progress/metrics';
 import { attemptLog, loadProfile, subscribe, type FullRunRecord } from '../progress/store';
 import { loadSession, onSessionChange } from '../progress/choir';
 import type { AttemptResult } from '../game/types';
@@ -92,5 +92,6 @@ export function trackPlayRun(r: PlayRun): void {
       full: r.full ? { counted: r.full.opened, toFix: r.full.toFix.length, tooMuch: !!r.full.tooMuch } : undefined,
       rehearsalReadyAfterDays: ready,
     });
+    void flushLive(); // (the last 24 hours: at most every few minutes)
   } catch { /* statistics never break a run */ }
 }

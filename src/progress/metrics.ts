@@ -1,10 +1,13 @@
-// Anonymous usage statistics (docs/PRIVACY.md): daily counters only, sent at most once a day.
+// Anonymous usage statistics (docs/PRIVACY.md): daily counters sent once a day, plus hourly ones for the last 24 hours.
 //
 // - A random install id made for this alone (never the member token, the account or the name). It is
 //   stored outside the app's `sh:` keys, so backups and synced progress never carry it.
 // - Today's counters pile up on this phone; the first time the app is opened (or hidden) on a later
 //   day, the finished days go to POST /schonberg/api/metrics in one small request. Days that can't be
 //   sent within a week are dropped.
+// - For the super admin's "last 24 hours" view, the same counters are also kept per UTC hour and, while
+//   the app is in use, what was counted since the last send goes to POST /schonberg/api/metrics/live
+//   (every few minutes at most, and when the app is hidden). The server keeps those hours for two days.
 // - On by default, off when the browser asks not to be tracked (Do Not Track / Global Privacy Control)
 //   unless the singer turns it on; the switch is in Settings. Turning it off deletes what's pending.
 
@@ -18,6 +21,10 @@ const KEEP_DAYS = 7;
 const MAX_KEYS_PER_DAY = 250;
 const MAX_JS_ERRORS_PER_DAY = 10;
 const MAX_TRIES = 300;
+/** Live (hourly) counts: sent at most this often, kept on the phone at most this long. */
+export const LIVE_EVERY = 5 * 60_000;
+const LIVE_KEEP_H = 47;
+const MAX_LIVE_HOURS = 8;
 
 export interface UsageData {
   /** local day (YYYY-MM-DD) → counter → count */
@@ -28,6 +35,12 @@ export interface UsageData {
   onb?: string[];
   /** Attempts so far at a section and level not yet passed (for attempts-to-pass). */
   tries?: Record<string, number>;
+  /** UTC hour (YYYY-MM-DDTHH) → counter → count, counted since the last live send. */
+  live?: Record<string, Record<string, number>>;
+  /** A live send not yet answered: sent again as it is (same batch), so the server counts it once. */
+  liveOut?: { batch: string; hours: { hour: string; c: Record<string, number> }[] };
+  /** When the last live send was tried (ms). */
+  liveAt?: number;
 }
 
 // ------------------------------------------------------------------ storage (never throws)
@@ -54,6 +67,19 @@ function save(d: UsageData): void { set(DATA_KEY, JSON.stringify(d)); }
 export function localDay(t: number | Date = Date.now()): string {
   const d = new Date(t);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** The UTC hour of a time, as the server files it. */
+export function utcHour(t: number = Date.now()): string {
+  return new Date(t).toISOString().slice(0, 13);
+}
+
+/** Also count in this hour's live bucket (inside a load/save). */
+function addLive(d: UsageData, key: string, n: number, now: number, replaceFamily?: string): void {
+  const h = (d.live ??= {})[utcHour(now)] ??= {};
+  if (replaceFamily) for (const k of Object.keys(h)) if (k.startsWith(replaceFamily) && k !== key) delete h[k];
+  if (!(key in h) && Object.keys(h).length >= MAX_KEYS_PER_DAY) return;
+  h[key] = replaceFamily ? 1 : Math.round((h[key] ?? 0) + n);
 }
 
 // ------------------------------------------------------------------ consent
@@ -117,6 +143,7 @@ export function track(key: string, n = 1, now: number = Date.now()): void {
     if (key.startsWith('jserr.') && Object.keys(c).filter((k) => k.startsWith('jserr.')).length >= MAX_JS_ERRORS_PER_DAY) return;
   }
   c[key] = Math.round((c[key] ?? 0) + n);
+  addLive(d, key, n, now);
   save(d);
 }
 
@@ -127,6 +154,7 @@ export function trackOnce(family: string, key: string, now: number = Date.now())
   const c = (d.days[localDay(now)] ??= {});
   for (const k of Object.keys(c)) if (k.startsWith(family) && k !== key) delete c[k];
   c[key] = 1;
+  addLive(d, key, 1, now, family);
   save(d);
 }
 
@@ -297,6 +325,55 @@ export async function flushUsage(now: number = Date.now(), base: string | null =
   }
 }
 
+let sendingLive = false;
+
+function batchId(): string {
+  const a = new Uint8Array(8);
+  crypto.getRandomValues(a);
+  return Array.from(a, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Send what was counted since the last live send (for the "last 24 hours" view), at most every
+ * LIVE_EVERY. A send whose answer was lost goes again as the same batch. Never throws.
+ */
+export async function flushLive(now: number = Date.now(), base: string | null = apiBase()): Promise<boolean> {
+  if (sendingLive || !usageStatsOn() || !base) return false;
+  const d = load();
+  const oldest = utcHour(now - LIVE_KEEP_H * 3_600_000);
+  if (d.liveOut) d.liveOut.hours = d.liveOut.hours.filter((x) => x.hour >= oldest);
+  if (d.liveOut && !d.liveOut.hours.length) delete d.liveOut;
+  for (const h of Object.keys(d.live ?? {})) if (h < oldest || !Object.keys(d.live![h]).length) delete d.live![h];
+  if (d.liveAt != null && now - d.liveAt < LIVE_EVERY && d.liveAt <= now) { save(d); return false; }
+  if (!d.liveOut) {
+    const hours = Object.keys(d.live ?? {}).sort().slice(-MAX_LIVE_HOURS).map((hour) => ({ hour, c: d.live![hour] }));
+    if (!hours.length) { save(d); return false; }
+    d.liveOut = { batch: batchId(), hours };
+    d.live = {};
+  }
+  d.liveAt = now;
+  save(d);
+  const out = d.liveOut;
+  sendingLive = true;
+  try {
+    const res = await fetch(`${base}/metrics/live`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ v: 1, id: installId(), batch: out.batch, hours: out.hours }),
+      keepalive: true,
+    });
+    if (!res.ok && res.status !== 400) return false; // the same batch goes again next time
+    const after = load();
+    if (after.liveOut?.batch === out.batch) delete after.liveOut;
+    save(after);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    sendingLive = false;
+  }
+}
+
 /** For Settings and the tests: what would be sent (finished days) and today's running counters. */
 export function usageSnapshot(now: number = Date.now()): { pending: number; today: Record<string, number> } {
   return { pending: pendingDays(now).length, today: load().days[localDay(now)] ?? {} };
@@ -308,15 +385,18 @@ export function installUsageStats(): void {
   if (installed || typeof window === 'undefined') return;
   installed = true;
   void flushUsage();
+  void flushLive();
+  setInterval(() => { if (document.visibilityState === 'visible') void flushLive(); }, LIVE_EVERY + 1000);
   window.addEventListener('error', (e) => { try { trackError(e.error ?? e.message); } catch { /* ignore */ } });
   window.addEventListener('unhandledrejection', (e) => { try { trackError(e.reason); } catch { /* ignore */ } });
-  const onHide = () => { if (document.visibilityState === 'hidden') void flushUsage(); };
+  const onHide = () => { if (document.visibilityState === 'hidden') { void flushUsage(); void flushLive(); } };
   document.addEventListener('visibilitychange', onHide);
-  window.addEventListener('pagehide', () => void flushUsage());
+  window.addEventListener('pagehide', () => { void flushUsage(); void flushLive(); });
 }
 
 /** Test helper. */
 export function _resetUsageForTests(): void {
   for (const k of [ID_KEY, OPT_KEY, DATA_KEY]) set(k, null);
   sending = false;
+  sendingLive = false;
 }

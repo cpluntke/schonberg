@@ -76,7 +76,7 @@ export function App() {
     const off = subscribe(() => { clearTimeout(t); t = window.setTimeout(() => { upgradeAllFullRuns(); void adoptLibraryIds(); }, 500); });
     return () => { off(); clearTimeout(t); };
   }, [lib.ready, lib.version]);
-  // Anonymous usage statistics (Settings → Send anonymous usage statistics): daily totals, sent at most once a day.
+  // Anonymous usage statistics (Settings → Send anonymous usage statistics): daily totals once a day, plus hourly counts every few minutes for the last 24 hours.
   useEffect(() => { startUsageStats(); }, []);
   // Progress kept with the choir account: on start and whenever the app comes back, if something
   // changed (at most once a minute). A new login also moves this phone's shared progress to the account.

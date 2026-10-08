@@ -13,7 +13,7 @@ section lead (both part of joining a choir), and two things that are the singer'
 - **In a small section** (three or four singers sharing), a lead who knows who practised what may still
   be able to work out one singer's detail from the totals, or from how they change after that singer
   practises.
-- **The super admin**: anonymous daily usage totals, never linked to a name.
+- **The super admin**: anonymous usage totals (daily, and hourly for the last two days), never linked to a name.
 - **Everyone in the choir, live**: how many singers of each voice part have the singing screen open right
   now (counts only, no names; see 0a).
 
@@ -56,11 +56,15 @@ Purpose: to see how the app is used and where it fails, so it can be improved.
   or failed, voice lined up), the headphone/mic delay in use (50 ms buckets, once a day) and error
   counts (microphone, score import, JavaScript errors as an 8-hex hash of the first line of the
   message, digits removed: the message itself is not sent).
-- **What is sent**: at most once a day (when the app starts or is hidden on a later day), the finished
+- **What is sent** for the daily totals: at most once a day (when the app starts or is hidden on a later day), the finished
   days (up to a week back) to `POST /schonberg/api/metrics` as
   `{ v: 1, id, days: [{ day, c: { counter: number } }] }`. `id` is a random 128-bit install id made only
   for this (`localStorage['shm:anonId']`): not the member token, not the choir account, not the name,
   and outside the `sh:` keys, so backups and synced progress never carry it.
+- **Also sent, for the "last 24 hours" view**: while the app is in use, what was counted since the
+  last send, by UTC hour, at most every 5 minutes (and when the app is hidden), to
+  `POST /schonberg/api/metrics/live` as `{ v: 1, id, batch, hours: [{ hour: "YYYY-MM-DDTHH", c }] }`
+  (same counters and install id; `batch` is a random id per send so a resend counts once).
 - **What the server keeps** (`utils/schonberg_metrics.py`, `DATA_DIR/schonberg_metrics/`):
   - daily totals only (`days/YYYY-MM-DD.json`): installs active, counters summed over installs, how many
     installs used each feature, browser / OS / mobile-or-desktop families parsed from the User-Agent
@@ -71,12 +75,16 @@ Purpose: to see how the app is used and where it fails, so it can be improved.
     `actives/YYYY-MM-DD.json`, the set of 16-hex HMAC-SHA256 hashes of the install ids active that day,
     keyed with a random server secret. Raw ids are never written. Each day's set is deleted after
     35 days; only the totals remain.
+  - for the last 24 hours: `hours/YYYY-MM-DDTHH.json`, that hour's counter totals and, per hashed install
+    (same keyed hash), the features and browser / OS / device families it used and its last batch ids.
+    Deleted after 48 hours; only the daily totals remain.
 - **Abuse limits**: unknown keys ignored, counts clamped per key, 16 KB per request (refused without a
   Content-Length), 8 days per request, 10 distinct error hashes per install and day (200 per day file),
-  30 requests an hour per client address (IPv6: /64), 3000 an hour in all, and the metrics folder is
+  30 requests an hour per client address (IPv6: /64), 3000 an hour in all (live sends: 600 and
+  30000 an hour, 8 hours per request, 5000 installs per hour file), and the metrics folder is
   capped at 20 MB (then 507). Summaries older than 7 days are refused.
 - **Who sees it**: only the super admin (Admin → Usage), as charts and a CSV of
-  daily totals.
+  daily totals (and of the last 24 hours, by the hour).
 
 ## 2. Sharing progress with the choir (on when joining a choir; switch in Settings → Privacy)
 

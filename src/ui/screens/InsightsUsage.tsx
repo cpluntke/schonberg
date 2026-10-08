@@ -1,13 +1,17 @@
-// Super admin: anonymous usage statistics (daily totals only; docs/PRIVACY.md), to improve the app.
+// Super admin: anonymous usage statistics (daily totals, and hourly ones for the last 24 hours;
+// docs/PRIVACY.md), to improve the app.
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { go } from '../router';
 import { apiBase, loadSuperSession } from '../../progress/choir';
 import { useSession } from './Choir';
-import { fetchMetrics, metricsCsv, sumKeys, type MetricsDay } from '../../progress/insights';
+import { fetchLiveMetrics, fetchMetrics, metricsCsv, sumKeys, type LiveView, type MetricsDay } from '../../progress/insights';
 import { BarList, Sparkline } from '../components/InsightCharts';
 
-const RANGES = [7, 30, 90] as const;
+const RANGES = ['24h', 7, 30, 90] as const;
+type Range = (typeof RANGES)[number];
+/** The last-24-hours tab asks again this often while it is open. */
+const LIVE_REFRESH = 60_000;
 const pct = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 100)}%` : '–');
 const int = (v: number) => (v >= 10_000 ? `${Math.round(v / 1000)}k` : String(Math.round(v)));
 
@@ -46,15 +50,22 @@ const LAT = ['0', '50', '100', '150', '200', '300'];
 export function UsageInsights() {
   useSession(); // re-renders when the super-admin login starts or ends
   const token = loadSuperSession()?.token ?? null;
-  const [n, setN] = useState<number>(30);
+  const [n, setN] = useState<Range>(30);
   const [days, setDays] = useState<MetricsDay[] | null>(null);
+  const [live, setLive] = useState<LiveView | null>(null);
   const [err, setErr] = useState('');
   useEffect(() => {
     if (!token) return;
     let alive = true;
     setErr('');
-    fetchMetrics({ bearer: token }, n).then((r) => { if (alive) setDays(r.days); }).catch((e) => { if (alive) setErr((e as Error).message); });
-    return () => { alive = false; };
+    if (n !== '24h') {
+      fetchMetrics({ bearer: token }, n).then((r) => { if (alive) setDays(r.days); }).catch((e) => { if (alive) setErr((e as Error).message); });
+      return () => { alive = false; };
+    }
+    const load = () => fetchLiveMetrics({ bearer: token }).then((r) => { if (alive) { setLive(r); setErr(''); } }).catch((e) => { if (alive) setErr((e as Error).message); });
+    void load();
+    const t = setInterval(() => { if (document.visibilityState === 'visible') void load(); }, LIVE_REFRESH);
+    return () => { alive = false; clearInterval(t); };
   }, [token, n]);
   const stats = useMemo(() => (days ? summarise(days) : null), [days]);
   if (!apiBase()) return <><div className="notice">Needs the online version of the app.</div></>;
@@ -66,26 +77,34 @@ export function UsageInsights() {
       </>
     );
   }
+  // (the last 24 hours: one row per UTC hour)
+  const rows: MetricsDay[] | null = n === '24h'
+    ? live && live.hours.map((h) => ({ day: `${h.hour}:00Z`, installs: h.installs, c: h.c, u: {}, tech: {}, jserr: h.jserr }))
+    : days;
   const csv = () => {
-    if (!days) return;
+    if (!rows?.length) return;
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([metricsCsv(days)], { type: 'text/csv' }));
-    a.download = `schonberg-usage-${days[0]?.day}-to-${days[days.length - 1]?.day}.csv`;
+    a.href = URL.createObjectURL(new Blob([metricsCsv(rows)], { type: 'text/csv' }));
+    a.download = n === '24h' ? `schonberg-usage-24h-to-${live?.now}.csv` : `schonberg-usage-${rows[0]?.day}-to-${rows[rows.length - 1]?.day}.csv`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   };
   return (
     <>
-      <span className="small muted">Anonymous daily totals only: no names, no accounts, no recordings. Phones send each day's summary when the app is next opened, so the last days fill in over a week.</span>
+      <span className="small muted">{n === '24h'
+        ? 'Anonymous hourly totals: no names, no accounts, no recordings. Phones send what they counted every few minutes while the app is in use (app versions from 8 Oct 2026 on); this page updates every minute. Hours are kept for two days.'
+        : 'Anonymous daily totals only: no names, no accounts, no recordings. Phones send each day\'s summary when the app is next opened, so the last days fill in over a week; the "24 hours" tab shows today\'s practice as it happens.'}</span>
       <div className="row wrap" style={{ gap: 8 }}>
         <div className="seg" role="group" aria-label="Date range" style={{ flex: 1 }}>
-          {RANGES.map((r) => <button key={r} aria-pressed={n === r} onClick={() => setN(r)}>{r} days</button>)}
+          {RANGES.map((r) => <button key={r} aria-pressed={n === r} onClick={() => setN(r)} data-testid={`usage-range-${r}`}>{r === '24h' ? '24 hours' : `${r} days`}</button>)}
         </div>
-        <button className="btn small" onClick={csv} disabled={!days} data-testid="usage-csv">Export CSV</button>
+        <button className="btn small" onClick={csv} disabled={!rows?.length} data-testid="usage-csv">Export CSV</button>
       </div>
       {err && <div className="notice" role="alert">{err}</div>}
-      {!days && !err && <span className="muted">Loading…</span>}
-      {stats && days && (
+      {n === '24h' && !live && !err && <span className="muted">Loading…</span>}
+      {n === '24h' && live && <LastDay live={live} />}
+      {n !== '24h' && !days && !err && <span className="muted">Loading…</span>}
+      {n !== '24h' && stats && days && (
         <>
           <div className="stats3" data-testid="usage-tiles">
             <Tile k="Daily actives (yesterday)" v={int(stats.dauY)} sub={`peak ${int(stats.dauMax)}`} />
@@ -101,75 +120,118 @@ export function UsageInsights() {
           <Section title="Runs a day">
             <Sparkline values={days.map((d) => sumKeys([d], (k) => k.startsWith('run.')))} labels={days.map((d) => d.day)} />
           </Section>
-          <Section title="Runs by mode" id="usage-modes">
-            <BarList rows={MODES.map(([m, l]) => ({ label: l, value: sumKeys(days, (k) => k.startsWith(`run.${m}.`)) }))} format={int} />
-          </Section>
-          <Section title="Runs by level" note="Level 0 = listening">
-            <BarList rows={[0, 1, 2, 3, 4, 5].map((l) => ({ label: `Level ${l}`, value: sumKeys(days, (k) => k.startsWith('run.') && k.endsWith(`.L${l}`)) }))} format={int} />
-          </Section>
-          <Section title="Onboarding funnel" note="New installs reaching each step (share of setups started)" id="usage-funnel">
-            <BarList rows={FUNNEL.map(([s, l]) => ({ label: l, value: sumKeys(days, (k) => k === `onb.${s}`) }))}
-              format={(v) => { const base = sumKeys(days, (k) => k === 'onb.setup_started'); return base ? `${int(v)} · ${pct(v, base)}` : int(v); }} />
-          </Section>
-          <Section title="Level pass rates" note="Counted section and whole-piece runs that passed">
-            <BarList rows={[1, 2, 3, 4, 5].map((l) => {
-              const runs = sumKeys(days, (k) => /^run\.(section|full)\./.test(k) && k.endsWith(`.L${l}`));
-              const pass = sumKeys(days, (k) => /^pass\.(section|full)\./.test(k) && k.endsWith(`.L${l}`));
-              return { label: `Level ${l}`, value: runs ? pass / runs : 0, note: `${pass} of ${runs}` };
-            })} format={(v) => `${Math.round(v * 100)}%`} max={1} />
-          </Section>
-          <Section title="Attempts to pass a level" note="Counted runs at a section and level until it passed">
-            <BarList rows={ATT.map(([b, l]) => ({ label: l, value: sumKeys(days, (k) => k.startsWith('att2pass.') && k.endsWith(`.${b}`)) }))} format={int} />
-          </Section>
-          <Section title="Time to rehearsal-ready" note="From first practice of a piece to piece level 3">
-            <BarList rows={T2RR.map(([b, l]) => ({ label: l, value: sumKeys(days, (k) => k === `t2rr.${b}`) }))} format={int} />
-          </Section>
-          <Section title="Whole-piece runs">
-            <BarList rows={[
-              { label: 'Clean (nothing to fix)', value: sumKeys(days, (k) => k === 'full.clean') },
-              { label: 'With a to-fix list', value: sumKeys(days, (k) => k === 'full.tofix') },
-              { label: 'Too much slipped (practice)', value: sumKeys(days, (k) => k === 'full.toomuch') },
-              { label: 'Blocked (fix first, earlier rules)', value: sumKeys(days, (k) => k === 'full.blocked') },
-            ]} format={int} />
-          </Section>
-          <Section title="Feature usage" note="Install-days using each feature" id="usage-features">
-            <BarList rows={FEATURES.map(([f, l]) => ({ label: l, value: sumKeys(days, (k) => k === `feat.${f}`, 'u') }))} format={int} />
-          </Section>
-          <Section title="Scoring quality" id="usage-scoring">
-            <BarList rows={DUR.map(([b, l]) => {
-              const all = sumKeys(days, (k) => k === `acc.${b}.n`);
-              return { label: l, value: all ? sumKeys(days, (k) => k === `acc.${b}.hit`) / all : 0, note: `${all} notes` };
-            })} format={(v) => `${Math.round(v * 100)}% hit`} max={1} />
-            <div className="row wrap small" style={{ gap: 14 }}>
-              <span>Delay check suggested: <span className="mono">{pct(sumKeys(days, (k) => k === 'q.delay_suggested'), stats.qRuns)}</span></span>
-              <span>Timing unsure: <span className="mono">{pct(sumKeys(days, (k) => k === 'q.timing_unsure'), stats.qRuns)}</span></span>
-              <span>Failed on timing: <span className="mono">{pct(sumKeys(days, (k) => k === 'q.timing_fail'), stats.qRuns)}</span></span>
-              <span>Voice lined up: <span className="mono">{pct(sumKeys(days, (k) => k === 'q.aligned'), stats.qRuns)}</span></span>
-            </div>
-            <span className="small">Headphone/mic delay in use (install-days)</span>
-            <BarList rows={LAT.map((b, i) => ({
-              label: i === LAT.length - 1 ? `${b}+ ms` : `${b}–${LAT[i + 1]} ms`,
-              value: sumKeys(days, (k) => k.startsWith('lat.') && k.endsWith(`.${b}`)),
-              note: ['measured', 'learned', 'est'].map((s) => `${s} ${sumKeys(days, (k) => k === `lat.${s}.${b}`)}`).join(', '),
-            }))} format={int} />
-          </Section>
-          <Section title="Devices" note="Install-days, from the browser's user agent (families only)" id="usage-tech">
-            {(['browser', 'os', 'device'] as const).map((f) => (
-              <BarList key={f} rows={Object.entries(techTotals(days, f)).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: `${f === 'os' ? 'OS' : f}: ${k}`, value: v }))} format={int} />
-            ))}
-          </Section>
-          <Section title="Problems" id="usage-errors">
-            <BarList rows={[
-              { label: 'Microphone errors', value: sumKeys(days, (k) => k === 'err.mic') },
-              { label: 'Score imports that failed', value: sumKeys(days, (k) => k === 'err.import') },
-              { label: 'JavaScript errors', value: sumKeys(days, (k) => k === 'err.js') },
-            ]} format={int} />
-            {stats.jsTop.length > 0 && (
-              <span className="tiny muted">Most frequent errors (message hash, match it with a diagnostics report): {stats.jsTop.map(([h, v]) => `${h} ×${v}`).join(', ')}</span>
-            )}
-          </Section>
+          <Breakdown days={days} />
         </>
       )}
+    </>
+  );
+}
+
+/** The breakdowns, over days (or the last 24 hours as one record: `hours`). */
+function Breakdown({ days, hours }: { days: MetricsDay[]; hours?: boolean }) {
+  const qRuns = sumKeys(days, (k) => k === 'q.runs');
+  const jsTop = topErrors(days);
+  return (
+    <>
+    <Section title="Runs by mode" id="usage-modes">
+      <BarList rows={MODES.map(([m, l]) => ({ label: l, value: sumKeys(days, (k) => k.startsWith(`run.${m}.`)) }))} format={int} />
+    </Section>
+    <Section title="Runs by level" note="Level 0 = listening">
+      <BarList rows={[0, 1, 2, 3, 4, 5].map((l) => ({ label: `Level ${l}`, value: sumKeys(days, (k) => k.startsWith('run.') && k.endsWith(`.L${l}`)) }))} format={int} />
+    </Section>
+    <Section title="Onboarding funnel" note="New installs reaching each step (share of setups started)" id="usage-funnel">
+      <BarList rows={FUNNEL.map(([s, l]) => ({ label: l, value: sumKeys(days, (k) => k === `onb.${s}`) }))}
+        format={(v) => { const base = sumKeys(days, (k) => k === 'onb.setup_started'); return base ? `${int(v)} · ${pct(v, base)}` : int(v); }} />
+    </Section>
+    <Section title="Level pass rates" note="Counted section and whole-piece runs that passed">
+      <BarList rows={[1, 2, 3, 4, 5].map((l) => {
+        const runs = sumKeys(days, (k) => /^run\.(section|full)\./.test(k) && k.endsWith(`.L${l}`));
+        const pass = sumKeys(days, (k) => /^pass\.(section|full)\./.test(k) && k.endsWith(`.L${l}`));
+        return { label: `Level ${l}`, value: runs ? pass / runs : 0, note: `${pass} of ${runs}` };
+      })} format={(v) => `${Math.round(v * 100)}%`} max={1} />
+    </Section>
+    <Section title="Attempts to pass a level" note="Counted runs at a section and level until it passed">
+      <BarList rows={ATT.map(([b, l]) => ({ label: l, value: sumKeys(days, (k) => k.startsWith('att2pass.') && k.endsWith(`.${b}`)) }))} format={int} />
+    </Section>
+    <Section title="Time to rehearsal-ready" note="From first practice of a piece to piece level 3">
+      <BarList rows={T2RR.map(([b, l]) => ({ label: l, value: sumKeys(days, (k) => k === `t2rr.${b}`) }))} format={int} />
+    </Section>
+    <Section title="Whole-piece runs">
+      <BarList rows={[
+        { label: 'Clean (nothing to fix)', value: sumKeys(days, (k) => k === 'full.clean') },
+        { label: 'With a to-fix list', value: sumKeys(days, (k) => k === 'full.tofix') },
+        { label: 'Too much slipped (practice)', value: sumKeys(days, (k) => k === 'full.toomuch') },
+        { label: 'Blocked (fix first, earlier rules)', value: sumKeys(days, (k) => k === 'full.blocked') },
+      ]} format={int} />
+    </Section>
+    <Section title="Feature usage" note={hours ? 'Installs using each feature' : 'Install-days using each feature'} id="usage-features">
+      <BarList rows={FEATURES.map(([f, l]) => ({ label: l, value: sumKeys(days, (k) => k === `feat.${f}`, 'u') }))} format={int} />
+    </Section>
+    <Section title="Scoring quality" id="usage-scoring">
+      <BarList rows={DUR.map(([b, l]) => {
+        const all = sumKeys(days, (k) => k === `acc.${b}.n`);
+        return { label: l, value: all ? sumKeys(days, (k) => k === `acc.${b}.hit`) / all : 0, note: `${all} notes` };
+      })} format={(v) => `${Math.round(v * 100)}% hit`} max={1} />
+      <div className="row wrap small" style={{ gap: 14 }}>
+        <span>Delay check suggested: <span className="mono">{pct(sumKeys(days, (k) => k === 'q.delay_suggested'), qRuns)}</span></span>
+        <span>Timing unsure: <span className="mono">{pct(sumKeys(days, (k) => k === 'q.timing_unsure'), qRuns)}</span></span>
+        <span>Failed on timing: <span className="mono">{pct(sumKeys(days, (k) => k === 'q.timing_fail'), qRuns)}</span></span>
+        <span>Voice lined up: <span className="mono">{pct(sumKeys(days, (k) => k === 'q.aligned'), qRuns)}</span></span>
+      </div>
+      <span className="small">Headphone/mic delay in use ({hours ? 'install-hours' : 'install-days'})</span>
+      <BarList rows={LAT.map((b, i) => ({
+        label: i === LAT.length - 1 ? `${b}+ ms` : `${b}–${LAT[i + 1]} ms`,
+        value: sumKeys(days, (k) => k.startsWith('lat.') && k.endsWith(`.${b}`)),
+        note: ['measured', 'learned', 'est'].map((s) => `${s} ${sumKeys(days, (k) => k === `lat.${s}.${b}`)}`).join(', '),
+      }))} format={int} />
+    </Section>
+    <Section title="Devices" note={`${hours ? 'Installs' : 'Install-days'}, from the browser\'s user agent (families only)`} id="usage-tech">
+      {(['browser', 'os', 'device'] as const).map((f) => (
+        <BarList key={f} rows={Object.entries(techTotals(days, f)).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: `${f === 'os' ? 'OS' : f}: ${k}`, value: v }))} format={int} />
+      ))}
+    </Section>
+    <Section title="Problems" id="usage-errors">
+      <BarList rows={[
+        { label: 'Microphone errors', value: sumKeys(days, (k) => k === 'err.mic') },
+        { label: 'Score imports that failed', value: sumKeys(days, (k) => k === 'err.import') },
+        { label: 'JavaScript errors', value: sumKeys(days, (k) => k === 'err.js') },
+      ]} format={int} />
+      {jsTop.length > 0 && (
+        <span className="tiny muted">Most frequent errors (message hash, match it with a diagnostics report): {jsTop.map(([h, v]) => `${h} ×${v}`).join(', ')}</span>
+      )}
+    </Section>
+    </>
+  );
+}
+
+function topErrors(days: MetricsDay[]): [string, number][] {
+  const js: Record<string, number> = {};
+  for (const d of days) for (const [h, v] of Object.entries(d.jserr ?? {})) js[h] = (js[h] ?? 0) + v;
+  return Object.entries(js).sort((a, b) => b[1] - a[1]).slice(0, 8);
+}
+
+const hourLabel = (h: string) => new Date(`${h}:00:00Z`).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+/** The last 24 hours, by the hour (local time on the labels). */
+function LastDay({ live }: { live: LiveView }) {
+  const t = live.total;
+  const runs = (c: Record<string, number>) => Object.entries(c).reduce((a, [k, v]) => a + (k.startsWith('run.') ? v : 0), 0);
+  const labels = live.hours.map((h) => hourLabel(h.hour));
+  const thisHour = live.hours[live.hours.length - 1];
+  return (
+    <>
+      <div className="stats3" data-testid="usage-24h-tiles">
+        <Tile k="Active in the last 24 hours" v={int(t.installs)} sub={`${int(thisHour?.installs ?? 0)} this hour`} />
+        <Tile k="Runs" v={int(runs(t.c))} sub={`${int(runs(thisHour?.c ?? {}))} this hour`} />
+        <Tile k="Minutes practised" v={int((t.c['sec.practice'] ?? 0) / 60)} />
+      </div>
+      <Section title="Active by the hour" note={`${labels[0]} to now`} id="usage-24h-actives">
+        <Sparkline values={live.hours.map((h) => h.installs)} labels={labels} />
+      </Section>
+      <Section title="Runs by the hour">
+        <Sparkline values={live.hours.map((h) => runs(h.c))} labels={labels} />
+      </Section>
+      <Breakdown days={[t]} hours />
     </>
   );
 }
@@ -190,8 +252,6 @@ function summarise(days: MetricsDay[]) {
   const nDays = Math.max(1, withData);
   const rets = days.filter((d) => d.ret && d.ret.base > 0);
   const ret = rets.length ? rets.reduce((a, d) => ({ base: a.base + d.ret!.base, back: a.back + d.ret!.back }), { base: 0, back: 0 }) : null;
-  const js: Record<string, number> = {};
-  for (const d of days) for (const [h, v] of Object.entries(d.jserr ?? {})) js[h] = (js[h] ?? 0) + v;
   return {
     dauY: y?.installs ?? 0,
     dauMax: Math.max(0, ...days.map((d) => d.installs ?? 0)),
@@ -199,9 +259,7 @@ function summarise(days: MetricsDay[]) {
     mau: y?.mau ?? last?.mau ?? 0,
     runsPerDay: sumKeys(days, (k) => k.startsWith('run.')) / nDays,
     minPerDay: sumKeys(days, (k) => k === 'sec.practice') / 60 / nDays,
-    qRuns: sumKeys(days, (k) => k === 'q.runs'),
     withData,
     ret,
-    jsTop: Object.entries(js).sort((a, b) => b[1] - a[1]).slice(0, 8),
   };
 }
