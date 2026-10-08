@@ -110,6 +110,22 @@ export const MIC_SOUND_SHARE = 0.7;
 export const SOUND_RMS = 0.02;
 /** …and at most this share of its pitched readings were elsewhere (a wrong note is never let off). */
 export const MIC_OFF_SHARE = 0.25;
+/**
+ * A consonant sung on the beat (s, sh, f, a stop's burst: sound without a pitch, at least this loud)
+ * that runs into the note's voice: the voice may arrive up to CONSONANT_SETTLE after it, when that is
+ * later than the plain arrival cap (TRANSITION_MAX). The consonant counts from the written start (or
+ * its own start, if later) for at most CONSONANT_MAX real seconds, never past half the note, and
+ * must start by the plain arrival cap.
+ * Likewise at the end: a consonant from the voice's end through the end of the note (a final s, or
+ * the next syllable's consonant sung early) is excused like an early release (RELEASE_MAX), up to
+ * CONSONANT_MAX and half the note.
+ */
+export const CONSONANT_RMS = 0.005;
+export const CONSONANT_MAX = 0.25;
+/** Time the voice gets to settle on the note after such a consonant (score seconds, like TRANSITION_MAX). */
+export const CONSONANT_SETTLE = 0.1;
+/** Quiet this short inside a consonant cluster (a stop's closure, "st", "sc") doesn't end it. */
+const CONSONANT_GAP = 0.07;
 
 export const GRADE_POINTS: Record<Grade, number> = { perfect: 100, good: 70, ok: 40, miss: 0 };
 export const GRADE_VALUE: Record<Grade, number> = { perfect: 1, good: 0.85, ok: 0.5, miss: 0 };
@@ -246,6 +262,15 @@ class NoteAcc {
   /** Count of voiced body samples that needed octave folding to be in tolerance. */
   octaveSamples = 0;
   onsetMs: number | null = null;
+  /** A consonant from the written start into the voice (see CONSONANT_RMS): its run, and its length once the voice came. */
+  consStart: number | null = null;
+  consLast: number | null = null;
+  consLen = 0;
+  consDone = false;
+  /** A consonant after the note's last pitched reading (tailStart…tailLast), and where it starts once it reached the end. */
+  tailStart: number | null = null;
+  tailLast: number | null = null;
+  consTail: number | null = null;
   /** Start of the current run of qualifying voiced samples (onset needs ~60 ms of sound). */
   runStart: number | null = null;
   runMiss = 0;
@@ -463,6 +488,12 @@ export class LiveScorer {
     }
     // Onset & scoop use samples from the note start (grace included).
     if (t >= w.start && t < w.bodyEnd) {
+      if (!a.consDone) this.trackConsonant(a, t, midi !== null && Number.isFinite(midi), c.s.rms);
+      if (midi !== null && Number.isFinite(midi)) a.tailStart = null;
+      else if (c.s.rms >= CONSONANT_RMS && a.bT.length > 0) {
+        if (a.tailStart === null || t - a.tailLast! > CONSONANT_GAP * (this.opts.rate && this.opts.rate > 0 ? this.opts.rate : 1)) a.tailStart = t;
+        a.tailLast = t;
+      }
       // Timing is judged independently of intonation: the note "starts" with the first voiced
       // sound after a rest, or (legato) once the voice has moved closer to this note than the last.
       if (a.onsetMs === null) {
@@ -532,12 +563,45 @@ export class LiveScorer {
     }
   }
 
+  /**
+   * A consonant on the beat: a run of loud unpitched readings (quiet gaps up to CONSONANT_GAP inside
+   * it) that starts by the plain arrival cap and runs into a pitched reading. Pitched readings before
+   * it (the previous vowel held to the beat) don't end the search; one after the cap with no
+   * consonant running does.
+   */
+  private trackConsonant(a: NoteAcc, t: number, voiced: boolean, rms: number): void {
+    const w = a.w;
+    const rate = this.opts.rate && this.opts.rate > 0 ? this.opts.rate : 1;
+    const cap = w.start + Math.min(TRANSITION_MAX, 0.35 * w.note.dur);
+    const gap = CONSONANT_GAP * rate;
+    if (!voiced) {
+      if (rms >= CONSONANT_RMS) {
+        if (a.consStart === null || t - a.consLast! > gap) {
+          if (t > cap) { a.consDone = true; a.consStart = null; return; }
+          a.consStart = t;
+        }
+        a.consLast = t;
+      } else if (a.consStart !== null && t - a.consLast! > gap) a.consStart = null;
+      return;
+    }
+    if (a.consStart !== null && t - a.consLast! <= gap) {
+      a.consLen = Math.min(CONSONANT_MAX * rate, Math.max(0, t - a.consStart));
+      a.consDone = true;
+    } else if (t > cap) a.consDone = true;
+    a.consStart = null;
+  }
+
   private finalize(a: NoteAcc): void {
     if (a.final) return;
     const w = a.w;
     // A qualifying run that was cut short only by the end of a short note still marks its start.
     if (a.onsetMs === null && a.runStart !== null) a.onsetMs = Math.max(0, (a.runStart - w.start) * 1000);
     const tolN = this.tol + w.tolExtra;
+    // A consonant that ran from the voice's end to the end of the body (see CONSONANT_RMS).
+    const rate = this.opts.rate && this.opts.rate > 0 ? this.opts.rate : 1;
+    if (a.tailStart !== null && a.tailLast! >= w.bodyEnd - CONSONANT_GAP * rate) {
+      a.consTail = Math.max(a.tailStart, w.start + 0.5 * w.note.dur, w.start + w.note.dur - CONSONANT_MAX * rate);
+    }
     const judged = judgedSpan(a, tolN, this.opts.octaveTolerant);
     const { k0, k1, from, to } = judged;
     const bodyDur = Math.max(1e-3, to - from);
@@ -684,10 +748,13 @@ export class LiveScorer {
  * (at most TRANSITION_MAX / 35% of the note after its start) to when it leaves for the next note
  * (at most RELEASE_MAX / 20% before its end). Indices into the note's body samples, and times.
  */
-export function judgedSpan(a: { w: NoteWindow; bT: number[]; bD: number[]; bW: number[] }, tol: number, octaveTolerant: boolean): { k0: number; k1: number; from: number; to: number } {
+export function judgedSpan(a: { w: NoteWindow; bT: number[]; bD: number[]; bW: number[]; consLen?: number; consTail?: number | null }, tol: number, octaveTolerant: boolean): { k0: number; k1: number; from: number; to: number } {
   const w = a.w;
   const n = a.bT.length;
-  const capStart = Math.max(w.bodyStart, Math.min(w.bodyEnd, w.start + Math.min(TRANSITION_MAX, 0.35 * w.note.dur)));
+  // A consonant sung on the beat delays the voice by its length (see CONSONANT_RMS).
+  const plain = w.start + Math.min(TRANSITION_MAX, 0.35 * w.note.dur);
+  const arrive = a.consLen ? Math.max(plain, Math.min(w.start + a.consLen + CONSONANT_SETTLE, w.start + 0.5 * w.note.dur)) : plain;
+  const capStart = Math.max(w.bodyStart, Math.min(w.bodyEnd, arrive));
   // Arrived = three readings in a row within tolerance (~60 ms), not just passing through it.
   const ok = (k: number) => k >= n || Math.abs(a.bD[k]) <= tol;
   let k0 = 0;
@@ -696,8 +763,14 @@ export function judgedSpan(a: { w: NoteWindow; bT: number[]; bD: number[]; bW: n
   const from = k0 < n ? clamp(a.bT[k0] - a.bW[k0] / 2, w.bodyStart, capStart) : capStart;
   let k1 = n;
   let to = w.bodyEnd;
+  // A consonant from the voice's end through the end of the note (see CONSONANT_RMS) is excused.
+  const consEnd = a.consTail != null ? a.consTail : w.bodyEnd;
+  if (w.legatoTo === null && consEnd < w.bodyEnd) {
+    const lastT = n > k0 ? a.bT[n - 1] + a.bW[n - 1] / 2 : from;
+    to = clamp(lastT, Math.max(from, consEnd), w.bodyEnd);
+  }
   if (w.legatoTo !== null) {
-    const capEnd = Math.max(from, w.start + w.note.dur - Math.min(RELEASE_MAX, 0.2 * w.note.dur));
+    const capEnd = Math.max(from, Math.min(consEnd, w.start + w.note.dur - Math.min(RELEASE_MAX, 0.2 * w.note.dur)));
     if (capEnd < w.bodyEnd) {
       // Trailing samples heading for the next pitch (closer to it than to this one) are excused.
       const nextDev = 100 * (w.legatoTo - w.target);

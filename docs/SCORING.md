@@ -25,6 +25,12 @@ For every note in your part:
 - **Intonation ("In tune").**
   - Judging starts when your voice *arrives* within tolerance of the note: at most 0.15 s (and 35% of the note) after the written start, plus the device delay the line-up corrects. The glide into the note, the overshoot and a late consonant don't count.
   - Judging stops when you head for the next note (at most 0.12 s early).
+  - **Consonants.** A consonant sung on the beat (an *s*, *sh*, *f*: sound without a pitch, running
+    straight into the vowel) doesn't count: the voice then has 0.1 s after it to arrive, when that is
+    later than the usual limit. One from the end of your vowel to the end of the note (a final *s*, or
+    the next word's consonant sung early) is excused like an early release. Each counts for at most
+    0.25 s and never more than half the note. Silence isn't a consonant: coming in late after a pause,
+    or stopping early, still counts.
   - Vibrato is cancelled by two cascaded moving averages (≈180 ms and ≈220 ms of real time, whatever the tempo: at level 1's 70% they span fewer score seconds). These remove vibratos from about 4 to 8 Hz almost completely, so a vibrato centred on the note counts as in tune.
   - A short dropout of the detector (up to 20% of the note) doesn't count against you.
 - **Very short notes** (fast passages, e.g. 16ths at 104–144 bpm, ~0.1 s). The voice rarely settles: it glides in, overshoots, and the next syllable's consonant cuts it off, so the detector gets only two to four readings per note.
@@ -91,7 +97,7 @@ What you hear from the phone and what the microphone picks up arrive late by the
 - **Delay check** (Voice setup): sing "ta" with 6 clicks and the app measures the delay directly.
 - **Automatic line-up after every run:**
   - The app tries a range of delays and keeps the one where your pitches agree best with the written notes. It uses pitch, not onsets, because consonants and breaths blur those.
-  - The search never goes beyond a plausible total device delay. With a **measured** delay it only corrects by up to 80 ms, and first checks where the voice really lines up (within ±250 ms): a voice that lines up only about a note late (more than 85% of a typical note and more than 0.1 s) or early (more than half a note, at least 50 ms and at most 80 ms) is singing the neighbouring notes, not suffering a delay error, and is not shifted, so a singer one note behind or ahead fails. In fast passages (a typical note shorter than 0.16 s), a voice that lines up a little beyond 80 ms is corrected by 80 ms (a slightly larger delay error costs a little, not everything); a voice on the wrong notes lines up nowhere and is not shifted.
+  - The search never goes beyond a plausible total device delay. With a **measured** delay it only corrects by up to 80 ms, and first checks where the voice really lines up (within ±250 ms): a voice that lines up only about a note late (more than 85% of a typical note and more than 0.1 s) or early (more than half a note, at least 50 ms and at most 80 ms) is singing the neighbouring notes, not suffering a delay error, and is not shifted, so a singer one note behind or ahead fails. In fast passages (a typical note shorter than 0.16 s), a voice that lines up a little beyond 80 ms is corrected by 80 ms (a slightly larger delay error costs a little, not everything); a voice on the wrong notes lines up nowhere and is not shifted. A correction that would score your intonation worse than the voice as heard is dropped (it lined up the wrong evidence, e.g. the glide after an on-beat *s* looks like a late voice).
   - **Only intonation** is judged on the lined-up voice. Onsets, rhythm and the timing tips stay on the delay the app applied, so singing late still shows as late.
 - **Learning the delay** (phones without a measured delay):
   - The app suggests a delay after each complete run.
