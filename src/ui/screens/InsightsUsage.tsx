@@ -65,7 +65,9 @@ export function UsageInsights() {
     const load = () => fetchLiveMetrics({ bearer: token }).then((r) => { if (alive) { setLive(r); setErr(''); } }).catch((e) => { if (alive) setErr((e as Error).message); });
     void load();
     const t = setInterval(() => { if (document.visibilityState === 'visible') void load(); }, LIVE_REFRESH);
-    return () => { alive = false; clearInterval(t); };
+    const onShow = () => { if (document.visibilityState === 'visible') void load(); };
+    document.addEventListener('visibilitychange', onShow);
+    return () => { alive = false; clearInterval(t); document.removeEventListener('visibilitychange', onShow); };
   }, [token, n]);
   const stats = useMemo(() => (days ? summarise(days) : null), [days]);
   if (!apiBase()) return <><div className="notice">Needs the online version of the app.</div></>;

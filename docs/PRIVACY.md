@@ -53,7 +53,7 @@ Purpose: to see how the app is used and where it fails, so it can be improved.
   words in rhythm, joined a choir, choir account, progress sync, shares progress), the first-setup
   steps reached (setup started, choir step, range check done/skipped, delay check done/skipped, first
   run, first pass), scoring quality (hit rate by note-length bucket, delay-check hints, timing unsure
-  or failed, voice lined up), the headphone/mic delay in use (50 ms buckets, once a day) and error
+  or failed, voice lined up), the headphone/mic delay in use (50 ms buckets, once a day; once an hour for the last 24 hours) and error
   counts (microphone, score import, JavaScript errors as an 8-hex hash of the first line of the
   message, digits removed: the message itself is not sent).
 - **What is sent** for the daily totals: at most once a day (when the app starts or is hidden on a later day), the finished
@@ -77,11 +77,12 @@ Purpose: to see how the app is used and where it fails, so it can be improved.
     35 days; only the totals remain.
   - for the last 24 hours: `hours/YYYY-MM-DDTHH.json`, that hour's counter totals and, per hashed install
     (same keyed hash), the features and browser / OS / device families it used and its last batch ids.
-    Deleted after 48 hours; only the daily totals remain.
+    Deleted after about 48 hours (the next clean-up, at most hourly); only the daily totals remain. The
+    hour files have their own 5 MB cap, so they can never crowd out the daily totals.
 - **Abuse limits**: unknown keys ignored, counts clamped per key, 16 KB per request (refused without a
   Content-Length), 8 days per request, 10 distinct error hashes per install and day (200 per day file),
   30 requests an hour per client address (IPv6: /64), 3000 an hour in all (live sends: 600 and
-  30000 an hour, 8 hours per request, 5000 installs per hour file), and the metrics folder is
+  12000 an hour, 8 hours per request, 2000 installs per hour file), and the metrics folder is
   capped at 20 MB (then 507). Summaries older than 7 days are refused.
 - **Who sees it**: only the super admin (Admin → Usage), as charts and a CSV of
   daily totals (and of the last 24 hours, by the hour).

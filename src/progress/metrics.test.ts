@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  LIVE_EVERY, _resetUsageForTests, attemptsBucket, browserSaysDoNotTrack, daysBucket, durationBucket, errorHash, flushLive, flushUsage, installId, latencyBucket,
+  LIVE_EVERY, LIVE_HIDDEN, _resetUsageForTests, attemptsBucket, browserSaysDoNotTrack, daysBucket, durationBucket, errorHash, flushLive, flushUsage, installId, latencyBucket,
   localDay, pendingDays, setUsageStats, track, trackError, trackOnce, trackRun, trackStep, usageSnapshot, usageStatsOn, utcHour,
 } from './metrics';
 import { memberToken } from './choir';
@@ -23,10 +23,11 @@ describe('anonymous usage statistics', () => {
     fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true, accepted: 1 }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
   });
-  afterEach(() => { vi.unstubAllGlobals(); setDnt(null); });
+  afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); setDnt(null); });
 
   it('sends what was counted since the last live send, by UTC hour, at most every few minutes; a lost answer resends the same batch', async () => {
     const H = 3_600_000;
+    vi.stubEnv('VITE_CHOIR_URL', BASE);
     track('run.section.L1', 1, T0);
     track('sec.practice', 30, T0);
     trackOnce('lat.', 'lat.est.100', T0);
@@ -68,6 +69,31 @@ describe('anonymous usage statistics', () => {
     setUsageStats(true);
     expect(await flushLive(t2 + 6 * LIVE_EVERY, BASE)).toBe(false);
     expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it('live counts: none kept without a server; hidden sends sooner; more than a request takes waits for the next one', async () => {
+    const H = 3_600_000;
+    vi.stubEnv('VITE_CHOIR_URL', '');
+    track('run.section.L1', 1, T0);
+    expect(await flushLive(T0, null)).toBe(false);
+    expect(JSON.parse(localStorage.getItem('shm:usage')!).live).toBeUndefined();
+    vi.stubEnv('VITE_CHOIR_URL', BASE);
+    // Offline for 12 hours of practice: the oldest 8 go first, the rest next.
+    for (let h = 0; h < 12; h++) track('run.section.L1', 1, T0 + h * H);
+    expect(await flushLive(T0 + 12 * H, BASE)).toBe(true);
+    const first = JSON.parse(String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body)).hours;
+    expect(first.map((x: { hour: string }) => x.hour)).toEqual(Array.from({ length: 8 }, (_, h) => utcHour(T0 + h * H)));
+    // Hidden soon after: sent anyway (after LIVE_HIDDEN), not only after LIVE_EVERY.
+    expect(await flushLive(T0 + 12 * H + 5_000, BASE, true)).toBe(false);
+    expect(await flushLive(T0 + 12 * H + LIVE_HIDDEN, BASE, true)).toBe(true);
+    const second = JSON.parse(String((fetchMock.mock.calls[1] as [string, RequestInit])[1].body)).hours;
+    expect(second.map((x: { hour: string }) => x.hour)).toEqual(Array.from({ length: 4 }, (_, h) => utcHour(T0 + (8 + h) * H)));
+    // A request the server can never take (too large) isn't sent again and again.
+    track('run.section.L1', 1, T0 + 12 * H + 2 * LIVE_HIDDEN);
+    fetchMock.mockImplementationOnce(async () => new Response('{}', { status: 413 }));
+    await flushLive(T0 + 12 * H + LIVE_EVERY * 2, BASE);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(JSON.parse(localStorage.getItem('shm:usage')!).liveOut).toBeUndefined();
   });
 
   it('batches a day of events into one summary and sends finished days at most once a day', async () => {

@@ -21,8 +21,9 @@ const KEEP_DAYS = 7;
 const MAX_KEYS_PER_DAY = 250;
 const MAX_JS_ERRORS_PER_DAY = 10;
 const MAX_TRIES = 300;
-/** Live (hourly) counts: sent at most this often, kept on the phone at most this long. */
+/** Live (hourly) counts: sent at most this often (when the app is hidden: LIVE_HIDDEN), kept on the phone at most this long. */
 export const LIVE_EVERY = 5 * 60_000;
+export const LIVE_HIDDEN = 20_000;
 const LIVE_KEEP_H = 47;
 const MAX_LIVE_HOURS = 8;
 
@@ -143,7 +144,7 @@ export function track(key: string, n = 1, now: number = Date.now()): void {
     if (key.startsWith('jserr.') && Object.keys(c).filter((k) => k.startsWith('jserr.')).length >= MAX_JS_ERRORS_PER_DAY) return;
   }
   c[key] = Math.round((c[key] ?? 0) + n);
-  addLive(d, key, n, now);
+  if (apiBase()) addLive(d, key, n, now); // (no server, nowhere to send them)
   save(d);
 }
 
@@ -154,7 +155,7 @@ export function trackOnce(family: string, key: string, now: number = Date.now())
   const c = (d.days[localDay(now)] ??= {});
   for (const k of Object.keys(c)) if (k.startsWith(family) && k !== key) delete c[k];
   c[key] = 1;
-  addLive(d, key, 1, now, family);
+  if (apiBase()) addLive(d, key, 1, now, family);
   save(d);
 }
 
@@ -337,19 +338,31 @@ function batchId(): string {
  * Send what was counted since the last live send (for the "last 24 hours" view), at most every
  * LIVE_EVERY. A send whose answer was lost goes again as the same batch. Never throws.
  */
-export async function flushLive(now: number = Date.now(), base: string | null = apiBase()): Promise<boolean> {
-  if (sendingLive || !usageStatsOn() || !base) return false;
+export async function flushLive(now: number = Date.now(), base: string | null = apiBase(), hidden = false): Promise<boolean> {
+  if (sendingLive) return false;
   const d = load();
+  // Forget hours too old to be taken (also when nothing can be sent).
   const oldest = utcHour(now - LIVE_KEEP_H * 3_600_000);
-  if (d.liveOut) d.liveOut.hours = d.liveOut.hours.filter((x) => x.hour >= oldest);
-  if (d.liveOut && !d.liveOut.hours.length) delete d.liveOut;
-  for (const h of Object.keys(d.live ?? {})) if (h < oldest || !Object.keys(d.live![h]).length) delete d.live![h];
-  if (d.liveAt != null && now - d.liveAt < LIVE_EVERY && d.liveAt <= now) { save(d); return false; }
+  let pruned = false;
+  if (d.liveOut) {
+    const keep = d.liveOut.hours.filter((x) => x.hour >= oldest);
+    if (keep.length !== d.liveOut.hours.length) { d.liveOut.hours = keep; pruned = true; }
+    if (!keep.length) delete d.liveOut;
+  }
+  for (const h of Object.keys(d.live ?? {})) if (h < oldest || !Object.keys(d.live![h]).length) { delete d.live![h]; pruned = true; }
+  if (!base || !usageStatsOn()) {
+    if (!base && (d.live || d.liveOut)) { delete d.live; delete d.liveOut; pruned = true; }
+    if (pruned) save(d);
+    return false;
+  }
+  // At most every few minutes; when the app is hidden (maybe closed), sooner.
+  const gap = hidden ? LIVE_HIDDEN : LIVE_EVERY;
+  if (d.liveAt != null && now - d.liveAt < gap && d.liveAt <= now) { if (pruned) save(d); return false; }
   if (!d.liveOut) {
-    const hours = Object.keys(d.live ?? {}).sort().slice(-MAX_LIVE_HOURS).map((hour) => ({ hour, c: d.live![hour] }));
-    if (!hours.length) { save(d); return false; }
+    const hours = Object.keys(d.live ?? {}).sort().slice(0, MAX_LIVE_HOURS).map((hour) => ({ hour, c: d.live![hour] }));
+    if (!hours.length) { if (pruned) save(d); return false; }
     d.liveOut = { batch: batchId(), hours };
-    d.live = {};
+    for (const x of hours) delete d.live![x.hour]; // (more than a request takes go in the next one)
   }
   d.liveAt = now;
   save(d);
@@ -362,7 +375,7 @@ export async function flushLive(now: number = Date.now(), base: string | null = 
       body: JSON.stringify({ v: 1, id: installId(), batch: out.batch, hours: out.hours }),
       keepalive: true,
     });
-    if (!res.ok && res.status !== 400) return false; // the same batch goes again next time
+    if (!res.ok && res.status !== 400 && res.status !== 413) return false; // the same batch goes again next time
     const after = load();
     if (after.liveOut?.batch === out.batch) delete after.liveOut;
     save(after);
@@ -387,11 +400,12 @@ export function installUsageStats(): void {
   void flushUsage();
   void flushLive();
   setInterval(() => { if (document.visibilityState === 'visible') void flushLive(); }, LIVE_EVERY + 1000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') void flushLive(); });
   window.addEventListener('error', (e) => { try { trackError(e.error ?? e.message); } catch { /* ignore */ } });
   window.addEventListener('unhandledrejection', (e) => { try { trackError(e.reason); } catch { /* ignore */ } });
-  const onHide = () => { if (document.visibilityState === 'hidden') { void flushUsage(); void flushLive(); } };
+  const onHide = () => { if (document.visibilityState === 'hidden') { void flushUsage(); void flushLive(Date.now(), apiBase(), true); } };
   document.addEventListener('visibilitychange', onHide);
-  window.addEventListener('pagehide', () => { void flushUsage(); void flushLive(); });
+  window.addEventListener('pagehide', () => { void flushUsage(); void flushLive(Date.now(), apiBase(), true); });
 }
 
 /** Test helper. */
