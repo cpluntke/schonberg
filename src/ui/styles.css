@@ -520,3 +520,17 @@ html:has(.results-foot) { scroll-padding-bottom: 170px; }
   .mm > :not(.practice-bar) { max-width: var(--content-max); }
   .mm > .seg { grid-auto-columns: minmax(160px, max-content); justify-content: start; background: transparent; padding: 0; }
 }
+
+/* Settings: two columns of cards; the about text and the super-admin link underneath. */
+@media (min-width: 900px) {
+  .settings-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px 24px; align-items: start; }
+  .settings-col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+  .settings-col > section { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 18px 20px; gap: 10px !important; }
+  .settings-col > section > h2.eyebrow { color: var(--text); font-size: 12px; margin-bottom: 2px; }
+  /* (inside a card: the controls one step lighter, so they stand out from it) */
+  .settings-col .choice, .settings-col .field input, .settings-col .field select, .settings-col .field textarea,
+  .settings-col .toggle-row select, .settings-col .toggle-row input[type='number'] { background: var(--surface-2) !important; }
+  .settings-col .seg { background: var(--bg-2); }
+  .settings-col .toggle-row { border-bottom-color: var(--line); }
+  .settings-about { max-width: 75ch; align-self: center; text-align: center; line-height: 1.5; }
+}

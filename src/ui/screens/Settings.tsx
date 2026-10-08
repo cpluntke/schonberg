@@ -59,9 +59,12 @@ export function Settings() {
   }
 
   return (
-    <main className="screen">
+    <main className="screen wide settings">
       <div className="topbar"><h1>Settings</h1></div>
 
+      {/* Wide screens: two columns of cards (how you practise and your cycle; your voice, account and data). */}
+      <div className="lay settings-cols">
+      <div className="lay settings-col">
       <section className="col" style={{ gap: 8 }}>
         <h2 className="eyebrow">Note names</h2>
         <div className="choice-grid">
@@ -202,6 +205,9 @@ export function Settings() {
         <button className="btn small" onClick={() => go({ name: 'library' })}>Choose the cycle's pieces</button>
       </section>
 
+      </div>
+
+      <div className="lay settings-col">
       <section className="col" style={{ gap: 8 }}>
         <h2 className="eyebrow">Voice &amp; audio</h2>
         <div className="toggle-row"><span>Name</span><span className="muted">{profile.name || '–'}</span></div>
@@ -261,8 +267,10 @@ export function Settings() {
           <button className="btn small" disabled={!backupText.trim()} onClick={() => restore(backupText)}>Restore</button>
         </details>
       </section>
+      </div>
+      </div>
 
-      <section className="col small muted" style={{ gap: 4 }}>
+      <section className="col small muted settings-about" style={{ gap: 4 }}>
         <span>Schönberg Hero · your practice stays on this device. Only your choir's leaderboard, the progress you share with your section lead, a live “practising now” count by voice part (no name), with a choir account the progress kept with it (above), and, if switched on, the anonymous daily usage totals (Privacy) reach the choir server.</span>
         <span>Built-in score: an original warm-up chorale. Scores from your choir's library show their edition and licence in the Library.</span>
       </section>
