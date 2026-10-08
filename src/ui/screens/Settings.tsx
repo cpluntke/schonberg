@@ -71,10 +71,11 @@ export function Settings() {
           {NOTATIONS.map((n) => (
             <button key={n.mode} className="choice" aria-pressed={profile.notation === n.mode} onClick={() => update({ notation: n.mode })}>
               <span className="big">{[62, 64, 66, 67].map((m) => noteLabel(m, n.mode, dMajor).text).join(' ')}</span>
-              <span className="sub">{n.sub}{n.mode === 'jianpu' || n.mode === 'movable' ? ' · in D major' : ''}</span>
+              <span className="sub">{n.sub}</span>
             </button>
           ))}
         </div>
+        <span className="small muted" data-testid="notation-example">Shown with the same four notes, D E F♯ G (in D major), as an example. In practice, movable do and the numbers follow each piece's own key, key changes included.</span>
       </section>
 
       <section className="col" style={{ gap: 8 }}>
