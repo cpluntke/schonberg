@@ -64,6 +64,11 @@ export function movePieceData(from: string, to: string): void {
       else if (kind === 'sh:lyricsQuiz:' && isObj(a) && isObj(b)) out = JSON.stringify(mergeQuiz(a, b));
       else out = dst; // (the part chosen on the new id stays)
     }
+    // (a progress record names its piece inside too: the account copy goes by that)
+    if (kind === 'sh:progress:' && out != null) {
+      const rec = parse(out);
+      if (isObj(rec)) out = JSON.stringify({ ...rec, pieceId: to, partId: k.slice(kind.length + from.length + 1) });
+    }
     if (out != null) rawSet(nk, out);
     rawRemove(k);
   }

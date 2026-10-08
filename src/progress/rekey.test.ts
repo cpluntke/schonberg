@@ -31,6 +31,7 @@ describe('a piece moving to its library id', () => {
     const prog = JSON.parse(localStorage.getItem(`sh:progress:${NEW}:P1`)!);
     expect(prog.sections.s0.level).toBe(4);
     expect(prog.sections.s1.level).toBe(2);
+    expect(prog).toMatchObject({ pieceId: NEW, partId: 'P1' });
     expect(localStorage.getItem(`sh:progress:${OLD}:P1`)).toBeNull();
     expect(localStorage.getItem(`sh:part:${NEW}`)).toBe('P1');
     expect(JSON.parse(localStorage.getItem(`sh:words:${NEW}:P1`)!).s0).toEqual({ passed: 2, best: { 0: 0.95, 2: 0.8 }, at: 5 });
@@ -40,6 +41,10 @@ describe('a piece moving to its library id', () => {
     expect(JSON.parse(localStorage.getItem('sh:lastRunPiece')!).pieceId).toBe(NEW);
     expect(loadCycle()).toMatchObject({ pieceIds: [NEW, 'x'], focusPieceIds: [NEW] });
     expect(hasPieceData(OLD)).toBe(false);
+    // Moved without a merge (nothing under the new id yet): the record names the new id too.
+    localStorage.setItem(`sh:progress:${OLD}:P2`, JSON.stringify({ pieceId: OLD, partId: 'P2', sections: { s0: sec(2, 7) } }));
+    movePieceData(OLD, NEW);
+    expect(JSON.parse(localStorage.getItem(`sh:progress:${NEW}:P2`)!)).toMatchObject({ pieceId: NEW, partId: 'P2' });
 
     // Again: nothing changes.
     const before = JSON.stringify({ ...localStorage });
