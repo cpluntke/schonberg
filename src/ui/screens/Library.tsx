@@ -53,10 +53,12 @@ export function Library() {
   }
 
   return (
-    <main className="screen">
+    <main className="screen wide">
       <div className="topbar"><h1>Library</h1></div>
 
-      <div className="card">
+      {/* Wide screens: the pieces as a grid of cards, the import beside them. */}
+      <div className="lay lib-cols">
+      <div className="card lib-import">
         <strong>Import your choir's scores</strong>
         <span className="small muted">
           MusicXML (.musicxml, .xml, .mxl) from MuseScore, Sibelius, Finale or Dorico works best: it keeps the parts and lyrics.
@@ -70,13 +72,14 @@ export function Library() {
         {error && <div className="notice" role="alert">{error}</div>}
       </div>
 
-      <section className="col" style={{ gap: 2 }}>
+      <section className="col lib-all" style={{ gap: 2 }}>
         <h2>All pieces</h2>
         <span className="small muted">Tick a piece to put it into this cycle (it then appears on Home).</span>
+        <div className="lay lib-grid">
         {pieces.map((p) => {
           const inCycle = cycle.pieceIds.includes(p.id);
           return (
-            <div key={p.id} className="list-row">
+            <div key={p.id} className={inCycle ? 'list-row lib-piece in-cycle' : 'list-row lib-piece'}>
               <button className="mono-tile" aria-label={inCycle ? `Remove ${p.title} from cycle` : `Add ${p.title} to cycle`}
                 aria-pressed={inCycle} onClick={() => toggleCycle(p.id)}
                 style={{ border: inCycle ? '2px solid var(--voice)' : '1px solid var(--line)', color: inCycle ? 'var(--voice)' : 'var(--muted)' }}>
@@ -100,9 +103,11 @@ export function Library() {
             </div>
           );
         })}
+        </div>
         {!pieces.length && <span className="muted">No pieces yet.</span>}
       </section>
-      <span className="tiny muted">Built in: an original warm-up chorale. Your choir's scores, including public-domain pieces your choir admin adds from the choir library, arrive when you join your choir.</span>
+      <span className="tiny muted lib-note">Built in: an original warm-up chorale. Your choir's scores, including public-domain pieces your choir admin adds from the choir library, arrive when you join your choir.</span>
+      </div>
     </main>
   );
 }
