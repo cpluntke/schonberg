@@ -36,7 +36,7 @@ export function ChoirPrivacy() {
       <label className="toggle-row">
         <span>Share my practice with my section lead
           <span className="tiny muted" style={{ display: 'block' }}>
-            It tells your section lead what the section should rehearse. Bars and levels arrive only as totals for the
+            It tells your section lead what the section should rehearse. Bars, levels and the notes that keep going wrong arrive only as totals for the
             section (from 3 singers sharing), never listed per singer; in a small section a lead may still guess which are
             yours. Your voice range is shown with your name (for dividing parts).
           </span>
@@ -44,7 +44,7 @@ export function ChoirPrivacy() {
         <input type="checkbox" checked={sharing} disabled={busy} data-testid="privacy-share"
           onChange={(e) => {
             if (e.target.checked) { void setSharing(true).then(() => { update({}); void shareMyProgress(true); toast('Sharing with your section lead again'); }); return; }
-            if (!confirm('Stop sharing with your section lead?\n\nYour lead sees bars and levels only as totals for the section, not listed per singer (in a very small section they may still guess yours). It shows them what to rehearse with everyone, you included. Only your voice range carries your name.\n\nStop anyway? What you shared so far is removed.')) return;
+            if (!confirm('Stop sharing with your section lead?\n\nYour lead sees bars, levels and the notes that keep going wrong only as totals for the section, not listed per singer (in a very small section they may still guess yours). It shows them what to rehearse with everyone, you included. Only your voice range carries your name.\n\nStop anyway? What you shared so far is removed.')) return;
             void run(() => setSharing(false), 'Not sharing any more; what you shared was removed', 'Not sharing any more; what you shared is removed as soon as possible');
           }} />
       </label>

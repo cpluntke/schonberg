@@ -23,6 +23,16 @@ function mergeWords(a: Record<string, WordsProgress>, b: Record<string, WordsPro
   return out;
 }
 
+/** Per-note history: per note, the one from more runs. */
+function mergeNoteStats(a: Record<string, unknown>, b: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...a };
+  for (const [i, v] of Object.entries(b)) {
+    const o = out[i];
+    if (!isObj(o) || (isObj(v) && (Number(v.n) || 0) > (Number(o.n) || 0))) out[i] = v;
+  }
+  return out;
+}
+
 /** The lyrics quiz: answer counts add up. */
 function mergeQuiz(a: Record<string, unknown>, b: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = { ...a, ...b };
@@ -43,14 +53,14 @@ function mergeQuiz(a: Record<string, unknown>, b: Record<string, unknown>): Reco
 
 /** Whether anything is stored under `from` (so a move is due). */
 export function hasPieceData(from: string): boolean {
-  return allKeys().some((k) => k === `sh:part:${from}` || ['sh:progress:', 'sh:bars:', 'sh:words:', 'sh:lyricsQuiz:'].some((p) => k.startsWith(`${p}${from}:`)));
+  return allKeys().some((k) => k === `sh:part:${from}` || ['sh:progress:', 'sh:bars:', 'sh:notes:', 'sh:words:', 'sh:lyricsQuiz:'].some((p) => k.startsWith(`${p}${from}:`)));
 }
 
 /** Move (merging) all of a piece's data from one id to another. Idempotent; throws only if storage fails. */
 export function movePieceData(from: string, to: string): void {
   if (from === to) return;
   for (const k of allKeys()) {
-    const kind = ['sh:progress:', 'sh:bars:', 'sh:words:', 'sh:lyricsQuiz:'].find((p) => k.startsWith(`${p}${from}:`));
+    const kind = ['sh:progress:', 'sh:bars:', 'sh:notes:', 'sh:words:', 'sh:lyricsQuiz:'].find((p) => k.startsWith(`${p}${from}:`));
     if (!kind && k !== `sh:part:${from}`) continue;
     const nk = kind ? `${kind}${to}:${k.slice(kind.length + from.length + 1)}` : `sh:part:${to}`;
     const src = rawGet(k);
@@ -61,6 +71,7 @@ export function movePieceData(from: string, to: string): void {
       if (kind === 'sh:progress:' && isObj(a) && isObj(b)) out = JSON.stringify(mergeProgress(a as never, b as never));
       else if (kind === 'sh:bars:' && isObj(a) && isObj(b)) out = JSON.stringify(mergeBars(a as never, b as never));
       else if (kind === 'sh:words:' && isObj(a) && isObj(b)) out = JSON.stringify(mergeWords(a as never, b as never));
+      else if (kind === 'sh:notes:' && isObj(a) && isObj(b)) out = JSON.stringify(mergeNoteStats(a, b));
       else if (kind === 'sh:lyricsQuiz:' && isObj(a) && isObj(b)) out = JSON.stringify(mergeQuiz(a, b));
       else out = dst; // (the part chosen on the new id stays)
     }

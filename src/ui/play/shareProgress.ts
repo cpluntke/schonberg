@@ -4,6 +4,7 @@
 
 import { loadCycle, loadProfile, getProgress } from '../../progress/store';
 import { getBars, type BarMap } from '../../progress/bars';
+import { sharedNotes } from '../../progress/notestats';
 import { pieceReadiness } from '../../progress/ladder';
 import { shareProgress, apiBase, sessionFor } from '../../progress/choir';
 import { accountConfirmed, loadMeta } from '../../progress/sync';
@@ -47,7 +48,7 @@ async function send(): Promise<void> {
     setShareError('Your name can’t contain / \\ ? # or %. Change it in Voice setup.');
     return;
   }
-  const pieces: Record<string, { readiness: number; level: number; bars: BarMap }> = {};
+  const pieces: Record<string, { readiness: number; level: number; bars: BarMap; notes?: Record<string, [number, string]> }> = {};
   for (const id of loadCycle().pieceIds.slice(0, 30)) {
     const piece = getPiece(id);
     if (!piece) continue;
@@ -57,7 +58,9 @@ async function send(): Promise<void> {
     if (!prog && Object.keys(bars).length === 0) continue;
     const r = pieceReadiness(singableSections(piece, partId), prog);
     // level = the piece level (sung through in one go at that level), not the weakest section.
-    pieces[id] = { readiness: Math.round(r.pct * 100) / 100, level: r.pieceLevel, bars };
+    // (and the notes that keep going wrong, with how: the section's rehearsal cheat sheet)
+    const notes = sharedNotes(id, partId);
+    pieces[id] = { readiness: Math.round(r.pct * 100) / 100, level: r.pieceLevel, bars, ...(Object.keys(notes).length ? { notes } : {}) };
   }
   last = Date.now();
   try {

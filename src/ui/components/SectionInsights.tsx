@@ -8,6 +8,7 @@ import { loadCycle } from '../../progress/store';
 import type { BarMap } from '../../progress/bars';
 import type { PieceAgg, SectionInsightsView } from '../../progress/insights';
 import { PieceMap } from './PieceMap';
+import { CheatSheet } from './CheatSheet';
 import { LevelBar, RangeChart } from './InsightCharts';
 import { VOICE_NAME } from './People';
 
@@ -107,6 +108,14 @@ function PieceCard({ id, agg, voice, minGroup }: { id: string; agg: PieceAgg; vo
               </div>
             </div>
           ) : <span className="small muted">No bar where most of the section struggles.</span>}
+          {piece && part && (
+            <details className="cheat" data-testid="cheat-details">
+              <summary className="small" style={{ cursor: 'pointer', fontWeight: 700 }}>
+                Rehearsal cheat sheet{agg.notes?.length ? ` · ${agg.notes.length} note${agg.notes.length === 1 ? '' : 's'}` : ''}
+              </summary>
+              <div style={{ marginTop: 8 }}><CheatSheet piece={piece} part={part} notes={agg.notes ?? []} singers={agg.singers} /></div>
+            </details>
+          )}
           {piece && part && agg.bars && (
             <PieceMap score={piece.score} part={part} sections={singableSections(piece, part.id)}
               bars={Object.fromEntries(Object.entries(agg.bars).map(([m, b]) => [Number(m), { ema: b.mean, n: b.n, at: 0 }])) as BarMap}

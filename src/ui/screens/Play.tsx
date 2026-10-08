@@ -43,6 +43,7 @@ import type { NotationMode } from '../../game/notation';
 import { NotFound } from '../components/NotFound';
 import { PracticeBar } from '../components/PracticeBar';
 import { skipTarget } from '../play/skip';
+import { recordNotes } from '../../progress/notestats';
 
 type PlayRoute = Extract<Route, { name: 'play' }>;
 
@@ -293,7 +294,10 @@ function SingPlay({ route }: { route: PlayRoute }) {
       if (ins) r = { ...r, insights: [ins, ...r.insights.filter((i) => i.kind !== 'great')] };
     }
     // Per-bar history for the piece map and off-book fading (real pieces only, not generated drills).
-    if (!/~|^(row|leaps)-/.test(piece.id)) recordBars(piece.id, part.id, r, level, { peeked: sess?.peeked, hidden: hiddenRef.current });
+    if (!/~|^(row|leaps)-/.test(piece.id)) {
+      recordBars(piece.id, part.id, r, level, { peeked: sess?.peeked, hidden: hiddenRef.current });
+      recordNotes(piece.id, part.id, r, tolerance);
+    }
     setLastRun(sess?.recording ? {
       recording: sess.recording,
       at: Date.now(),

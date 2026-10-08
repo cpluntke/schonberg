@@ -9,6 +9,8 @@ import { apiBase, ChoirApiError, endSession, endSuperSession, loadSession, loadS
 export const VOICE_ORDER = ['S', 'A', 'T', 'B'] as const;
 
 export interface BarAgg { n: number; weak: number; mean: number }
+/** A note at least two singers of the section keep getting wrong: how many (n), and their usual faults. */
+export interface NoteAgg { i: number; n: number; kinds: Record<string, number> }
 export interface PieceTrend { state: 'improving' | 'stalling' | 'slipping'; since: string; readiness: [number, number]; ready: [number, number] }
 export interface PieceAgg {
   singers: number;
@@ -22,6 +24,8 @@ export interface PieceAgg {
   readiness?: number;
   bars?: Record<string, BarAgg>;
   hardest?: (BarAgg & { bar: number })[];
+  /** The rehearsal cheat sheet (most struggled first). */
+  notes?: NoteAgg[];
   trend?: PieceTrend;
 }
 export interface SingerRange { name: string; measured: boolean; lo?: number; hi?: number; reachLo?: number; reachHi?: number; at?: number }

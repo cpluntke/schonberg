@@ -18,6 +18,8 @@ export interface MistakeMark {
   fault: Fault;
   /** NoteResult.targetOffset (just intonation): the cents are measured from target + this. */
   targetOffset: number;
+  /** The tag over the note, when not the fault's own ("flat · 3 of 5" on the section's cheat sheet). */
+  tag?: string;
 }
 
 interface PlacedMark {
@@ -119,7 +121,7 @@ export function layoutMistakes(c: Ctx, score: Score, part: Part, m0: number, m1:
       const midi = n.midi + (f.cents + mk.targetOffset) / 100;
       sungDy = yOf(sungStep(midi, eg.m.sm.key, { midi: n.midi, step: written.step, alt: written.alt }));
     }
-    const tag = faultTag(f);
+    const tag = mk.tag ?? faultTag(f);
     const tagW = c.measureText(tag).width + 0.9 * sp + 8;
     // (from just right of the head, so the head doesn't hide it)
     // (…to just before the next note's head)

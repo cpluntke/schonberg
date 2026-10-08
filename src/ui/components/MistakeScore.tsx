@@ -40,7 +40,7 @@ interface Props {
 }
 
 /** Bumped when web fonts finish loading (the lyrics' widths change: draw again). */
-function useFontsLoaded(): number {
+export function useFontsLoaded(): number {
   const [n, setN] = useState(0);
   useEffect(() => {
     const fonts = typeof document !== 'undefined' ? document.fonts : undefined;
@@ -55,7 +55,7 @@ function useFontsLoaded(): number {
 }
 
 /** Inner width of an element (CSS px), kept up to date. */
-function useWidth(ref: React.RefObject<HTMLElement | null>): number {
+export function useWidth(ref: React.RefObject<HTMLElement | null>): number {
   const [w, setW] = useState(0);
   useLayoutEffect(() => {
     const el = ref.current;
@@ -73,7 +73,7 @@ function useWidth(ref: React.RefObject<HTMLElement | null>): number {
   return w;
 }
 
-function SnippetCanvas({ piece, part, spot, marks, opts, fonts, label }: {
+export function SnippetCanvas({ piece, part, spot, marks, opts, fonts, label }: {
   piece: PieceInfo; part: Part; spot: Spot; marks: MistakeMark[]; opts: MistakeOpts; fonts: number; label: string;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -111,7 +111,7 @@ function SnippetCanvas({ piece, part, spot, marks, opts, fonts, label }: {
 }
 
 /** 1-based position of note `i` within its bar. */
-function nth(part: Part, i: number): number {
+export function nth(part: Part, i: number): number {
   const m = part.notes[i].measure;
   let k = 1;
   for (let j = i - 1; j >= 0 && part.notes[j].measure === m; j--) k++;

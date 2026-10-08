@@ -130,7 +130,7 @@ export function ChoirScreen() {
               <button className="btn primary small" style={{ alignSelf: 'flex-start' }} data-testid="start-sharing"
                 onClick={() => { startSharing(); void shareMyProgress(true).then(() => update({})); update({}); }}>Start sharing</button>
             )}
-            <span className="small muted" data-testid="share-note">How each bar is going, so they know what to rehearse. Your lead and the admins see bars and levels only as section totals (in a small section they may still tell which are yours), and your voice range by name. The leaderboard shows everyone in the choir your first name, voice and readiness. Both can be switched off in Settings → Privacy.</span>
+            <span className="small muted" data-testid="share-note">How each bar is going and which notes keep going wrong, so they know what to rehearse. Your lead and the admins see these only as section totals (in a small section they may still tell which are yours), and your voice range by name. The leaderboard shows everyone in the choir your first name, voice and readiness. Both can be switched off in Settings → Privacy.</span>
             {!profile.name.trim() && !sessionFor(profile.choirCode) && profile.shareProgress && <span className="small" style={errStyle}>Add your name in Voice setup first.</span>}
             {profile.name.trim() && profile.shareProgress && shareError() && <span className="small" role="alert" style={errStyle}>Not shared yet: {shareError()}</span>}
           </div>
