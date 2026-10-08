@@ -33,7 +33,9 @@ export interface SectionInsightsView {
   pieces: Record<string, PieceAgg>;
   ranges: SingerRange[];
 }
-export interface ChoirInsightsView { minGroup: number; sections: Record<string, SectionInsightsView> }
+/** Admins: who uses the app (from shared progress and the leaderboard), with the last time they practised. */
+export interface ChoirSinger { name: string; voice: string; lastAt: number; sharing: boolean; board: boolean }
+export interface ChoirInsightsView { minGroup: number; sections: Record<string, SectionInsightsView>; singers?: ChoirSinger[] }
 
 async function get<T>(path: string, auth: Auth): Promise<T> {
   const base = apiBase();
