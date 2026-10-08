@@ -180,7 +180,7 @@ function Wave({ beats, colour = 'var(--voice)', height = 110, label }: { beats: 
     return s;
   }, [b, height]);
   return (
-    <svg viewBox={`0 0 340 ${height}`} width="100%" height={height} role="img" aria-label={label} data-testid="lab-wave" data-beats={b ?? ''}>
+    <svg viewBox={`0 0 340 ${height}`} width="100%" height={height} preserveAspectRatio="none" role="img" aria-label={label} data-testid="lab-wave" data-beats={b ?? ''}>
       <line x1={0} x2={340} y1={height / 2} y2={height / 2} stroke="var(--line)" />
       {d && <path d={d} fill="none" stroke={colour} strokeWidth={1.4} />}
     </svg>
@@ -194,7 +194,7 @@ function Landed({ deg, value, tol }: { deg: Degree; value: number; tol: number }
   const x = (c: number) => 10 + ((Math.max(lo, Math.min(hi, c)) - lo) / (hi - lo)) * 300;
   const showPiano = Math.abs(piano - pure) >= 3;
   return (
-    <svg viewBox="0 0 320 112" width="100%" role="img" data-testid="lab-landed"
+    <svg viewBox="0 0 320 112" width="100%" style={{ maxWidth: 400 }} role="img" data-testid="lab-landed"
       aria-label={`You: ${Math.round(value)} cents above do. Pure: ${Math.round(pure)}${showPiano ? `, the piano: ${piano}` : ''}.`}>
       <rect x={x(pure - tol)} y={44} width={x(pure + tol) - x(pure - tol)} height={24} rx={6} fill="var(--good)" opacity={0.16} />
       <line x1={10} x2={310} y1={56} y2={56} stroke="var(--line)" strokeWidth={2} />
@@ -501,7 +501,6 @@ function SingRung({ iv, root, lab, record, rung }: RungProps & { rung: number })
   const [hinting, setHinting] = useState(false);
   const unsub = useRef<(() => void) | null>(null);
   const hintTimer = useRef(0);
-  const lockedAt = useRef(0);
   const live = useRef({ hold: new HoldDetector(), recent: [] as { t: number; hz: number }[], paused: false, locked: false, shown: 0 });
   const rootHz = midiToHz(root);
   const target = pureCents(deg);
@@ -518,7 +517,7 @@ function SingRung({ iv, root, lab, record, rung }: RungProps & { rung: number })
     void drone.get().then((d) => d?.set(Object.fromEntries(others.map((o) => [o, toneHz(root, o)]))));
     clearTimeout(hintTimer.current);
     setHinting(false);
-    again(true);
+    again();
   }, [part]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function start() {
@@ -567,7 +566,6 @@ function SingRung({ iv, root, lab, record, rung }: RungProps & { rung: number })
     const L = live.current;
     L.paused = true;
     L.locked = true;
-    lockedAt.current = Date.now();
     setHeld(0);
     const { target: tg, showWobble: sw, record: rec } = cur.current;
     const offBy = c - tg;
@@ -577,9 +575,8 @@ function SingRung({ iv, root, lab, record, rung }: RungProps & { rung: number })
     if (counted && rec(iv, rung, offBy)) setPassed(true);
   }
 
-  /** A new round (`force`: also right after a lock, e.g. the chord's part changed). */
-  function again(force = false) {
-    if (!force && Date.now() - lockedAt.current < 600) return; // (a double tap on the lock)
+  /** A new round. */
+  function again() {
     const L = live.current;
     L.hold.reset();
     L.recent = [];
@@ -595,6 +592,7 @@ function SingRung({ iv, root, lab, record, rung }: RungProps & { rung: number })
     const L = live.current;
     L.paused = true;
     L.hold.reset();
+    setHeld(0);
     setHinting(true);
     d.set({ ...Object.fromEntries(others.map((o) => [o, toneHz(root, o)])), hint: toneHz(root, deg) });
     clearTimeout(hintTimer.current);
@@ -610,7 +608,7 @@ function SingRung({ iv, root, lab, record, rung }: RungProps & { rung: number })
   const v = result ? (Math.abs(result.value - target) > 60
     ? { title: 'That was a different note', good: false, text: `Aim for ${DEG_NAME[deg]}: ${hintInterval(deg)}.` }
     : verdict(deg, result.value - target, tol)) : null;
-  const title = rung === 3 ? 'Sing it, with the wobble' : rung === 4 ? 'Now with your ears only' : 'In the chord';
+  const title = rung === 3 ? 'Sing it, with the wobble' : rung === 4 ? 'Sing it blind' : 'In the chord';
   const how = deg === 'do' ? 'Hold do steady; the others are tuned to it.'
     : `Start a little ${deg === 'mi' ? 'above' : 'below'} ${DEG_NAME[deg]} on “nee”, straight tone, and slide slowly. Stop where it goes still, and hold.`;
   return (
@@ -630,7 +628,7 @@ function SingRung({ iv, root, lab, record, rung }: RungProps & { rung: number })
           </div>
           <label className="toggle-row">
             <span className="small" style={{ fontWeight: 600 }}>Show the wobble{showWobble ? ' (practice: rounds count with it off)' : ''}</span>
-            <input type="checkbox" checked={showWobble} data-testid="lab-wobble-toggle" onChange={(e) => { setShowWobble(e.target.checked); again(true); }} />
+            <input type="checkbox" checked={showWobble} data-testid="lab-wobble-toggle" onChange={(e) => { setShowWobble(e.target.checked); again(); }} />
           </label>
         </>
       )}
@@ -670,7 +668,7 @@ function SingRung({ iv, root, lab, record, rung }: RungProps & { rung: number })
       {v && result && (
         <div className={v.good ? 'notice info col' : 'notice col'} style={{ gap: 6 }} role="status" data-testid="lab-verdict">
           <strong>{v.title}{!result.counted && Math.abs(result.value - target) <= 60 ? ' (practice round)' : ''}</strong>
-          <Landed deg={deg} value={result.value} tol={tol} />
+          {Math.abs(result.value - target) <= 60 && <Landed deg={deg} value={result.value} tol={tol} />}
           <span className="small">{v.text}</span>
         </div>
       )}
