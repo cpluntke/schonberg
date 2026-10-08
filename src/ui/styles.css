@@ -368,7 +368,7 @@ html:has(.results-foot) { scroll-padding-bottom: 170px; }
    spacing stay exactly as they are. */
 .lay { display: contents; }
 .nav-brand, .nav-choir { display: none; }
-@media (max-width: 899.98px) { .nav.wide-only { display: none; } }
+@media not all and (min-width: 900px) and (min-height: 600px) { .nav.wide-only { display: none; } }
 
 /* Mouse: hover states (touch screens never see them). */
 @media (hover: hover) and (pointer: fine) {
@@ -376,7 +376,9 @@ html:has(.results-foot) { scroll-padding-bottom: 170px; }
   .btn.ghost:not(:disabled):hover { background: var(--surface); }
   .btn.primary:not(:disabled):hover { background: var(--accent); border-color: transparent; filter: brightness(1.08); }
   .btn.voice:not(:disabled):hover { background: var(--voice); border-color: transparent; filter: brightness(1.08); }
-  .chip:not(:disabled):hover, .choice:not(:disabled):hover, .lvl-btn:not(:disabled):hover, .mixer button:not(:disabled):hover { border-color: #4a5288; }
+  /* (never over a selected one's own border) */
+  .chip:not(:disabled):not([aria-pressed='true']):hover, .choice:not(:disabled):not([aria-pressed='true']):hover,
+  .lvl-btn:not(:disabled):not(.done):hover, .mixer button:not(:disabled):not(.me):hover { border-color: #4a5288; }
   .seg button:not(:disabled):not([aria-pressed='true']):hover { background: #262b4d; }
   button.list-row:hover { background: rgba(255, 255, 255, 0.03); }
   .list-row button.grow:hover > .ellipsis:first-child, .linklike:hover { color: var(--accent-text); }
@@ -386,7 +388,7 @@ html:has(.results-foot) { scroll-padding-bottom: 170px; }
   .heat button:hover { filter: brightness(1.15); }
 }
 
-@media (min-width: 900px) {
+@media (min-width: 900px) and (min-height: 600px) {
   :root { --side-w: 200px; --gutter: 28px; --content-max: 1160px; --read-max: 760px; }
   .app { max-width: none; }
   .app.has-nav { padding-left: var(--side-w); }
@@ -410,6 +412,7 @@ html:has(.results-foot) { scroll-padding-bottom: 170px; }
   }
   .nav button svg { flex: none; }
   .nav button:hover { background: var(--surface); color: var(--text); }
+  @media (hover: none) { .nav button:hover { background: none; color: var(--muted); } }
   .nav button[aria-current] { background: var(--accent-soft); color: var(--accent); }
   .nav button[aria-current]::before { content: ''; position: absolute; left: -12px; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0; background: var(--accent); }
   .nav-choir {
@@ -421,14 +424,14 @@ html:has(.results-foot) { scroll-padding-bottom: 170px; }
   /* (no tab bar under it any more; Play keeps its toasts above its controls) */
   .app.has-nav .toast { bottom: 24px; left: calc(50% + var(--side-w) / 2); }
 }
-@media (min-width: 1200px) {
+@media (min-width: 1200px) and (min-height: 600px) {
   :root { --side-w: 248px; --gutter: 40px; --content-max: 1200px; }
   .screen { padding-top: 36px; }
 }
 
 /* Home: a dashboard. The greeting across the top; today (tiles, plan, next up) in the main column,
    the repertoire and the Zwölfton row beside it. */
-@media (min-width: 900px) {
+@media (min-width: 900px) and (min-height: 600px) {
   .home-top { display: flex; flex-direction: row-reverse; align-items: center; gap: 16px; }
   .home-top > .home-head { flex: none; }
   .home-top > :not(.home-head) { flex: 1 1 auto; min-width: 0; }
@@ -441,12 +444,12 @@ html:has(.results-foot) { scroll-padding-bottom: 170px; }
   .home-rep .list-row > .col:last-child { flex: none; white-space: nowrap; }
   .home [data-testid='stats'] .card { padding: 16px 18px !important; }
 }
-@media (min-width: 1200px) {
+@media (min-width: 1200px) and (min-height: 600px) {
   .home-cols { gap: 28px; }
 }
 
 /* Library: the pieces as a grid of cards; importing and the note about the built-in piece beside it. */
-@media (min-width: 900px) {
+@media (min-width: 900px) and (min-height: 600px) {
   .lib-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 320px); grid-template-rows: auto 1fr; gap: 16px 28px; align-items: start; }
   .lib-all { grid-column: 1; grid-row: 1 / span 2; }
   .lib-import { grid-column: 2; grid-row: 1; }
@@ -461,12 +464,12 @@ html:has(.results-foot) { scroll-padding-bottom: 170px; }
   .lib-piece > button.grow .ellipsis { white-space: normal; }
   .lib-piece > .icon-btn { margin: -8px -8px 0 0; }
 }
-@media (hover: hover) and (pointer: fine) and (min-width: 900px) {
+@media (hover: hover) and (pointer: fine) and (min-width: 900px) and (min-height: 600px) {
   .lib-piece:hover { border-color: #4a5288; }
 }
 
 /* Piece: your part, readiness, the full run and the map on the left; the sections and the drills on the right. */
-@media (min-width: 900px) {
+@media (min-width: 900px) and (min-height: 600px) {
   .piece-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
   .piece-side, .piece-main { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
   /* (the sections are in view beside the readiness: no need to jump down to them) */
@@ -474,13 +477,13 @@ html:has(.results-foot) { scroll-padding-bottom: 170px; }
   .piece-screen .ladder { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 16px 20px 6px; }
   .piece-screen .ladder-row:last-child { border-bottom: none; }
 }
-@media (min-width: 1200px) {
+@media (min-width: 1200px) and (min-height: 600px) {
   .piece-cols { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 28px; }
 }
 
 /* Practice screens (Results, the lyrics quiz, the memory map): no sidebar, as on phones. The top bar
    and Results' footer span the screen; the content sits in a centred column (Results: two columns). */
-@media (min-width: 900px) {
+@media (min-width: 900px) and (min-height: 600px) {
   .screen.practice { max-width: none; padding-top: 16px; }
   .screen.practice > :where(:not(.practice-bar):not(.results-foot):not(style)) { width: 100%; max-width: var(--read-max); margin-left: auto; margin-right: auto; }
   .screen > .practice-bar, .screen > .practice-bar.mm-top { margin: -16px calc(-1 * var(--gutter)) -4px; min-height: 60px;
@@ -515,7 +518,7 @@ html:has(.results-foot) { scroll-padding-bottom: 170px; }
 }
 
 /* The memory map: an outline in two columns. */
-@media (min-width: 900px) {
+@media (min-width: 900px) and (min-height: 600px) {
   .mm > .mm-secs { display: block; columns: 2; column-gap: 20px; }
   .mm-secs > * { break-inside: avoid; margin-bottom: 14px; }
   .mm > :not(.practice-bar) { max-width: var(--content-max); }
@@ -523,13 +526,13 @@ html:has(.results-foot) { scroll-padding-bottom: 170px; }
 }
 
 /* Settings: two columns of cards; the about text and the super-admin link underneath. */
-@media (min-width: 900px) {
+@media (min-width: 900px) and (min-height: 600px) {
   .settings-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px 24px; align-items: start; }
   .settings-col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
   .settings-col > section { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 18px 20px; gap: 10px !important; }
   .settings-col > section > h2.eyebrow { color: var(--text); font-size: 12px; margin-bottom: 2px; }
   /* (inside a card: the controls one step lighter, so they stand out from it) */
-  .settings-col .choice, .settings-col .field input, .settings-col .field select, .settings-col .field textarea,
+  .settings-col .choice:not([aria-pressed='true']), .settings-col .field input, .settings-col .field select, .settings-col .field textarea,
   .settings-col .toggle-row select, .settings-col .toggle-row input[type='number'] { background: var(--surface-2) !important; }
   .settings-col .seg { background: var(--bg-2); }
   .settings-col .toggle-row { border-bottom-color: var(--line); }
@@ -538,7 +541,7 @@ html:has(.results-foot) { scroll-padding-bottom: 170px; }
 
 /* Ranks: the board (and how it's ranked) on the left; the section battle, the choir overview and
    comparing with the choir on the right. */
-@media (min-width: 900px) {
+@media (min-width: 900px) and (min-height: 600px) {
   .ranks-grid {
     display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(300px, 1fr); grid-template-rows: auto auto auto 1fr;
     gap: 18px 24px; align-items: start;
@@ -555,7 +558,7 @@ html:has(.results-foot) { scroll-padding-bottom: 170px; }
 
 /* Admin: the sub-tabs as a compact switch; the choir's admin in two columns of cards; the
    insights at a width where their charts read well. */
-@media (min-width: 900px) {
+@media (min-width: 900px) and (min-height: 600px) {
   .admin .admin-tabs { max-width: 480px; }
   .admin-body { display: flex; flex-direction: column; gap: 18px; min-width: 0; max-width: 980px; }
   .admin-body:has(> .admin-cols) { max-width: none; }
@@ -564,7 +567,7 @@ html:has(.results-foot) { scroll-padding-bottom: 170px; }
 }
 
 /* Expert mode: its own night-violet ground across the whole screen; the two drills side by side. */
-@media (min-width: 900px) {
+@media (min-width: 900px) and (min-height: 600px) {
   .app:has(> .expert-screen) { background: #0C0A1F; }
   .expert-screen { background: transparent !important; }
   .expert-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: stretch; }
@@ -572,7 +575,7 @@ html:has(.results-foot) { scroll-padding-bottom: 170px; }
 
 /* Small laptops and tablets in landscape (900–1099 px): the sidebar is a narrow rail (icons with
    their labels underneath, as in the phone's tab bar), so the columns keep their room. */
-@media (min-width: 900px) and (max-width: 1099.98px) {
+@media (min-width: 900px) and (max-width: 1099.98px) and (min-height: 600px) {
   :root { --side-w: 84px; --gutter: 24px; }
   .nav { padding: 16px 8px calc(12px + var(--safe-bottom)); gap: 16px; align-items: stretch; }
   .nav-brand { justify-content: center; padding: 0; }
@@ -586,3 +589,6 @@ html:has(.results-foot) { scroll-padding-bottom: 170px; }
   .nav-choir { justify-content: center; padding: 12px 0 0; }
   .nav-choir > .col { display: none; }
 }
+
+/* Home on wide screens: the sidebar already shows the choir's logo and name. */
+@media (min-width: 900px) and (min-height: 600px) { .home-logo { display: none; } }

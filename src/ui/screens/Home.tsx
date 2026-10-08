@@ -77,7 +77,7 @@ export function Home() {
           <span className="small muted">{voiceName(profile.voice)}{logo && choir?.name ? ` · ${choir.name}` : ''}</span>
         </div>
         {logo && (
-          <img src={logo} alt={`${choir?.name ?? 'Choir'} logo`} data-testid="choir-logo"
+          <img src={logo} alt={`${choir?.name ?? 'Choir'} logo`} data-testid="choir-logo" className="home-logo"
             style={{ width: 56, height: 56, borderRadius: 14, objectFit: 'contain', background: LOGO_TILE, padding: 4, boxSizing: 'border-box', flex: 'none' }} />
         )}
       </div>
