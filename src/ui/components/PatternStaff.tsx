@@ -14,17 +14,22 @@ export type NoteState = 'todo' | 'now' | 'done' | 'bad';
 const SP = 9; // staff space (px)
 const NOTE_GAP = 4.2; // staff spaces between noteheads
 
-export function PatternStaff({ notes, root, states, label }: {
+export function PatternStaff({ notes, root, states, label, voice }: {
   notes: number[];
+  /** The singer's voice part, when known: its clef (as in practice), so it stays the same from round to round. */
+  voice?: string;
   /** The pattern's root (do): sets the spelling. */
   root: number;
   states: NoteState[];
   label: string;
 }) {
-  // (by pitch, as staff2d's clefFor does for an unknown voice: the check may come before the voice is chosen)
-  const avg = notes.reduce((a, m) => a + m, 0) / notes.length;
-  const clef: Clef = avg >= 59 ? 'treble' : avg >= 52 ? 'treble8' : 'bass';
   const key = { fifths: MAJOR_FIFTHS[((root % 12) + 12) % 12], mode: 'major' as const };
+  // The voice's clef (staff2d's clefFor) while the notes fit it (at most three ledger lines), else by
+  // pitch (the voice may not be chosen yet, or the singer is far from its range).
+  const avg = notes.reduce((a, m) => a + m, 0) / notes.length;
+  const own: Clef | null = voice === 'S' || voice === 'A' ? 'treble' : voice === 'T' ? 'treble8' : voice === 'B' ? 'bass' : null;
+  const fits = (c: Clef) => notes.every((m) => Math.abs(spell(m, key).step - middleStep(c)) <= 10);
+  const clef: Clef = own && fits(own) ? own : avg >= 59 ? 'treble' : avg >= 52 ? 'treble8' : 'bass';
   const mid = middleStep(clef);
   const spelled = notes.map((m) => spell(m, key));
   // Vertical extent: the staff (mid ± 4 steps) and every note with its ledger lines, plus the clef.

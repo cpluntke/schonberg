@@ -13,14 +13,15 @@ const measureAt = (measures: Measure[], t: number): Measure | undefined =>
   measures.find((m) => t >= m.start - 1e-6 && t < m.start + m.dur - 1e-6) ?? (t >= (measures.at(-1)?.start ?? Infinity) ? measures.at(-1) : undefined);
 
 /**
- * Where a skip from `pos` would land: the start of the bar that begins at least one bar before the
+ * Where a skip from `pos` would land (not within `afterLast` score seconds of a note's end): the start of the bar that begins at least one bar before the
  * singer's next note (between one and two bars of lead-in), or null when there is no long rest ahead
  * (a note is sounding or starts soon, or there are no more notes before `end`).
  */
-export function skipTarget(measures: Measure[], part: Pick<Part, 'notes'>, pos: number, end: number): { target: number; entry: number } | null {
+export function skipTarget(measures: Measure[], part: Pick<Part, 'notes'>, pos: number, end: number, afterLast = 0): { target: number; entry: number } | null {
   let next: { start: number } | null = null;
   for (const n of part.notes) {
-    if (n.start + n.dur > pos + 1e-6 && n.start <= pos + 1e-6) return null; // singing now
+    // singing now, or the last note only just ended (its tail hasn't reached the scoring yet: `afterLast`)
+    if (n.start + n.dur + afterLast > pos + 1e-6 && n.start <= pos + 1e-6) return null;
     if (n.start > pos + 1e-6) { next = n; break; }
   }
   if (!next || next.start >= end - 1e-6) return null;

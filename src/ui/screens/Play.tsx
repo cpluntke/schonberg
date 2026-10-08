@@ -323,7 +323,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
       && sectionRunCounts({ level, rate, partial, timingUnsure: timingUnsure != null, offBookPractice, headphones }).counted;
     // Practice runs (slower tempo, stopped early) are logged but never change section levels.
     const recId = sectionLadder || !realSection ? section.id : 'practice';
-    const durationSec = (section.end - section.start) / rate;
+    const durationSec = Math.max(0, section.end - section.start - (sess?.skippedSec ?? 0)) / rate;
     const prevBest = personalBest(piece.id, part.id, recId, level)?.score ?? null;
     const streakBefore = streakDays();
     const secs = singableSections(piece, part.id);
@@ -509,7 +509,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
       dropGuard();
         }
         let count = 0;
-        if (s && s.phase === 'countin') {
+        if (s && s.phase === 'countin' && s.countingIn) {
           const target = sessionStartTarget(s, section.start);
           if (pos < target) count = Math.ceil((target - pos) / s.beatSec(target) - 1e-6);
           if (count > 4) count = 0; // a cold start's lead-in bars: only count the last beats
@@ -521,8 +521,9 @@ function SingPlay({ route }: { route: PlayRoute }) {
         }
         // A long rest ahead: offer to skip to a bar or so before the next entry (not in a cold start's lead-in).
         let skip: { target: number; entry: number; bar: string } | null = null;
-        if (s && !listenOnly && !cold && (s.phase === 'playing' || (s.phase === 'countin' && count === 0))) {
-          const k = skipTarget(piece.score.measures, part, pos, section.end);
+        if (s && !listenOnly && !cold && (s.phase === 'playing' || (s.phase === 'countin' && pos >= s.resumePoint))) {
+          // (once the last note's tail has reached us: one mic round-trip after it ends)
+          const k = skipTarget(piece.score.measures, part, pos, section.end, (s.latencyMs / 1000 + 0.15) * rate);
           if (k) skip = { ...k, bar: piece.score.measures.find((m) => k.entry >= m.start - 1e-6 && k.entry < m.start + m.dur - 1e-6)?.number ?? '' };
         }
         const next = { score: s?.live?.score ?? 0, combo: s?.live?.combo ?? 0, count, lyricIdx, skip };

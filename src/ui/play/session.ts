@@ -182,6 +182,7 @@ export class PracticeSession {
 
   private play(from: number, countIn: boolean, cue?: SessionConfig['cue']) {
     this.plays++;
+    this.countingIn = countIn;
     this.ended = false;
     this.unsubEnd?.();
     this.unsubEnd = this.player.onEnded(() => {
@@ -380,11 +381,14 @@ export class PracticeSession {
     // A second time mapping: the recording couldn't be re-scored (as after a pause).
     this.recorder?.stop();
     this.recorder = null;
+    this.skippedSec += Math.max(0, target - this.player.position);
     this.resumeFrom = target;
     this.minTime = target - 0.02;
     const audible = new Set(Object.entries(this.partGains).filter(([, g]) => g > 0).map(([id]) => id));
     const heard = this.cfg.score.parts.some((p) => audible.has(p.id) && p.notes.some((n) => n.start < entry - 1e-6 && n.start + n.dur > target + 1e-6));
-    this.play(target, !heard, this.cfg.cue);
+    // No cue for the entry unless your own part is playing anyway (the entry after a long rest is the
+    // hard part; a pause, which gives one, stops the run counting, a skip doesn't).
+    this.play(target, !heard, this.cfg.guide ? this.cfg.cue : 'none');
     return true;
   }
 
@@ -450,6 +454,11 @@ export class PracticeSession {
 
   /** True when the last finish() came before the end of the section. */
   partial = false;
+
+  /** Score seconds skipped (long rests: skipTo). */
+  skippedSec = 0;
+  /** The current playback started with a count-in (else it starts straight away: no count shown). */
+  countingIn = false;
 
   /** The run was paused and resumed (not sung in one go). */
   get resumed(): boolean {

@@ -57,7 +57,7 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
   const stable = useRef<{ since: number; xs: number[]; out: number; lastVoiced: number } | null>(null);
   useEffect(() => {
     cancelRef.current = false; // (re)mounted, e.g. after React's development double-mount
-    return () => { cancelRef.current = true; };
+    return () => { cancelRef.current = true; endRoundRef.current?.(); };
   }, []);
 
   // Step 1: hold a comfortable note for two seconds. Vibrato is fine: readings only have to stay
@@ -133,18 +133,25 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
       });
       setSungSteps(0);
       setRound('listen');
-      await sleep(Math.max(0, (respStart - ctx.currentTime) * 1000));
-      if (cancelRef.current) { off(); lights.forEach(clearTimeout); return null; }
+      endRoundRef.current = finish; // ("That's my top" while listening ends the round too)
+      await Promise.race([ended, sleep(Math.max(0, (respStart - ctx.currentTime) * 1000))]);
+      if (cancelRef.current || (stopRef.current && !follower.end)) {
+        off();
+        lights.forEach(clearTimeout);
+        endRoundRef.current = null;
+        setPlaying(-1);
+        if (!cancelRef.current) { setPattern(null); setRound('idle'); }
+        return null;
+      }
       setPlaying(-1);
       setRound('sing');
-      endRoundRef.current = finish;
       // (a time limit of its own, in case the tracker goes quiet)
       await Promise.race([ended, sleep((FOLLOW.total + lat + 1) * 1000)]);
       endRoundRef.current = null;
       off();
       if (cancelRef.current) return null;
       // Stopped by the singer before the answer was over: this round doesn't count.
-      if (!follower.end && stopRef.current) { setRound('idle'); return null; }
+      if (!follower.end && stopRef.current) { setPattern(null); setRound('idle'); return null; }
       setRound('judging');
       const r = judgeFollowed(judgeRoot, follower);
       setPattern({ notes, root: judgeRoot, unmet: !!r.unmet });
@@ -186,7 +193,7 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
     const done: PatternResult[] = [];
     // Up: patterns from your comfortable note upwards; down: from it downwards.
     let top = ph === 'high' ? comfy : comfy;
-    for (let i = 0; i < MAX_ROUNDS && !cancelRef.current; i++) {
+    for (let i = 0; i < MAX_ROUNDS && !cancelRef.current && !stopRef.current; i++) {
       const r = await playRound(top, dir as 1 | -1, ph);
       if (!r) return;
       done.push(r);
@@ -288,10 +295,10 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
           <div className="card" style={{ alignItems: 'center', textAlign: 'center', gap: 6 }} aria-live="polite">
             {/* Room for two lines, so the buttons below don't move when the text wraps. */}
             <span style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.2, minHeight: '2.4em', display: 'flex', alignItems: 'center', justifyContent: 'center', color: round === 'sing' ? 'var(--accent)' : undefined }}>
-              {round === 'listen' ? 'Listen…' : round === 'sing' ? 'Your turn: sing it back' : busy ? (stopping ? 'Stopping…' : 'Next round…') : lastDone ? 'Done' : 'Ready'}
+              {round === 'listen' ? 'Listen…' : round === 'sing' ? 'Your turn: sing it back' : busy ? (stopping ? 'Stopping…' : 'Next round…') : lastDone ? (phaseRounds[phaseRounds.length - 1].r.unmet ? 'Not met' : 'Done') : 'Ready'}
             </span>
             {pattern && (busy || lastDone) && (
-              <PatternStaff notes={pattern.notes} root={pattern.root} states={staffStates()}
+              <PatternStaff notes={pattern.notes} root={pattern.root} states={staffStates()} voice={profile.voice}
                 label={round === 'sing' ? `${sungSteps} of ${PATTERN.length} notes sung` : round === 'listen' ? 'The notes to sing back' : `${sungSteps} of ${PATTERN.length} notes sung`} />
             )}
             <span className="tiny muted">{round === 'sing' ? 'Take your time: the round ends when you have sung all five.' : "Headphones help: the app only listens while it's your turn."}</span>

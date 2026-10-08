@@ -20,6 +20,8 @@ describe('skipping a long rest', () => {
     expect(skipTarget(ms, part, 26, 80)).toBeNull(); // only 6 s (1.5 bars) to save
     expect(skipTarget(ms, part, 4.5, 30)).toBeNull(); // the entry is after the run's end
     expect(skipTarget(ms, part, 40, 80)).toBeNull(); // no more notes
+    expect(skipTarget(ms, part, 4.1, 80, 0.3)).toBeNull(); // the last note's tail hasn't reached the scoring yet
+    expect(skipTarget(ms, part, 4.31, 80, 0.3)).toEqual({ target: 32, entry: 38 });
   });
   it('from before the first note (a long opening rest) too', () => {
     expect(skipTarget(ms, { notes: [note(50)] as never }, 0, 80)).toEqual({ target: 44, entry: 50 });

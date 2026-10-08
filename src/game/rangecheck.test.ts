@@ -150,7 +150,7 @@ describe('range check: the answer at the singer\'s own pace', () => {
   const STEP_S = 0.02;
   type Note = { midi: number | null; sec: number; cents?: number };
   /** Readings every 20 ms: each note slides in over 80 ms from the one before, with a light vibrato. */
-  function answer(notes: Note[], lead = 0.6): { r: Reading; t: number }[] {
+  function answer(notes: Note[], lead = 0.6, vib = { st: 0.1, hz: 7.2 }): { r: Reading; t: number }[] {
     const out: { r: Reading; t: number }[] = [];
     let t = 0;
     for (let i = 0; i < lead / STEP_S; i++, t += STEP_S) out.push({ r: { midi: null, rms: 0.001 }, t });
@@ -161,7 +161,7 @@ describe('range check: the answer at the singer\'s own pace', () => {
         if (n.midi === null) { out.push({ r: { midi: null, rms: 0.001 }, t }); continue; }
         const target = n.midi + (n.cents ?? 0) / 100;
         const into = prev !== null && i < 4 ? (prev - target) * (1 - i / 4) : 0;
-        out.push({ r: { midi: target + into + 0.1 * Math.sin(i * 0.9), rms: 0.05 }, t });
+        out.push({ r: { midi: target + into + vib.st * Math.sin(2 * Math.PI * vib.hz * t), rms: 0.05 }, t });
       }
       prev = n.midi;
     }
@@ -169,10 +169,12 @@ describe('range check: the answer at the singer\'s own pace', () => {
     for (let i = 0; i < 30 / STEP_S; i++, t += STEP_S) out.push({ r: { midi: null, rms: 0.001 }, t });
     return out;
   }
-  const follow = (root: number, notes: Note[], dir: 1 | -1 = 1) => {
+  const follow = (root: number, notes: Note[], dir: 1 | -1 = 1, vib?: { st: number; hz: number }, edit?: (x: { r: Reading; t: number }[]) => void) => {
     const f = new PatternFollower(PATTERN.map((x) => root + dir * x));
     let at = 0;
-    for (const { r, t } of answer(notes)) { at = t; if (f.push(r, t)) break; }
+    const xs = answer(notes, 0.6, vib);
+    edit?.(xs);
+    for (const { r, t } of xs) { at = t; if (f.push(r, t)) break; }
     return { f, at, res: judgeFollowed(dir > 0 ? root : root - 4, f) };
   };
   const pat = (root: number, sec: number | number[], dir: 1 | -1 = 1): Note[] =>
@@ -221,6 +223,45 @@ describe('range check: the answer at the singer\'s own pace', () => {
     const r = follow(60, pat(60, 0.8).map((n) => ({ ...n, cents: -65 }))).res;
     expect(r.unmet).toBeUndefined();
     expect(r.verdict).toBe('shaky');
+  });
+  it('vibrato, also a wide one, is one sung note', () => {
+    for (const vib of [{ st: 0.65, hz: 5 }, { st: 0.65, hz: 6.5 }, { st: 1.0, hz: 5.5 }, { st: 1.0, hz: 6.5 }, { st: 0.5, hz: 4.5 }]) {
+      for (const sec of [0.8, 1.5]) {
+        const { f, res } = follow(60, pat(60, sec), 1, vib);
+        expect(f.end, JSON.stringify({ vib, sec })).toBe('done');
+        expect(res.notes.every((n) => Math.abs(n.cents!) < 25), JSON.stringify({ vib, sec, notes: res.notes })).toBe(true);
+      }
+    }
+  });
+  it('an octave slip of the tracker on the first reading of a note (after a breath) is folded', () => {
+    const breaths = pat(60, 0.7).flatMap((n) => [n, { midi: null, sec: 0.3 }]);
+    for (const [k, d] of [[0, -12], [2, 12], [4, 12]]) {
+      const { f } = follow(60, breaths, 1, undefined, (xs) => {
+        // the first voiced reading of the k-th note
+        let seen = -1;
+        for (let i = 0; i < xs.length; i++) {
+          if (xs[i].r.midi !== null && (i === 0 || xs[i - 1].r.midi === null) && ++seen === k) { xs[i].r = { ...xs[i].r, midi: xs[i].r.midi! + d }; break; }
+        }
+      });
+      expect(f.end, `${k} ${d}`).toBe('done');
+    }
+  });
+  it('a singer who scoops a semitone up into every note: judged on the held notes, not the scoops', () => {
+    for (const scoop of [0.12, 0.2]) {
+      const notes: Note[] = pat(60, 0.8).flatMap((n) => [{ midi: n.midi! - 1, sec: scoop, cents: 20 }, { midi: n.midi, sec: 0.8 }]);
+      const { f, res } = follow(60, notes);
+      expect(f.end, String(scoop)).toBe('done');
+      expect(res.verdict, String(scoop) + JSON.stringify(res.notes)).toBe('good');
+      expect(res.notes.every((n) => Math.abs(n.cents!) < 20), JSON.stringify(res.notes)).toBe(true);
+    }
+  });
+  it('the notes of a round not met never count as steady', () => {
+    const wrong = pat(60, 0.8);
+    wrong[3] = { midi: 65, sec: 0.8 };
+    const { res } = follow(60, wrong);
+    expect(res.unmet).toBe('wrong');
+    expect(res.notes.map((n) => n.verdict)).toEqual(['shaky', 'shaky', 'shaky']);
+    expect(summarize([res]).steady).toBeNull();
   });
   it('the scoop into a note is not a wrong note; a tracker octave slip is folded', () => {
     const scoop: Note[] = [{ midi: 60, sec: 0.7 }, { midi: 61, sec: 0.22 }, { midi: 62, sec: 0.7 }, { midi: 64, sec: 0.7 }, { midi: 62, sec: 0.7 }, { midi: 59, sec: 0.2 }, { midi: 60, sec: 0.7 }];

@@ -50,7 +50,7 @@ export function judgePattern(root: number, readings: Reading[], opts: { toleranc
   const tol = opts.tolerance ?? 50;
   const minN = opts.minReadings ?? 4;
   const pitches = [...new Set(PATTERN)].map((x) => root + x);
-  const bins = new Map<number, { c: number[]; db: number[]; core: number[]; groups: number[] }>(pitches.map((p) => [p, { c: [], db: [], core: [], groups: [] }]));
+  const bins: Bins = new Map(pitches.map((p) => [p, { c: [], db: [], core: [], groups: [] }]));
   // Readings arrive in time order: consecutive readings on the same pitch form one sung note. The
   // glide into and out of each note is left out of the pitch and steadiness judgement (it's how
   // anyone moves between notes, and it gets wider high up), as long as enough of the note is left.
@@ -69,10 +69,8 @@ export function judgePattern(root: number, readings: Reading[], opts: { toleranc
     const core = r.c.length >= GLIDE_IN + GLIDE_OUT + 4 ? r.c.slice(GLIDE_IN, r.c.length - GLIDE_OUT) : r.c;
     b.core.push(...core);
     // Averages over whole vibrato cycles within this sung note (never across two notes, never a
-    // half cycle at the end).
-    for (let i = 0; i + GROUP <= core.length; i += GROUP) b.groups.push(core.slice(i, i + GROUP).reduce((x, y) => x + y, 0) / GROUP);
-    // …and the note's last full cycle, so a drift towards the end isn't cut off.
-    if (core.length > GROUP && core.length % GROUP >= 4) b.groups.push(core.slice(-GROUP).reduce((x, y) => x + y, 0) / GROUP);
+    // half cycle at the end), and the note's last full cycle, so a drift towards the end isn't cut off.
+    addGroups(b.groups, core);
   };
   for (const r of readings) {
     if (r.midi === null || !Number.isFinite(r.midi)) { closeRun(); continue; }
@@ -96,6 +94,18 @@ export function judgePattern(root: number, readings: Reading[], opts: { toleranc
     if (bestOct === 0) run.inOctave++;
   }
   closeRun();
+  return verdicts(root, pitches, bins, tol, minN);
+}
+
+type Bins = Map<number, { c: number[]; db: number[]; core: number[]; groups: number[] }>;
+
+/** Per-cycle averages of a sung note's core readings, for its steadiness (see judgePattern). */
+function addGroups(groups: number[], core: number[]): void {
+  for (let i = 0; i + GROUP <= core.length; i += GROUP) groups.push(core.slice(i, i + GROUP).reduce((x, y) => x + y, 0) / GROUP);
+  if (core.length > GROUP && core.length % GROUP >= 4) groups.push(core.slice(-GROUP).reduce((x, y) => x + y, 0) / GROUP);
+}
+
+function verdicts(root: number, pitches: number[], bins: Bins, tol: number, minN: number): PatternResult {
   const notes = pitches.map((p) => {
     const b = bins.get(p)!;
     if (b.c.length < minN) return { midi: p, cents: null, spread: null, db: null, verdict: 'missed' as Verdict };
@@ -162,8 +172,11 @@ export function suggestVoice(lo: number, hi: number): 'S' | 'A' | 'T' | 'B' {
 export const FOLLOW = {
   /** A pitch held this long is a sung note (shorter ones are the glide between notes). */
   settle: 0.14,
-  /** Readings within this many semitones of a note's running median belong to it (vibrato, scoops). */
-  hold: 0.6,
+  /** A new note starts when the average of the last `splitTail` readings is this far (semitones) from the note so far… */
+  split: 1.0,
+  splitTail: 6,
+  /** …once the note so far has this many readings (about one vibrato cycle: its median is its centre). */
+  splitAfter: 9,
   /** A sung note this near the expected one counts as it; how well it was sung is judged afterwards. */
   match: 0.8,
   /** A different note held this long is clearly wrong… */
@@ -188,10 +201,22 @@ export const FOLLOW = {
 /** How an answer ended: all five notes in order, or not met (a different note, nothing, stopped, too slow). */
 export type FollowEnd = 'done' | 'wrong' | 'silent' | 'stopped' | 'slow';
 
-interface Seg { xs: number[]; rs: Reading[]; t0: number; t1: number; step: number | null; wrongCounted: boolean; lastVoiced: number }
+interface Seg { ms: number[]; rs: Reading[]; ts: number[]; ref: number; t0: number; t1: number; step: number | null; wrongCounted: boolean; lastVoiced: number; seen: boolean }
 
-const fold = (m: number, around: number) => m - 12 * Math.round((m - around) / 12);
-const centre = (xs: number[]) => median(xs.slice(-25));
+/**
+ * A sung note's pitch: the median of its last readings, each folded to the octave most of them are
+ * in (relative to `ref`, the note expected), so a stray octave slip of the tracker — also on the very
+ * first reading — doesn't move the note to another octave.
+ */
+function folded(ms: number[], ref: number): number[] {
+  const octs = new Map<number, number>();
+  for (const m of ms) { const o = Math.round((m - ref) / 12); octs.set(o, (octs.get(o) ?? 0) + 1); }
+  let maj = 0;
+  let best = -1;
+  for (const [o, n] of octs) if (n > best || (n === best && Math.abs(o) < Math.abs(maj))) { best = n; maj = o; }
+  return ms.map((m) => m - 12 * (Math.round((m - ref) / 12) - maj));
+}
+const centreOf = (s: Pick<Seg, 'ms' | 'ref'>) => median(folded(s.ms.slice(-25), s.ref));
 
 /**
  * Follows a sung-back pattern reading by reading (any tempo): which of the expected notes have been
@@ -204,8 +229,9 @@ export class PatternFollower {
   step = 0;
   end: FollowEnd | null = null;
   private seg: Seg | null = null;
-  private pending: { m: number; r: Reading; t: number }[] = [];
   private matched: Reading[][] = [];
+  /** Centre of the segment each step was matched with. */
+  private matchedAt: number[] = [];
   private wrongs = 0;
   private firstVoice: number | null = null;
   private lastVoice = 0;
@@ -218,13 +244,17 @@ export class PatternFollower {
   push(r: Reading, t: number): FollowEnd | null {
     if (this.end) return this.end;
     if (r.midi === null || !Number.isFinite(r.midi)) {
-      this.pending = [];
-      if (this.seg && t - this.seg.lastVoiced > FOLLOW.gap) this.closeSeg();
+      if (this.seg && t - this.seg.lastVoiced > FOLLOW.gap) this.closeSeg(true);
     } else {
       this.voiced(r.midi, r, t);
     }
     if (!this.end) this.checkTime(t);
     return this.end;
+  }
+
+  /** The notes sung in order: the pattern note each was sung for, and its readings. */
+  steps(): { pitch: number; rs: Reading[] }[] {
+    return this.matched.map((rs, k) => ({ pitch: this.expected[k], rs })).filter((x) => x.rs);
   }
 
   /** The readings of the notes sung in order (a gap between notes), for judgePattern. */
@@ -234,38 +264,44 @@ export class PatternFollower {
     return out;
   }
 
+  private newSeg(ms: number[], rs: Reading[], ts: number[]): Seg {
+    const ref = this.expected[Math.min(this.step, this.expected.length - 1)];
+    return { ms, rs, ts, ref, t0: ts[0], t1: ts[ts.length - 1], step: null, wrongCounted: false, lastVoiced: ts[ts.length - 1], seen: false };
+  }
+
   private voiced(m: number, r: Reading, t: number): void {
     const s = this.seg;
-    if (s) {
-      const c = centre(s.xs);
-      const f = fold(m, c);
-      if (Math.abs(f - c) <= FOLLOW.hold) {
-        // (a reading or two that strayed and came back were a glitch: they stay in the note)
-        for (const p of this.pending) { s.xs.push(fold(p.m, c)); s.rs.push(p.r); }
-        this.pending = [];
-        s.xs.push(f);
-        s.rs.push(r);
-        s.t1 = t;
-        s.lastVoiced = t;
-        this.judgeSeg(t);
-        return;
-      }
-      // Three readings in a row away from the note (and together): a new note starts.
-      this.pending.push({ m, r, t });
-      const pc = median(this.pending.map((p) => p.m));
-      if (this.pending.some((p) => Math.abs(fold(p.m, pc) - pc) > FOLLOW.hold)) this.pending = this.pending.slice(-1);
-      if (this.pending.length < 3) return;
-      this.closeSeg();
-      if (this.end) return;
-    } else {
-      this.pending.push({ m, r, t });
+    if (!s) {
+      this.seg = this.newSeg([m], [r], [t]);
+      this.judgeSeg(t);
+      return;
     }
-    const pc = median(this.pending.map((p) => p.m));
-    this.seg = {
-      xs: this.pending.map((p) => fold(p.m, pc)), rs: this.pending.map((p) => p.r),
-      t0: this.pending[0].t, t1: t, step: null, wrongCounted: false, lastVoiced: t,
-    };
-    this.pending = [];
+    s.ms.push(m);
+    s.rs.push(r);
+    s.ts.push(t);
+    s.t1 = t;
+    s.lastVoiced = t;
+    // A new note starts when the last ~120 ms (an average: vibrato, even a wide one, evens out)
+    // sit a semitone or more from the note so far.
+    const n = s.ms.length;
+    if (n >= FOLLOW.splitAfter + FOLLOW.splitTail) {
+      const all = folded(s.ms.slice(-25 - FOLLOW.splitTail), s.ref);
+      const tail = all.slice(-FOLLOW.splitTail);
+      const body = median(all.slice(0, -FOLLOW.splitTail));
+      const avg = tail.reduce((a, x) => a + x, 0) / tail.length;
+      if (Math.abs(avg - body) >= FOLLOW.split) {
+        // The new note starts at the first of those readings already nearer it than the old note.
+        const now = tail.slice(-3).reduce((a, x) => a + x, 0) / 3;
+        const j = Math.max(0, tail.findIndex((x) => Math.abs(x - now) < Math.abs(x - body)));
+        const k = n - FOLLOW.splitTail + j;
+        const next = { ms: s.ms.splice(k), rs: s.rs.splice(k), ts: s.ts.splice(k) };
+        s.t1 = s.ts[s.ts.length - 1];
+        s.lastVoiced = s.t1;
+        this.closeSeg(false);
+        if (this.end) return;
+        this.seg = this.newSeg(next.ms, next.rs, next.ts);
+      }
+    }
     this.judgeSeg(t);
   }
 
@@ -276,7 +312,7 @@ export class PatternFollower {
     if (dur < FOLLOW.settle) return;
     if (this.firstVoice === null) { this.firstVoice = s.t0; this.lastProgress = s.t0; }
     this.lastVoice = t;
-    const c = centre(s.xs);
+    const c = centreOf(s);
     if (s.step !== null) {
       if (s.step === this.expected.length - 1 && dur >= FOLLOW.lastHold) this.end = 'done';
       return;
@@ -286,13 +322,31 @@ export class PatternFollower {
       s.step = this.step;
       if (s.wrongCounted) this.wrongs--; // (it was the scoop into this note)
       this.matched[this.step] = s.rs;
+      this.matchedAt[this.step] = c;
       this.step++;
       this.lastProgress = t;
       if (s.step === this.expected.length - 1 && dur >= FOLLOW.lastHold) this.end = 'done';
       return;
     }
     const prev = this.expected[this.step - 1];
-    if (prev !== undefined && Math.abs(c - prev) <= FOLLOW.match) return; // the last note again (a new "la")
+    if (prev !== undefined && Math.abs(c - prev) <= FOLLOW.match) {
+      // The last note again: a new "la", or the note itself after a scoop into it was matched. The
+      // one nearer the note stands for it (the scoop is the glide in, not the note).
+      if (!s.seen) {
+        s.seen = true;
+        const k = this.step - 1;
+        // (either way it is that note: the last one ends the answer like the first time)
+        s.step = k;
+        if (Math.abs(c - prev) < Math.abs(this.matchedAt[k] - prev)) {
+          this.matched[k] = s.rs;
+          this.matchedAt[k] = c;
+        }
+        if (k === this.expected.length - 1 && dur >= FOLLOW.lastHold) this.end = 'done';
+      }
+      return;
+    }
+    // All five sung, and now something else: the answer is over.
+    if (this.step >= this.expected.length) { this.end = 'done'; return; }
     if (!s.wrongCounted && dur >= FOLLOW.wrongBrief) {
       s.wrongCounted = true;
       if (++this.wrongs >= FOLLOW.wrongCount) this.end = 'wrong';
@@ -300,11 +354,13 @@ export class PatternFollower {
     if (dur >= FOLLOW.wrongHold) this.end = 'wrong';
   }
 
-  private closeSeg(): void {
+  /** `gap`: the voice stopped (else another note starts). */
+  private closeSeg(gap: boolean): void {
     const s = this.seg;
     this.seg = null;
-    // The last note, sung and ended: the answer is complete.
-    if (s && s.step === this.expected.length - 1) this.end = 'done';
+    // The last note, sung and ended (the voice stopped, or it was held long enough): the answer is
+    // complete. A short one followed by more voice may be a scoop into the last note: wait.
+    if (s && s.step === this.expected.length - 1 && (gap || s.t1 - s.t0 >= FOLLOW.lastHold)) this.end = 'done';
   }
 
   private checkTime(t: number): void {
@@ -317,8 +373,42 @@ export class PatternFollower {
   }
 }
 
-/** Judge a followed answer: as before when all five notes were sung in order, else not met. */
-export function judgeFollowed(root: number, f: PatternFollower): PatternResult {
-  const r = judgePattern(root, f.readings());
-  return f.end === 'done' ? r : { ...r, verdict: 'missed', unmet: f.end ?? 'slow' };
+/**
+ * Judge a followed answer. Each sung note is judged against the note it was sung for (the follower
+ * knows which), so a wide vibrato isn't split between two pattern notes; the scoop or glide into it is
+ * left out up to where it settles (the last reading of its first part more than 50¢ off). As in judgePattern: a note sung
+ * mostly in another octave isn't credited, steadiness from per-cycle averages. The notes of a round
+ * not met count as reached at best ("shaky"), never as the steady range.
+ */
+export function judgeFollowed(root: number, f: PatternFollower, opts: { tolerance?: number; minReadings?: number } = {}): PatternResult {
+  const pitches = [...new Set(PATTERN)].map((x) => root + x);
+  const bins: Bins = new Map(pitches.map((p) => [p, { c: [], db: [], core: [], groups: [] }]));
+  for (const { pitch, rs } of f.steps()) {
+    const b = bins.get(pitch);
+    const voiced = rs.filter((r): r is { midi: number; rms: number } => r.midi !== null && Number.isFinite(r.midi));
+    if (!b || !voiced.length) continue;
+    let inOctave = 0;
+    const c = voiced.map((r) => {
+      const d = r.midi - pitch;
+      const oct = Math.round(d / 12);
+      if (oct === 0) inOctave++;
+      return (d - 12 * oct) * 100;
+    });
+    if (inOctave * 2 < c.length) continue;
+    const settled = median(c.slice(Math.floor(c.length / 3)));
+    // (after the last reading of its first part still more than 50¢ off: a glide may pass through the note on its way)
+    // (on a moving average over about a vibrato cycle, so a wide vibrato isn't taken for a glide)
+    const avg = (i: number) => { const w = c.slice(Math.max(0, i - 4), i + 5); return w.reduce((x, y) => x + y, 0) / w.length; };
+    let from = 0;
+    for (let i = 0; i < Math.floor(c.length * 0.6); i++) if (Math.abs(avg(i) - settled) > 50) from = i + 1;
+    const body = c.slice(from);
+    const core = body.length >= GLIDE_OUT + 4 ? body.slice(0, body.length - GLIDE_OUT) : body;
+    b.c.push(...c);
+    b.db.push(...voiced.map((r) => 20 * Math.log10(Math.max(r.rms, 1e-5))));
+    b.core.push(...core);
+    addGroups(b.groups, core);
+  }
+  const r = verdicts(root, pitches, bins, opts.tolerance ?? 50, opts.minReadings ?? 4);
+  if (f.end === 'done') return r;
+  return { ...r, verdict: 'missed', unmet: f.end ?? 'slow', notes: r.notes.map((n) => (n.verdict === 'good' ? { ...n, verdict: 'shaky' as Verdict } : n)) };
 }
