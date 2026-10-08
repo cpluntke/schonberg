@@ -29,8 +29,9 @@ For every note in your part:
   - **Consonants** (only with headphones on: through the speaker the backing fills every gap). The
     tracker marks readings without a pitch whose sound is mostly high (above ~2.5 kHz: an *s*, *sh*,
     *f*) as fricatives. One that is clearly louder than the room (3× the level heard in the count-in
-    and the rests) and not far below your voice is a consonant, unless it lasts more than 0.3 s (a
-    sustained hiss or breath is not a consonant).
+    and the rests; a run without a count-in assumes half the level gate until its first rest) and not
+    far below your voice is a consonant, unless it lasts more than 0.25 s (a sustained hiss or breath
+    is not a consonant).
     - A consonant sung on the beat, running straight into the vowel, gives the voice 0.1 s after it
       to arrive, when that is later than the usual limit.
     - Consonant time inside the note or at its end (a repeated "sa sa", a final *s*, the next word's

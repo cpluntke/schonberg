@@ -134,7 +134,7 @@ export const CONSONANT_SHARE = 0.35;
 export const CONSONANT_MIN_VOICED = 0.35;
 export const CONSONANT_SETTLE = 0.1;
 /** A run of consonant readings longer than this (real seconds) is a sustained hiss or breath, not a consonant. */
-export const CONSONANT_RUN_MAX = 0.3;
+export const CONSONANT_RUN_MAX = 0.25;
 /** Quiet this short inside a consonant cluster (a stop's closure: "st", "sc") doesn't end it (real seconds). */
 const CONSONANT_GAP = 0.07;
 /** Unpitched readings this far from any note (real seconds) measure the noise floor. */
