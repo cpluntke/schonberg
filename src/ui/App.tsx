@@ -113,9 +113,12 @@ export function App() {
     setFromTab(route.name);
     try { sessionStorage.setItem('sh:fromTab', route.name); } catch { /* storage blocked */ }
   }, [route.name]);
-  const tab = route.name === 'piece' ? fromTab : route.name;
+  // Settings' own pages (the choir, the tuner, diagnostics) keep the sidebar on wide screens (no tab bar on phones).
+  const settingsPage = ['choir', 'tuner', 'diagnostics'].includes(route.name);
+  const tab = route.name === 'piece' ? fromTab : settingsPage ? 'settings' : route.name;
   const isAdmin = ADMIN_ROUTES.includes(route.name);
   const showNav = ['home', 'library', 'ranks', 'settings', 'piece', 'expert'].includes(route.name) || isAdmin;
+  const sidebar = showNav || settingsPage;
 
   let body: React.ReactNode;
   if (!lib.ready && route.name !== 'setup' && route.name !== 'tuner') {
@@ -146,12 +149,12 @@ export function App() {
   }
 
   return (
-    <div className={route.name === 'play' ? 'app app-play' : showNav ? 'app has-nav' : 'app'}>
+    <div className={route.name === 'play' ? 'app app-play' : sidebar ? 'app has-nav' : 'app'}>
       <ErrorBoundary resetKey={JSON.stringify(route)}>{body}</ErrorBoundary>
       <UpdatePrompt hidden={route.name === 'play'} />
       <StorageFullNotice hidden={route.name === 'play'} />
-      {showNav && (
-        <nav className="nav" aria-label="Main">
+      {sidebar && (
+        <nav className={showNav ? 'nav' : 'nav wide-only'} aria-label="Main">
           {/* (wide screens: the nav is a sidebar with the app's name on top and the choir below) */}
           <div className="nav-brand" aria-hidden="true">
             <span>Schönberg</span>

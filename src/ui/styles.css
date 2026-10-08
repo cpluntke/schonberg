@@ -368,6 +368,7 @@ html:has(.results-foot) { scroll-padding-bottom: 170px; }
    spacing stay exactly as they are. */
 .lay { display: contents; }
 .nav-brand, .nav-choir { display: none; }
+@media (max-width: 899.98px) { .nav.wide-only { display: none; } }
 
 /* Mouse: hover states (touch screens never see them). */
 @media (hover: hover) and (pointer: fine) {
@@ -446,7 +447,7 @@ html:has(.results-foot) { scroll-padding-bottom: 170px; }
 
 /* Library: the pieces as a grid of cards; importing and the note about the built-in piece beside it. */
 @media (min-width: 900px) {
-  .lib-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); grid-template-rows: auto 1fr; gap: 16px 28px; align-items: start; }
+  .lib-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 320px); grid-template-rows: auto 1fr; gap: 16px 28px; align-items: start; }
   .lib-all { grid-column: 1; grid-row: 1 / span 2; }
   .lib-import { grid-column: 2; grid-row: 1; }
   .lib-note { grid-column: 2; grid-row: 2; padding: 0 4px; line-height: 1.5; }
