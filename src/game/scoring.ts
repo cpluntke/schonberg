@@ -137,6 +137,8 @@ export const CONSONANT_SETTLE = 0.1;
 export const CONSONANT_RUN_MAX = 0.25;
 /** The vowel's onset may come this long after the voice is first heard (ms, real time) for the timing to count from the consonant. */
 const CONSONANT_ONSET_SLACK_MS = 120;
+/** …and the consonant must start by this long after the beat (ms, real time): a late hiss doesn't hide a late vowel. */
+const CONSONANT_ON_BEAT_MS = 80;
 /** Quiet this short inside a consonant cluster (a stop's closure: "st", "sc") doesn't end it (real seconds). */
 const CONSONANT_GAP = 0.07;
 /** Unpitched readings this far from any note (real seconds) measure the noise floor. */
@@ -665,9 +667,10 @@ export class LiveScorer {
     // with the voice, not later): a singer with the s on the beat is on time, not late.
     let consonantMs: number | undefined;
     if (consOn && a.consVoice !== null && a.consFrom !== null && a.onsetMs !== null
+      && (a.consFrom - w.start) * 1000 <= CONSONANT_ON_BEAT_MS * this.rate
       && a.onsetMs <= (a.consVoice - w.start) * 1000 + CONSONANT_ONSET_SLACK_MS * this.rate) {
       consonantMs = Math.round((a.consVoice - a.consFrom) * 1000);
-      a.onsetMs = Math.max(0, (a.consFrom - w.start) * 1000);
+      a.onsetMs = Math.min(a.onsetMs, Math.max(0, (a.consFrom - w.start) * 1000));
     }
     const judged = judgedSpan(a, tolN, this.opts.octaveTolerant);
     const { k0, k1, from, to } = judged;

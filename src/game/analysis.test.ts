@@ -45,6 +45,9 @@ describe('analyze', () => {
     expect(analyze(ctx, withCons([1, 3])).some((i) => i.kind === 'consonant-on-beat')).toBe(false);
     const short = r.notes.map((n) => ([1, 3, 5, 8].includes(n.index) ? { ...n, consonantMs: 60, onsetMs: 0 } : n));
     expect(analyze(ctx, short).some((i) => i.kind === 'consonant-on-beat')).toBe(false);
+    // Stop bursts (a t or k heard as a short fricative) elsewhere don't dilute the share.
+    const bursts = withCons([1, 3, 5, 8]).map((n) => (n.consonantMs === undefined ? { ...n, consonantMs: 30 } : n));
+    expect(analyze(ctx, bursts).some((i) => i.kind === 'consonant-on-beat')).toBe(true);
   });
 
   it('detects rising long notes', () => {

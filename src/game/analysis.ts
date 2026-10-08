@@ -13,6 +13,8 @@ const ENTRY_REST_SEC = 0.5;
 /** A consonant this long (ms) sung on the beat (starting within CONS_ON_BEAT_MS of it) counts for the tip. */
 const CONS_TIP_MS = 120;
 const CONS_ON_BEAT_MS = 80;
+/** Shorter "consonants" (a stop's burst: t, k, p) don't count as consonants for the tip's share. */
+const CONS_REAL_MS = 60;
 const LATE_MS = 180;
 const LEAP_SEMITONES = 5;
 
@@ -200,7 +202,7 @@ export function analyze(ctx: ScoringContext, notes: NoteResult[], samples?: Pitc
   // counted as on time, but the vowel lands late; the choir habit is the consonant just before the beat.
   {
     const onBeat = notes.filter((n) => (n.consonantMs ?? 0) >= CONS_TIP_MS && n.onsetMs !== null && n.onsetMs <= CONS_ON_BEAT_MS);
-    const withCons = notes.filter((n) => n.consonantMs !== undefined);
+    const withCons = notes.filter((n) => (n.consonantMs ?? 0) >= CONS_REAL_MS);
     if (onBeat.length >= 3 && onBeat.length >= 0.4 * withCons.length) {
       const bad = new Map<number, number>();
       for (const n of onBeat) addTo(bad, noteOf(n).measure, 1);

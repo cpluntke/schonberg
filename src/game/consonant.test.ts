@@ -63,6 +63,11 @@ describe('consonants (ScoringOptions.consonants)', () => {
     // A hiss longer than a consonant (a late singer hissing from the beat): timed from the vowel.
     const late = (i: number, dt: number, m: number): Heard => (i !== 1 ? m : dt < 0.32 ? hiss : m);
     expect(n(take(det, 100, late)).onsetMs!).toBeGreaterThanOrEqual(300);
+    // A consonant that starts well after the beat (a late singer): timed from the vowel, still late.
+    const lateS = (i: number, dt: number, m: number): Heard => (i !== 1 ? m : dt < 0.12 ? quiet : dt < 0.32 ? hiss : m);
+    const ls = n(take(det, 100, lateS));
+    expect(ls.consonantMs).toBeUndefined();
+    expect(ls.onsetMs!).toBeGreaterThanOrEqual(300);
   });
 
   it('room noise, hum or the backing (loud but not fricative) is no consonant', () => {

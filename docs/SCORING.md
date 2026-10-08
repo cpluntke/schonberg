@@ -38,8 +38,8 @@ For every note in your part:
       *s* sung early, also before a rest) is excused like a dropout.
     - **Timing** (entries, "late"/"early") counts from the start of such a consonant when it runs
       straight into the vowel, not from the vowel: an *s* on the beat is on time. Anything that isn't a
-      consonant by these rules (silence, room noise, no headphones, a hiss longer than 0.25 s) leaves
-      the timing on the vowel. When it keeps happening (three or more notes, the consonant ≥ 120 ms),
+      consonant by these rules (silence, room noise, no headphones, a hiss longer than 0.25 s, a
+      consonant that itself starts more than 80 ms after the beat) leaves the timing on the vowel. When it keeps happening (three or more notes, the consonant ≥ 120 ms),
       Results gives a gentle tip: put the consonant just before the beat, so the vowel sits on it.
     - Both together count for at most 0.25 s and never more than 35% of the note, and only on a
       note your voice covers for at least 35% of it. Silence, hum or room noise are never consonants:
