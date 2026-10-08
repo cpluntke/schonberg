@@ -23,6 +23,10 @@ describe('skipping a long rest', () => {
     expect(skipTarget(ms, part, 4.1, 80, 0.3)).toBeNull(); // the last note's tail hasn't reached the scoring yet
     expect(skipTarget(ms, part, 4.31, 80, 0.3)).toEqual({ target: 32, entry: 38 });
   });
+  it('at a fast tempo, the lead-in is at least three seconds', () => {
+    const fast = bars(40, 1.6); // bars of 1.6 s
+    expect(skipTarget(fast, { notes: [note(0), note(32)] as never }, 2, 80)).toEqual({ target: 28.8, entry: 32 }); // 2 bars = 3.2 s
+  });
   it('from before the first note (a long opening rest) too', () => {
     expect(skipTarget(ms, { notes: [note(50)] as never }, 0, 80)).toEqual({ target: 44, entry: 50 });
   });

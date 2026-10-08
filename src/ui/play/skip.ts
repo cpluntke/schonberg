@@ -8,13 +8,15 @@ import type { Measure, Part } from '../../music/types';
 export const SKIP_MIN_BARS = 2;
 /** …and this many score seconds. */
 export const SKIP_MIN_SEC = 4;
+/** The lead-in before the entry is at least a bar and at least this many score seconds (fast tempi: more bars). */
+export const LEAD_MIN_SEC = 3;
 
 const measureAt = (measures: Measure[], t: number): Measure | undefined =>
   measures.find((m) => t >= m.start - 1e-6 && t < m.start + m.dur - 1e-6) ?? (t >= (measures.at(-1)?.start ?? Infinity) ? measures.at(-1) : undefined);
 
 /**
  * Where a skip from `pos` would land (not within `afterLast` score seconds of a note's end): the start of the bar that begins at least one bar before the
- * singer's next note (between one and two bars of lead-in), or null when there is no long rest ahead
+ * singer's next note (between one and two bars of lead-in, more at fast tempi: at least LEAD_MIN_SEC), or null when there is no long rest ahead
  * (a note is sounding or starts soon, or there are no more notes before `end`).
  */
 export function skipTarget(measures: Measure[], part: Pick<Part, 'notes'>, pos: number, end: number, afterLast = 0): { target: number; entry: number } | null {
@@ -28,7 +30,8 @@ export function skipTarget(measures: Measure[], part: Pick<Part, 'notes'>, pos: 
   const entry = next.start;
   const em = measureAt(measures, entry);
   if (!em) return null;
-  const lead = measureAt(measures, entry - em.dur + 1e-6);
+  let lead = measureAt(measures, entry - em.dur + 1e-6);
+  while (lead && entry - lead.start < LEAD_MIN_SEC - 1e-6 && lead.index > 0) lead = measures[lead.index - 1];
   if (!lead) return null;
   const target = lead.start;
   const here = measureAt(measures, pos);
