@@ -551,3 +551,13 @@ html:has(.results-foot) { scroll-padding-bottom: 170px; }
   .ranks-board > .col > .row:last-child { border-bottom: none !important; }
   .ranks .topbar select { max-width: 300px !important; }
 }
+
+/* Admin: the sub-tabs as a compact switch; the choir's admin in two columns of cards; the
+   insights at a width where their charts read well. */
+@media (min-width: 900px) {
+  .admin .admin-tabs { max-width: 480px; }
+  .admin-body { display: flex; flex-direction: column; gap: 18px; min-width: 0; max-width: 980px; }
+  .admin-body:has(> .admin-cols) { max-width: none; }
+  .admin-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px 24px; align-items: start; }
+  .admin-col { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+}

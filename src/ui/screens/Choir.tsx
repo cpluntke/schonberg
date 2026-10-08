@@ -396,6 +396,9 @@ export function ChoirAdmin() {
       ) : (
         <NeedLogin code={code} what="Your changes below are kept: log in again, then publish them." />
       )}
+      {/* Wide screens: the logo, cycles, programme and scores on the left; the library and the people on the right. */}
+      <div className="lay admin-cols">
+      <div className="lay admin-col">
       <ChoirLogoEditor code={code} auth={auth} info={info} onChanged={(i) => setInfo((cur) => (cur ? { ...cur, logo: i.logo } : i))} />
       <CyclesPanel code={code} auth={auth} cycles={cycles} selId={selId}
         onSelect={(id) => { if (id !== selId && unsaved(`Edit another cycle anyway`)) return; setSelId(id); setJump((n) => n + 1); }}
@@ -408,6 +411,8 @@ export function ChoirAdmin() {
           onSaved={(r) => { justSaved.current = true; gotCycles(r); void refresh(); }} onConflict={reloadCycles} />
       )}
       <ScoresEditor code={code} auth={auth} info={info} onChanged={refresh} />
+      </div>
+      <div className="lay admin-col">
       {session && (
         <LibraryPanel code={code} auth={auth} info={info} draft={draft.current} cycle={sel} onList={setLibrary}
           onAdded={(i) => { if (i) setInfo(i); void refresh(); reloadCycles(); }} />
@@ -419,6 +424,8 @@ export function ChoirAdmin() {
           <button className="btn small ghost" onClick={() => go({ name: 'choirinsights' })}>See the sections</button>
         </div>
       )}
+      </div>
+      </div>
     </>
   );
 }

@@ -81,7 +81,7 @@ export function AdminScreen({ route }: { route: Route }) {
     : tab === 'choirs' ? <SuperAdmin />
     : <UsageInsights />;
   return (
-    <main className="screen" data-testid="admin-screen">
+    <main className="screen wide admin" data-testid="admin-screen">
       <div className="topbar">
         {!allowed && <button className="icon-btn" aria-label="Back" onClick={() => back({ name: 'settings' })}><IconBack /></button>}
         <h1>{allowed && staff.label ? staff.label : TITLE[tab]}</h1>
@@ -95,7 +95,7 @@ export function AdminScreen({ route }: { route: Route }) {
           ))}
         </div>
       )}
-      {body}
+      <div className="lay admin-body">{body}</div>
     </main>
   );
 }
