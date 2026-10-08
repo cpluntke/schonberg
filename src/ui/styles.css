@@ -561,3 +561,10 @@ html:has(.results-foot) { scroll-padding-bottom: 170px; }
   .admin-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px 24px; align-items: start; }
   .admin-col { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 }
+
+/* Expert mode: its own night-violet ground across the whole screen; the two drills side by side. */
+@media (min-width: 900px) {
+  .app:has(> .expert-screen) { background: #0C0A1F; }
+  .expert-screen { background: transparent !important; }
+  .expert-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: stretch; }
+}

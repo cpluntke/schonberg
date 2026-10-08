@@ -34,7 +34,7 @@ export function Expert() {
   }
 
   return (
-    <main className="screen" style={{ background: '#0C0A1F' }}>
+    <main className="screen wide expert-screen" style={{ background: '#0C0A1F' }}>
       <div className="topbar">
         <button className="icon-btn" aria-label="Back" onClick={() => back()}><IconBack /></button>
         <div className="grow col" style={{ gap: 0 }}>
@@ -44,6 +44,8 @@ export function Expert() {
         <span className="badge expert">×3</span>
       </div>
 
+      {/* (wide screens: the row of the day and the leap drill side by side) */}
+      <div className="lay expert-cols">
       <section className="card expert">
         <div className="row between">
           <strong>Zwölfton of the day</strong>
@@ -91,6 +93,7 @@ export function Expert() {
           <span className="small muted">Add pieces to your cycle to get leap drills.</span>
         )}
       </section>
+      </div>
     </main>
   );
 }
