@@ -110,7 +110,7 @@ export function Ranks() {
   }
 
   return (
-    <main className="screen">
+    <main className="screen wide ranks">
       <div className="topbar">
         <h1>Ranks</h1>
         {pieces.length > 0 && (
@@ -124,13 +124,15 @@ export function Ranks() {
       {!pieces.length && <div className="notice info">Add pieces to your cycle to see rankings.</div>}
       <LevelsNote />
 
-      <div className="seg" role="group" aria-label="Rank by">
+      {/* Wide screens: the board on the left; the section battle, the choir overview and comparing on the right. */}
+      <div className="lay ranks-grid">
+      <div className="seg ranks-by" role="group" aria-label="Rank by">
         {TABS.map((t) => (
           <button key={t.by} aria-pressed={by === t.by} onClick={() => setBy(t.by)}>{t.label}<span className="sub">{t.sub}</span></button>
         ))}
       </div>
 
-      <div className="card">
+      <div className="card ranks-battle">
         <div className="row between"><h2 style={{ fontSize: 15 }}>Section battle</h2><span className="tiny muted">avg. readiness (current app)</span></div>
         {sections.map((s) => (
           <div key={s.vt} className="row">
@@ -143,6 +145,7 @@ export function Ranks() {
         ))}
       </div>
 
+      <div className="lay ranks-board">
       {profile.boardHidden && profile.choirCode && (
         <span className="small muted" data-testid="board-hidden">You're off the choir's leaderboard: only you see your own row here (Settings → Privacy).</span>
       )}
@@ -174,8 +177,10 @@ export function Ranks() {
         })}
       </div>
 
+      </div>
+
       {pieces.length > 0 && (
-        <div className="card">
+        <div className="card ranks-overview">
           <div className="row between"><h2 style={{ fontSize: 15 }}>Choir overview</h2><span className="tiny muted">avg. readiness per section of the choir</span></div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 13 }}>
@@ -208,7 +213,7 @@ export function Ranks() {
         </div>
       )}
 
-      <div className="card">
+      <div className="card ranks-compare">
         <strong>Compare with your choir</strong>
         {backend.kind === 'http' && profile.choirCode ? (
           <span className="small muted" data-testid="on-board">You're on your choir's board: everyone in the choir sees your first name, voice and these numbers.</span>
@@ -238,6 +243,7 @@ export function Ranks() {
         </label>
         <button className="btn small" disabled={!paste.trim()} onClick={addCodes}>Add rankings</button>
         {err && <span className="small" style={{ color: 'var(--accent-text)' }}>{err}</span>}
+      </div>
       </div>
     </main>
   );
