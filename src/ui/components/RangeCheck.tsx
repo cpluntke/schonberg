@@ -6,6 +6,7 @@ import { scheduleClick, scheduleVoice, synthBus } from '../../audio/synth';
 import { FOLLOW, NOTE_SEC, PATTERN, PatternFollower, STEADY_MAX, STEP, judgeFollowed, shouldStop, suggestVoice, summarize, type FollowEnd, type PatternResult, type Verdict } from '../../game/rangecheck';
 import type { RawPitch } from '../../audio/pitch';
 import { useProfile } from '../hooks';
+import { PatternStaff, type NoteState } from './PatternStaff';
 
 type Phase = 'comfortable' | 'middle' | 'high' | 'low' | 'done';
 type RoundState = 'idle' | 'listen' | 'sing' | 'judging';
@@ -35,6 +36,9 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
   const [round, setRound] = useState<RoundState>('idle');
   /** Notes of the pattern sung back so far in this round. */
   const [sungSteps, setSungSteps] = useState(0);
+  /** The pattern of the current (or last) round, for the staff, and the note being played (−1: none). */
+  const [pattern, setPattern] = useState<{ notes: number[]; root: number; unmet?: boolean } | null>(null);
+  const [playing, setPlaying] = useState(-1);
   /** Ends the round being sung now ("That's my top"), so it needn't run to its time limit. */
   const endRoundRef = useRef<(() => void) | null>(null);
   const [rounds, setRounds] = useState<{ phase: Phase; r: PatternResult }[]>([]);
@@ -107,6 +111,10 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
       const out = synthBus(ctx);
       const t0 = ctx.currentTime + 0.25;
       notes.forEach((m, k) => scheduleVoice(ctx, out, m, t0 + k * NOTE_SEC, NOTE_SEC * 0.9, { timbre: 'guide' }));
+      setPattern({ notes, root: judgeRoot });
+      // (each note lights up on the staff while it plays)
+      const lights = notes.map((_, k) => setTimeout(() => { if (!cancelRef.current) setPlaying(k); }, Math.max(0, (t0 + k * NOTE_SEC - ctx.currentTime) * 1000)));
+      lights.push(setTimeout(() => { if (!cancelRef.current) setPlaying(-1); }, Math.max(0, (t0 + notes.length * NOTE_SEC - ctx.currentTime) * 1000)));
       // A breath after the pattern, then a click: your turn, at your own pace. The answer is
       // followed note by note and ends when all five were sung (or isn't met: a different note,
       // nothing heard, stopped, too long). The click is at 1760 Hz, above the tracker's range.
@@ -126,7 +134,8 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
       setSungSteps(0);
       setRound('listen');
       await sleep(Math.max(0, (respStart - ctx.currentTime) * 1000));
-      if (cancelRef.current) { off(); return null; }
+      if (cancelRef.current) { off(); lights.forEach(clearTimeout); return null; }
+      setPlaying(-1);
       setRound('sing');
       endRoundRef.current = finish;
       // (a time limit of its own, in case the tracker goes quiet)
@@ -138,6 +147,7 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
       if (!follower.end && stopRef.current) { setRound('idle'); return null; }
       setRound('judging');
       const r = judgeFollowed(judgeRoot, follower);
+      setPattern({ notes, root: judgeRoot, unmet: !!r.unmet });
       setRounds((rs) => [...rs, { phase: ph, r }]);
       setRound('idle');
       return r;
@@ -194,6 +204,14 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
   const stepNo = { comfortable: 1, middle: 2, high: 3, low: 4, done: 5 }[phase];
   const phaseRounds = rounds.filter((x) => x.phase === phase);
   const lastDone = phaseRounds.length > 0 && !busy;
+
+  /** Each note on the staff: being played, sung, next, or where the answer went wrong. */
+  const staffStates = (): NoteState[] => PATTERN.map((_, i) => {
+    if (round === 'listen') return i === playing ? 'now' : 'todo';
+    if (round === 'sing') return i < sungSteps ? 'done' : i === sungSteps ? 'now' : 'todo';
+    if (pattern?.unmet) return i < sungSteps ? 'done' : i === sungSteps ? 'bad' : 'todo';
+    return 'done';
+  });
 
   // Fixed place right under the status card, so the buttons don't move as results come in.
   const rangeActions = () => (
@@ -272,12 +290,9 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
             <span style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.2, minHeight: '2.4em', display: 'flex', alignItems: 'center', justifyContent: 'center', color: round === 'sing' ? 'var(--accent)' : undefined }}>
               {round === 'listen' ? 'Listen…' : round === 'sing' ? 'Your turn: sing it back' : busy ? (stopping ? 'Stopping…' : 'Next round…') : lastDone ? 'Done' : 'Ready'}
             </span>
-            {round === 'sing' && (
-              <div className="row" style={{ gap: 8, justifyContent: 'center' }} aria-label={`${sungSteps} of ${PATTERN.length} notes sung`} data-testid="range-progress">
-                {PATTERN.map((_, k) => (
-                  <span key={k} style={{ width: 14, height: 14, borderRadius: 7, border: '2px solid var(--voice)', background: k < sungSteps ? 'var(--voice)' : 'transparent' }} />
-                ))}
-              </div>
+            {pattern && (busy || lastDone) && (
+              <PatternStaff notes={pattern.notes} root={pattern.root} states={staffStates()}
+                label={round === 'sing' ? `${sungSteps} of ${PATTERN.length} notes sung` : round === 'listen' ? 'The notes to sing back' : `${sungSteps} of ${PATTERN.length} notes sung`} />
             )}
             <span className="tiny muted">{round === 'sing' ? 'Take your time: the round ends when you have sung all five.' : "Headphones help: the app only listens while it's your turn."}</span>
           </div>
