@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PATTERN, judgePattern, shouldStop, summarize } from './rangecheck';
+import { PATTERN, PatternFollower, judgeFollowed, judgePattern, shouldStop, summarize, type Reading } from './rangecheck';
 
 /** Readings of a sung-back pattern: 37 readings (0.75 s) per note, with a little vibrato and an offset. */
 function sing(root: number, opts: { cents?: number; wobble?: number; skip?: number[]; db?: number; drift?: number } = {}) {
@@ -143,5 +143,91 @@ describe('range check: octaves', () => {
     expect(judgePattern(40, flips).verdict).toBe('good');
     const e3 = sing(52).map((x, i) => (i % 9 < 2 && x.midi != null ? { ...x, midi: x.midi + 12 } : x));
     expect(judgePattern(52, e3).verdict).toBe('good');
+  });
+});
+
+describe('range check: the answer at the singer\'s own pace', () => {
+  const STEP_S = 0.02;
+  type Note = { midi: number | null; sec: number; cents?: number };
+  /** Readings every 20 ms: each note slides in over 80 ms from the one before, with a light vibrato. */
+  function answer(notes: Note[], lead = 0.6): { r: Reading; t: number }[] {
+    const out: { r: Reading; t: number }[] = [];
+    let t = 0;
+    for (let i = 0; i < lead / STEP_S; i++, t += STEP_S) out.push({ r: { midi: null, rms: 0.001 }, t });
+    let prev: number | null = null;
+    for (const n of notes) {
+      const k = Math.round(n.sec / STEP_S);
+      for (let i = 0; i < k; i++, t += STEP_S) {
+        if (n.midi === null) { out.push({ r: { midi: null, rms: 0.001 }, t }); continue; }
+        const target = n.midi + (n.cents ?? 0) / 100;
+        const into = prev !== null && i < 4 ? (prev - target) * (1 - i / 4) : 0;
+        out.push({ r: { midi: target + into + 0.1 * Math.sin(i * 0.9), rms: 0.05 }, t });
+      }
+      prev = n.midi;
+    }
+    // …then silence until the follower is done or gives up.
+    for (let i = 0; i < 30 / STEP_S; i++, t += STEP_S) out.push({ r: { midi: null, rms: 0.001 }, t });
+    return out;
+  }
+  const follow = (root: number, notes: Note[], dir: 1 | -1 = 1) => {
+    const f = new PatternFollower(PATTERN.map((x) => root + dir * x));
+    let at = 0;
+    for (const { r, t } of answer(notes)) { at = t; if (f.push(r, t)) break; }
+    return { f, at, res: judgeFollowed(dir > 0 ? root : root - 4, f) };
+  };
+  const pat = (root: number, sec: number | number[], dir: 1 | -1 = 1): Note[] =>
+    PATTERN.map((x, k) => ({ midi: root + dir * x, sec: Array.isArray(sec) ? sec[k] : sec }));
+
+  it('any tempo: fast, slow, uneven, with a breath between notes, all complete', () => {
+    for (const sec of [0.35, 0.75, 1.6, [0.4, 1.8, 0.6, 1.2, 0.5]]) {
+      const { f, res } = follow(60, pat(60, sec));
+      expect(f.end, String(sec)).toBe('done');
+      expect(res.verdict, String(sec)).toBe('good');
+    }
+    const breaths = pat(60, 0.7).flatMap((n) => [n, { midi: null, sec: 0.5 }]);
+    expect(follow(60, breaths).f.end).toBe('done');
+    // A pattern going down, from the top.
+    expect(follow(67, pat(67, 0.9, -1), -1).res.verdict).toBe('good');
+  });
+  it('ends soon after the last note, not after a fixed time', () => {
+    const { f, at } = follow(60, pat(60, 0.5));
+    expect(f.end).toBe('done');
+    expect(at).toBeLessThan(0.6 + 5 * 0.5 + 0.2);
+  });
+  it('a held wrong note, or two brief ones, is not met', () => {
+    const wrong = pat(60, 0.8);
+    wrong[2] = { midi: 63, sec: 0.8 }; // a third instead of the fourth step
+    const a = follow(60, wrong);
+    expect(a.f.end).toBe('wrong');
+    expect(a.res.verdict).toBe('missed');
+    expect(a.res.unmet).toBe('wrong');
+    // The notes in the wrong order.
+    expect(follow(60, [{ midi: 60, sec: 0.7 }, { midi: 64, sec: 0.7 }, { midi: 62, sec: 0.7 }]).f.end).toBe('wrong');
+  });
+  it('out of range: the top note sung flat by a semitone and a half, or not at all, is not met', () => {
+    const flat = pat(70, 0.8);
+    flat[2] = { midi: 72, sec: 1.5, cents: 50 }; // aiming for 74, stuck around 72.5
+    expect(follow(70, flat).res.unmet).toBe('wrong');
+    const stops = pat(70, 0.8).slice(0, 2);
+    expect(follow(70, stops).res.unmet).toBe('stopped');
+  });
+  it('nothing sung, or stuck too long, is not met', () => {
+    expect(follow(60, []).res.unmet).toBe('silent');
+    const stuck = pat(60, 0.8);
+    stuck[1] = { midi: 62, sec: 7 };
+    expect(follow(60, stuck).res.unmet).toBe('slow');
+  });
+  it('a slightly flat note still counts as that note; the judgement makes it shaky', () => {
+    const r = follow(60, pat(60, 0.8).map((n) => ({ ...n, cents: -65 }))).res;
+    expect(r.unmet).toBeUndefined();
+    expect(r.verdict).toBe('shaky');
+  });
+  it('the scoop into a note is not a wrong note; a tracker octave slip is folded', () => {
+    const scoop: Note[] = [{ midi: 60, sec: 0.7 }, { midi: 61, sec: 0.22 }, { midi: 62, sec: 0.7 }, { midi: 64, sec: 0.7 }, { midi: 62, sec: 0.7 }, { midi: 59, sec: 0.2 }, { midi: 60, sec: 0.7 }];
+    expect(follow(60, scoop).f.end).toBe('done');
+    const notes = answer(pat(60, 0.8));
+    const f = new PatternFollower(PATTERN.map((x) => 60 + x));
+    notes.forEach(({ r, t }, i) => { if (!f.end) f.push(i % 9 === 0 && r.midi !== null ? { ...r, midi: r.midi + 12 } : r, t); });
+    expect(f.end).toBe('done');
   });
 });
