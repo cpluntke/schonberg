@@ -98,7 +98,7 @@ export const ALL_PIECES = '*all';
 
 /**
  * One entry per singer over the programme's pieces (`pieceIds`): readiness and 7-day gain averaged
- * over all of them (a piece not started counts 0), this week's points added up, the longest streak.
+ * over all of them (a piece not started counts 0), this week's points added up, the current streak.
  * Singers are matched by name (case and spaces ignored); voice and name from their newest entry.
  * Comparable (v) only when every piece's entry is. Entries for other pieces are left out.
  */
@@ -118,14 +118,16 @@ export function combineEntries(entries: LeaderboardEntry[], pieceIds: string[]):
   return [...by.values()].map((m) => {
     const es = [...m.values()];
     const newest = es.reduce((a, e) => (e.updatedAt > a.updatedAt ? e : a));
+    // (the spelling with a capital, if any: "Frauke" over "frauke")
+    const name = (es.find((e) => /^\p{Lu}/u.test(e.name.trim())) ?? newest).name.trim();
     return {
-      name: newest.name.trim(),
+      name,
       voice: newest.voice,
       pieceId: ALL_PIECES,
       readiness: es.reduce((a, e) => a + e.readiness, 0) / n,
       improved: es.reduce((a, e) => a + e.improved, 0) / n,
       weeklyScore: es.reduce((a, e) => a + e.weeklyScore, 0),
-      streak: Math.max(...es.map((e) => e.streak)),
+      streak: newest.streak, // (one number per singer, not per piece: the newest is current)
       updatedAt: newest.updatedAt,
       ...(es.every((e) => e.v === READINESS_VERSION) ? { v: READINESS_VERSION } : {}),
     };

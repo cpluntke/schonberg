@@ -91,7 +91,7 @@ describe('leaderboard', () => {
 describe('ranks over all pieces', () => {
   const e = (name: string, pieceId: string, o: Partial<LeaderboardEntry> = {}): LeaderboardEntry =>
     ({ name, voice: 'S', pieceId, readiness: 0.5, weeklyScore: 100, streak: 2, improved: 0.1, updatedAt: 1, v: READINESS_VERSION, ...o });
-  it('averages readiness and gain over the programme (a piece not started counts 0), adds points, keeps the longest streak', () => {
+  it('averages readiness and gain over the programme (a piece not started counts 0), adds points, keeps the current streak', () => {
     const out = combineEntries([
       e('Frauke', 'kyrie', { readiness: 0.6, improved: 0.2, weeklyScore: 300, streak: 3, updatedAt: 5 }),
       e('frauke ', 'yver', { readiness: 0.3, improved: 0.1, weeklyScore: 50, streak: 4, updatedAt: 9, voice: 'A' }),
@@ -99,7 +99,7 @@ describe('ranks over all pieces', () => {
       e('Caroline', 'yver', { readiness: 0.12, v: undefined }),
       e('Steven', 'not-in-programme', { readiness: 1 }),
     ], ['kyrie', 'yver', 'madrigal']);
-    const f = out.find((x) => x.name.trim() === 'frauke')!;
+    const f = out.find((x) => x.name === 'Frauke')!; // (the capitalised spelling)
     expect(f).toMatchObject({ pieceId: ALL_PIECES, voice: 'A', weeklyScore: 350, streak: 4, updatedAt: 9, v: READINESS_VERSION });
     expect(f.readiness).toBeCloseTo(0.3);
     expect(f.improved).toBeCloseTo(0.1);

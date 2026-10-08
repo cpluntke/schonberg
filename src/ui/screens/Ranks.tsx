@@ -53,12 +53,13 @@ export function Ranks() {
     if (!pieceId) return;
     (async () => {
       try {
-        // Named entries on a real (server) board only (see postBoardEntry). All pieces: each of mine.
-        if (overAll) for (const e of myEntries) await postBoardEntry(e);
-        else if (me) await postBoardEntry(me);
+        // Named entries on a real (server) board only (see postBoardEntry). All pieces: each piece I
+        // practised. A post that fails (rate limit, full board) doesn't keep the board from showing.
+        const posts = overAll ? myEntries.filter((e) => e.readiness > 0 || e.weeklyScore > 0) : me ? [me] : [];
+        const failed = (await Promise.allSettled(posts.map((e) => postBoardEntry(e)))).find((r) => r.status === 'rejected');
         const everything = await backend.list(choir);
         const list = overAll ? combineEntries(everything, programme) : await backend.list(choir, pieceId);
-        if (alive) { setEntries(list); setAllEntries(everything); setErr(null); }
+        if (alive) { setEntries(list); setAllEntries(everything); setErr(failed ? String((failed as PromiseRejectedResult).reason?.message ?? failed.reason) : null); }
       } catch (e) {
         if (alive) setErr((e as Error).message);
       }
@@ -67,7 +68,9 @@ export function Ranks() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pieceId, choir, profile.choirCode, profile.name, refresh, programme.join(',')]);
 
-  const others = entries.filter((e) => !(me && e.name.trim().toLowerCase() === me.name.trim().toLowerCase() && e.pieceId === me.pieceId));
+  // (only rows of the view shown: while switching, the last view's rows are still there)
+  const sameName = (a: string, b: string) => (overAll ? a.trim().toLowerCase() === b.trim().toLowerCase() : a === b);
+  const others = entries.filter((e) => e.pieceId === pieceId && !(me && sameName(e.name, me.name)));
   const all = me ? [...others, { ...me, name: me.name }] : others;
   const ranked = rankEntries(all, by);
   // Averages only use entries with the current readiness formula (older app versions report
@@ -156,7 +159,7 @@ export function Ranks() {
       <div className="lay ranks-board">
       {overAll && pieces.length > 1 && (
         <span className="tiny muted" data-testid="ranks-all-note">
-          All {pieces.length} pieces of the programme: readiness and the 7-day gain are averaged (a piece not started counts 0), this week's points added up, the longest streak.
+          All {pieces.length} pieces of the programme: readiness and the 7-day gain are averaged (a piece not started counts 0), this week's points added up.
         </span>
       )}
       {profile.boardHidden && profile.choirCode && (
@@ -182,7 +185,9 @@ export function Ranks() {
               <span className="mono" style={{ fontWeight: 600 }}>{metric(e)}</span>
               {!isMe && backend.kind === 'local' && (
                 <button className="icon-btn" aria-label={`Remove ${e.name}`} title="Remove" onClick={() => {
-                  for (const id of e.pieceId === ALL_PIECES ? programme : [e.pieceId]) removeLocalEntry(choir, e.name, id);
+                  // (every spelling of the name, over all pieces)
+                  const names = e.pieceId === ALL_PIECES ? [...new Set(allEntries.filter((x) => x.name.trim().toLowerCase() === e.name.trim().toLowerCase()).map((x) => x.name))] : [e.name];
+                  for (const id of e.pieceId === ALL_PIECES ? programme : [e.pieceId]) for (const n of names) removeLocalEntry(choir, n, id);
                   setRefresh((x) => x + 1);
                 }}>
                   <span aria-hidden="true" style={{ fontSize: 18, color: 'var(--muted)' }}>×</span>
