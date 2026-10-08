@@ -150,11 +150,13 @@ export function App() {
 
   return (
     <div className={route.name === 'play' ? 'app app-play' : sidebar ? 'app has-nav' : 'app'}>
+      {/* (keyboard: the menu comes after the page in the document; this jumps there first) */}
+      {sidebar && <a href="#main-nav" className="skip-link" onClick={(e) => { e.preventDefault(); document.querySelector<HTMLElement>('#main-nav button')?.focus(); }}>Go to the menu</a>}
       <ErrorBoundary resetKey={JSON.stringify(route)}>{body}</ErrorBoundary>
       <UpdatePrompt hidden={route.name === 'play'} />
       <StorageFullNotice hidden={route.name === 'play'} />
       {sidebar && (
-        <nav className={showNav ? 'nav' : 'nav wide-only'} aria-label="Main">
+        <nav id="main-nav" className={showNav ? 'nav' : 'nav wide-only'} aria-label="Main">
           {/* (wide screens: the nav is a sidebar with the app's name on top and the choir below) */}
           <div className="nav-brand" aria-hidden="true">
             <span>Schönberg</span>
