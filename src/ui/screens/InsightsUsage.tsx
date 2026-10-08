@@ -95,7 +95,7 @@ export function UsageInsights() {
     <>
       <span className="small muted">{n === '24h'
         ? 'Anonymous hourly totals: no names, no accounts, no recordings. Phones send what they counted every few minutes while the app is in use (app versions from 8 Oct 2026 on); this page updates every minute. Hours are kept for two days.'
-        : 'Anonymous daily totals only: no names, no accounts, no recordings. Phones send each day\'s summary when the app is next opened, so the last days fill in over a week; the "24 hours" tab shows today\'s practice as it happens.'}</span>
+        : 'Anonymous daily totals only: no names, no accounts, no recordings. Phones send each day\'s summary when the app is next opened, so the last days fill in over a week; the "24 hours" tab shows the last 24 hours as they happen.'}</span>
       <div className="row wrap" style={{ gap: 8 }}>
         <div className="seg" role="group" aria-label="Date range" style={{ flex: 1 }}>
           {RANGES.map((r) => <button key={r} aria-pressed={n === r} onClick={() => setN(r)} data-testid={`usage-range-${r}`}>{r === '24h' ? '24 hours' : `${r} days`}</button>)}

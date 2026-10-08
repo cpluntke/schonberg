@@ -187,6 +187,9 @@ input[type='range'] { accent-color: var(--accent); width: 100%; }
 .play-hud { display: flex; align-items: center; gap: 6px; padding: 8px 8px 4px; }
 .play-canvas-wrap { position: relative; flex: 1 1 auto; min-height: 240px; }
 .play-canvas-wrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+/* A long rest ahead: "Skip the rest", low in the middle of the music (out of the way of the notes being sung). */
+.skip-rest { position: absolute; left: 0; right: 0; bottom: 14px; display: flex; justify-content: center; pointer-events: none; }
+.skip-rest .btn { pointer-events: auto; box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45); }
 .lyrics { padding: 10px 16px 2px; font-size: 20px; min-height: 36px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lyrics .done { color: var(--voice); }
 .lyrics .now { color: var(--accent); font-weight: 800; }

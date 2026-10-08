@@ -42,6 +42,7 @@ import type { AttemptResult } from '../../game/types';
 import type { NotationMode } from '../../game/notation';
 import { NotFound } from '../components/NotFound';
 import { PracticeBar } from '../components/PracticeBar';
+import { skipTarget } from '../play/skip';
 
 type PlayRoute = Extract<Route, { name: 'play' }>;
 
@@ -93,7 +94,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
   const [phase, setPhase] = useState<'ready' | 'running' | 'paused' | 'micError'>('ready');
   const [micMsg, setMicMsg] = useState('');
   const [listened, setListened] = useState(false);
-  const [hud, setHud] = useState({ score: 0, combo: 0, count: 0, lyricIdx: -1 });
+  const [hud, setHud] = useState<{ score: number; combo: number; count: number; lyricIdx: number; skip: { target: number; entry: number; bar: string } | null }>({ score: 0, combo: 0, count: 0, lyricIdx: -1, skip: null });
   const [gains, setGains] = useState<Record<string, number>>(() => {
     const g: Record<string, number> = {};
     for (const p of piece?.score.parts ?? []) {
@@ -518,14 +519,21 @@ function SingPlay({ route }: { route: PlayRoute }) {
           if (part.notes[i].start <= pos + 0.05) lyricIdx = i;
           else break;
         }
-        const next = { score: s?.live?.score ?? 0, combo: s?.live?.combo ?? 0, count, lyricIdx };
-        setHud((h) => (h.score === next.score && h.combo === next.combo && h.count === next.count && h.lyricIdx === next.lyricIdx ? h : next));
+        // A long rest ahead: offer to skip to a bar or so before the next entry (not in a cold start's lead-in).
+        let skip: { target: number; entry: number; bar: string } | null = null;
+        if (s && !listenOnly && !cold && (s.phase === 'playing' || (s.phase === 'countin' && count === 0))) {
+          const k = skipTarget(piece.score.measures, part, pos, section.end);
+          if (k) skip = { ...k, bar: piece.score.measures.find((m) => k.entry >= m.start - 1e-6 && k.entry < m.start + m.dur - 1e-6)?.number ?? '' };
+        }
+        const next = { score: s?.live?.score ?? 0, combo: s?.live?.combo ?? 0, count, lyricIdx, skip };
+        setHud((h) => (h.score === next.score && h.combo === next.combo && h.count === next.count && h.lyricIdx === next.lyricIdx
+          && h.skip?.target === next.skip?.target && h.skip?.entry === next.skip?.entry ? h : next));
       }
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [piece, part, section, route.mode, notation, showNames, rate, tolerance, offBook, cold, display, staves, doo, scorePages]);
+  }, [piece, part, section, route.mode, notation, showNames, rate, tolerance, offBook, cold, display, staves, doo, scorePages, listenOnly]);
 
   // Seen once a run starts with it on screen (switching display before Start shows the other one's).
   useEffect(() => {
@@ -609,6 +617,14 @@ function SingPlay({ route }: { route: PlayRoute }) {
             {sessionRef.current?.resumed && (
               <span className="small" data-testid="resume-hint" style={{ background: 'rgba(11,13,26,0.85)', borderRadius: 8, padding: '4px 10px' }}>Carry on singing from the line</span>
             )}
+          </div>
+        )}
+        {running && hud.skip && hud.count === 0 && (
+          <div className="skip-rest">
+            <button className="btn small voice" data-testid="skip-rest"
+              onClick={() => { const k = hud.skip; if (k && sessionRef.current?.skipTo(k.target, k.entry)) setHud((h) => ({ ...h, skip: null })); }}>
+              ⏩ Skip the rest{hud.skip.bar ? ` · in at bar ${hud.skip.bar}` : ''}
+            </button>
           </div>
         )}
         {phase === 'ready' && (

@@ -180,7 +180,7 @@ export class PracticeSession {
     this.requestWakeLock();
   }
 
-  private play(from: number, countIn: boolean) {
+  private play(from: number, countIn: boolean, cue?: SessionConfig['cue']) {
     this.plays++;
     this.ended = false;
     this.unsubEnd?.();
@@ -201,7 +201,7 @@ export class PracticeSession {
       click: this.clickFor(lead ?? from),
       cuePartId: this.cfg.part.id,
       // After a resume, give the note as a reminder — except at concert level, which only gets the chord.
-      cue: lead != null ? 'none' : from === this.cfg.from || this.cfg.cue !== 'note' ? this.cfg.cue : 'note',
+      cue: cue ?? (lead != null ? 'none' : from === this.cfg.from || this.cfg.cue !== 'note' ? this.cfg.cue : 'note'),
     });
     this.phase = 'countin';
   }
@@ -364,6 +364,28 @@ export class PracticeSession {
     this.recorder = null;
     this.phase = 'paused';
     this.releaseWakeLock();
+  }
+
+  /**
+   * Skip a long rest: jump the playback to `target` (a bar or two before the singer's next note, see
+   * skip.ts). Not a pause: nothing of the singer's part is skipped, so the run still counts. With
+   * nothing audible playing in the lead-in, a count-in leads to it. False when not running.
+   */
+  skipTo(target: number, entry: number): boolean {
+    if ((this.phase !== 'playing' && this.phase !== 'countin') || this.ended || this.disposed) return false;
+    if (!(target > this.player.position + 1e-3) || target >= this.cfg.to) return false;
+    this.unsubEnd?.();
+    this.unsubEnd = null;
+    this.player.stop();
+    // A second time mapping: the recording couldn't be re-scored (as after a pause).
+    this.recorder?.stop();
+    this.recorder = null;
+    this.resumeFrom = target;
+    this.minTime = target - 0.02;
+    const audible = new Set(Object.entries(this.partGains).filter(([, g]) => g > 0).map(([id]) => id));
+    const heard = this.cfg.score.parts.some((p) => audible.has(p.id) && p.notes.some((n) => n.start < entry - 1e-6 && n.start + n.dur > target + 1e-6));
+    this.play(target, !heard, this.cfg.cue);
+    return true;
   }
 
   /**
