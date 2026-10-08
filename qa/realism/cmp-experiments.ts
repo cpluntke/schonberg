@@ -90,7 +90,7 @@ export const SANITY_DEVICE_MS = 130;
 
 export async function sanity(): Promise<SanityRow[]> {
   const out: SanityRow[] = [];
-  const singers = [SINGERS.wrongNotes, SINGERS.flat40, SINGERS.echo300, SINGERS.oneBehind, SINGERS.lateArriver];
+  const singers = [SINGERS.wrongNotes, SINGERS.flat40, SINGERS.echo300, SINGERS.oneBehind, SINGERS.lateArriver, SINGERS.fragmentsHiss, SINGERS.lateHiss];
   for (const singer of singers) {
     for (const target of [T.dieu0, T.warmup1]) {
       for (const level of [1, 2, 4]) {
@@ -105,6 +105,14 @@ export async function sanity(): Promise<SanityRow[]> {
           chains: await sequence({ target, singer, level, trueLatencyMs: SANITY_DEVICE_MS, seed: 7 }, UNCAL_CHAINS.slice(0, 2), 3),
         });
       }
+    }
+  }
+  // Fragments of voice through the phone speaker: the backing fills the gaps (no consonant relief there).
+  for (const target of [T.dieu0, T.warmup1]) {
+    for (const level of [1, 2, 4]) {
+      const setup = await render({ target, singer: SINGERS.fragmentsHiss, level, trueLatencyMs: SANITY_DEVICE_MS, performanceSeed: 1, microSeed: 1, channel: CHANNELS.phoneSpeaker });
+      const chains = calChains(SANITY_DEVICE_MS).map((c) => ({ label: c.label, runs: [summarize(runSession(c.spec, setup, c.start), c.label)] }));
+      out.push({ singer: `${SINGERS.fragmentsHiss.name}, phone speaker`, target: target.id, level, latency: `measured ${SANITY_DEVICE_MS}`, chains });
     }
   }
   return out;

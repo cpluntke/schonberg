@@ -12,7 +12,7 @@ import { Rng } from './prng';
 
 /** The pure pitch functions the tracker uses; swap in another implementation to compare. */
 export interface PitchImpl {
-  detectPitch(frame: Float32Array, sampleRate: number, expectedHz?: number | null, prevHz?: number | null): { hz: number; clarity: number; rms: number; lifted?: 2 | 3; subDb?: number | null };
+  detectPitch(frame: Float32Array, sampleRate: number, expectedHz?: number | null, prevHz?: number | null): { hz: number; clarity: number; rms: number; lifted?: 2 | 3; subDb?: number | null; hfHz?: number };
   gatePitch(r: { hz: number; clarity: number; rms: number }, o?: { minHz?: number }): number | null;
   newSmoother(): { push(m: number | null): number | null };
   /** The app stamps the smoothed reading with the previous frame's own window centre (current pitch.ts); else centre − hop. */
@@ -77,6 +77,10 @@ export interface TrackReading {
   lifted?: 2 | 3;
   /** Components at ½ / ⅓ of the reading (dB under its harmonics). */
   subDb?: number | null;
+  /** The frame is a fricative (pitch.ts isFricative; trackers that report hfHz). */
+  fric?: boolean;
+  /** pitch.ts highFreqHz of the frame (above the level gate). */
+  hfHz?: number;
 }
 
 export function trackOffline(pcm: Float32Array, sampleRate: number, opts: TrackOptions = {}): TrackReading[] {
@@ -93,6 +97,7 @@ export function trackOffline(pcm: Float32Array, sampleRate: number, opts: TrackO
   const frame = new Float32Array(N);
   let lastEnd = -1;
   let prevCentre: number | null = null;
+  let prevFric = false;
   const prev = new current.LastDirectReading();
   // The tracker's lower limit just above 60 Hz mains hum (pitch.ts humFloorHz).
   const floorHz = current.humFloorHz(opts.filter?.mainsHz ?? null);
@@ -112,7 +117,11 @@ export function trackOffline(pcm: Float32Array, sampleRate: number, opts: TrackO
     const midi = smoother.push(gated);
     const stampSec = impl.stampPrevFrame && prevCentre !== null ? prevCentre : centreSec - hop;
     prevCentre = centreSec;
-    out.push({ centreSec, stampSec, hz: gated == null ? null : r.hz, rawMidi: gated, midi, clarity: r.clarity, rms: r.rms, ...(r.lifted ? { lifted: r.lifted } : {}), subDb: r.subDb ?? null });
+    // The app sends the previous frame (one-frame look-ahead) with its own fricative flag.
+    const fricNow = current.isFricative({ pitched: gated != null, rms: r.rms, hfHz: r.hfHz });
+    const fric = impl.stampPrevFrame ? prevFric : fricNow;
+    prevFric = fricNow;
+    out.push({ centreSec, stampSec, hz: gated == null ? null : r.hz, rawMidi: gated, midi, clarity: r.clarity, rms: r.rms, ...(r.lifted ? { lifted: r.lifted } : {}), subDb: r.subDb ?? null, ...(fric ? { fric } : {}), ...(r.hfHz != null ? { hfHz: r.hfHz } : {}) });
   }
   return out;
 }

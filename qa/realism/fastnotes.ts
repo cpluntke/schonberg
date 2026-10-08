@@ -13,7 +13,7 @@ import { median, type ScoringContext } from '../../src/game/scoring';
 import { makePart, makeScore } from '../../src/game/testutil';
 import { CLARITY_GATE, RMS_GATE } from '../../src/audio/pitch';
 import { levelSetup, oracleSamples } from './harness';
-import { AFTER, UNCALIBRATED, afterScorerView, measured, runSession, type PipelineSpec, type Profile, type SessionOutcome } from './pipeline';
+import { AFTER, UNCALIBRATED, afterScorerView, measured, runSession, scoringConsonants, type PipelineSpec, type Profile, type SessionOutcome } from './pipeline';
 import { SINGERS, onDoo } from './singer';
 import { gitVariant } from './variants';
 import { hashSeed } from './prng';
@@ -136,7 +136,7 @@ export function diagnose(run: RenderedRun, mod: ScoringModule = curScoring): { n
   const { passage, level, take, outcome } = run;
   const rate = take.rate;
   const tol = tolOf(level);
-  const opts = { toleranceCents: tol, tuning: 'equal' as const, octaveTolerant: false, rate };
+  const opts = { toleranceCents: tol, tuning: 'equal' as const, octaveTolerant: false, rate, ...(scoringConsonants(outcome.pipeline === 'after', take) ? { consonants: true } : {}) };
   const ctx: ScoringContext = { score: passage.score, part: passage.part, range: passage.range, end: passage.to };
   const lag = (outcome.alignedMs / 1000) * rate;
   const view = afterScorerView(passage.part, outcome.samples).map((s) => ({ ...s, time: s.time - lag }));

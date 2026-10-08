@@ -16,6 +16,11 @@ export interface PitchSample {
    * distortion). Absent = clean.
    */
   mic?: boolean;
+  /**
+   * No pitch, but a fricative (an s, sh, f: sound above the level gate with its energy mostly high,
+   * src/audio/pitch.ts isFricative). The scorer can excuse it as a consonant (ScoringOptions.consonants).
+   */
+  fric?: boolean;
 }
 
 export type Grade = 'perfect' | 'good' | 'ok' | 'miss';
@@ -40,6 +45,12 @@ export interface ScoringOptions {
    * in score seconds is vibratoWindow × rate: one vibrato cycle whatever the tempo. Default 1.
    */
   rate?: number;
+  /**
+   * Excuse consonants (PitchSample.fric readings) at a note's start, inside it and at its end, within
+   * limits (scoring.ts CONSONANT_*). Only when the mic hears the voice alone (headphones on): through
+   * the speaker the backing fills every gap. Default false.
+   */
+  consonants?: boolean;
 }
 
 export interface NoteResult {

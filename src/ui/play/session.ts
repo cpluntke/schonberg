@@ -260,7 +260,7 @@ export class PracticeSession {
     // Raw readings are kept (and exported); the end of the run corrects speaker-bleed subharmonics
     // after lining the voice up (game/align.ts). The live display corrects them on the fly.
     // Frames where the tracker saw input trouble are marked (scoring: NoteResult.unsure 'mic').
-    const s: PitchSample = { time: t, midi: p.midi, clarity: p.clarity, rms: p.rms, ...(micTrouble(p) ? { mic: true } : {}) };
+    const s: PitchSample = { time: t, midi: p.midi, clarity: p.clarity, rms: p.rms, ...(micTrouble(p) ? { mic: true } : {}), ...(p.fric ? { fric: true } : {}) };
     const shown = p.midi != null && !this.cfg.scoring.octaveTolerant ? { ...s, midi: fixSubharmonic(p.midi, this.noteDueAt(t)) } : s;
     this.latest = shown;
     this.keep(s, shown);

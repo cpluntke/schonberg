@@ -13,6 +13,7 @@ This page is for singers and testers who want to know what the app is doing.
 | Hop | A new reading every **20 ms**. |
 | Harmonic check | MPM picks the first strong period of the sound. Hum mixing with the voice in a laptop's input can make that period two or three times the voice's, so a sung C#4 reads as C#3 or F#2. A voice at the reading would have energy at every multiple of it; when the multiples that aren't multiples of 3 are far (9 dB) weaker than those that are, the reading is lifted ×3, and ×2 when the odd ones are 15 dB weaker. Between 3 and 9 dB the note due or the voice's previous reading decide the ×3 lift; the octave never uses a hint. A voice really singing an octave or an octave and a fifth low has its own harmonics and still reads low. |
 | Gates | A reading only counts as sung when the level is above the noise floor, the MPM *clarity* is at least 0.85 (clearly pitched sound, not a consonant or breath) and the pitch is between 60 and 1400 Hz. |
+| Fricatives | A reading without a pitch, above the level gate, whose sound sits mostly above ~2.5 kHz (the power-weighted frequency of the frame, from the energy of its first difference) is marked as a fricative (*s*, *sh*, *f*): the scorer can excuse it as a consonant (below). Voices, hum and the backing through the speaker sit far lower. |
 | Smoothing | Each reading is checked against the one before and the one after it (so it is reported one reading, 20 ms, later). A reading more than 1.5 semitones away from **both** neighbours on the same side (a one-frame octave jump or a wild reading) is replaced by the median of the three. Every other reading is passed on unchanged, so the one or two readings a fast note gets are not flattened. Nothing else: the trace you see is what the detector heard. |
 | Time stamp | Each reading is stamped at the centre of its own window (it is sent one reading later, with that window's level and clarity). The device delay is then subtracted (see below). |
 
@@ -25,6 +26,20 @@ For every note in your part:
 - **Intonation ("In tune").**
   - Judging starts when your voice *arrives* within tolerance of the note: at most 0.15 s (and 35% of the note) after the written start, plus the device delay the line-up corrects. The glide into the note, the overshoot and a late consonant don't count.
   - Judging stops when you head for the next note (at most 0.12 s early).
+  - **Consonants** (only with headphones on: through the speaker the backing fills every gap). The
+    tracker marks readings without a pitch whose sound is mostly high (above ~2.5 kHz: an *s*, *sh*,
+    *f*) as fricatives. One that is clearly louder than the room (3× the level heard in the count-in
+    and the rests) and not far below your voice is a consonant, unless it lasts more than 0.3 s (a
+    sustained hiss or breath is not a consonant).
+    - A consonant sung on the beat, running straight into the vowel, gives the voice 0.1 s after it
+      to arrive, when that is later than the usual limit.
+    - Consonant time inside the note or at its end (a repeated "sa sa", a final *s*, the next word's
+      *s* sung early, also before a rest) is excused like a dropout.
+    - Both together count for at most 0.25 s and never more than 35% of the note, and only on a
+      note your voice covers for at least 35% of it. Silence, hum or room noise are never consonants:
+      coming in late after a pause, or stopping early, still counts.
+    - These durations are real time: at level 1's 70% they span fewer score seconds (like the
+      vibrato smoothing); the shares are of the written note.
   - Vibrato is cancelled by two cascaded moving averages (≈180 ms and ≈220 ms of real time, whatever the tempo: at level 1's 70% they span fewer score seconds). These remove vibratos from about 4 to 8 Hz almost completely, so a vibrato centred on the note counts as in tune.
   - A short dropout of the detector (up to 20% of the note) doesn't count against you.
 - **Very short notes** (fast passages, e.g. 16ths at 104–144 bpm, ~0.1 s). The voice rarely settles: it glides in, overshoots, and the next syllable's consonant cuts it off, so the detector gets only two to four readings per note.
@@ -91,7 +106,7 @@ What you hear from the phone and what the microphone picks up arrive late by the
 - **Delay check** (Voice setup): sing "ta" with 6 clicks and the app measures the delay directly.
 - **Automatic line-up after every run:**
   - The app tries a range of delays and keeps the one where your pitches agree best with the written notes. It uses pitch, not onsets, because consonants and breaths blur those.
-  - The search never goes beyond a plausible total device delay. With a **measured** delay it only corrects by up to 80 ms, and first checks where the voice really lines up (within ±250 ms): a voice that lines up only about a note late (more than 85% of a typical note and more than 0.1 s) or early (more than half a note, at least 50 ms and at most 80 ms) is singing the neighbouring notes, not suffering a delay error, and is not shifted, so a singer one note behind or ahead fails. In fast passages (a typical note shorter than 0.16 s), a voice that lines up a little beyond 80 ms is corrected by 80 ms (a slightly larger delay error costs a little, not everything); a voice on the wrong notes lines up nowhere and is not shifted.
+  - The search never goes beyond a plausible total device delay. With a **measured** delay it only corrects by up to 80 ms, and first checks where the voice really lines up (within ±250 ms): a voice that lines up only about a note late (more than 85% of a typical note and more than 0.1 s) or early (more than half a note, at least 50 ms and at most 80 ms) is singing the neighbouring notes, not suffering a delay error, and is not shifted, so a singer one note behind or ahead fails. In fast passages (a typical note shorter than 0.16 s), a voice that lines up a little beyond 80 ms is corrected by 80 ms (a slightly larger delay error costs a little, not everything); a voice on the wrong notes lines up nowhere and is not shifted. A correction that would score your intonation strictly worse than the voice as heard is dropped (it lined up the wrong evidence, e.g. the glide after an on-beat *s* looks like a late voice); a dropped correction of 60 ms or more still suggests the delay check.
   - **Only intonation** is judged on the lined-up voice. Onsets, rhythm and the timing tips stay on the delay the app applied, so singing late still shows as late.
 - **Learning the delay** (phones without a measured delay):
   - The app suggests a delay after each complete run.

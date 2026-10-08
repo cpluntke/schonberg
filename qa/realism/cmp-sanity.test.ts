@@ -15,6 +15,10 @@ it('sanity and adversarial singers (before vs after)', async () => {
       void k;
       const mustFail =
         r.singer === SINGERS.wrongNotes.name || r.singer === SINGERS.oneBehind.name ||
+        // Singing a quarter of each note and hissing (or the backing) through the rest is never enough.
+        r.singer.startsWith(SINGERS.fragmentsHiss.name) ||
+        // Late with a hiss from each beat (a consonant can't hide 300 ms): as the echo singer.
+        (r.singer === SINGERS.lateHiss.name && r.level >= 2 && r.latency.startsWith('measured')) ||
         (r.singer === SINGERS.flat40.name && r.level >= 2) ||
         // The echo singer must not pass L2+ when the delay is measured (a learned delay can't tell
         // device delay from late singing, so passing there is by design).

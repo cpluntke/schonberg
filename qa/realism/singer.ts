@@ -66,6 +66,12 @@ export interface SingerProfile {
   noteBehind?: boolean;
   /** Adversarial: in legato, the pitch only starts moving this long after the vowel onset. */
   arrivalDelayMs?: number;
+  /**
+   * Adversarial: a hiss (s-like noise, `db` re the voice) instead of singing. 'fragments': the voice
+   * sounds for only `share` of each written note (at a random place), hissing for the rest of it;
+   * 'fromBeat': hissing from the written beat until the (late) voice comes.
+   */
+  hiss?: { db: number; mode: 'fragments' | 'fromBeat'; share?: number };
   source: { jitterPct: number; shimmerPct: number; aspirationDb: number };
 }
 
@@ -193,6 +199,10 @@ export const SINGERS = {
   oneBehind: { ...base, name: 'one note behind', noteBehind: true } as SingerProfile,
   /** Consonant and vowel on time, but the pitch arrives 200 ms late on every legato change. */
   lateArriver: { ...base, name: 'late pitch arrival (200 ms)', arrivalDelayMs: 200 } as SingerProfile,
+  /** Sings only a quarter of each note (at a random place) and hisses through the rest of it. */
+  fragmentsHiss: { ...base, name: 'fragments + hiss (25 % voice)', hiss: { db: -10, mode: 'fragments', share: 0.25 } } as SingerProfile,
+  /** Sings the right notes 300 ms behind, hissing from each beat until the voice comes. */
+  lateHiss: { ...base, name: 'late 300 ms, hissing from the beat', timing: { jitterMs: 25, biasMs: 300 }, hiss: { db: -10, mode: 'fromBeat' } } as SingerProfile,
   /** Good intonation, slow but well-damped transitions (settling ≈ 0.3 s). */
   slowTransitions: { ...base, name: 'slow transitions (fn 3–4 Hz)', transition: { fnHz: [3, 4], zeta: [0.6, 0.75] } } as SingerProfile,
 };
@@ -285,7 +295,8 @@ export function renderSinger(o: RenderOptions): RenderedTake {
   const ns = o.part.notes;
   const [ra, rb] = o.range;
   const hasLyrics = ns.slice(ra, rb + 1).some((n) => n.lyric);
-  const notes: (RenderedNote & { endSec: number; voiceEnd: number; fn: number; zeta: number; vibDelay: number; vibExtent: number; scoopCents: number; vowel: number; consDur: number })[] = [];
+  const notes: (RenderedNote & { endSec: number; voiceEnd: number; fn: number; zeta: number; vibDelay: number; vibExtent: number; scoopCents: number; vowel: number; consDur: number; beatSec: number; fragA: number; fragB: number })[] = [];
+  const hissRng = perf.fork('hiss');
   let vowel = perf.fork('vowel').next() * 5 | 0;
   // Wrong notes: exactly round(p·N) of the notes (random choice), so every take is equally bad.
   const wrongSet = new Set<number>();
@@ -328,8 +339,14 @@ export function renderSinger(o: RenderOptions): RenderedTake {
       vibDelay: P.vibrato ? perf.range(P.vibrato.delayMs) / 1000 : 0,
       vibExtent: P.vibrato ? perf.range(P.vibrato.extentCents) : 0,
       scoopCents: afterRest && P.transition && perf.chance(P.scoop.prob) ? perf.range(P.scoop.cents) : 0,
-      vowel, consDur,
+      vowel, consDur, beatSec: tau(n.start), fragA: -Infinity, fragB: Infinity,
     });
+    if (P.hiss?.mode === 'fragments') {
+      const nn = notes[notes.length - 1];
+      const len = (P.hiss.share ?? 0.25) * (nn.endSec - nn.beatSec);
+      nn.fragA = nn.beatSec + hissRng.uniform(0, nn.endSec - nn.beatSec - len);
+      nn.fragB = nn.fragA + len;
+    }
   }
   for (let k = 0; k < notes.length; k++) {
     const a = notes[k];
@@ -350,6 +367,7 @@ export function renderSinger(o: RenderOptions): RenderedTake {
   const ctlMidi = new Float32Array(nCtl); // always defined (for phase continuity)
   const ctlAmp = new Float32Array(nCtl);
   const ctlCons = new Float32Array(nCtl);
+  const ctlHiss = new Float32Array(nCtl);
   const ctlVowel = new Int8Array(nCtl);
   const vibRate = P.vibrato ? perf.range(P.vibrato.rateHz) : 0;
   let vibPhase = micro.uniform(0, 2 * Math.PI);
@@ -406,9 +424,13 @@ export function renderSinger(o: RenderOptions): RenderedTake {
     // Voicing and consonants.
     let voiced = false;
     let cons = 0;
+    let inNote = false;
+    let beforeVoice = false;
     for (let q = Math.max(0, k - 1); q <= Math.min(notes.length - 1, k + 1); q++) {
       const nq = notes[q];
-      if (t >= nq.vowelSec && t < nq.voiceEnd) voiced = true;
+      if (t >= nq.vowelSec && t < nq.voiceEnd && t >= nq.fragA && t < nq.fragB) voiced = true;
+      if (t >= nq.beatSec && t < nq.endSec) inNote = true;
+      if (t >= nq.beatSec && t < nq.vowelSec) beforeVoice = true;
       if (nq.consonantSec !== null && t >= nq.consonantSec && t < nq.vowelSec) {
         const a1 = (t - nq.consonantSec) / 0.006;
         const a2 = (nq.vowelSec - t) / 0.012;
@@ -419,6 +441,7 @@ export function renderSinger(o: RenderOptions): RenderedTake {
     amp += (aimAmp - amp) * Math.min(1, dt / (aimAmp > amp ? 0.012 : 0.02));
     ctlAmp[j] = amp;
     ctlCons[j] = cons;
+    if (P.hiss) ctlHiss[j] = (P.hiss.mode === 'fragments' ? inNote && !voiced : beforeVoice && !voiced) ? 1 : 0;
     ctlVowel[j] = cur ? cur.vowel : 0;
     if (amp > 0.3) {
       truthMidi[j] = m;
@@ -491,6 +514,23 @@ export function renderSinger(o: RenderOptions): RenderedTake {
   const vr = cnt ? Math.sqrt(e / cnt) : 1;
   const g = o.channel.voiceRms / (vr || 1);
   for (let n = 0; n < nAud; n++) voice[n] *= g;
+  if (P.hiss) {
+    // s-like band (3.8–10 kHz), unit RMS, smoothed on and off over ~10 ms.
+    const hr = micro.fork('hiss');
+    const bands = [Biquad.highpass(3800, sr), Biquad.highpass(3800, sr), new Biquad().setLowpass(10000, sr)];
+    const cal = [Biquad.highpass(3800, sr), Biquad.highpass(3800, sr), new Biquad().setLowpass(10000, sr)];
+    const cr = new Rng(7);
+    let ce = 0;
+    for (let n = 0; n < sr; n++) { let y = cr.gauss(); for (const b of cal) y = b.process(y); ce += y * y; }
+    const hg = (o.channel.voiceRms * dbToGain(P.hiss.db)) / Math.sqrt(ce / sr);
+    let env = 0;
+    for (let n = 0; n < nAud; n++) {
+      let y = hr.gauss();
+      for (const b of bands) y = b.process(y);
+      env += (ctlHiss[Math.min(nCtl - 1, Math.floor(n / block))] - env) * (1 / (0.01 * sr));
+      voice[n] += env * hg * y;
+    }
+  }
 
   // ---- backing bleed ---------------------------------------------------------------------------
   const mix = voice;

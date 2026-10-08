@@ -111,6 +111,11 @@ export interface AlignedResult {
    * a very slow device, or a singer far behind. The run can't be judged fairly without the delay check.
    */
   beyondCapMs?: number;
+  /**
+   * A measured delay's correction (ms) that was dropped because it scored the voice worse than as
+   * heard (shiftMs is then 0). The delay may still be off: a reason to suggest the delay check.
+   */
+  rejectedShiftMs?: number;
 }
 
 /** With a measured delay, the line-up corrects it by at most this many seconds. */
@@ -194,6 +199,15 @@ export function scoreAligned(
   // Small shifts aren't worth second-guessing the delay setting for.
   if (Math.abs(shiftMs) < 25) return { result: scoreAttempt(ctx, prep(samples), opts), estimate, shiftMs: 0, beyondCapMs };
   const aligned = scoreAttempt(ctx, prep(shiftSamples(samples, estimate.lag)), opts);
+  // With a measured delay the line-up is only a small correction; when it scores worse than the
+  // voice as heard, it lined up the wrong evidence (e.g. glides after on-beat consonants, with the
+  // consonant's noise masking the end of each vowel, look like a late voice): keep the voice as heard.
+  // (Strictly worse: on a tie, by the hit ratios, a real delay error keeps its correction.)
+  if (run.calibrated) {
+    const plain = scoreAttempt(ctx, prep(samples), opts);
+    const worse = aligned.accuracy < plain.accuracy - 1e-9 || (Math.abs(aligned.accuracy - plain.accuracy) <= 1e-9 && aligned.pitch < plain.pitch - 1e-9);
+    if (worse) return { result: plain, estimate: { ...estimate, lag: 0, confident: false }, shiftMs: 0, rejectedShiftMs: shiftMs, beyondCapMs };
+  }
   // Timing is reported against the delay we applied: add the shift back to every onset.
   const lagMs = estimate.lag * 1000;
   const notes = aligned.notes.map((n) => ({ ...n, onsetMs: n.onsetMs === null ? null : Math.max(0, n.onsetMs + lagMs) }));

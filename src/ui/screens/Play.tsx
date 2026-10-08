@@ -196,7 +196,8 @@ function SingPlay({ route }: { route: PlayRoute }) {
         listenOnly,
         cue: route.sectionId === 'entries' || route.sectionId === 'cold' ? 'none' : spec?.cue ?? 'note',
         leadFrom: route.sectionId === 'cold' ? coldLeadFrom(piece.score, section.start) : undefined,
-        scoring: { toleranceCents: tolerance, tuning: profile.tuning, octaveTolerant, rate },
+        // Consonants are excused only when the mic hears the voice alone (scoring.ts CONSONANT_FLOOR).
+        scoring: { toleranceCents: tolerance, tuning: profile.tuning, octaveTolerant, rate, consonants: headphonesRef.current === true },
         latencyMs: profile.latencyMs || 0,
         range,
         // Tenors and basses (or anyone whose range reaches low) keep the long analysis window.
@@ -271,7 +272,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
           updateProfile({ latencyHint: suggested });
         }
       }
-      if (calibrated && Math.abs(al.shiftMs) >= 60) suggestDelayCheck = true;
+      if (calibrated && Math.abs(al.shiftMs || al.rejectedShiftMs || 0) >= 60) suggestDelayCheck = true;
       // From level 2 ("In time") on, coming in clearly late fails the run. Only with a measured
       // delay: without it, device delay and late singing can't be told apart.
       const med = medianOnsetMs(r, sess.cfg.rate, part);

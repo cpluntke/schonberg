@@ -110,6 +110,35 @@ export const MIC_SOUND_SHARE = 0.7;
 export const SOUND_RMS = 0.02;
 /** …and at most this share of its pitched readings were elsewhere (a wrong note is never let off). */
 export const MIC_OFF_SHARE = 0.25;
+/**
+ * Consonants (only with ScoringOptions.consonants: headphones on, the mic hears the voice alone).
+ * A fricative reading (PitchSample.fric: no pitch, energy mostly above ~2.5 kHz: an s, sh, f) at
+ * least CONSONANT_FLOOR times the run's noise floor (the median level of the unpitched readings
+ * before the first note and in rests) and at least CONSONANT_VOICE of the run's voiced level is a
+ * consonant, unless its run lasts longer than CONSONANT_RUN_MAX. Silence, hum, room noise and the
+ * backing are not.
+ * - At a note's start: a consonant from the beat (starting by the plain arrival cap,
+ *   TRANSITION_MAX) running into the voice moves the arrival cap to CONSONANT_SETTLE after the voice
+ *   comes.
+ * - Inside the note and at its end (a repeated "sa sa", a final s, the next syllable's s sung
+ *   early): consonant time is excused like a dropout.
+ * Both together at most CONSONANT_MAX (real seconds) and CONSONANT_SHARE of the written note, and
+ * only for a note whose voice (pitched readings) covers at least CONSONANT_MIN_VOICED of it.
+ * Durations here are real time (score seconds × the tempo factor: a consonant takes as long at
+ * level 1's 70 %); shares are of the written note.
+ */
+export const CONSONANT_FLOOR = 3;
+export const CONSONANT_VOICE = 0.1;
+export const CONSONANT_MAX = 0.25;
+export const CONSONANT_SHARE = 0.35;
+export const CONSONANT_MIN_VOICED = 0.35;
+export const CONSONANT_SETTLE = 0.1;
+/** A run of consonant readings longer than this (real seconds) is a sustained hiss or breath, not a consonant. */
+export const CONSONANT_RUN_MAX = 0.3;
+/** Quiet this short inside a consonant cluster (a stop's closure: "st", "sc") doesn't end it (real seconds). */
+const CONSONANT_GAP = 0.07;
+/** Unpitched readings this far from any note (real seconds) measure the noise floor. */
+const FLOOR_MARGIN = 0.15;
 
 export const GRADE_POINTS: Record<Grade, number> = { perfect: 100, good: 70, ok: 40, miss: 0 };
 export const GRADE_VALUE: Record<Grade, number> = { perfect: 1, good: 0.85, ok: 0.5, miss: 0 };
@@ -246,6 +275,18 @@ class NoteAcc {
   /** Count of voiced body samples that needed octave folding to be in tolerance. */
   octaveSamples = 0;
   onsetMs: number | null = null;
+  /** A consonant from the written start into the voice (see CONSONANT_FLOOR): its run, and when the voice came. */
+  consStart: number | null = null;
+  consLast: number | null = null;
+  consVoice: number | null = null;
+  consDone = false;
+  /** Consonant readings overlapping the body (time, covered seconds of the body). */
+  cT: number[] = [];
+  cW: number[] = [];
+  /** Seconds of the written note covered by pitched readings. */
+  noteVoiced = 0;
+  /** The arrival cap a consonant on the beat moved (absolute score time), or null. */
+  consCap: number | null = null;
   /** Start of the current run of qualifying voiced samples (onset needs ~60 ms of sound). */
   runStart: number | null = null;
   runMiss = 0;
@@ -338,6 +379,11 @@ export class LiveScorer {
   private _maxCombo = 0;
   private _score = 0;
   private finished: AttemptResult | null = null;
+  /** Consonants: unpitched levels in the count-in and rests (the noise floor), and the voice's level. */
+  private floorRms: number[] = [];
+  private floorMed: number | null = null;
+  private floorDirty = false;
+  private voiceRms: number | null = null;
 
   constructor(private readonly ctx: ScoringContext, private readonly opts: ScoringOptions) {
     this.windows = noteWindows(ctx, opts);
@@ -428,12 +474,73 @@ export class LiveScorer {
       this.finalize(this.accs[this.cur]);
       this.cur++;
     }
+    if (this.opts.consonants) this.levels(c.s);
     for (let j = this.cur; j < this.accs.length; j++) {
       const a = this.accs[j];
       if (a.w.start > c.to) break;
       if (a.final) continue;
       this.addToNote(a, c, t);
     }
+  }
+
+  private get rate(): number {
+    return this.opts.rate && this.opts.rate > 0 ? this.opts.rate : 1;
+  }
+
+  /** The noise floor (unpitched readings away from every note) and the voice's level, as the run goes. */
+  private levels(s: PitchSample): void {
+    if (s.midi !== null && Number.isFinite(s.midi)) {
+      this.voiceRms = this.voiceRms === null ? s.rms : this.voiceRms + 0.05 * (s.rms - this.voiceRms);
+      return;
+    }
+    const m = FLOOR_MARGIN * this.rate;
+    const next = this.accs[this.cur];
+    const prev = this.cur > 0 ? this.accs[this.cur - 1] : null;
+    if ((!next || s.time < next.w.start - m) && (!prev || s.time >= prev.w.start + prev.w.note.dur + m)) {
+      this.floorRms.push(s.rms);
+      this.floorDirty = true;
+    }
+  }
+
+  /** A consonant reading (see CONSONANT_FLOOR). */
+  private consonant(s: PitchSample): boolean {
+    if (!this.opts.consonants || !s.fric || (s.midi !== null && Number.isFinite(s.midi)) || s.rms < SILENCE_RMS) return false;
+    if (this.floorDirty) {
+      this.floorMed = median(this.floorRms);
+      this.floorDirty = false;
+    }
+    // No count-in heard: assume a floor of half the level gate.
+    if (s.rms < CONSONANT_FLOOR * (this.floorMed ?? SILENCE_RMS / 2)) return false;
+    return this.voiceRms === null || s.rms >= CONSONANT_VOICE * this.voiceRms;
+  }
+
+  /**
+   * A consonant on the beat: a run of consonant readings (other unpitched readings up to
+   * CONSONANT_GAP inside it) that starts by the plain arrival cap and runs into a pitched reading.
+   * Pitched readings before it (the previous vowel held to the beat) don't end the search; one after
+   * the cap with no consonant running does.
+   */
+  private trackConsonant(a: NoteAcc, t: number, voiced: boolean, cons: boolean): void {
+    const w = a.w;
+    const cap = w.start + Math.min(TRANSITION_MAX, 0.35 * w.note.dur);
+    const gap = CONSONANT_GAP * this.rate;
+    if (cons) {
+      if (a.consStart === null || t - a.consLast! > gap) {
+        if (t > cap) { a.consDone = true; a.consStart = null; return; }
+        a.consStart = t;
+      }
+      a.consLast = t;
+      return;
+    }
+    if (!voiced) {
+      if (a.consStart !== null && t - a.consLast! > gap) a.consStart = null;
+      return;
+    }
+    if (a.consStart !== null && t - a.consLast! <= gap) {
+      if (t - a.consStart <= CONSONANT_RUN_MAX * this.rate) a.consVoice = t;
+      a.consDone = true;
+    } else if (t > cap) a.consDone = true;
+    a.consStart = null;
   }
 
   private addToNote(a: NoteAcc, c: Covered, t: number): void {
@@ -461,8 +568,10 @@ export class LiveScorer {
       a.nW.push(Math.max(0, Math.min(c.to, w.start + w.note.dur) - Math.max(c.from, w.start)));
       a.nR.push(a.nBreaks);
     }
+    const cons = this.opts.consonants ? this.consonant(c.s) : false;
     // Onset & scoop use samples from the note start (grace included).
     if (t >= w.start && t < w.bodyEnd) {
+      if (this.opts.consonants && !a.consDone) this.trackConsonant(a, t, dev !== null, cons);
       // Timing is judged independently of intonation: the note "starts" with the first voiced
       // sound after a rest, or (legato) once the voice has moved closer to this note than the last.
       if (a.onsetMs === null) {
@@ -503,6 +612,11 @@ export class LiveScorer {
     // Body coverage. In-tune is judged on the vibrato-smoothed deviation (mean over the last
     // ~one vibrato cycle of this note's body), so a centred vibrato is not punished.
     const overlap = Math.min(c.to, w.bodyEnd) - Math.max(c.from, w.bodyStart);
+    if (overlap > 0 && cons) {
+      a.cT.push(t);
+      a.cW.push(overlap);
+    }
+    if (dev !== null) a.noteVoiced += Math.max(0, Math.min(c.to, w.start + w.note.dur) - Math.max(c.from, w.start));
     if (overlap > 0) {
       if (c.s.mic) a.micTime += overlap;
       if (dev !== null || c.s.rms >= SOUND_RMS) a.soundTime += overlap;
@@ -538,6 +652,11 @@ export class LiveScorer {
     // A qualifying run that was cut short only by the end of a short note still marks its start.
     if (a.onsetMs === null && a.runStart !== null) a.onsetMs = Math.max(0, (a.runStart - w.start) * 1000);
     const tolN = this.tol + w.tolExtra;
+    // Consonants (see CONSONANT_FLOOR): only for a note that was sung through enough of it.
+    const plainCap = w.start + Math.min(TRANSITION_MAX, 0.35 * w.note.dur);
+    const budget = Math.min(CONSONANT_MAX * this.rate, CONSONANT_SHARE * w.note.dur);
+    const consOn = !!this.opts.consonants && a.noteVoiced >= CONSONANT_MIN_VOICED * w.note.dur;
+    if (consOn && a.consVoice !== null) a.consCap = Math.min(Math.max(plainCap, a.consVoice + CONSONANT_SETTLE * this.rate), plainCap + budget);
     const judged = judgedSpan(a, tolN, this.opts.octaveTolerant);
     const { k0, k1, from, to } = judged;
     const bodyDur = Math.max(1e-3, to - from);
@@ -547,9 +666,35 @@ export class LiveScorer {
     // Brief tracker dropouts (a breathy moment, an inner consonant) are excused; a note that
     // simply isn't held to its end is not.
     let excused = 0;
+    const dropout: boolean[] = [];
     for (let k = 1; k < jT.length; k++) {
       const gap = jT[k] - jW[k] / 2 - (jT[k - 1] + jW[k - 1] / 2);
-      if (gap > 0 && gap < DROPOUT_MAX) excused += gap;
+      dropout[k] = gap > 0 && gap < DROPOUT_MAX;
+      if (dropout[k]) excused += gap;
+    }
+    // Consonant time in the judged span that the dropout rule didn't excuse already, within what
+    // the arrival cap's move left of the budget.
+    let consEx = 0;
+    if (consOn && a.cT.length) {
+      // Runs of consonant readings (CONSONANT_GAP apart at most); one longer than CONSONANT_RUN_MAX isn't a consonant.
+      const gap = CONSONANT_GAP * this.rate;
+      const keep: boolean[] = [];
+      for (let q0 = 0; q0 < a.cT.length;) {
+        let q1 = q0 + 1;
+        while (q1 < a.cT.length && a.cT[q1] - a.cT[q1 - 1] <= gap) q1++;
+        const ok = a.cT[q1 - 1] - a.cT[q0] <= CONSONANT_RUN_MAX * this.rate;
+        for (let q = q0; q < q1; q++) keep[q] = ok;
+        q0 = q1;
+      }
+      let k = 0;
+      for (let q = 0; q < a.cT.length; q++) {
+        const ct = a.cT[q];
+        if (!keep[q] || ct < from || ct > to) continue;
+        while (k < jT.length && jT[k] < ct) k++;
+        if (k > 0 && k < jT.length && dropout[k]) continue;
+        consEx += a.cW[q];
+      }
+      consEx = Math.min(consEx, Math.max(0, budget - Math.max(0, from - plainCap)));
     }
     // Final judgement over the settled part of the note: a vibrato-cancelling average (or the
     // median for short notes), so neither vibrato nor the glide into the note reads as out of tune.
@@ -564,7 +709,7 @@ export class LiveScorer {
           if (Math.abs(median(D)!) <= tolN) hitTime = jW.reduce((x, y) => x + y, 0) + excused;
         }
       }
-      return clamp(hitTime / Math.max(1e-3, bodyDur - excused), 0, 1);
+      return clamp(hitTime / Math.max(1e-3, bodyDur - excused - consEx), 0, 1);
     };
     let hitRatio = hitOf(jD);
     const voicedRatio = clamp(a.voicedTime / Math.max(1e-3, w.bodyEnd - w.bodyStart), 0, 1);
@@ -684,10 +829,11 @@ export class LiveScorer {
  * (at most TRANSITION_MAX / 35% of the note after its start) to when it leaves for the next note
  * (at most RELEASE_MAX / 20% before its end). Indices into the note's body samples, and times.
  */
-export function judgedSpan(a: { w: NoteWindow; bT: number[]; bD: number[]; bW: number[] }, tol: number, octaveTolerant: boolean): { k0: number; k1: number; from: number; to: number } {
+export function judgedSpan(a: { w: NoteWindow; bT: number[]; bD: number[]; bW: number[]; consCap?: number | null }, tol: number, octaveTolerant: boolean): { k0: number; k1: number; from: number; to: number } {
   const w = a.w;
   const n = a.bT.length;
-  const capStart = Math.max(w.bodyStart, Math.min(w.bodyEnd, w.start + Math.min(TRANSITION_MAX, 0.35 * w.note.dur)));
+  // A consonant sung on the beat moves the cap (see CONSONANT_FLOOR).
+  const capStart = Math.max(w.bodyStart, Math.min(w.bodyEnd, a.consCap ?? w.start + Math.min(TRANSITION_MAX, 0.35 * w.note.dur)));
   // Arrived = three readings in a row within tolerance (~60 ms), not just passing through it.
   const ok = (k: number) => k >= n || Math.abs(a.bD[k]) <= tol;
   let k0 = 0;

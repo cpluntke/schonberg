@@ -27,6 +27,8 @@ export interface RawPitch {
   lifted?: 2 | 3;
   /** Components at ½ / ⅓ of the reading relative to its harmonics (dB), for voiced readings. */
   subDb?: number | null;
+  /** Unpitched, above the level gate, and mostly high-frequency sound (an s, sh, f: see isFricative). */
+  fric?: true;
 }
 
 /** 'setup': the mic opened but the audio graph around it couldn't be built (e.g. a closed/interrupted context). */
@@ -49,6 +51,34 @@ export const MIN_HZ = 60;
 export const MAX_HZ = 1400;
 export const RMS_GATE = 0.005;
 export const CLARITY_GATE = 0.85;
+/**
+ * A frame without a pitch whose energy sits mostly this high (Hz, see highFreqHz) is a fricative
+ * (s, sh, f, a breathy h), not silence, hum or the backing through the speaker (voices and the
+ * backing put most of their energy under ~1.5 kHz).
+ */
+export const FRIC_HZ = 2500;
+
+/**
+ * Power-weighted "typical frequency" of a frame (Hz): from the energy of its first difference
+ * relative to its own energy (a sine at f gives f; white noise gives sampleRate/4). Cheap: one pass.
+ */
+export function highFreqHz(frame: ArrayLike<number>, sampleRate: number): number {
+  let e = 0;
+  let d = 0;
+  for (let i = 1; i < frame.length; i++) {
+    const x = frame[i];
+    const y = x - frame[i - 1];
+    e += x * x;
+    d += y * y;
+  }
+  if (e <= 0) return 0;
+  return (sampleRate / Math.PI) * Math.asin(Math.min(1, Math.sqrt(d / (4 * e))));
+}
+
+/** A reading that is a fricative: no pitch passed the gates, the level did, and the sound is high (FRIC_HZ). */
+export function isFricative(r: { pitched: boolean; rms: number; hfHz?: number }): boolean {
+  return !r.pitched && r.rms >= RMS_GATE && (r.hfHz ?? 0) >= FRIC_HZ;
+}
 
 export function hzToMidi(hz: number): number {
   return 69 + 12 * Math.log2(hz / 440);
@@ -85,6 +115,8 @@ export interface PitchFrame {
   lifted?: 2 | 3;
   /** Components at ½ / ⅓ of the reported pitch relative to its harmonics (dB); null when not checked. */
   subDb?: number | null;
+  /** highFreqHz of the frame (frames above the level gate). */
+  hfHz?: number;
 }
 
 /** McLeod's reading alone (no harmonic check). */
@@ -110,9 +142,10 @@ const CHECK_MIN_HZ = 40;
  */
 export function detectPitch(frame: Float32Array, sampleRate: number, expectedHz: number | null = null, prevHz: number | null = null): PitchFrame {
   const { hz, clarity, rms } = mcleodPitch(frame, sampleRate);
-  if (rms < RMS_GATE || clarity < CHECK_CLARITY || hz < CHECK_MIN_HZ || hz > MAX_HZ) return { hz, clarity, rms };
+  const hf = rms >= RMS_GATE ? { hfHz: highFreqHz(frame, sampleRate) } : {};
+  if (rms < RMS_GATE || clarity < CHECK_CLARITY || hz < CHECK_MIN_HZ || hz > MAX_HZ) return { hz, clarity, rms, ...hf };
   const v = harmonicCheck(frame, sampleRate, hz, MAX_HZ, [expectedHz, prevHz]);
-  return { hz: v.hz, clarity, rms, rawHz: hz, ...(v.lifted > 1 ? { lifted: v.lifted as 2 | 3 } : {}), subDb: v.subDb };
+  return { hz: v.hz, clarity, rms, rawHz: hz, ...(v.lifted > 1 ? { lifted: v.lifted as 2 | 3 } : {}), subDb: v.subDb, ...hf };
 }
 
 /** Apply voicing gates; returns fractional MIDI or null. */
@@ -305,7 +338,7 @@ export class PitchTracker {
   private buf: Float32Array<ArrayBuffer>;
   private smoother = new PitchSmoother();
   /** The previous frame (the one the smoother reports on this tick): window centre and raw values. */
-  private frames = new FrameDelay<{ ctxTime: number; hz: number | null; clarity: number; rms: number; lifted?: 2 | 3; subDb?: number | null }>();
+  private frames = new FrameDelay<{ ctxTime: number; hz: number | null; clarity: number; rms: number; lifted?: 2 | 3; subDb?: number | null; fric?: boolean }>();
   private stopped = false;
   private winN = FFT_SIZE;
   /** Filters between the mic and the analyser (rebuilt when the plan changes). */
@@ -515,11 +548,11 @@ export class PitchTracker {
     const gated = gatePitch(r, { minHz: humFloorHz(this.mains.mainsHz) });
     this.prev.push(gated == null ? null : r.hz, !!r.lifted);
     const midi = this.smoother.push(gated);
-    const cur = { ctxTime: centre, hz: gated == null ? null : r.hz, clarity: r.clarity, rms: r.rms, lifted: r.lifted, subDb: r.subDb };
+    const cur = { ctxTime: centre, hz: gated == null ? null : r.hz, clarity: r.clarity, rms: r.rms, lifted: r.lifted, subDb: r.subDb, fric: isFricative({ pitched: gated != null, rms: r.rms, hfHz: r.hfHz }) };
     // The smoother reports the previous frame (one-frame look-ahead): send it with that frame's own
     // window centre, Hz, clarity and level, so every field of a reading describes the same moment.
     const f = this.frames.push(cur) ?? { ...cur, ctxTime: cur.ctxTime - INTERVAL_MS / 1000 };
-    const p: RawPitch = { ctxTime: f.ctxTime, hz: f.hz, midi, clarity: f.clarity, rms: f.rms, ...(f.lifted ? { lifted: f.lifted } : {}), subDb: f.subDb ?? null };
+    const p: RawPitch = { ctxTime: f.ctxTime, hz: f.hz, midi, clarity: f.clarity, rms: f.rms, ...(f.lifted ? { lifted: f.lifted } : {}), subDb: f.subDb ?? null, ...(f.fric && midi == null ? { fric: true as const } : {}) };
     this.last = p;
     for (const cb of this.listeners) {
       try {

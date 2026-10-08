@@ -43,6 +43,8 @@ export interface PlayPolicy {
   fixSubInSamples: boolean;
   /** scoreAligned gets { voiceOnly } (headphones on: no backing in the mic). */
   voiceOnly: boolean;
+  /** The run's scoring options excuse consonants when the headphones are on (ScoringOptions.consonants). */
+  consonants: boolean;
   detected: string[];
 }
 
@@ -67,12 +69,22 @@ export function detectPlayPolicy(): PlayPolicy {
   detected.push(`scoreAligned everyNote: ${everyNoteLift}`);
   const fixSubInSamples = /const midi = p\.midi != null && !this\.cfg\.scoring\.octaveTolerant \? fixSubharmonic/.test(sess);
   const voiceOnly = /voiceOnly: headphonesRef\.current/.test(play);
+  const consonants = /consonants: headphonesRef\.current === true/.test(play);
+  detected.push(`scoring consonants (headphones): ${consonants}`);
   detected.push(`scoreAligned voiceOnly (headphones): ${voiceOnly}`);
   detected.push(`session stores ${fixSubInSamples ? 'fixSubharmonic-corrected' : 'raw'} samples`);
-  return { lateFailMs, timingGate, guideLearnMaxAbove, liftSubharmonics, everyNoteLift, fixSubInSamples, voiceOnly, detected };
+  return { lateFailMs, timingGate, guideLearnMaxAbove, liftSubharmonics, everyNoteLift, fixSubInSamples, voiceOnly, consonants, detected };
 }
 
 export const PLAY_POLICY = detectPlayPolicy();
+declare const process: { env: Record<string, string | undefined> };
+/** REALISM_NO_CONSONANTS=1: the current app without the consonant relief (for before/after comparisons). */
+const NO_CONSONANTS = process.env.REALISM_NO_CONSONANTS === '1';
+
+/** Play.tsx: the run's scoring options excuse consonants when the headphones are on (no backing in the mic). */
+export function scoringConsonants(after: boolean, take: RenderedTake): boolean {
+  return after && PLAY_POLICY.consonants && !take.speaker && !NO_CONSONANTS;
+}
 
 type Lift = (part: Part, samples: PitchSample[]) => PitchSample[];
 const liftFn: Lift | undefined = (curAlign as unknown as { liftSubharmonics?: Lift }).liftSubharmonics;
@@ -211,7 +223,11 @@ export function runSession(spec: PipelineSpec, setup: RunSetup, profile: Profile
   const { take, part, ctx, level } = setup;
   const L = levelSetup(level);
   const rate = take.rate;
-  const opts: ScoringOptions = setup.scoring ?? { toleranceCents: L.toleranceCents, tuning: 'equal', octaveTolerant: false, rate: take.rate };
+  // Play.tsx: consonants are excused with the headphones on (the singer answers truthfully: no bleed).
+  const opts: ScoringOptions = setup.scoring ?? {
+    toleranceCents: L.toleranceCents, tuning: 'equal', octaveTolerant: false, rate: take.rate,
+    ...(scoringConsonants(spec.id === 'after', take) ? { consonants: true } : {}),
+  };
   const latencyUsed = profile.latencyMs > 0 ? profile.latencyMs : spec.estimateMs;
   // The app stops listening min(700, latency + 120) ms after the player ends.
   const stopSec = (setup.to - take.scoreTimeAtSample0) / rate + Math.min(0.7, latencyUsed / 1000 + 0.12);

@@ -92,7 +92,7 @@ export function readingsToSamples(
   for (const r of readings) {
     const time = m.scoreTimeAtSample0 + (r.stampSec - m.latencyMs / 1000) * m.rate;
     if (time < minTime) continue;
-    out.push({ time, midi: r.midi, clarity: r.clarity, rms: r.rms, ...(micTrouble(r) ? { mic: true } : {}) });
+    out.push({ time, midi: r.midi, clarity: r.clarity, rms: r.rms, ...(micTrouble(r) ? { mic: true } : {}), ...(r.fric && r.midi == null ? { fric: true } : {}) });
   }
   return out;
 }
