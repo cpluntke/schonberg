@@ -28,7 +28,10 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { UpdatePrompt } from './components/UpdatePrompt';
 import { StorageFullNotice } from './components/StorageFullNotice';
 import { flushProgress, onAccountConfirmed, syncProgressSoon } from '../progress/sync';
-import { ensureChoirSharing, refreshSuperSessionSoon } from '../progress/choir';
+import { cachedChoir, choirLogo, ensureChoirSharing, refreshSuperSessionSoon } from '../progress/choir';
+import { useProfile, useStoreVersion } from './hooks';
+import { voiceName } from './screens/Home';
+import { LOGO_TILE } from './components/ChoirLogo';
 import { shareMyProgress } from './play/shareProgress';
 import { retryPrivacyRemovals } from './play/privacy';
 
@@ -143,12 +146,17 @@ export function App() {
   }
 
   return (
-    <div className={route.name === 'play' ? 'app app-play' : 'app'}>
+    <div className={route.name === 'play' ? 'app app-play' : showNav ? 'app has-nav' : 'app'}>
       <ErrorBoundary resetKey={JSON.stringify(route)}>{body}</ErrorBoundary>
       <UpdatePrompt hidden={route.name === 'play'} />
       <StorageFullNotice hidden={route.name === 'play'} />
       {showNav && (
         <nav className="nav" aria-label="Main">
+          {/* (wide screens: the nav is a sidebar with the app's name on top and the choir below) */}
+          <div className="nav-brand" aria-hidden="true">
+            <span>Schönberg</span>
+            <span className="badge">Hero</span>
+          </div>
           <div className="nav-inner">
             {TABS.map((t) => (
               <button key={t.name} aria-current={tab === t.name ? (route.name === t.name ? 'page' : 'true') : undefined} onClick={() => go({ name: t.name } as Route)}>
@@ -164,9 +172,28 @@ export function App() {
               </button>
             )}
           </div>
+          <NavChoir />
         </nav>
       )}
       {toast && <div className="toast" role="status">{toast}</div>}
+    </div>
+  );
+}
+
+/** Wide screens: the choir (logo, name) and the singer's voice at the foot of the sidebar. Hidden on phones. */
+function NavChoir() {
+  const [profile] = useProfile();
+  useStoreVersion();
+  const choir = profile.choirCode ? cachedChoir() : null;
+  if (!choir) return null;
+  const logo = choirLogo();
+  return (
+    <div className="nav-choir">
+      {logo && <img src={logo} alt={`${choir.name} logo`} data-testid="nav-choir-logo" style={{ background: LOGO_TILE }} />}
+      <div className="col" style={{ gap: 0, minWidth: 0 }}>
+        <span className="nav-choir-name">{choir.name}</span>
+        <span className="tiny muted">{voiceName(profile.voice)}</span>
+      </div>
     </div>
   );
 }

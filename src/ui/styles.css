@@ -359,3 +359,87 @@ html:has(.results-foot) { scroll-padding-bottom: 170px; }
 
 /* Piece: a shortcut to the section list. */
 .jump-link { align-self: flex-start; color: var(--voice); text-decoration: none; font-weight: 600; font-size: 14px; min-height: 44px; display: inline-flex; align-items: center; gap: 4px; }
+
+/* ===================================================================== wide screens
+   Laptops, desktops, tablets in landscape (≥ 900 px). Phones and portrait tablets keep the 560 px
+   column above, unchanged. The tab bar becomes a sidebar; screens lay out in columns inside a
+   centred content area; practice screens keep their top bar and have no sidebar (as on phones).
+   Layout wrappers (.lay) are invisible on phones (display: contents), so the phone order and
+   spacing stay exactly as they are. */
+.lay { display: contents; }
+.nav-brand, .nav-choir { display: none; }
+
+/* Mouse: hover states (touch screens never see them). */
+@media (hover: hover) and (pointer: fine) {
+  .btn:not(:disabled):hover { background: var(--surface-2); border-color: #39406e; }
+  .btn.ghost:not(:disabled):hover { background: var(--surface); }
+  .btn.primary:not(:disabled):hover { background: var(--accent); border-color: transparent; filter: brightness(1.08); }
+  .btn.voice:not(:disabled):hover { background: var(--voice); border-color: transparent; filter: brightness(1.08); }
+  .chip:not(:disabled):hover, .choice:not(:disabled):hover, .lvl-btn:not(:disabled):hover, .mixer button:not(:disabled):hover { border-color: #4a5288; }
+  .seg button:not(:disabled):not([aria-pressed='true']):hover { background: #262b4d; }
+  button.list-row:hover { background: rgba(255, 255, 255, 0.03); }
+  .list-row button.grow:hover > .ellipsis:first-child, .linklike:hover { color: var(--accent-text); }
+  button.card:hover { border-color: #4a5288; }
+  .icon-btn:not(:disabled):hover { background: var(--surface); }
+  .icon-btn.filled:not(:disabled):hover { background: var(--surface-2); }
+  .heat button:hover { filter: brightness(1.15); }
+}
+
+@media (min-width: 900px) {
+  :root { --side-w: 200px; --gutter: 28px; --content-max: 1160px; --read-max: 760px; }
+  .app { max-width: none; }
+  .app.has-nav { padding-left: var(--side-w); }
+  /* Every screen: centred, at most a readable width; screens laid out in columns (.wide) get the full content width. */
+  .screen { width: 100%; max-width: calc(var(--read-max) + 2 * var(--gutter)); margin: 0 auto; padding: 28px var(--gutter) 56px; gap: 20px; }
+  .screen.wide { max-width: calc(var(--content-max) + 2 * var(--gutter)); }
+  .topbar { min-height: 52px; }
+  .topbar h1 { font-size: 28px; }
+  .card { padding: 18px 20px; }
+
+  /* The sidebar: the app's name, the tabs, the choir. */
+  .nav {
+    top: 0; right: auto; width: var(--side-w); padding: 22px 12px calc(16px + var(--safe-bottom));
+    border-top: none; border-right: 1px solid var(--surface-2); display: flex; flex-direction: column; gap: 22px; overflow-y: auto;
+  }
+  .nav-brand { display: flex; align-items: center; gap: 8px; padding: 0 10px; font-weight: 800; font-size: 20px; letter-spacing: -0.02em; }
+  .nav-inner { max-width: none; margin: 0; height: auto; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 4px; }
+  .nav button {
+    flex: none; height: 46px; flex-direction: row; justify-content: flex-start; gap: 14px; padding: 0 12px;
+    border-radius: 12px; font-size: 15px; font-weight: 600; color: var(--muted); position: relative;
+  }
+  .nav button svg { flex: none; }
+  .nav button:hover { background: var(--surface); color: var(--text); }
+  .nav button[aria-current] { background: var(--accent-soft); color: var(--accent); }
+  .nav button[aria-current]::before { content: ''; position: absolute; left: -12px; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0; background: var(--accent); }
+  .nav-choir {
+    display: flex; align-items: center; gap: 10px; margin-top: auto; padding: 12px 10px 0; border-top: 1px solid var(--surface-2);
+  }
+  .nav-choir img { width: 40px; height: 40px; border-radius: 10px; object-fit: contain; padding: 3px; flex: none; }
+  .nav-choir-name { font-weight: 700; font-size: 14px; line-height: 1.25; overflow-wrap: anywhere; }
+
+  .toast { bottom: 24px; }
+  .app.has-nav .toast { left: calc(50% + var(--side-w) / 2); }
+}
+@media (min-width: 1200px) {
+  :root { --side-w: 248px; --gutter: 40px; --content-max: 1200px; }
+  .screen { padding-top: 36px; }
+}
+
+/* Home: a dashboard. The greeting across the top; today (tiles, plan, next up) in the main column,
+   the repertoire and the Zwölfton row beside it. */
+@media (min-width: 900px) {
+  .home-top { display: flex; flex-direction: row-reverse; align-items: center; gap: 16px; }
+  .home-top > .home-head { flex: none; }
+  .home-top > :not(.home-head) { flex: 1 1 auto; min-width: 0; }
+  .home .home-brand { display: none; }
+  .home h1.hero { font-size: 36px; }
+  .home-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 0.72fr); gap: 24px; align-items: start; }
+  .home-main, .home-side { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+  .home-rep { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 14px 20px 8px; }
+  .home-rep .list-row:last-child { border-bottom: none; }
+  .home-rep .list-row > .col:last-child { flex: none; white-space: nowrap; }
+  .home [data-testid='stats'] .card { padding: 16px 18px !important; }
+}
+@media (min-width: 1200px) {
+  .home-cols { gap: 28px; }
+}

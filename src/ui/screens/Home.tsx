@@ -58,9 +58,10 @@ export function Home() {
   const concertOver = toConcert != null && toConcert < 0;
 
   return (
-    <main className="screen">
-      <div className="row between">
-        <div className="row" style={{ gap: 8 }}>
+    <main className="screen wide home">
+      <div className="lay home-top">
+      <div className="row between home-head">
+        <div className="row home-brand" style={{ gap: 8 }}>
           <span style={{ fontWeight: 800, fontSize: 20, letterSpacing: '-0.02em' }}>Schönberg</span>
           <span className="badge">Hero</span>
         </div>
@@ -80,6 +81,11 @@ export function Home() {
             style={{ width: 56, height: 56, borderRadius: 14, objectFit: 'contain', background: LOGO_TILE, padding: 4, boxSizing: 'border-box', flex: 'none' }} />
         )}
       </div>
+      </div>
+
+      {/* Wide screens: today in the main column, the repertoire beside it. */}
+      <div className="lay home-cols">
+      <div className="lay home-main">
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 10 }} data-testid="stats">
         <div className="card flat" style={{ gap: 2, padding: '12px 14px', minWidth: 0 }} data-testid="streak-tile">
@@ -202,8 +208,10 @@ export function Home() {
           <div className="notice info">No pieces in this cycle yet. Add some from the Library or import your choir's MusicXML.</div>
         )}
       </section>}
+      </div>
 
-      <section className="col" style={{ gap: 2 }}>
+      <div className="lay home-side">
+      <section className="col home-rep" style={{ gap: 2 }}>
         <div className="row between">
           <h2>Repertoire</h2>
           <button className="btn ghost small" onClick={() => go({ name: 'library' })}>Library</button>
@@ -248,6 +256,8 @@ export function Home() {
         </div>
         <span className="small" style={{ color: '#D4CCFF' }}>Plus leap drills built from the hardest intervals in your parts.</span>
       </button>
+      </div>
+      </div>
     </main>
   );
 }
