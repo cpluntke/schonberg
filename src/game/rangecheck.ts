@@ -16,6 +16,8 @@ const GLIDE_OUT = 3;
 export const STEADY_MAX = 30;
 /** Readings per average: about one vibrato cycle (9 × 20 ms), so an even vibrato averages out. */
 const GROUP = 9;
+/** Running averages in a row that must stay within 60¢ for a note to count as held (judgeFollowed). */
+const STEADY_STRETCH = 5;
 /** Semitones between rounds. */
 export const STEP = 2;
 
@@ -179,6 +181,8 @@ export const FOLLOW = {
   splitAfter: 9,
   /** A sung note this near the expected one counts as it; how well it was sung is judged afterwards. */
   match: 0.8,
+  /** …once it has settled: its running average (over ~180 ms) moved less than this over the last 80 ms (a slide or a flick through the note isn't singing it). */
+  settledMax: 0.3,
   /** A different note held this long is clearly wrong… */
   wrongHold: 0.5,
   /** …and so are this many different notes held at least `wrongBrief`. */
@@ -217,6 +221,21 @@ function folded(ms: number[], ref: number): number[] {
   return ms.map((m) => m - 12 * (Math.round((m - ref) / 12) - maj));
 }
 const centreOf = (s: Pick<Seg, 'ms' | 'ref'>) => median(folded(s.ms.slice(-25), s.ref));
+
+/** Means over `w` readings ending at each of the last `n` readings (fewer when there are fewer readings). */
+function runningMeans(xs: number[], w: number, n: number): number[] {
+  const out: number[] = [];
+  for (let e = Math.max(w, xs.length - n + 1); e <= xs.length; e++) out.push(xs.slice(e - w, e).reduce((a, x) => a + x, 0) / w);
+  return out;
+}
+
+/** The note has settled: its running average (~180 ms, or what there is) barely moved over the last 80 ms. */
+function settled(s: Pick<Seg, 'ms' | 'ref'>): boolean {
+  const f = folded(s.ms.slice(-13), s.ref);
+  if (f.length < 7) return false;
+  const ms = runningMeans(f, Math.min(9, f.length - 4), 5);
+  return ms.length >= 5 && Math.max(...ms) - Math.min(...ms) <= FOLLOW.settledMax;
+}
 
 /**
  * Follows a sung-back pattern reading by reading (any tempo): which of the expected notes have been
@@ -318,6 +337,7 @@ export class PatternFollower {
       return;
     }
     const want = this.expected[this.step];
+    if (want !== undefined && Math.abs(c - want) <= FOLLOW.match && !settled(s)) return; // on its way: wait
     if (want !== undefined && Math.abs(c - want) <= FOLLOW.match) {
       s.step = this.step;
       if (s.wrongCounted) this.wrongs--; // (it was the scoop into this note)
@@ -358,6 +378,14 @@ export class PatternFollower {
   private closeSeg(gap: boolean): void {
     const s = this.seg;
     this.seg = null;
+    // A short last note (too short to be judged while sung) that ends with the voice: it was sung.
+    const last = this.expected.length - 1;
+    if (s && gap && s.step === null && this.step === last && s.t1 - s.t0 >= 0.1 && Math.abs(centreOf(s) - this.expected[last]) <= FOLLOW.match) {
+      s.step = last;
+      this.matched[last] = s.rs;
+      this.matchedAt[last] = centreOf(s);
+      this.step++;
+    }
     // The last note, sung and ended (the voice stopped, or it was held long enough): the answer is
     // complete. A short one followed by more voice may be a scoop into the last note: wait.
     if (s && s.step === this.expected.length - 1 && (gap || s.t1 - s.t0 >= FOLLOW.lastHold)) this.end = 'done';
@@ -383,6 +411,7 @@ export class PatternFollower {
 export function judgeFollowed(root: number, f: PatternFollower, opts: { tolerance?: number; minReadings?: number } = {}): PatternResult {
   const pitches = [...new Set(PATTERN)].map((x) => root + x);
   const bins: Bins = new Map(pitches.map((p) => [p, { c: [], db: [], core: [], groups: [] }]));
+  const unsteady = new Set<number>();
   for (const { pitch, rs } of f.steps()) {
     const b = bins.get(pitch);
     const voiced = rs.filter((r): r is { midi: number; rms: number } => r.midi !== null && Number.isFinite(r.midi));
@@ -407,8 +436,19 @@ export function judgeFollowed(root: number, f: PatternFollower, opts: { toleranc
     b.db.push(...voiced.map((r) => 20 * Math.log10(Math.max(r.rms, 1e-5))));
     b.core.push(...core);
     addGroups(b.groups, core);
+    // Held, not slid through: a stretch of ~0.26 s (five running averages over ~180 ms) within 60¢.
+    const means = runningMeans(c, 9, c.length);
+    let ok = false;
+    for (let i = 0; i + STEADY_STRETCH <= means.length && !ok; i++) {
+      const w = means.slice(i, i + STEADY_STRETCH);
+      ok = Math.max(...w) - Math.min(...w) <= 60;
+    }
+    if (!ok) unsteady.add(pitch);
   }
-  const r = verdicts(root, pitches, bins, opts.tolerance ?? 50, opts.minReadings ?? 4);
+  const v = verdicts(root, pitches, bins, opts.tolerance ?? 50, opts.minReadings ?? 4);
+  // (a note never held is at best reached: 'shaky')
+  const notes = v.notes.map((n) => (n.verdict === 'good' && unsteady.has(n.midi) ? { ...n, verdict: 'shaky' as Verdict } : n));
+  const r = { ...v, notes, verdict: v.verdict === 'good' && notes.some((n) => n.verdict !== 'good') ? 'shaky' as Verdict : v.verdict };
   if (f.end === 'done') return r;
   return { ...r, verdict: 'missed', unmet: f.end ?? 'slow', notes: r.notes.map((n) => (n.verdict === 'good' ? { ...n, verdict: 'shaky' as Verdict } : n)) };
 }
