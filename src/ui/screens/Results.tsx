@@ -205,9 +205,14 @@ export function Results() {
       };
 
   return (
-    <main className="screen practice has-foot">
+    <main className="screen practice has-foot results">
       <PracticeBar up={up} heading title={piece.title}
         sub={[part?.name, section?.label ?? (lr.sectionId === 'all' ? 'Whole piece' : lr.sectionId === 'cold' ? 'Cold start' : lr.sectionId === 'entries' ? 'Entry drill' : 'Drill'), spec ? `L${lr.level} ${spec.name}` : ''].filter(Boolean).join(' · ')} />
+
+      {/* Wide screens: how it went (the verdict, the score, the sections) beside what to fix (the wrong
+          notes, bar by bar); the extras under how it went. */}
+      <div className="lay res-cols">
+      <div className="lay res-a">
 
       {lr.alignedMs != null && Math.abs(lr.alignedMs) >= 25 && lr.timingFail == null && lr.timingUnsure == null && (
         <div className="notice info" role="status" data-testid="aligned-note">
@@ -323,6 +328,9 @@ export function Results() {
         </div>
       )}
 
+      </div>
+
+      <div className="lay res-b">
       {wrong.length > 0 && part && <MistakeScore piece={piece} part={part} notes={wrong} tol={tol} level={lr.level} from={lr.from} to={lr.to} play={goPlay} />}
 
       {measureIdx.length > 0 && (
@@ -348,6 +356,9 @@ export function Results() {
         </div>
       )}
 
+      </div>
+
+      <div className="lay res-c">
       {(lr.points || lr.streak) && (
         <div className="row wrap" style={{ gap: 8 }} data-testid="run-stats">
           {lr.streak && lr.streak.days > 0 && (
@@ -405,6 +416,8 @@ export function Results() {
         <button className="btn ghost block" onClick={() => go({ name: 'ranks' })}>Leaderboard</button>
         <AccountTip />
         <ShareRecording pieceId={lr.pieceId} partId={lr.partId} />
+      </div>
+      </div>
       </div>
 
       <ResultsFoot primary={primary} again={again} toPiece={primary.onClick === toPiece ? null : toPiece} />

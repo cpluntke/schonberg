@@ -476,3 +476,47 @@ html:has(.results-foot) { scroll-padding-bottom: 170px; }
 @media (min-width: 1200px) {
   .piece-cols { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 28px; }
 }
+
+/* Practice screens (Results, the lyrics quiz, the memory map): no sidebar, as on phones. The top bar
+   and Results' footer span the screen; the content sits in a centred column (Results: two columns). */
+@media (min-width: 900px) {
+  .screen.practice { max-width: none; padding-top: 16px; }
+  .screen.practice > :where(:not(.practice-bar):not(.results-foot):not(style)) { width: 100%; max-width: var(--read-max); margin-left: auto; margin-right: auto; }
+  .screen > .practice-bar, .screen > .practice-bar.mm-top { margin: -16px calc(-1 * var(--gutter)) -4px; min-height: 60px;
+    padding: 6px max(calc(var(--gutter) - 12px), calc((100% + 2 * var(--gutter) - var(--content-max)) / 2 - 12px));
+  }
+  .practice-bar-title h1, .practice-bar-title .title { font-size: 18px; }
+  .practice-bar-title .tiny { font-size: 12px; }
+
+  .results > .res-cols {
+    max-width: var(--content-max); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto 1fr;
+    gap: 20px 28px; align-items: start;
+  }
+  .res-a, .res-b, .res-c { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+  .res-a { grid-column: 1; grid-row: 1; }
+  .res-b { grid-column: 2; grid-row: 1 / span 2; }
+  .res-c { grid-column: 1; grid-row: 2; }
+  /* Nothing to fix (no wrong notes, no bars): one readable column. */
+  .results > .res-cols:not(:has(.res-b > *)) { grid-template-columns: minmax(0, var(--read-max)); justify-content: center; }
+  .results > .res-cols:not(:has(.res-b > *)) > .res-b { display: none; }
+
+  /* Results' footer: the next step and why on the left, again / the piece on the right, under the content. */
+  html:has(.results-foot) { scroll-padding-bottom: 120px; }
+  .results-foot {
+    margin: auto calc(-1 * var(--gutter)) 0; display: grid; grid-template-columns: minmax(260px, 420px) minmax(0, 1fr) auto;
+    align-items: center; column-gap: 20px; row-gap: 4px;
+    padding: 14px max(var(--gutter), calc((100% + 2 * var(--gutter) - var(--content-max)) / 2)) calc(14px + var(--safe-bottom));
+  }
+  .results-foot > .btn.primary { grid-column: 1; grid-row: 1; }
+  .results-foot .why { grid-column: 2; grid-row: 1; margin: 0; text-align: left; font-size: 13px; max-width: 60ch; }
+  .results-foot > .row { grid-column: 3; grid-row: 1; }
+  .results-foot .row > .btn { flex: none; min-width: 120px; padding: 0 18px; height: 48px; }
+}
+
+/* The memory map: an outline in two columns. */
+@media (min-width: 900px) {
+  .mm > .mm-secs { display: block; columns: 2; column-gap: 20px; }
+  .mm-secs > * { break-inside: avoid; margin-bottom: 14px; }
+  .mm > :not(.practice-bar) { max-width: var(--content-max); }
+  .mm > .seg { grid-auto-columns: minmax(160px, max-content); justify-content: start; background: transparent; padding: 0; }
+}

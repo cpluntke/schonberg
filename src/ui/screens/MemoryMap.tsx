@@ -171,7 +171,10 @@ export function MemoryMap({ pieceId, partId }: { pieceId: string; partId: string
         </div>
       )}
 
-      {map.sections.map((s) => <SectionCard key={s.id} s={s} letters={letters} />)}
+      {/* (wide screens: the sections in two columns, like a printed outline) */}
+      <div className="lay mm-secs">
+        {map.sections.map((s) => <SectionCard key={s.id} s={s} letters={letters} />)}
+      </div>
     </Shell>
   );
 }
