@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from '../hooks';
-import { addLibraryPiece, fetchLibrary, type Auth, type ChoirCycle, type ChoirInfo, type LibraryPiece } from '../../progress/choir';
+import { addLibraryPiece, fetchCycles, fetchLibrary, setInProgramme, targetCycle, type Auth, type ChoirCycle, type ChoirInfo, type CyclesReply, type LibraryPiece } from '../../progress/choir';
 import { LAB_ID, LAB_TITLE } from '../../game/intonation';
 
 /** The programme editor's unpublished changes: its piece ids (null when there are none) and how to add one. */
@@ -61,7 +61,7 @@ export function LibraryPanel({ code, auth, info, draft, cycle, embedded = false,
         Public-domain pieces for choirs. Add to our choir copies the score into the choir's scores and puts it into the programme
         {cycle ? <> of {cycle.name} (the cycle you're editing above)</> : <>: members get it the next time they open the app</>}. Only choir admins see this list.
       </span>
-      {draft && <LabEntry draft={draft} cycle={cycle ?? null} />}
+      <LabEntry code={code} auth={auth} draft={draft} cycle={cycle ?? null} stamp={stamp} onAdded={onAdded} />
       {err && <div className="notice" role="alert">{err}</div>}
       {!list && !err && <span className="small muted">Loading…</span>}
       {list && (
@@ -115,31 +115,78 @@ export function LibraryPanel({ code, auth, info, draft, cycle, embedded = false,
 }
 
 /**
- * The intonation lab in the library: an exercise, not a score. It goes into the programme being
- * edited above (published with it); the choir's singers get it while that cycle runs.
+ * The intonation lab in the library: an exercise, not a score. With the cycle editor open above, it
+ * goes into that programme (published with it); otherwise (the super admin's list, no cycle open) it
+ * goes straight into the programme of the running cycle, else the next one. The choir's singers get
+ * it while that cycle runs.
  */
-function LabEntry({ draft, cycle }: { draft: ProgrammeDraft; cycle: ChoirCycle | null }) {
-  const saved = !!cycle?.pieceIds.includes(LAB_ID);
-  const inProgramme = draft.ids ? draft.ids.includes(LAB_ID) : saved;
+function LabEntry({ code, auth, draft, cycle, stamp, onAdded }: {
+  code: string; auth: Auth; draft?: ProgrammeDraft; cycle: ChoirCycle | null; stamp: string; onAdded?: (i: ChoirInfo | null) => void;
+}) {
+  const viaEditor = !!draft?.add && !!cycle;
+  const [cycles, setCycles] = useState<CyclesReply | null>(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (viaEditor) return;
+    let alive = true;
+    fetchCycles(code, auth).then((r) => { if (alive) { setCycles(r); setErr(''); } }).catch((e) => { if (alive) setErr((e as Error).message); });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code, viaEditor, stamp]);
+  const target = viaEditor ? cycle : cycles ? targetCycle(cycles.cycles) : null;
+  const saved = !!target?.pieceIds.includes(LAB_ID);
+  const inProgramme = viaEditor && draft!.ids ? draft!.ids.includes(LAB_ID) : saved;
+  const direct = async (on: boolean) => {
+    if (!cycles || !target) return;
+    setBusy(true);
+    try {
+      const r = await setInProgramme(code, auth, target, LAB_ID, on, cycles.cycleUpdatedAt);
+      setCycles(r);
+      toast(on ? `${LAB_TITLE} put in the programme of ${target.name}: the choir's singers get it while that cycle runs`
+        : `${LAB_TITLE} taken out of the programme of ${target.name}`);
+      onAdded?.(r.choir ?? null);
+    } catch (e) {
+      toast((e as Error).message);
+      // (another admin changed the cycles: load them again)
+      fetchCycles(code, auth).then(setCycles).catch(() => {});
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <div className="col" data-testid="library-lab" style={{ gap: 4, padding: '12px 0', borderTop: '1px solid var(--surface-2)' }}>
       <div className="row" style={{ gap: 8, alignItems: 'flex-start' }}>
         <strong className="grow" style={{ fontSize: 15 }}>{LAB_TITLE}</strong>
         <span className="badge muted">Exercise</span>
       </div>
-      <span className="small">Find the pure fifth and the pure major third by ear: listen, tune by hand, sing with and without help, then in a chord. About 10 minutes a step; no score needed.</span>
+      <span className="small">Find the pure fifth and the pure major third by ear: listen, tune by hand, sing with and without help, then in a chord. No score needed.</span>
+      {err && <span className="small" role="alert" style={{ color: 'var(--accent-text)' }}>{err}</span>}
       <div className="row wrap" style={{ gap: 8, marginTop: 4 }}>
-        {inProgramme ? (
-          <span className="small" data-testid="library-lab-in" style={{ color: 'var(--voice)', fontWeight: 600 }}>
-            ✓ In the programme{draft.ids && !saved ? ' (publish it above)' : ''}
-          </span>
-        ) : draft.add && cycle ? (
-          <button className="btn small primary" data-testid="library-lab-add" onClick={() => {
-            draft.add!(LAB_ID);
-            toast(`${LAB_TITLE} added to the programme of ${cycle.name} above: publish it to send it to the choir`);
-          }}>Put it in the programme</button>
+        {viaEditor ? (
+          inProgramme ? (
+            <span className="small" data-testid="library-lab-in" style={{ color: 'var(--voice)', fontWeight: 600 }}>
+              ✓ In the programme{draft!.ids && !saved ? ' (publish it above)' : ''}
+            </span>
+          ) : (
+            <button className="btn small primary" data-testid="library-lab-add" onClick={() => {
+              draft!.add!(LAB_ID);
+              toast(`${LAB_TITLE} added to the programme of ${cycle!.name} above: publish it to send it to the choir`);
+            }}>Put it in the programme</button>
+          )
+        ) : !cycles && !err ? (
+          <span className="small muted">Loading…</span>
+        ) : !target ? (
+          <span className="small muted">This choir has no running or coming cycle: start one to give it the lab.</span>
+        ) : inProgramme ? (
+          <>
+            <span className="small" data-testid="library-lab-in" style={{ color: 'var(--voice)', fontWeight: 600 }}>✓ In the programme of {target.name}</span>
+            <button className="btn small ghost" disabled={busy} data-testid="library-lab-remove" onClick={() => void direct(false)}>Take it out</button>
+          </>
         ) : (
-          <span className="small muted">Open a cycle above to put it in its programme.</span>
+          <button className="btn small primary" disabled={busy} data-testid="library-lab-add" onClick={() => void direct(true)}>
+            {busy ? 'Adding…' : `Put it in the programme of ${target.name}`}
+          </button>
         )}
       </div>
     </div>

@@ -379,6 +379,21 @@ export const createCycle = (code: string, auth: Auth, body: CycleFields & { star
   call<CyclesReply>(`/choirs/${enc(code)}/cycles`, { method: 'POST', auth, ...json(body) });
 export const updateCycle = (code: string, auth: Auth, id: string, body: CycleFields) =>
   call<CyclesReply>(`/choirs/${enc(code)}/cycles/${enc(id)}`, { method: 'PUT', auth, ...json(body) });
+/** Where the library's quick actions go: the cycle running by this phone's date, else the next one (null: none). */
+export function targetCycle(cycles: ChoirCycle[]): ChoirCycle | null {
+  return (choirCycleNow({ cycle: null, cycles }) as ChoirCycle | null) ?? choirCycleNext({ cycles });
+}
+/**
+ * Put `id` into (or take it out of) `cycle`'s programme as the server has it: the whole programme is
+ * sent back unchanged apart from that (`base`: the cycles' version the caller saw, for conflicts).
+ */
+export function setInProgramme(code: string, auth: Auth, cycle: ChoirCycle, id: string, on: boolean, base: number) {
+  const { id: cid, createdAt: _c, updatedAt: _u, ...programme } = cycle;
+  const ids = on ? [...programme.pieceIds.filter((x) => x !== id), id] : programme.pieceIds.filter((x) => x !== id);
+  return updateCycle(code, auth, cid, {
+    ...programme, end: cycle.end ?? null, pieceIds: ids, focusPieceIds: (programme.focusPieceIds ?? []).filter((x) => ids.includes(x)), base,
+  });
+}
 export const deleteCycle = (code: string, auth: Auth, id: string, base?: number) =>
   call<CyclesReply>(`/choirs/${enc(code)}/cycles/${enc(id)}`, { method: 'DELETE', auth, ...json(base != null ? { base } : {}) });
 export async function uploadChoirPiece(code: string, auth: Auth, file: File, title: string, composer: string): Promise<{ piece: ChoirPiece }> {
