@@ -503,7 +503,11 @@ function SingRung({ iv, root, lab, record, rung }: RungProps & { rung: number })
   const [hinting, setHinting] = useState(false);
   const unsub = useRef<(() => void) | null>(null);
   const hintTimer = useRef(0);
-  const live = useRef({ hold: new HoldDetector(), recent: [] as { t: number; hz: number }[], paused: false, locked: false, shown: 0 });
+  // `locked`: a round just locked; the voice is still followed on screen, and the next round starts
+  // by itself after a breath (BREATH_SEC without a voice) or with "Next round".
+  const live = useRef({ hold: new HoldDetector(), recent: [] as { t: number; hz: number }[], paused: false, locked: false, lastVoice: 0, shown: 0 });
+  const [lockedUi, setLockedUi] = useState(false);
+  const verdictRef = useRef<HTMLDivElement | null>(null);
   const rootHz = midiToHz(root);
   const target = pureCents(deg);
   const tol = TOL_SING;
@@ -547,12 +551,19 @@ function SingRung({ iv, root, lab, record, rung }: RungProps & { rung: number })
           L.recent = L.recent.filter((r) => r.t > now - 0.3);
         } else if (L.recent.length && now - L.recent[L.recent.length - 1].t > 0.3) L.recent = [];
         const { target: tg } = cur.current;
-        const locked = L.hold.push(now, hz != null ? centsAbove(hz, rootHz, tg) : null);
+        if (hz != null) L.lastVoice = now;
+        else if (L.locked && now - L.lastVoice > BREATH_SEC) {
+          // A breath after a locked round: the next round starts.
+          L.locked = false;
+          L.hold.reset();
+          setLockedUi(false);
+        }
+        const locked = L.locked ? null : L.hold.push(now, hz != null ? centsAbove(hz, rootHz, tg) : null);
         // (the screen at most ~15 times a second)
         if (performance.now() - L.shown > 66) {
           L.shown = performance.now();
           setOffNow(L.recent.length ? centsAbove(median(L.recent.map((r) => r.hz)), rootHz, tg) - tg : null);
-          setHeld(L.hold.held());
+          setHeld(L.locked ? 0 : L.hold.held());
         }
         if (locked != null) onLock(locked);
       });
@@ -566,9 +577,12 @@ function SingRung({ iv, root, lab, record, rung }: RungProps & { rung: number })
 
   function onLock(c: number) {
     const L = live.current;
-    L.paused = true;
     L.locked = true;
+    L.hold.reset();
+    setLockedUi(true);
     setHeld(0);
+    // (on a phone the result may be below the fold)
+    window.setTimeout(() => verdictRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }), 50);
     const { target: tg, showWobble: sw, record: rec } = cur.current;
     const offBy = c - tg;
     // A different note (more than a semitone away) is no try; in the chord, rounds with the wobble shown are practice.
@@ -584,6 +598,7 @@ function SingRung({ iv, root, lab, record, rung }: RungProps & { rung: number })
     L.recent = [];
     L.paused = false;
     L.locked = false;
+    setLockedUi(false);
     setOffNow(null);
     setResult(null);
   }
@@ -603,7 +618,7 @@ function SingRung({ iv, root, lab, record, rung }: RungProps & { rung: number })
       d.set(Object.fromEntries(cur.current.others.map((o) => [o, toneHz(root, o)])));
       setHinting(false);
       L.recent = [];
-      if (!L.locked) L.paused = false;
+      L.paused = false;
     }, 2500);
   }
 
@@ -664,11 +679,11 @@ function SingRung({ iv, root, lab, record, rung }: RungProps & { rung: number })
               <strong>Listen for the moment it stops moving</strong>
             </div>
           )}
-          <HoldRing held={result ? 0 : held} />
+          <HoldRing held={held} done={lockedUi} />
         </div>
       )}
       {v && result && (
-        <div className={v.good ? 'notice info col' : 'notice col'} style={{ gap: 6 }} role="status" data-testid="lab-verdict">
+        <div ref={verdictRef} className={v.good ? 'notice info col' : 'notice col'} style={{ gap: 6, scrollMarginBottom: 16 }} role="status" data-testid="lab-verdict">
           <strong>{v.title}{!result.counted && Math.abs(result.value - target) <= 60 ? ' (practice round)' : ''}</strong>
           {Math.abs(result.value - target) <= 60 && <Landed deg={deg} value={result.value} tol={tol} />}
           <span className="small">{v.text}</span>
@@ -691,12 +706,15 @@ function SingRung({ iv, root, lab, record, rung }: RungProps & { rung: number })
   );
 }
 
+/** Silence this long after a locked round (s) starts the next one. */
+const BREATH_SEC = 0.4;
+
 function hintInterval(d: Degree) {
   return d === 'mi' ? 'a major third above do' : d === 'sol' ? 'a fifth above do' : 'the root, under the other two';
 }
 
-function HoldRing({ held }: { held: number }) {
-  const f = Math.min(1, held / HOLD_SEC);
+function HoldRing({ held, done }: { held: number; done: boolean }) {
+  const f = done ? 1 : Math.min(1, held / HOLD_SEC);
   const C = 2 * Math.PI * 30;
   return (
     <div className="row" style={{ gap: 14 }}>
@@ -704,11 +722,11 @@ function HoldRing({ held }: { held: number }) {
         <circle cx={36} cy={36} r={30} fill="none" stroke="var(--line)" strokeWidth={7} />
         <circle cx={36} cy={36} r={30} fill="none" stroke="var(--accent)" strokeWidth={7} strokeLinecap="round"
           strokeDasharray={`${(C * f).toFixed(1)} ${C.toFixed(1)}`} transform="rotate(-90 36 36)" />
-        <text x={36} y={41} textAnchor="middle" fontSize={15} fontWeight={600} fill="var(--text)" fontFamily="var(--mono)">{(HOLD_SEC * f).toFixed(1)}s</text>
+        <text x={36} y={41} textAnchor="middle" fontSize={15} fontWeight={600} fill="var(--text)" fontFamily="var(--mono)">{done ? '✓' : `${(HOLD_SEC * f).toFixed(1)}s`}</text>
       </svg>
       <div className="col grow" style={{ gap: 2 }}>
-        <strong className="small">Hold it steady for {HOLD_SEC} s</strong>
-        <span className="tiny muted">The app takes what you hold and shows where you landed.</span>
+        <strong className="small">{done ? 'Got it: see where you landed below' : `Hold it steady for ${HOLD_SEC} s`}</strong>
+        <span className="tiny muted">{done ? 'Still listening. Take a breath, then sing again for the next round.' : 'The app takes what you hold and shows where you landed.'}</span>
       </div>
     </div>
   );
