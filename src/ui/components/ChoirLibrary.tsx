@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from '../hooks';
-import { addLibraryPiece, fetchCycles, fetchLibrary, setInProgramme, targetCycle, type Auth, type ChoirCycle, type ChoirInfo, type CyclesReply, type LibraryPiece } from '../../progress/choir';
+import { addLibraryPiece, ChoirApiError, fetchCycles, fetchLibrary, setInProgramme, targetCycle, type Auth, type ChoirCycle, type ChoirInfo, type CyclesReply, type LibraryPiece } from '../../progress/choir';
 import { LAB_ID, LAB_TITLE } from '../../game/intonation';
 
 /** The programme editor's unpublished changes: its piece ids (null when there are none) and how to add one. */
@@ -21,6 +21,8 @@ export function LibraryPanel({ code, auth, info, draft, cycle, embedded = false,
   const [list, setList] = useState<LibraryPiece[] | null>(null);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
+  // (an added piece can change the programme on the server: the lab's entry loads the cycles again)
+  const [added, setAdded] = useState(0);
   const stamp = `${info?.updatedAt ?? 0}:${info?.cycleUpdatedAt ?? 0}`;
   useEffect(() => {
     let alive = true;
@@ -39,6 +41,7 @@ export function LibraryPanel({ code, auth, info, draft, cycle, embedded = false,
       const r = await addLibraryPiece(code, auth, p.id, toProgramme && !local, cycle?.id);
       if (local && toProgramme) draft!.add!(p.id);
       setList((l) => l?.map((x) => (x.id === p.id ? { ...x, scoreId: r.piece.id, inProgramme: x.inProgramme || r.programme } : x)) ?? l);
+      setAdded((n) => n + 1);
       toast(local && toProgramme
         ? `“${p.title}” added to the choir's scores and to the programme above: publish it to send it to the choir`
         : toProgramme && !r.programme
@@ -61,7 +64,7 @@ export function LibraryPanel({ code, auth, info, draft, cycle, embedded = false,
         Public-domain pieces for choirs. Add to our choir copies the score into the choir's scores and puts it into the programme
         {cycle ? <> of {cycle.name} (the cycle you're editing above)</> : <>: members get it the next time they open the app</>}. Only choir admins see this list.
       </span>
-      <LabEntry code={code} auth={auth} draft={draft} cycle={cycle ?? null} stamp={stamp} onAdded={onAdded} />
+      <LabEntry code={code} auth={auth} draft={draft} cycle={cycle ?? null} stamp={`${stamp}:${added}`} onAdded={onAdded} />
       {err && <div className="notice" role="alert">{err}</div>}
       {!list && !err && <span className="small muted">Loading…</span>}
       {list && (
@@ -143,11 +146,13 @@ function LabEntry({ code, auth, draft, cycle, stamp, onAdded }: {
     try {
       const r = await setInProgramme(code, auth, target, LAB_ID, on, cycles.cycleUpdatedAt);
       setCycles(r);
-      toast(on ? `${LAB_TITLE} put in the programme of ${target.name}: the choir's singers get it while that cycle runs`
-        : `${LAB_TITLE} taken out of the programme of ${target.name}`);
+      const now = r.cycles.find((c) => c.id === target.id);
+      toast(on && !now?.pieceIds.includes(LAB_ID) ? `The programme of ${target.name} is full: take a piece out of it to make room`
+        : on ? `${LAB_TITLE} put in the programme of ${target.name}: the choir's singers get it while that cycle runs`
+          : `${LAB_TITLE} taken out of the programme of ${target.name}`);
       onAdded?.(r.choir ?? null);
     } catch (e) {
-      toast((e as Error).message);
+      toast(e instanceof ChoirApiError && e.status === 409 ? 'The cycles changed meanwhile: they are loaded again, try once more' : (e as Error).message);
       // (another admin changed the cycles: load them again)
       fetchCycles(code, auth).then(setCycles).catch(() => {});
     } finally {
@@ -176,7 +181,7 @@ function LabEntry({ code, auth, draft, cycle, stamp, onAdded }: {
           )
         ) : !cycles && !err ? (
           <span className="small muted">Loading…</span>
-        ) : !target ? (
+        ) : !cycles ? null : !target ? (
           <span className="small muted">This choir has no running or coming cycle: start one to give it the lab.</span>
         ) : inProgramme ? (
           <>

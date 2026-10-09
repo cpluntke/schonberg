@@ -567,3 +567,25 @@ describe('super-admin login', () => {
     for (const r of ['choiradmin', 'section', 'choirinsights', 'superadmin', 'usage']) expect(parseHash(`#/${r}`)).toEqual({ name: r });
   });
 });
+
+describe('the intonation lab straight into a cycle (library, no editor)', () => {
+  it('targets the running cycle, else the next; sends the programme back with only the lab changed', async () => {
+    const { targetCycle, setInProgramme } = await import('./choir');
+    const day = (n: number) => { const d = new Date(Date.now() + n * 864e5); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+    const past = { id: 'p', name: 'Past', start: day(-60), end: day(-30), pieceIds: ['a'] };
+    const run = { id: 'r', name: 'Now', start: day(-5), pieceIds: ['a', 'b'], focusPieceIds: ['b'], concertDate: day(40), wanted: [{ title: 'X', composer: 'Y' }], createdAt: 1, updatedAt: 2 };
+    const next = { id: 'n', name: 'Next', start: day(20), pieceIds: [] };
+    expect(targetCycle([past, run, next])?.id).toBe('r');
+    expect(targetCycle([past, next])?.id).toBe('n');
+    expect(targetCycle([past])).toBeNull();
+    const sent: unknown[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (_u: string, init: RequestInit) => { sent.push(JSON.parse(String(init.body))); return new Response(JSON.stringify({ choir: {}, cycles: [], current: null, cycleUpdatedAt: 3 }), { status: 200 }); }));
+    vi.stubEnv('VITE_CHOIR_URL', '/schonberg/api');
+    await setInProgramme('abc', { bearer: 't' }, run, 'lab:intonation', true, 7);
+    await setInProgramme('abc', { bearer: 't' }, { ...run, pieceIds: ['a', 'b', 'lab:intonation'] }, 'lab:intonation', false, 8);
+    expect(sent[0]).toEqual({ name: 'Now', start: run.start, end: null, pieceIds: ['a', 'b', 'lab:intonation'], focusPieceIds: ['b'], concertDate: run.concertDate, wanted: run.wanted, base: 7 });
+    expect((sent[1] as { pieceIds: string[] }).pieceIds).toEqual(['a', 'b']);
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+});
