@@ -187,7 +187,7 @@ export function Settings() {
         {[cycle.rehearsalWeekday == null ? cycle.rehearsalDate : undefined, cycle.concertDate].some((d) => d && (daysUntil(d) ?? 0) < 0) && (
           <span className="small" style={{ color: 'var(--accent-text)' }}>A date is in the past. Set the next rehearsal so Home can pace your practice.</span>
         )}
-        {cycle.pieceIds.length > 0 && (
+        {cycle.pieceIds.some((id) => getPiece(id)) && (
           <div className="col" style={{ gap: 0 }}>
             <span className="small">The next rehearsal works on…</span>
             {cycle.pieceIds.map((id) => {

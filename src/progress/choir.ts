@@ -270,9 +270,10 @@ export function leaveChoir(): void {
   try { localStorage.removeItem('sh:choirApplied'); } catch { /* ignore */ }
   // An admin's or section lead's login belongs to that choir.
   if (p.choirCode && loadSession()?.code === p.choirCode) void logout();
-  // The programme stays as the singer's own (no longer tied to the choir).
+  // The programme stays as the singer's own (no longer tied to the choir), but not the choir's
+  // intonation lab (LAB_ID in game/intonation.ts: the choir's to give).
   const c = loadCycle();
-  if (c.preset?.startsWith('choir:')) saveCycle({ ...c, preset: undefined });
+  if (c.preset?.startsWith('choir:')) saveCycle({ ...c, preset: undefined, pieceIds: c.pieceIds.filter((id) => id !== 'lab:intonation') });
 }
 
 /**

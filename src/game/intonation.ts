@@ -29,8 +29,11 @@ export const INTERVAL_DEGREE: Record<LabInterval, Degree> = { fifth: 'sol', thir
  */
 export const LAB_ID = 'lab:intonation';
 export const LAB_TITLE = 'Intonation lab';
-/** In this phone's programme (the choir's running cycle, or the singer's own)? */
-export const labInProgramme = () => loadCycle().pieceIds.includes(LAB_ID);
+/** In this phone's programme from its choir (the running cycle)? */
+export const labInProgramme = () => {
+  const c = loadCycle();
+  return !!c.preset?.startsWith('choir:') && c.pieceIds.includes(LAB_ID);
+};
 /** The programme's pieces without the lab (for counts). */
 export const scoresOf = (ids: string[]) => ids.filter((id) => id !== LAB_ID);
 

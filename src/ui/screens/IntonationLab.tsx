@@ -55,7 +55,7 @@ export function IntonationLab({ route }: { route: LabRoute }) {
           <button className="icon-btn" aria-label="Back" onClick={() => back({ name: 'home' })}><IconBack /></button>
           <h1>Intonation lab</h1>
         </div>
-        <div className="notice info">The intonation lab isn't open yet. It's coming soon.</div>
+        <div className="notice info">The intonation lab isn't in your choir's programme right now. When your choir adds it to a cycle, it appears on Home.</div>
       </main>
     );
   }

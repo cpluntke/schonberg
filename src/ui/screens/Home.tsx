@@ -209,7 +209,9 @@ export function Home() {
         ) : statuses.length ? (
           <div className="notice info">Everything in this cycle is concert-ready. Try the arcade mode or today's Zwölfton row.</div>
         ) : (
-          <div className="notice info">No pieces in this cycle yet. Add some from the Library or import your choir's MusicXML.</div>
+          <div className="notice info">{labInProgramme()
+            ? 'No scores in this cycle yet. Start with the intonation lab below.'
+            : "No pieces in this cycle yet. Add some from the Library or import your choir's MusicXML."}</div>
         )}
       </section>}
 

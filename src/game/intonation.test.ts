@@ -150,8 +150,12 @@ describe('the lab in a choir programme', () => {
     const { saveCycle, loadCycle } = await import('../progress/store');
     const { LAB_ID, labInProgramme, scoresOf } = await import('./intonation');
     const before = loadCycle();
-    saveCycle({ ...before, pieceIds: ['some-piece', LAB_ID] });
+    saveCycle({ ...before, pieceIds: ['some-piece', LAB_ID], preset: 'choir:abc' });
     expect(labInProgramme()).toBe(true);
+    // (only from a choir)
+    saveCycle({ ...before, pieceIds: ['some-piece', LAB_ID], preset: undefined });
+    expect(labInProgramme()).toBe(false);
+    saveCycle({ ...before, pieceIds: ['some-piece', LAB_ID], preset: 'choir:abc' });
     expect(scoresOf(loadCycle().pieceIds)).toEqual(['some-piece']);
     saveCycle({ ...before, pieceIds: ['some-piece'] });
     expect(labInProgramme()).toBe(false);
