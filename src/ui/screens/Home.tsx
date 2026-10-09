@@ -17,7 +17,7 @@ import { presenceShown, usePresence } from '../../progress/presence';
 import { LOGO_TILE } from '../components/ChoirLogo';
 import { useStaff } from './Admin';
 import { labEnabled } from './IntonationLab';
-import { loadLab, RUNGS } from '../../game/intonation';
+import { labInProgramme, loadLab, RUNGS } from '../../game/intonation';
 
 export { pieceStatus, type PieceStatus };
 
@@ -212,6 +212,8 @@ export function Home() {
           <div className="notice info">No pieces in this cycle yet. Add some from the Library or import your choir's MusicXML.</div>
         )}
       </section>}
+
+      {labInProgramme() && <IntonationCard inProgramme />}
       </div>
 
       <div className="lay home-side">
@@ -248,7 +250,7 @@ export function Home() {
         ))}
       </section>
 
-      {labEnabled(staff) && <IntonationCard />}
+      {labEnabled(staff) && !labInProgramme() && <IntonationCard />}
 
       <button className="card expert" style={{ textAlign: 'left', color: 'inherit' }} onClick={() => go({ name: 'expert' })}>
         <div className="row between">
@@ -279,8 +281,8 @@ function Notice() {
   );
 }
 
-/** The intonation lab (preview: admins only, see labEnabled). */
-function IntonationCard() {
+/** The intonation lab: in the programme (all singers) or as a preview (admins, see labEnabled). */
+function IntonationCard({ inProgramme = false }: { inProgramme?: boolean }) {
   const lab = loadLab();
   const step = (k: 'fifth' | 'third') => (lab[k].rung > RUNGS ? 'done ✓' : `step ${lab[k].rung} of ${RUNGS}`);
   return (
@@ -288,7 +290,7 @@ function IntonationCard() {
       onClick={() => go({ name: 'intonation' })}>
       <div className="row between">
         <strong>Intonation lab</strong>
-        <span className="badge">Preview · admins</span>
+        <span className="badge">{inProgramme ? 'In this cycle' : 'Preview · admins'}</span>
       </div>
       <span className="small muted">Find the pure fifth and the pure major third by ear: listen, tune by hand, then sing.</span>
       <span className="tiny mono" style={{ color: 'var(--voice)' }}>Fifth: {step('fifth')} · Third: {step('third')}</span>

@@ -9,7 +9,7 @@
 // sing blind, sing it in a chord.
 
 import type { VoiceType } from '../music/types';
-import { rawGet, rawSet } from '../progress/store';
+import { loadCycle, rawGet, rawSet } from '../progress/store';
 
 export type LabInterval = 'fifth' | 'third';
 /** A chord tone, as scale degrees of a major triad. */
@@ -21,6 +21,18 @@ export const RATIO: Record<Degree, [number, number]> = { do: [1, 1], mi: [5, 4],
 export const ET_SEMIS: Record<Degree, number> = { do: 0, mi: 4, sol: 7 };
 
 export const INTERVAL_DEGREE: Record<LabInterval, Degree> = { fifth: 'sol', third: 'mi' };
+
+/**
+ * The lab's id in a choir's programme (a cycle's pieceIds): an admin adds it like a piece, and the
+ * choir's singers get it while that cycle runs. Not a score: everything that lists the programme's
+ * scores skips it (getPiece knows no such id).
+ */
+export const LAB_ID = 'lab:intonation';
+export const LAB_TITLE = 'Intonation lab';
+/** In this phone's programme (the choir's running cycle, or the singer's own)? */
+export const labInProgramme = () => loadCycle().pieceIds.includes(LAB_ID);
+/** The programme's pieces without the lab (for counts). */
+export const scoresOf = (ids: string[]) => ids.filter((id) => id !== LAB_ID);
 
 export const cents = (ratio: number) => 1200 * Math.log2(ratio);
 /** The pure tone's distance from do (cents): 0, 386.3, 702.0. */

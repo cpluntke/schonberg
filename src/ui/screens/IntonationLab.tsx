@@ -15,14 +15,14 @@ import { getTracker } from '../play/session';
 import { micErrorText } from '../components/Tuner';
 import {
   CHECK_PASS, CHECK_ROUNDS, HOLD_SEC, HoldDetector, INTERVAL_DEGREE, PASS, ROUNDS, RUNGS, RUNG_NAMES, RATIO, TOL_HAND, TOL_SING,
-  centsAbove, loadLab, logRound, median, pianoCents, pureCents, rootFor, saveLab, shownBeats, wobbleWord,
+  centsAbove, labInProgramme, loadLab, logRound, median, pianoCents, pureCents, rootFor, saveLab, shownBeats, wobbleWord,
   type Degree, type LabInterval, type LabProgress,
 } from '../../game/intonation';
 
 type LabRoute = Extract<Route, { name: 'intonation' }>;
 
-/** Feature flag: the lab is a preview for choir admins and the super admin. */
-export const labEnabled = (staff: Staff) => staff.admin || staff.superAdmin;
+/** Who gets the lab: choir admins and the super admin always (preview); singers while their choir's programme has it. */
+export const labEnabled = (staff: Staff) => staff.admin || staff.superAdmin || labInProgramme();
 
 const IV_NAME: Record<LabInterval, string> = { fifth: 'Pure fifth', third: 'Pure major third' };
 const DEG_NAME: Record<Degree, string> = { do: 'do', mi: 'mi', sol: 'sol' };

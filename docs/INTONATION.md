@@ -3,9 +3,12 @@
 Find a **pure fifth** (3:2, 702¢, about 2¢ wider than the piano's) and a **pure major third**
 (5:4, 386¢, about 14¢ lower than the piano's) by ear, at home, on your own phone.
 
-Open to choir admins and the super admin only for now (`labEnabled` in
-`src/ui/screens/IntonationLab.tsx`). Those accounts see an "Intonation lab" card on Home. The lab's
-address is `#/intonation`.
+Choir admins and the super admin always have it, as a preview: an "Intonation lab" card on Home.
+An admin can also put it into a cycle's programme, like a piece: in the cycle editor ("Intonation lab"
+under Pieces) or from the choir's Library ("Put it in the programme"). Then every singer of the choir
+gets the card on Home while that cycle runs (`labEnabled` in `src/ui/screens/IntonationLab.tsx`). In a
+programme it is the id `lab:intonation` (`LAB_ID`): not a score, so piece lists, readiness and ranks
+skip it. The lab's address is `#/intonation`.
 
 ## What to listen for
 

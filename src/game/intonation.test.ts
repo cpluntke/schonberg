@@ -144,3 +144,17 @@ describe('ladder progress', () => {
     localStorage.removeItem('sh:intonation');
   });
 });
+
+describe('the lab in a choir programme', () => {
+  it('is on for singers while the programme has it; counts of scores skip it', async () => {
+    const { saveCycle, loadCycle } = await import('../progress/store');
+    const { LAB_ID, labInProgramme, scoresOf } = await import('./intonation');
+    const before = loadCycle();
+    saveCycle({ ...before, pieceIds: ['some-piece', LAB_ID] });
+    expect(labInProgramme()).toBe(true);
+    expect(scoresOf(loadCycle().pieceIds)).toEqual(['some-piece']);
+    saveCycle({ ...before, pieceIds: ['some-piece'] });
+    expect(labInProgramme()).toBe(false);
+    saveCycle(before);
+  });
+});

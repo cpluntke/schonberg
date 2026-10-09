@@ -12,6 +12,7 @@ import {
   fetchCycles, createCycle, updateCycle, deleteCycle, type ChoirCycle, type CyclesReply, choirCycleNow,
 } from '../../progress/choir';
 import { LibraryPanel, type ProgrammeDraft } from '../components/ChoirLibrary';
+import { LAB_ID, LAB_TITLE, scoresOf } from '../../game/intonation';
 import { ChoirLogoEditor } from '../components/ChoirLogo';
 import { SectionInsights } from '../components/SectionInsights';
 import { fetchSectionInsights, type SectionInsightsView } from '../../progress/insights';
@@ -465,7 +466,7 @@ function ProgrammeEditor({ code, auth, info, cycle, all, base, library, draft, o
   // library piece without a score in the choir. The server copies a library piece's score in by
   // itself when it serves the choir (a former built-in piece), so that one is missing only when the
   // choir's storage is full.
-  const missing = ids.filter((id) => !choices.some((p) => p.id === id));
+  const missing = ids.filter((id) => id !== LAB_ID && !choices.some((p) => p.id === id));
   // Library pieces the programme can take straight away: tapping one copies its score into the choir
   // (on the server) and includes it here; publishing sends it to the members.
   const fromLibrary = (library ?? []).filter((l) => !choices.some((p) => p.id === l.id) && !ids.includes(l.id));
@@ -512,6 +513,13 @@ function ProgrammeEditor({ code, auth, info, cycle, all, base, library, draft, o
             </div>
           );
         })}
+        {/* (an exercise, not a score: no rehearsal star) */}
+        <div className="row" style={{ gap: 6 }}>
+          <button className="chip grow" style={{ textAlign: 'left' }} aria-pressed={ids.includes(LAB_ID)} data-testid="programme-lab"
+            onClick={() => setIds(toggle(ids, LAB_ID))}>
+            {LAB_TITLE}<span className="tiny muted"> · exercise: pure fifths and thirds by ear</span>
+          </button>
+        </div>
         {missing.map((id) => {
           const m = missingLabel(id);
           return (
@@ -687,7 +695,7 @@ function CyclesPanel({ code, auth, cycles, selId, onSelect, onLoaded, onChanged 
             <div key={c.id} className="row" style={{ gap: 8, padding: '6px 0', borderTop: '1px solid var(--line)' }} data-testid="cycle-row">
               <div className="col grow" style={{ gap: 0, minWidth: 0 }}>
                 <span className="small ellipsis" style={{ fontWeight: 700 }}>{c.name}</span>
-                <span className="tiny muted">{fmtDay(c.start)}{c.end ? ` – ${fmtDay(c.end)}` : ' onwards'} · {c.pieceIds.length} piece{c.pieceIds.length === 1 ? '' : 's'}</span>
+                <span className="tiny muted">{fmtDay(c.start)}{c.end ? ` – ${fmtDay(c.end)}` : ' onwards'} · {scoresOf(c.pieceIds).length} piece{scoresOf(c.pieceIds).length === 1 ? '' : 's'}{c.pieceIds.includes(LAB_ID) ? ` + ${LAB_TITLE.toLowerCase()}` : ''}</span>
                 <span className="tiny" style={{ color: st === 'Running now' ? 'var(--voice)' : 'var(--muted)', fontWeight: 600 }}>{st}</span>
               </div>
               <button className="btn small" aria-pressed={c.id === selId} onClick={() => onSelect(c.id)} data-testid="cycle-edit">{c.id === selId ? 'Editing ↓' : 'Edit'}</button>

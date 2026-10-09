@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from '../hooks';
 import { addLibraryPiece, fetchLibrary, type Auth, type ChoirCycle, type ChoirInfo, type LibraryPiece } from '../../progress/choir';
+import { LAB_ID, LAB_TITLE } from '../../game/intonation';
 
 /** The programme editor's unpublished changes: its piece ids (null when there are none) and how to add one. */
 export interface ProgrammeDraft { ids: string[] | null; add: ((id: string) => void) | null }
@@ -60,6 +61,7 @@ export function LibraryPanel({ code, auth, info, draft, cycle, embedded = false,
         Public-domain pieces for choirs. Add to our choir copies the score into the choir's scores and puts it into the programme
         {cycle ? <> of {cycle.name} (the cycle you're editing above)</> : <>: members get it the next time they open the app</>}. Only choir admins see this list.
       </span>
+      {draft && <LabEntry draft={draft} cycle={cycle ?? null} />}
       {err && <div className="notice" role="alert">{err}</div>}
       {!list && !err && <span className="small muted">Loading…</span>}
       {list && (
@@ -110,4 +112,36 @@ export function LibraryPanel({ code, auth, info, draft, cycle, embedded = false,
   return embedded
     ? <div className="col" style={{ gap: 8 }} data-testid="library-panel">{body}</div>
     : <div className="card" data-testid="library-panel">{body}</div>;
+}
+
+/**
+ * The intonation lab in the library: an exercise, not a score. It goes into the programme being
+ * edited above (published with it); the choir's singers get it while that cycle runs.
+ */
+function LabEntry({ draft, cycle }: { draft: ProgrammeDraft; cycle: ChoirCycle | null }) {
+  const saved = !!cycle?.pieceIds.includes(LAB_ID);
+  const inProgramme = draft.ids ? draft.ids.includes(LAB_ID) : saved;
+  return (
+    <div className="col" data-testid="library-lab" style={{ gap: 4, padding: '12px 0', borderTop: '1px solid var(--surface-2)' }}>
+      <div className="row" style={{ gap: 8, alignItems: 'flex-start' }}>
+        <strong className="grow" style={{ fontSize: 15 }}>{LAB_TITLE}</strong>
+        <span className="badge muted">Exercise</span>
+      </div>
+      <span className="small">Find the pure fifth and the pure major third by ear: listen, tune by hand, sing with and without help, then in a chord. About 10 minutes a step; no score needed.</span>
+      <div className="row wrap" style={{ gap: 8, marginTop: 4 }}>
+        {inProgramme ? (
+          <span className="small" data-testid="library-lab-in" style={{ color: 'var(--voice)', fontWeight: 600 }}>
+            ✓ In the programme{draft.ids && !saved ? ' (publish it above)' : ''}
+          </span>
+        ) : draft.add && cycle ? (
+          <button className="btn small primary" data-testid="library-lab-add" onClick={() => {
+            draft.add!(LAB_ID);
+            toast(`${LAB_TITLE} added to the programme of ${cycle.name} above: publish it to send it to the choir`);
+          }}>Put it in the programme</button>
+        ) : (
+          <span className="small muted">Open a cycle above to put it in its programme.</span>
+        )}
+      </div>
+    </div>
+  );
 }
