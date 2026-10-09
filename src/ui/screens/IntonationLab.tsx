@@ -684,7 +684,7 @@ function SingRung({ iv, root, lab, record, rung }: RungProps & { rung: number })
       )}
       {v && result && (
         <div ref={verdictRef} className={v.good ? 'notice info col' : 'notice col'} style={{ gap: 6, scrollMarginBottom: 16 }} role="status" data-testid="lab-verdict">
-          <strong>{v.title}{!result.counted && Math.abs(result.value - target) <= 60 ? ' (practice round)' : ''}</strong>
+          <strong>{lockedUi ? '' : 'Last round: '}{v.title}{!result.counted && Math.abs(result.value - target) <= 60 ? ' (practice round)' : ''}</strong>
           {Math.abs(result.value - target) <= 60 && <Landed deg={deg} value={result.value} tol={tol} />}
           <span className="small">{v.text}</span>
         </div>
@@ -697,8 +697,8 @@ function SingRung({ iv, root, lab, record, rung }: RungProps & { rung: number })
       {passed && <PassedNote iv={iv} rung={rung} />}
       {state === 'on' && (
         <div className="row" style={{ gap: 10 }}>
-          {rung === 3 && <button className="btn grow" disabled={hinting || !!result} data-testid="lab-hint" onClick={() => void hint()}>{hinting ? 'Listen…' : 'Hear it once'}</button>}
-          {result && <button className="btn primary grow" data-testid="lab-next" onClick={() => again()}>Next round</button>}
+          {rung === 3 && <button className="btn grow" disabled={hinting || lockedUi} data-testid="lab-hint" onClick={() => void hint()}>{hinting ? 'Listen…' : 'Hear it once'}</button>}
+          {lockedUi && <button className="btn primary grow" data-testid="lab-next" onClick={() => again()}>Next round</button>}
         </div>
       )}
       <span className="tiny muted">To pass: {PASS} of the last {ROUNDS} within {tol}¢ of pure{chordRung ? ', with the wobble off' : ''}. Hold it {HOLD_SEC} s, straight tone (no vibrato).</span>
@@ -718,7 +718,7 @@ function HoldRing({ held, done }: { held: number; done: boolean }) {
   const C = 2 * Math.PI * 30;
   return (
     <div className="row" style={{ gap: 14 }}>
-      <svg width={72} height={72} viewBox="0 0 72 72" role="img" aria-label={`Held ${held.toFixed(1)} of ${HOLD_SEC} seconds`} data-testid="lab-hold">
+      <svg width={72} height={72} viewBox="0 0 72 72" role="img" aria-label={done ? 'Round taken' : `Held ${held.toFixed(1)} of ${HOLD_SEC} seconds`} data-testid="lab-hold">
         <circle cx={36} cy={36} r={30} fill="none" stroke="var(--line)" strokeWidth={7} />
         <circle cx={36} cy={36} r={30} fill="none" stroke="var(--accent)" strokeWidth={7} strokeLinecap="round"
           strokeDasharray={`${(C * f).toFixed(1)} ${C.toFixed(1)}`} transform="rotate(-90 36 36)" />
