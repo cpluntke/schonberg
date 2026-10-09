@@ -55,7 +55,9 @@ export function IntonationLab({ route }: { route: LabRoute }) {
           <button className="icon-btn" aria-label="Back" onClick={() => back({ name: 'home' })}><IconBack /></button>
           <h1>Intonation lab</h1>
         </div>
-        <div className="notice info">The intonation lab isn't in your choir's programme right now. When your choir adds it to a cycle, it appears on Home.</div>
+        <div className="notice info">{profile.choirCode
+          ? 'The intonation lab isn’t in your choir’s programme right now. When your choir adds it to a cycle, it appears on Home.'
+          : 'The intonation lab comes with a choir’s programme: join your choir (Settings → Your choir) to get it when your choir adds it.'}</div>
       </main>
     );
   }
@@ -77,7 +79,7 @@ function Ladder({ iv, lab }: { iv: LabInterval; lab: LabProgress }) {
       <div className="topbar">
         <button className="icon-btn" aria-label="Back" onClick={() => back({ name: 'home' })}><IconBack /></button>
         <h1>Intonation lab</h1>
-        <span className="badge" style={{ marginLeft: 'auto' }}>Preview</span>
+        {!labInProgramme() && <span className="badge" style={{ marginLeft: 'auto' }}>Preview</span>}
       </div>
       <div className="col" style={{ gap: 6 }}>
         <strong style={{ fontSize: 22, lineHeight: 1.15 }}>Hear it, tune it, sing it</strong>
