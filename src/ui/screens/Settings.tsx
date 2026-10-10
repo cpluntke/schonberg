@@ -219,7 +219,7 @@ export function Settings() {
         <button className="btn block" onClick={() => go({ name: 'choir' })} data-testid="settings-choir">
           {profile.choirCode ? `Choir: ${cachedChoir()?.name ?? profile.choirCode}` : 'Join your choir'}
         </button>
-        {cycle.preset?.startsWith('choir:') && <span className="tiny muted">The programme below comes from your choir; your changes last until the choir publishes a new one.</span>}
+        {cycle.preset?.startsWith('choir:') && <span className="tiny muted">The programme (This cycle) comes from your choir; your changes there last until the choir publishes a new one.</span>}
       </section>
 
       <AccountSync />
