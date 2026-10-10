@@ -170,30 +170,37 @@ function sceneC(t,A){const x=170,y=110,lx=560;
       text('in every view',lxp+ctx.measureText('± cents').width+22,by0,MONO(18),C.faint);
       text('the bubble: + sharp · − flat',lxp,by0+38,SERIF(24),C.muted);ctx.globalAlpha=1}}}
 
-/* D: sections, the level ladder (five levels), and "Sing it all" (a run in one go opens the level; fixing what slipped earns it; a clean run earns a star) */
-const LV=[['1','Note-learning','70% tempo · on “doo” · every note right'],['2','In time','full tempo · words · your part plays'],['3','Independent','others only'],['4','Concert-ready','no note names · chord only'],['5','Off book','from memory · on two days']];
+/* D: passages, the level ladder (five levels, each first slow, then in tempo), and "Sing it all" (a run in one go opens the level; fixing what slipped earns it; a clean run earns a star) */
+const LV=[['1','Notes','on “doo” · your part plays · note names'],['2','Words','with the words · your part still plays'],['3','Alone','your part muted · the others play'],['4','Concert','no note names · only the starting chord'],['5','By heart','from memory · on two different days']];
 const LVCOL=[C.cyan,C.cyan,C.orange,C.purple,C2.green];
 const SEGS=['Bars 1–5','Bars 6–13','Bars 14–21','Bars 22–29'];
 function sceneD(t,A){const x=150,y=110,bx=520;
-  // phone: piece screen (Sing it all + sections) → the to-fix version while a section slips → back
+  // phone: piece screen (Sing it all + passages) → the to-fix version while a passage slips → back
   const fx=ramp(12,0.47,t,0.5)*(1-ease((t-L(13).start+0.3)/0.45));
   phone('piece',x,y,A*(1-fx));if(fx>0.01)phone('piece-tofix',x,y,A*fx);
   // 9: what's on the piece screen (gone before the level cards come in)
   const c9=A*(1-ease((t-L(10).start+0.5)/0.4));
-  callout(...P(100,455,x,y),560,380,'Sections','practice steps, level by level',C.cyan,c9*at(9,0.12,t));
+  callout(...P(100,455,x,y),560,380,'Passages','practice steps, level by level',C.cyan,c9*at(9,0.12,t));
   callout(...P(130,42,x,y),560,190,'Sing it all','the whole piece in one go, then fix what slipped',C.orange,c9*at(9,0.55,t));
-  // level cards; on line 12 they get compact to make room for the run below
+  // level cards; on line 12 they get compact to make room for the run below.
+  // Each card has its two steps (slow, then in tempo), lit as line 10 says "first slow, then in tempo".
   const k=ramp(12,0,t,0.6),LVH=lerp(72,50,k),LVG=lerp(13,8,k),LVY=lerp(130,108,k),yOf=i=>LVY+i*(LVH+LVG);
-  LV.forEach((l,i)=>{const f=[0.0,0.28,0.41,0.6,0.78][i];const a=A*(lineIdx(t)>10?1:at(10,f,t));
+  const stOn=[lineIdx(t)>10?1:at(10,0.07,t),lineIdx(t)>10?1:at(10,0.13,t)];
+  LV.forEach((l,i)=>{const f=[0.0,0.385,0.47,0.625,0.815][i];const a=A*(lineIdx(t)>10?1:at(10,f,t));
     if(a<0.01)return;ctx.globalAlpha=a;const yy=yOf(i),bs=lerp(48,34,k);
     const col=LVCOL[i];ctx.fillStyle=C.panel;rr(bx,yy,500,LVH,lerp(16,12,k));ctx.fill();ctx.strokeStyle=col;ctx.lineWidth=2;rr(bx,yy,500,LVH,lerp(16,12,k));ctx.stroke();
     ctx.fillStyle=col;rr(bx+14,yy+(LVH-bs)/2,bs,bs,lerp(12,9,k));ctx.fill();text(l[0],bx+14+bs/2,yy+LVH/2+lerp(11,8,k),DISP(lerp(30,23,k)),C.paper,'center');
     text(l[1],bx+lerp(80,64,k),yy+lerp(33,LVH/2+9,k),DISP6(lerp(27,24,k)),C.ink);
+    const ph=lerp(28,24,k),pcy=lerp(yy+24,yy+LVH/2,k);ctx.font=MONO(14);
+    const tw=ctx.measureText('in tempo').width+20,sw0=ctx.measureText('slow').width+20,tx=bx+500-14-tw,sx0=tx-24-sw0;
+    ctx.globalAlpha=a*lerp(0.3,1,stOn[0]);ctx.strokeStyle=col;ctx.lineWidth=1.5;rr(sx0,pcy-ph/2,sw0,ph,ph/2);ctx.stroke();text('slow',sx0+sw0/2,pcy+5,MONO(14),col,'center');
+    ctx.globalAlpha=a*lerp(0.3,1,stOn[1]);text('→',tx-12,pcy+5,MONO(14),C.faint,'center');
+    ctx.fillStyle=col;rr(tx,pcy-ph/2,tw,ph,ph/2);ctx.fill();text('in tempo',tx+tw/2,pcy+5,MONO(14),C.paper,'center');
     ctx.globalAlpha=a*(1-k);text(l[2],bx+80,yy+59,MONO(16),C.muted);ctx.globalAlpha=1});
   // 12: targets next to levels 3 and 4
   const tg=1-ease((t-L(13).start+0.2)/0.4);const ar=A*tg*at(12,0.08,t);if(ar>0.01){ctx.globalAlpha=ar;text('← rehearsal-ready',bx+514,yOf(2)+22,MONO(19),C.orange);text('whole piece at 3',bx+514+28,yOf(2)+44,MONO(15),C.muted);ctx.globalAlpha=1}
   const ac=A*tg*at(12,0.3,t);if(ac>0.01){ctx.globalAlpha=ac;text('← concert-ready',bx+514,yOf(3)+22,MONO(19),C.purple);text('whole piece at 4',bx+514+28,yOf(3)+44,MONO(15),C.muted);ctx.globalAlpha=1}
-  // 12: Sing it all, two runs: level 3 held everywhere ✓; level 4 where a section slips → fix just
+  // 12: Sing it all, two runs: level 3 held everywhere ✓; level 4 where a passage slips → fix just
   // that bit → level 4 ✓ (no second run); then the clean-run star for everything right first time.
   const sA=A*ramp(12,0.02,t,0.4)*(1-ease((t-L(13).start+0.4)/0.4));
   if(sA>0.01){const u=lp(12,t),runs=[[0.04,0.25,3,-1],[0.31,0.45,4,1]],ri=u<0.29?0:1,[r0,r1,lv,slip]=runs[ri],p=clamp((u-r0)/(r1-r0),0,1);
@@ -212,7 +219,7 @@ function sceneD(t,A){const x=150,y=110,bx=520;
     const stA=sA*star;if(stA>0.01){ctx.globalAlpha=stA;text('★',bx+8,sy+sh+80,DISP(34),'#FFD166');
       text('everything right first time: a star',bx+48,sy+sh+75,SERIF(22),'#FFD166')}
     ctx.globalAlpha=1;
-    // on the phone: the to-fix list and the section tag, then the star on level 1
+    // on the phone: the to-fix list and the passage tag, then the star on level 1
     const pr=A*fx*at(12,0.55,t)*(1-star);if(pr>0.01){ctx.globalAlpha=pr;ctx.strokeStyle=C.orange;ctx.lineWidth=3;
       let [qx,qy]=P(26,208,x,y);rr(qx,qy,334*PH.s,52*PH.s,8);ctx.stroke();[qx,qy]=P(10,718,x,y);rr(qx,qy,120*PH.s,24*PH.s,8);ctx.stroke();ctx.globalAlpha=1}
     const ps=A*fx*star;if(ps>0.01){ctx.globalAlpha=ps;ctx.strokeStyle='#FFD166';ctx.lineWidth=3;const [qx,qy]=P(83,166,x,y);ctx.beginPath();ctx.arc(qx,qy,15,0,7);ctx.stroke();ctx.globalAlpha=1}}
@@ -224,7 +231,7 @@ function sceneD(t,A){const x=150,y=110,bx=520;
     const anyA=kA*at(14,0.45,t);if(anyA>0.01){ctx.globalAlpha=anyA;ctx.strokeStyle=C.orange;ctx.lineWidth=3;const x2=bx+514,y1=yOf(0)+6,y2=yOf(4)+LVH-6;
       ctx.beginPath();ctx.moveTo(x2,y1);ctx.lineTo(x2+12,y1);ctx.lineTo(x2+12,y2);ctx.lineTo(x2,y2);ctx.stroke();
       text('any',x2+28,(y1+y2)/2-6,DISP6(26),C.orange);text('level',x2+28,(y1+y2)/2+24,DISP6(26),C.orange);
-      text('no need to do the sections first',bx+250,yy+104,SERIF(22),C.muted,'center')}
+      text('no need to do the passages first',bx+250,yy+104,SERIF(22),C.muted,'center')}
     // on the phone: the Sing it all card's level row
     const ph=A*(1-fx)*at(13,0.25,t);if(ph>0.01){ctx.globalAlpha=ph;ctx.strokeStyle=C.orange;ctx.lineWidth=3;const [qx,qy]=P(26,150,x,y);rr(qx,qy,338*PH.s,56*PH.s,10);ctx.stroke()}
     ctx.globalAlpha=1}}
@@ -258,7 +265,7 @@ function sceneG(t,A){const x0=210;
     // level button look (as on the piece screen)
     ctx.fillStyle=C.panel;rr(cx,yy-30,250,60,12);ctx.fill();ctx.strokeStyle=C.cyan;ctx.lineWidth=2;rr(cx,yy-30,250,60,12);ctx.stroke();
     ctx.fillStyle=C.cyan;rr(cx+10,yy-20,40,40,10);ctx.fill();text('1',cx+30,yy+10,DISP(26),C.paper,'center');
-    text('Level 1',cx+62,yy-2,DISP6(24),C.ink);text('first section',cx+62,yy+22,MONO(15),C.muted);ctx.globalAlpha=1}
+    text('Level 1',cx+62,yy-2,DISP6(24),C.ink);text('first passage',cx+62,yy+22,MONO(15),C.muted);ctx.globalAlpha=1}
   const a3=A*at(20,0.05,t);if(a3>0.01){ctx.globalAlpha=a3;text('≈ 5 minutes today',W/2,430,DISP6(34),C.orange,'center');
     text('tomorrow, Home shows your next step',W/2,470,SERIF(25),C.muted,'center');ctx.globalAlpha=1}
   const a4=A*at(21,0.0,t);if(a4>0.01){ctx.globalAlpha=a4;text("Let's sing.",W/2,550,DISP(52),C.cyan,'center');ctx.globalAlpha=1}}
