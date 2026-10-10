@@ -18,6 +18,11 @@ export interface LastResult {
   stepUp?: boolean;
   /** Level 1 in tempo: whether the entries were sung and on time (ladder.entriesOnTime). */
   entries?: EntriesCheck;
+  /** The part of the delay taken off every entry's onset when judging the entries (ms). */
+  entriesOffsetMs?: number;
+  /** The piece's level before and after this run (a milestone when it crossed 3, 4 or 5). */
+  pieceBefore?: number;
+  pieceAfter?: number;
   mode: '2d' | '3d';
   from: number;
   to: number;

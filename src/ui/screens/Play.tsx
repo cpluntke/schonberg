@@ -4,8 +4,8 @@ import { dropGuard, go, leaveTo, practiceParent, pushGuard, useBackGuard } from 
 import { getPiece, noteRangeFor, singableSections } from '../library';
 import { useProfile, useWide } from '../hooks';
 import {
-  LISTEN, MAX_LEVEL, OFF_BOOK_DAYS, effectiveTolerance, entriesOnTime, fixesBefore, fullRunCounts, passLabel, pieceReadiness, sectionRunCounts,
-  speakerPractice, stepFor, stepLabel, stepSpec, stepWord, type EntriesCheck, type Step,
+  MAX_LEVEL, OFF_BOOK_DAYS, effectiveTolerance, entriesOnTime, fixesBefore, fullRunCounts, pieceReadiness, sectionRunCounts,
+  speakerPractice, stepFor, stepLabel, stepSpec, type EntriesCheck, type Step,
 } from '../../progress/ladder';
 import { shareMyProgress } from '../play/shareProgress';
 import { postBoardEntrySoon } from '../play/boardEntry';
@@ -39,7 +39,12 @@ import { defaultShow, hasOtherStaves, isFullScore } from '../play/fullscore';
 import { drawArcade, lanesFor, newFx } from '../play/arcade3d';
 import { setLastResult } from '../play/lastResult';
 import { useResume } from '../play/useResume';
-import { IconBack, IconEar, IconHome, IconPause, IconPlay, IconRestart, IconStop } from '../icons';
+import { IconBack, IconChevronDown, IconEar, IconHome, IconPause, IconPlay, IconRestart, IconStop } from '../icons';
+import { passRule, taskSentence } from '../play/prerun';
+import { toleranceWords } from '../../game/pitchwords';
+import { lowerLabel, troubleNote } from '../path';
+import { getNoteStats } from '../../progress/notestats';
+import { barRangeLabel } from '../../music/sections';
 import { STUCK_AFTER, failsInARow, firstTime, markSeen, slowRate } from '../../progress/struggle';
 import type { AttemptResult } from '../../game/types';
 import type { NotationMode } from '../../game/notation';
@@ -94,6 +99,8 @@ function SingPlay({ route }: { route: PlayRoute }) {
   // "Practise slowly" (from the results screen): start at that tempo; it's practice, not a counted run.
   const [rateOverride, setRateOverride] = useState<number | null>(() => (route.rate != null && route.rate < (spec?.rate ?? 1) - 1e-6 ? route.rate : null));
   const [slowShown, setSlowShown] = useState(() => route.rate != null);
+  // "change" on the pre-run card's headphones line: show the Yes / No question again.
+  const [hpEdit, setHpEdit] = useState(false);
   // First-run "how to read the screen", once per display (the highway's flag predates the score view).
   const [howtoSeen, setHowtoSeen] = useState<{ score: boolean; highway: boolean } | null>(() => {
     try {
@@ -252,6 +259,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
     let timingFail: number | undefined;
     let timingUnsure: number | undefined;
     let entries: EntriesCheck | undefined;
+    let entriesOffsetMs = 0;
     let alignLag = 0;
     const sess = sessionRef.current;
     const calibrated = profile.latencySource === 'measured' && profile.latencyMs > 0;
@@ -301,7 +309,8 @@ function SingPlay({ route }: { route: PlayRoute }) {
       }
       // Level 1 in tempo: every entry sung, on time on average (without a measured delay, judged on
       // the lined-up voice: the part the line-up corrected is device delay).
-      if (spec?.entries) entries = entriesOnTime(part.notes, r.notes, calibrated ? 0 : Math.max(0, al.shiftMs));
+      entriesOffsetMs = calibrated ? 0 : Math.max(0, al.shiftMs);
+      if (spec?.entries) entries = entriesOnTime(part.notes, r.notes, entriesOffsetMs);
     }
     // Tempo where you sing alone: rushing or dragging with nobody else playing.
     if (sess && sess.exposed.size) {
@@ -351,6 +360,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
     const prevBest = personalBest(piece.id, part.id, recId, level, step)?.score ?? null;
     const streakBefore = streakDays();
     const secs = singableSections(piece, part.id);
+    const pieceBefore = pieceReadiness(secs, getProgress(piece.id, part.id)).pieceLevel;
     const full = isFull
       ? recordFullRun(piece.id, part.id, level, r, secs, (i) => part.notes[i]?.start,
         { counted: fullCounted, step, timingFail: timingFail != null, entriesLate, durationSec })
@@ -360,6 +370,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
     const fixed = full ? undefined : (rec as ReturnType<typeof recordAttempt>).fixed;
     const reached = full ? full.reached : (rec as ReturnType<typeof recordAttempt>).reached;
     const ladder = full ? full.counted : sectionLadder;
+    const pieceAfter = pieceReadiness(secs, getProgress(piece.id, part.id)).pieceLevel;
     if (ladder) {
       snapshotReadiness(piece.id, part.id, pieceReadiness(secs, getProgress(piece.id, part.id)).pct);
     }
@@ -381,7 +392,8 @@ function SingPlay({ route }: { route: PlayRoute }) {
     setLastResult({
       pieceId: piece.id, partId: part.id, sectionId: section.id, level, step, mode: route.mode,
       from: section.start, to: section.end, result: r, ladder, prevBest, tolerance, everyNote: !!spec?.everyNote,
-      ...(entries ? { entries } : {}),
+      ...(entries ? { entries, entriesOffsetMs } : {}),
+      ...(realSection || isFull ? { pieceBefore, pieceAfter } : {}),
       ...(sectionRec ? { prevSlow: sectionRec.prevSlow, newSlow: sectionRec.newSlow, ...(sectionRec.stepUp ? { stepUp: true } : {}) } : {}),
       latencyAdjusted,
       alignedMs,
@@ -619,6 +631,14 @@ function SingPlay({ route }: { route: PlayRoute }) {
   const fullSecs = isFullRun ? singableSections(piece, part.id) : [];
   const fullFixes = isFullRun ? fixesBefore(fullSecs, getProgress(piece.id, part.id), level) : [];
 
+  // What the run covers, inside a sentence: "bars 22–29", "the whole piece".
+  const what = section.id === 'all' ? 'the whole piece'
+    : realSec ? lowerLabel(section.label)
+      : (() => { const [a, b] = sectionBars(piece.score, section.start, section.end); return barRangeLabel(piece.score, a, b, true); })();
+  // A passage's note gone wrong most lately: "Watch bar 25."
+  const watch = realSec && !listenOnly ? troubleNote(part, section.start, section.end, getNoteStats(piece.id, part.id)) : null;
+  const watchBar = watch ? piece.score.measures[watch.measure]?.number ?? null : null;
+
   function togglePart(id: string) {
     const s = sessionRef.current;
     const cur = (s?.partGains ?? gains)[id] ?? 0;
@@ -632,7 +652,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
     <main className={display === 'score' && route.mode === '2d' ? 'play play-score' : 'play'}>
       <h1 className="sr-only">{piece.title}: {part.name}, {section.label}</h1>
       <PracticeBar className="play-hud" up={up} title={piece.title}
-        sub={<>{part.name} · {section.label} · {listenOnly ? 'Listen' : `L${level} ${levelInfo?.name} · ${stepWord(step)}`}{route.mode === '3d' ? ' · Arcade' : ''}</>}
+        sub={<>{part.name} · {section.label} · {listenOnly ? 'Listen' : stepLabel(level, step)}{route.mode === '3d' ? ' · Arcade' : ''}</>}
         onBack={() => leaveFor(up)} onHome={() => leaveFor({ name: 'home' })}
         extra={!listenOnly && (
           <div className="col" style={{ alignItems: 'flex-end', gap: 0, paddingRight: 2 }}>
@@ -661,111 +681,54 @@ function SingPlay({ route }: { route: PlayRoute }) {
           </div>
         )}
         {phase === 'ready' && (
-          // Scrolls on short phones; the card stays centred when it fits.
-          <div className="overlay" style={{ overflowY: 'auto', alignItems: 'flex-start' }}>
-            <div className="card" style={{ margin: 'auto 0', flex: 'none' }}>
-              <span className="eyebrow" data-testid="step-label">{listenOnly ? 'Listen' : levelInfo?.label}</span>
-              <strong style={{ fontSize: 18 }}>{section.label}</strong>
-              {!cold && <span className="small muted">{listenOnly ? LISTEN.description : levelInfo?.description}</span>}
-              {/* What the level asks, near the top: on a small phone the sticky Start button covers the card's lower part. */}
+          // The pre-run card, low on the screen so the first bars stay in view above it (scrolls on short phones).
+          <div className="overlay prerun">
+            <div className="card precard" data-testid="prerun">
+              <span className="eb now" data-testid="step-label">{listenOnly ? 'Listen' : levelInfo?.label}</span>
+              {cold ? (
+                <p className="task">
+                  {coldLeadFrom(piece.score, section.start) != null ? "You'll hear two bars of the other voices, then come in" : 'After a count-in, come in'}{' '}
+                  at bar {piece.score.measures.find((m) => section.start >= m.start - 1e-3 && section.start < m.start + m.dur - 1e-3)?.number} from memory: no starting note, nothing of your part shown.
+                </p>
+              ) : section.id === 'entries' ? (
+                <p className="task">Come in on your own at each entry: two beats of the other voices, then you, with no starting note.</p>
+              ) : listenOnly ? (
+                <p className="task">Listen to {what} once, every voice playing. Not scored.</p>
+              ) : levelInfo && (
+                <p className="task" data-testid={doo ? 'doo-note' : 'task'}>{taskSentence(levelInfo, what, rate)}</p>
+              )}
               {!listenOnly && levelInfo && !cold && (
-                <span className="tiny mono muted">
-                  {Math.round(rate * 100)}% tempo · ±{tolerance}¢ · pass: {passLabel(levelInfo)} · start: {levelInfo.cue === 'chord' ? 'chord only' : 'your note'}
-                </span>
-              )}
-              {ladderSec && (
-                <div className="col" style={{ gap: 4 }}>
-                  <div className="seg" role="group" aria-label="Step" data-testid="step-toggle">
-                    <button aria-pressed={step === 'slow'} onClick={() => step !== 'slow' && toStep('slow')} data-testid="step-slow">Slow ({Math.round(stepSpec(level, 'slow').rate * 100)}%)</button>
-                    <button aria-pressed={step === 'tempo'} onClick={() => step !== 'tempo' && toStep('tempo')} data-testid="step-tempo">In tempo</button>
-                  </div>
-                  {step === 'slow' && <span className="tiny muted">Slow first, then in tempo: passing in tempo completes the level. Know it already? Go straight to in tempo.</span>}
-                </div>
-              )}
-              {askHeadphones && (
-                <div className="col" style={{ gap: 4 }} data-testid="headphones-q">
-                  <span className="small" id="hp-label"><strong>Headphones on?</strong> <span className="tiny muted">(remembered on this phone)</span></span>
-                  <div className="seg" role="group" aria-labelledby="hp-label">
-                    <button aria-pressed={profile.headphones === true} onClick={() => updateProfile({ headphones: true })} data-testid="hp-yes">Yes</button>
-                    <button aria-pressed={profile.headphones === false} onClick={() => updateProfile({ headphones: false })} data-testid="hp-no">No, speaker</button>
-                  </div>
-                  <span className={profile.headphones === false ? 'tiny' : 'tiny muted'} style={profile.headphones === false ? { color: 'var(--accent-text)' } : undefined} data-testid="hp-note">
-                    {profile.headphones === false
-                      ? 'Practice only: Level 1 slow counts with headphones on, because through the speaker the app can’t hear every note reliably.'
-                      : profile.headphones ? 'Level 1 slow counts with headphones on.' : 'Level 1 slow counts with headphones on. Choose one to start.'}
-                  </span>
-                </div>
-              )}
-              {/* Listen / slow help near the top too: the sticky Start button covers the card's lower part on a phone. */}
-              {helpable && (firstListen ? (
-                <div className="notice info small col" style={{ gap: 8 }} data-testid="first-listen">
-                  <span><strong>New to this passage?</strong> Listen to it once, then sing it. Know it already? Sing it straight away.</span>
-                  <div className="row wrap" style={{ gap: 6 }}>
-                    <button className="btn voice" onClick={listenFirst} data-testid="listen-first"><IconEar size={18} /> Listen first</button>
-                  </div>
-                </div>
-              ) : (
-                <div className="col" style={{ gap: 6 }} data-testid="help-row">
-                  {stuck > 0 && (
-                    <span className="small" data-testid="stuck-hint">
-                      <strong>This one has been tricky</strong> ({stuck} misses in a row). Listen to it again, or sing it slower first: then try it again.
-                    </span>
-                  )}
-                  <div className="row wrap" style={{ gap: 6 }}>
-                    <button className={`btn small${stuck > 0 ? ' voice' : ''}`} onClick={listenFirst} data-testid="listen-btn"><IconEar size={16} /> Listen</button>
-                    {/* In tempo on a passage: its slow step (it counts). Elsewhere: slower practice. */}
-                    {step === 'tempo' && ladderSec && (
-                      <button className={`btn small${stuck > 0 ? ' voice' : ''}`} data-testid="slow-btn"
-                        onClick={() => toStep('slow')}>Sing it slow ({Math.round(stepSpec(level, 'slow').rate * 100)}%)</button>
-                    )}
-                    {step === 'tempo' && !ladderSec && !slowShown && (
-                      <button className={`btn small${stuck > 0 ? ' voice' : ''}`} data-testid="slow-btn"
-                        onClick={() => { setSlowShown(true); setRateOverride(slowRate(step)); }}>Practise slowly</button>
-                    )}
-                    {step === 'slow' && rate >= (spec?.rate ?? 1) - 1e-6 && (
-                      <button className={`btn small${stuck > 0 ? ' voice' : ''}`} data-testid="slow-btn"
-                        onClick={() => setRateOverride(slowRate(step))}>Slower ({Math.round(slowRate(step) * 100)}%)</button>
-                    )}
-                  </div>
-                </div>
-              ))}
-              {doo && !listenOnly && (
-                <div className="notice info small" data-testid="doo-note">
-                  <strong>Sing every note on “doo”.</strong> The words are shown faintly; you sing them from Level 2.
-                </div>
+                <p className="t14 muted" data-testid="pass-rule" style={{ margin: 0 }}>
+                  {rate < (spec?.rate ?? 1) - 1e-6
+                    ? 'Slower than the step: practice only, it doesn’t pass.'
+                    : passRule(levelInfo, { full: isFullRun })}
+                  {watchBar ? ` Watch bar ${watchBar}.` : ''}
+                </p>
               )}
               {isFullRun && (
-                <span className="small" data-testid="full-info">
+                <span className="t14 muted" data-testid="full-info">
                   {step === 'slow' ? <><strong>Slow runs of the whole piece are practice:</strong> only a run in tempo counts for the piece. </> : null}
-                  Sing the whole piece in one go, in tempo. Every passage is scored{' '}
-                  {levelInfo?.everyNote ? '(every note must be right).' : `(each needs ${Math.round((levelInfo?.pass ?? 0.8) * 100)}%).`}{' '}
-                  All of them right: Level {level} is yours at once, with a clean-run ★. A few slipped: fix just those
-                  afterwards and the level is yours. More than half slipped, or the run under {Math.round((levelInfo?.pass ?? 0.8) * 100) - 10}% overall: it’s practice. Stopping or pausing makes it a practice run too.
+                  In one go: stopping or pausing makes it practice. All passages right: Level {level} is yours at once, with a clean-run ★.
+                  More than half slipped, or the run under {Math.round((levelInfo?.pass ?? 0.8) * 100) - 10}% overall: it’s practice.
                 </span>
               )}
               {isFullRun && fullFixes.length > 0 && (
-                <span className="small muted" data-testid="full-open-fixes">
+                <span className="t14 muted" data-testid="full-open-fixes">
                   Still to fix at Level {level} from your last full run: {fullFixes.map((id) => fullSecs.find((x) => x.id === id)?.label ?? id).join(', ')}.
                   This run counts too: what slips now becomes the list to fix.
-                </span>
-              )}
-              {cold && (
-                <span className="small">
-                  {coldLeadFrom(piece.score, section.start) != null ? "You'll hear two bars of the other voices, then come in" : 'After a count-in, come in'}{' '}
-                  at bar {piece.score.measures.find((m) => section.start >= m.start - 1e-3 && section.start < m.start + m.dur - 1e-3)?.number} from memory: no starting note, nothing of your part shown.
                 </span>
               )}
               {offBook && !cold && (
                 <div className="col" style={{ gap: 6 }} data-testid="offbook-mode">
                   {allKnown ? (
-                    <span className="small">You know every bar of this {isFullRun ? 'piece' : 'passage'} by heart: this is the real test. Everything is hidden.</span>
+                    <span className="t14">You know every bar of this {isFullRun ? 'piece' : 'passage'} by heart: this is the real test. Everything is hidden.</span>
                   ) : (
                     <>
-                      <div className="chips" role="group" aria-label="Off-book mode">
+                      <div className="chips" role="group" aria-label="By heart: practise or test">
                         <button className="chip" aria-pressed={obMode === 'fade'} onClick={() => setObMode('fade')}>Practise: fade out</button>
                         <button className="chip" aria-pressed={obMode === 'test'} onClick={() => setObMode('test')}>Test: all hidden</button>
                       </div>
-                      <span className="small muted">
+                      <span className="t14 muted">
                         {obMode === 'fade'
                           ? known.size === 0
                             ? 'All bars still show. Bars you sing well from memory disappear, leaving the first letter of each word.'
@@ -774,80 +737,164 @@ function SingPlay({ route }: { route: PlayRoute }) {
                       </span>
                     </>
                   )}
-                  <span className="tiny muted">Hold “Peek” to see the next bars for two seconds. Pass in tempo by heart on {OFF_BOOK_DAYS} different days and the {isFullRun ? 'piece' : 'passage'} is memorised.</span>
+                  <span className="t14 muted">Hold “Peek” to see the next bars for two seconds. Pass in tempo by heart on {OFF_BOOK_DAYS} different days and the {isFullRun ? 'piece' : 'passage'} is memorised.</span>
+                </div>
+              )}
+              {askHeadphones && (
+                <div className="col" style={{ gap: 2 }} data-testid="headphones-q">
+                  {profile.headphones == null || hpEdit ? (
+                    <>
+                      <span className="t16" id="hp-label"><strong>Headphones on?</strong> <span className="t14 muted">(remembered on this phone)</span></span>
+                      <div className="seg" role="group" aria-labelledby="hp-label">
+                        <button aria-pressed={profile.headphones === true} onClick={() => { updateProfile({ headphones: true }); setHpEdit(false); }} data-testid="hp-yes">Yes</button>
+                        <button aria-pressed={profile.headphones === false} onClick={() => { updateProfile({ headphones: false }); setHpEdit(false); }} data-testid="hp-no">No, speaker</button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="hp">
+                      <span className="grow t16" data-testid="hp-state">{profile.headphones ? '🎧 Headphones on' : '🔈 Phone speaker: practice only'}</span>
+                      <button className="link inline" style={{ margin: 0 }} data-testid="hp-change" aria-label="Change: headphones or speaker" onClick={() => setHpEdit(true)}>change</button>
+                    </div>
+                  )}
+                  <span className="t14" style={{ color: profile.headphones === false ? 'var(--accent-text)' : 'var(--muted)' }} data-testid="hp-note">
+                    With the phone speaker the app can’t hear every note, so runs only count with headphones.
+                  </span>
+                </div>
+              )}
+              {helpable && (
+                <div className="col" style={{ gap: 6 }} data-testid={firstListen ? 'first-listen' : 'help-row'}>
+                  {firstListen && <span className="t14 muted">New to this passage? Listen to it once. Know it already? Sing it straight away.</span>}
+                  {stuck > 0 && (
+                    <span className="t14" data-testid="stuck-hint">
+                      <strong>This one has been tricky</strong> ({stuck} misses in a row). Listen to it again, or sing it slower first: then try it again.
+                    </span>
+                  )}
+                  <div className="row help" style={{ gap: 8, alignItems: 'stretch' }}>
+                    <button className={`btn two${stuck > 0 ? ' voice' : ''}`} onClick={listenFirst} data-testid={firstListen ? 'listen-first' : 'listen-btn'}>
+                      <span><IconEar size={16} /> Listen first</span>
+                    </button>
+                    {/* In tempo on a passage: its slow step (it counts). Elsewhere: slower practice. */}
+                    {step === 'tempo' && ladderSec && (
+                      <button className={`btn two${stuck > 0 ? ' voice' : ''}`} style={{ flexGrow: 1.6 }} data-testid="slow-btn" onClick={() => toStep('slow')}>
+                        <span>Sing it slow ({Math.round(stepSpec(level, 'slow').rate * 100)}%)</span><span className="sub">the slow step: it counts</span>
+                      </button>
+                    )}
+                    {step === 'tempo' && !ladderSec && !slowShown && (
+                      <button className={`btn two${stuck > 0 ? ' voice' : ''}`} style={{ flexGrow: 1.6 }} data-testid="slow-btn"
+                        onClick={() => { setSlowShown(true); setRateOverride(slowRate(step)); }}>
+                        <span>Practise slowly ({Math.round(slowRate(step) * 100)}%)</span><span className="sub">practice only, doesn’t pass</span>
+                      </button>
+                    )}
+                    {step === 'slow' && rate >= (spec?.rate ?? 1) - 1e-6 && (
+                      <button className={`btn two${stuck > 0 ? ' voice' : ''}`} style={{ flexGrow: 1.6 }} data-testid="slow-btn"
+                        onClick={() => setRateOverride(slowRate(step))}>
+                        <span>Slower ({Math.round(slowRate(step) * 100)}%)</span><span className="sub">practice only, doesn’t pass</span>
+                      </button>
+                    )}
+                    {rate < (spec?.rate ?? 1) - 1e-6 && (
+                      <button className="btn two" style={{ flexGrow: 1.6 }} data-testid="step-rate-btn" onClick={() => setRateOverride(null)}>
+                        <span>Back to {Math.round((spec?.rate ?? 1) * 100)}%</span><span className="sub">the step’s tempo: it counts</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
               {route.mode === '2d' && !listenOnly && profile.scoreDefaultNote && display === 'score' && (
-                <div className="col small" style={{ gap: 6, background: 'var(--bg-2)', borderRadius: 10, padding: '10px 12px' }} data-testid="score-default-note">
+                <div className="col t14" style={{ gap: 6, background: 'var(--bg-2)', borderRadius: 10, padding: '10px 12px' }} data-testid="score-default-note">
                   <strong>Sheet music is now the default</strong>
-                  <span className="muted">Your voice is drawn on the staff: just under a note means flat, just over means sharp. Prefer the moving bars? Switch to Highway any time, here or in Settings.</span>
+                  <span className="muted">Your voice is drawn on the staff: just under a note means flat, just over means sharp. Prefer the moving bars? Switch to Highway any time, under Display &amp; tempo or in Settings.</span>
                   <div className="row" style={{ gap: 8 }}>
                     <button className="btn voice" onClick={() => updateProfile({ scoreDefaultNote: false })} data-testid="score-default-ok">Got it</button>
                     <button className="btn" onClick={() => updateProfile({ display: 'highway', displayChosen: true, scoreDefaultNote: false })} data-testid="score-default-highway">Back to Highway</button>
                   </div>
                 </div>
               )}
-              {route.mode === '2d' && (
-                <div className="col" style={{ gap: 4 }}>
-                  <span className="tiny muted" id="display-label">Score / Highway <span style={{ opacity: 0.8 }}>(remembered)</span></span>
-                  <div className="seg" role="group" aria-labelledby="display-label" data-testid="display-toggle">
-                    <button aria-pressed={display === 'score'} onClick={() => updateProfile({ display: 'score', displayChosen: true, scoreDefaultNote: false })} data-testid="display-score">Score</button>
-                    <button aria-pressed={display === 'highway'} onClick={() => updateProfile({ display: 'highway', displayChosen: true, scoreDefaultNote: false })} data-testid="display-highway">Highway</button>
-                  </div>
-                </div>
-              )}
-              {route.mode === '2d' && wide && display === 'score' && (others.voices || others.accompaniment) && (
-                <div className="col" style={{ gap: 4 }}>
-                  <span className="tiny muted" id="staves-label">Show <span style={{ opacity: 0.8 }}>{profile.scoreStaves ? '(remembered)' : '(automatic)'}</span></span>
-                  <div className="seg" role="group" aria-labelledby="staves-label" data-testid="staves-toggle">
-                    <button aria-pressed={staves === 'mine' || (staves === 'voices' && !others.voices)} onClick={() => pickStaves('mine')}>My part</button>
-                    {others.voices && <button aria-pressed={staves === 'voices' || (staves === 'all' && !others.accompaniment)} onClick={() => pickStaves('voices')}>All voices</button>}
-                    {others.accompaniment && <button aria-pressed={staves === 'all'} onClick={() => pickStaves('all')} data-testid="staves-all">{others.voices ? '+ Accomp.' : 'With accomp.'}</button>}
-                  </div>
-                  {offBook && staves !== 'mine' && <span className="tiny muted">Off book the full score shows the other voices without their words or the accompaniment, so nothing gives your part away.</span>}
-                </div>
-              )}
-              {helpable && (step === 'slow' || slowShown) && (
-                <label className="field" data-testid="tempo">
-                  <span className="small">Tempo {Math.round(rate * 100)}%{rate < (spec?.rate ?? 1) - 1e-6 ? ' (slower than the step: practice only, won’t count)' : ''}</span>
-                  <input type="range" min={40} max={100} step={5} value={Math.round(rate * 100)} onChange={(e) => setRateOverride(Number(e.target.value) / 100)} />
-                </label>
-              )}
               {!listenOnly && showHowto && (
-                <div className="col small howto" style={{ gap: 4, background: 'var(--bg-2)', borderRadius: 10, padding: '10px 12px' }} data-testid="howto">
-                  <strong>How to read the screen</strong>
+                <details className="col t14 howto" style={{ gap: 4, background: 'var(--bg-2)', borderRadius: 10, padding: '0 12px' }} data-testid="howto">
+                  <summary className="link start" style={{ fontSize: 15 }}>First time? How to read the screen</summary>
+                  <div className="col" style={{ gap: 4, paddingBottom: 10 }}>
                   {display === 'score' ? (
                     <>
                       {fullScore
                         ? <span>The full score: your part is the staff with the <span style={{ color: 'var(--voice)' }}>blue</span> band, the other voices are drawn plainly. The white line moves through the bars: sing the note it's on in your staff (it glows <span style={{ color: 'var(--accent)' }}>orange</span>).</span>
                         : <span>Your part as sheet music. The white line moves through the bar: sing the note it's on (it glows <span style={{ color: 'var(--accent)' }}>orange</span>).</span>}
                       <span><span style={{ color: 'var(--voice)' }}>━</span> Your voice draws a blue line at its exact height on the staff: just under the note means flat, just over means sharp (light orange when out of tune).</span>
-                      <span>Notes turn <span style={{ color: 'var(--voice)' }}>blue</span> when sung well, <span style={{ color: '#F2D15C' }}>yellow</span> when close, <span style={{ color: '#FF5D73' }}>red</span> when missed. The bubble shows how many cents sharp (+) or flat (−) you are. Prefer moving bars? Choose Highway above.</span>
+                      <span>Notes turn <span style={{ color: 'var(--voice)' }}>blue</span> when sung well, <span style={{ color: '#F2D15C' }}>yellow</span> when close, <span style={{ color: '#FF5D73' }}>red</span> when missed. The bubble says how close you are: spot on, a touch, a little or clearly flat or sharp. Prefer moving bars? Choose Highway under Display &amp; tempo.</span>
                     </>
                   ) : (
                     <>
                       <span><span style={{ color: 'var(--accent)' }}>■</span> Orange bars are your notes. They move left to the white line: sing when they reach it.</span>
                       <span><span style={{ color: 'var(--voice)' }}>━</span> The blue line is your voice. Keep it on the bar: the bar fills with blue when you're on the note.</span>
-                      <span>Dashed outlines are the other voices. The bubble shows how many cents sharp (+) or flat (−) you are.</span>
+                      <span>Dashed outlines are the other voices. The bubble says how close you are: spot on, a touch, a little or clearly flat or sharp.</span>
                     </>
                   )}
-                </div>
+                  </div>
+                </details>
               )}
-              {!listenOnly && !askHeadphones && <span className="tiny muted">Wear headphones so the mic only hears you.{!profile.latencyMs ? ' Tip: run voice setup once to measure your headphone delay.' : ''}</span>}
-              {askHeadphones && !profile.latencyMs && <span className="tiny muted">Tip: run voice setup once to measure your headphone delay.</span>}
               {listenOnly && listened && (route.after != null || !GENERATED_SECTIONS.has(section.id)) ? (
                 <>
-                  <button className="btn primary block" onClick={() => go({ ...route, level: afterLevel, after: undefined, step }, true)} data-testid="learn-next">
+                  <button className="btn primary block start-btn" onClick={() => go({ ...route, level: afterLevel, after: undefined, step }, true)} data-testid="learn-next">
                     <IconPlay size={18} /> Now sing it: {stepLabel(afterLevel, step)}
                   </button>
                   <button className="btn block" onClick={start}>Listen again</button>
                 </>
               ) : (
                 // Waiting for "Headphones on?": not sticky, so it doesn't cover the question on a small phone.
-                <button className={`btn primary block${headphonesUnanswered ? '' : ' start-sticky'}`} onClick={start} disabled={headphonesUnanswered} data-testid="start"
+                <button className={`btn primary block start-btn${headphonesUnanswered ? '' : ' start-sticky'}`} onClick={start} disabled={headphonesUnanswered} data-testid="start"
                   style={headphonesUnanswered ? { opacity: 1, background: 'var(--surface-2)', color: 'var(--muted)' } : undefined}>
-                  {headphonesUnanswered ? 'Answer above to start' : <><IconPlay size={18} /> {listenOnly ? 'Listen' : firstListen ? 'Sing it now' : 'Start singing'}</>}
+                  {headphonesUnanswered ? 'Answer above to start' : <><IconPlay size={18} /> {listenOnly ? 'Listen' : firstListen ? 'Sing it now' : 'Start'}</>}
                 </button>
+              )}
+              {route.mode === '2d' && (
+                <details className="disclose" data-testid="display-tempo">
+                  <summary>
+                    <span className="grow"><strong className="t16">Display &amp; tempo</strong> <span className="t14 muted">· {display === 'score' ? 'score' : 'highway'}, {Math.round(rate * 100)}%</span></span>
+                    <span className="chev"><IconChevronDown size={20} /></span>
+                  </summary>
+                  <div className="col">
+                    {ladderSec && (
+                      <div className="col" style={{ gap: 4 }}>
+                        <span className="t14 muted" id="step-label-seg">Step</span>
+                        <div className="seg" role="group" aria-labelledby="step-label-seg" data-testid="step-toggle">
+                          <button aria-pressed={step === 'slow'} onClick={() => step !== 'slow' && toStep('slow')} data-testid="step-slow">Slow ({Math.round(stepSpec(level, 'slow').rate * 100)}%)</button>
+                          <button aria-pressed={step === 'tempo'} onClick={() => step !== 'tempo' && toStep('tempo')} data-testid="step-tempo">In tempo</button>
+                        </div>
+                        <span className="t14 muted">Slow first, then in tempo: passing in tempo completes the level. Know it already? Go straight to in tempo.</span>
+                      </div>
+                    )}
+                    <div className="col" style={{ gap: 4 }}>
+                      <span className="t14 muted" id="display-label">Score / Highway <span style={{ opacity: 0.8 }}>(remembered)</span></span>
+                      <div className="seg" role="group" aria-labelledby="display-label" data-testid="display-toggle">
+                        <button aria-pressed={display === 'score'} onClick={() => updateProfile({ display: 'score', displayChosen: true, scoreDefaultNote: false })} data-testid="display-score">Score</button>
+                        <button aria-pressed={display === 'highway'} onClick={() => updateProfile({ display: 'highway', displayChosen: true, scoreDefaultNote: false })} data-testid="display-highway">Highway</button>
+                      </div>
+                    </div>
+                    {wide && display === 'score' && (others.voices || others.accompaniment) && (
+                      <div className="col" style={{ gap: 4 }}>
+                        <span className="t14 muted" id="staves-label">Show <span style={{ opacity: 0.8 }}>{profile.scoreStaves ? '(remembered)' : '(automatic)'}</span></span>
+                        <div className="seg" role="group" aria-labelledby="staves-label" data-testid="staves-toggle">
+                          <button aria-pressed={staves === 'mine' || (staves === 'voices' && !others.voices)} onClick={() => pickStaves('mine')}>My part</button>
+                          {others.voices && <button aria-pressed={staves === 'voices' || (staves === 'all' && !others.accompaniment)} onClick={() => pickStaves('voices')}>All voices</button>}
+                          {others.accompaniment && <button aria-pressed={staves === 'all'} onClick={() => pickStaves('all')} data-testid="staves-all">{others.voices ? '+ Accomp.' : 'With accomp.'}</button>}
+                        </div>
+                        {offBook && staves !== 'mine' && <span className="t14 muted">By heart, the full score shows the other voices without their words or the accompaniment, so nothing gives your part away.</span>}
+                      </div>
+                    )}
+                    {helpable && (
+                      <label className="field" data-testid="tempo">
+                        <span className="t14">Tempo {Math.round(rate * 100)}%{rate < (spec?.rate ?? 1) - 1e-6 ? ' (slower than the step: practice only, won’t count)' : ''}</span>
+                        <input type="range" min={40} max={100} step={5} value={Math.round(rate * 100)} onChange={(e) => setRateOverride(Number(e.target.value) / 100 >= (spec?.rate ?? 1) - 1e-6 ? null : Number(e.target.value) / 100)} />
+                      </label>
+                    )}
+                    {!listenOnly && levelInfo && !cold && (
+                      <span className="t14 muted">
+                        A note may be up to {toleranceWords(tolerance)} off. Start: {levelInfo.cue === 'chord' ? 'the starting chord only' : 'your note'}.
+                      </span>
+                    )}
+                    {!listenOnly && !askHeadphones && <span className="t14 muted">Wear headphones so the mic only hears you.</span>}
+                    {!listenOnly && !profile.latencyMs && <span className="t14 muted">Tip: run voice setup once to measure your headphone delay.</span>}
+                  </div>
+                </details>
               )}
             </div>
           </div>
@@ -964,6 +1011,16 @@ function disposeSession(s: PracticeSession | null): void {
     if (n > 0) addCyclePoints(n);
   }
   s.dispose();
+}
+
+/** First and last bar (measure indices) of a stretch of score time. */
+function sectionBars(score: { measures: { start: number; dur: number }[] }, from: number, to: number): [number, number] {
+  const ms = score.measures;
+  let a = ms.findIndex((m) => from >= m.start - 1e-3 && from < m.start + m.dur - 1e-3);
+  if (a < 0) a = 0;
+  let b = a;
+  for (let i = a; i < ms.length && ms[i].start < to - 1e-3; i++) b = i;
+  return [a, b];
 }
 
 function sessionStartTarget(s: PracticeSession, sectionStart: number): number {

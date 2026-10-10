@@ -1,6 +1,7 @@
 // Super admin: anonymous usage statistics (daily totals, and hourly ones for the last 24 hours;
 // docs/PRIVACY.md), to improve the app.
 
+import { levelLabel } from '../../progress/ladder';
 import React, { useEffect, useMemo, useState } from 'react';
 import { go } from '../router';
 import { apiBase, loadSuperSession } from '../../progress/choir';
@@ -138,21 +139,21 @@ function Breakdown({ days, hours }: { days: MetricsDay[]; hours?: boolean }) {
     <Section title="Runs by mode" id="usage-modes">
       <BarList rows={MODES.map(([m, l]) => ({ label: l, value: sumKeys(days, (k) => k.startsWith(`run.${m}.`)) }))} format={int} />
     </Section>
-    <Section title="Runs by level" note="Level 0 = listening">
-      <BarList rows={[0, 1, 2, 3, 4, 5].map((l) => ({ label: `Level ${l}`, value: sumKeys(days, (k) => k.startsWith('run.') && k.endsWith(`.L${l}`)) }))} format={int} />
+    <Section title="Runs by level">
+      <BarList rows={[0, 1, 2, 3, 4, 5].map((l) => ({ label: l === 0 ? 'Listen' : levelLabel(l), value: sumKeys(days, (k) => k.startsWith('run.') && k.endsWith(`.L${l}`)) }))} format={int} />
     </Section>
     <Section title="Onboarding funnel" note="New installs reaching each step (share of setups started)" id="usage-funnel">
       <BarList rows={FUNNEL.map(([s, l]) => ({ label: l, value: sumKeys(days, (k) => k === `onb.${s}`) }))}
         format={(v) => { const base = sumKeys(days, (k) => k === 'onb.setup_started'); return base ? `${int(v)} · ${pct(v, base)}` : int(v); }} />
     </Section>
-    <Section title="Level pass rates" note="Counted section and whole-piece runs that passed">
+    <Section title="Level pass rates" note="Counted passage and whole-piece runs that passed">
       <BarList rows={[1, 2, 3, 4, 5].map((l) => {
         const runs = sumKeys(days, (k) => /^run\.(section|full)\./.test(k) && k.endsWith(`.L${l}`));
         const pass = sumKeys(days, (k) => /^pass\.(section|full)\./.test(k) && k.endsWith(`.L${l}`));
-        return { label: `Level ${l}`, value: runs ? pass / runs : 0, note: `${pass} of ${runs}` };
+        return { label: levelLabel(l), value: runs ? pass / runs : 0, note: `${pass} of ${runs}` };
       })} format={(v) => `${Math.round(v * 100)}%`} max={1} />
     </Section>
-    <Section title="Attempts to pass a level" note="Counted runs at a section and level until it passed">
+    <Section title="Attempts to pass a level" note="Counted runs at a passage and level until it passed">
       <BarList rows={ATT.map(([b, l]) => ({ label: l, value: sumKeys(days, (k) => k.startsWith('att2pass.') && k.endsWith(`.${b}`)) }))} format={int} />
     </Section>
     <Section title="Time to rehearsal-ready" note="From first practice of a piece to piece level 3">

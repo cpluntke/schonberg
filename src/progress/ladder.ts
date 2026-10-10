@@ -573,25 +573,31 @@ export function nextStep(sections: Section[], prog: PieceProgress | undefined, n
       return { sectionId: 'all', level: minSec, step: 'tempo', kind: 'full', reason };
     }
   }
-  // 6. Earliest section with the lowest level, at its current step. (A section already sung from
-  // memory today waits until tomorrow.)
+  // 6. Earliest section at the lowest step: the lowest level, and of those a section still on its
+  // slow step before one whose slow step is done (one new thing at a time, for the whole piece).
+  // (A section already sung from memory today waits until tomorrow.)
   let best: Section | null = null;
+  let bestRank = Infinity;
   let bestLevel = 5;
   for (const s of [...sections].sort((a, b) => a.index - b.index)) {
     const l = levelOf(prog, s.id);
     if (l === 4 && prog?.sections[s.id]?.offBookDays?.includes(today)) continue;
-    if (l < bestLevel) { best = s; bestLevel = l; }
+    const rank = 2 * l + (stepFor(prog?.sections[s.id], Math.min(MAX_LEVEL, l + 1)) === 'tempo' ? 1 : 0);
+    if (rank < bestRank) { best = s; bestRank = rank; bestLevel = l; }
   }
   if (!best || bestLevel >= MAX_LEVEL) return null;
   const sp = prog?.sections[best.id];
   const { level: target, step } = currentStep(sp);
   const left = sections.filter((s) => levelOf(prog, s.id) < target).length;
+  // Sections still to pass the target level's slow step (or in tempo).
+  const leftSlow = sections.filter((s) => stepFor(prog?.sections[s.id], target) === 'slow' && levelOf(prog, s.id) < target).length;
   const started = sections.some((s) => (prog?.sections[s.id]?.attempts ?? 0) > 0 || levelOf(prog, s.id) > 0);
   const tail = target === 5 && step === 'slow' ? ' Everything is concert-ready: now learn it by heart.'
     : step === 'tempo' ? ' Slow is done: now in tempo.'
       : multi && left === 1 ? ` Last passage at Level ${target}.`
-        : target === 1 && !started ? ' Learn the notes on “doo”.'
-          : '';
+        : multi && leftSlow === 1 ? ' Last passage to sing slow.'
+          : target === 1 && !started ? ' Learn the notes on “doo”.'
+            : '';
   const out: NextStep = { sectionId: best.id, level: target, step, kind: 'section', reason: `${best.label}: ${stepLabel(target, step)}.${tail}` };
   if (target === 2 && step === 'slow' && words?.(best.id) === false) out.wordsFirst = true;
   return out;

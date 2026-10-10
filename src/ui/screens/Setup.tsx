@@ -134,7 +134,7 @@ export function Setup() {
             if ([c.rehearsalDate, c.concertDate].some((d) => d && d < today)) return <span className="small" role="alert" style={{ color: 'var(--accent-text)' }}>That date is in the past.</span>;
             return null;
           })()}
-          <span className="tiny muted">With dates, Home tells you how many sections to learn per day.</span>
+          <span className="tiny muted">With dates, Home tells you how many passages to learn per day.</span>
           <div className="col">
             <span className="small">{choirCycleNow(cachedChoir()) && profile.choirCode && loadCycle().preset === `choir:${profile.choirCode}` ? `Pieces ${cachedChoir()!.name} is singing (from the choir; change them any time)` : 'Pieces your choir is singing this cycle'}</span>
             <div className="chips" role="group" aria-label="Pieces in this cycle">

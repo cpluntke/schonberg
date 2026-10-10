@@ -4,6 +4,7 @@ import type { Score, ScoreNote } from '../music/types';
 import { barRangeLabel } from '../music/sections';
 import type { Grade, Insight, NoteResult, PitchSample } from './types';
 import type { ScoringContext } from './scoring';
+import { pitchPhrase } from './pitchwords';
 
 const GRADE_VALUE: Record<Grade, number> = { perfect: 1, good: 0.85, ok: 0.5, miss: 0 };
 
@@ -122,8 +123,8 @@ export function analyze(ctx: ScoringContext, notes: NoteResult[], samples?: Pitc
       kind: flat ? 'flat-overall' : 'sharp-overall',
       title: flat ? 'You tend to sing flat' : 'You tend to sing sharp',
       detail: flat
-        ? `Overall you sat about ${c} cents under the pitch, most clearly in ${barsText(score, m)}. Keep the sound bright and the breath moving; think each note slightly higher than you feel it.`
-        : `Overall you sat about ${c} cents above the pitch, most clearly in ${barsText(score, m)}. Release tension in the throat and let the notes settle rather than pushing them up.`,
+        ? `Overall you sat ${pitchPhrase(-c)}, most clearly in ${barsText(score, m)}. Keep the sound bright and the breath moving; think each note slightly higher than you feel it.`
+        : `Overall you sat ${pitchPhrase(c)}, most clearly in ${barsText(score, m)}. Release tension in the throat and let the notes settle rather than pushing them up.`,
       measures: m,
       severity: Math.abs(overall) > 25 ? 3 : Math.abs(overall) > 20 ? 2 : 1,
       weight: Math.abs(overall) * 2,
@@ -144,8 +145,8 @@ export function analyze(ctx: ScoringContext, notes: NoteResult[], samples?: Pitc
       kind: dir < 0 ? 'flat-long-notes' : 'sharp-long-notes',
       title: dir < 0 ? 'Long notes sink' : 'Long notes creep up',
       detail: dir < 0
-        ? `On the held notes in ${where} the pitch drops by about ${amount} cents by the end. Keep the breath support going right to the end of the note and think the line onward.`
-        : `On the held notes in ${where} the pitch rises by about ${amount} cents. Keep the sound relaxed and steady instead of pushing through the note.`,
+        ? `On the held notes in ${where} the pitch sinks: ${pitchPhrase(-amount)} by the end. Keep the breath support going right to the end of the note and think the line onward.`
+        : `On the held notes in ${where} the pitch creeps up: ${pitchPhrase(amount)} by the end. Keep the sound relaxed and steady instead of pushing through the note.`,
       measures: m,
       severity: amount >= 30 || drifting.length >= 3 ? 2 : 1,
       weight: amount * drifting.length,
@@ -389,7 +390,7 @@ export function analyze(ctx: ScoringContext, notes: NoteResult[], samples?: Pitc
     result.push({
       kind: 'great',
       title: 'Excellent run',
-      detail: `${Math.round(accuracy * 100)}% accuracy across ${barsText(score, bounds)}. ${result.length ? 'Polish the point above, then move on' : 'Move on to the next level or the next section'}.`,
+      detail: `${Math.round(accuracy * 100)}% accuracy across ${barsText(score, bounds)}. ${result.length ? 'Polish the point above, then move on' : 'Move on to the next level or the next passage'}.`,
       measures: bounds,
       severity: 1,
     });

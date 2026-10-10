@@ -264,6 +264,12 @@ describe('ladder', () => {
     expect(half.reason).toBe('Bars 5–8: Level 1 · Notes · in tempo. Slow is done: now in tempo.');
     // A slow pass alone never confirms a level: still the section, not the full run.
     expect(nextStep(secs, prog([1, 0, 1, 1], { s1: { slow: 1 } }), NOW)).toMatchObject({ sectionId: 's1', level: 1, step: 'tempo' });
+    // One new thing at a time for the whole piece: a passage still on slow comes before one whose
+    // slow step is done (the designs' "Last passage slow").
+    const mid = nextStep(secs, prog([1, 0, 0, 0], { s1: { slow: 1 }, s2: { slow: 1 } }), NOW)!;
+    expect(mid).toMatchObject({ sectionId: 's3', level: 1, step: 'slow' });
+    expect(mid.reason).toBe('Bars 13–16: Level 1 · Notes · slow. Last passage to sing slow.');
+    expect(nextStep(secs, prog([1, 0, 0, 0], { s1: { slow: 1 }, s2: { slow: 1 }, s3: { slow: 1 } }), NOW)).toMatchObject({ sectionId: 's1', step: 'tempo' });
     // Every section at level ≥ 1, piece level 0: confirm level 1 with a full run.
     expect(nextStep(secs, prog([2, 1, 3, 1]), NOW)).toMatchObject({ sectionId: 'all', level: 1, kind: 'full' });
     expect(nextStep(secs, withFull(prog([2, 1, 3, 1]), { level: 1 }), NOW)).toMatchObject({ sectionId: 's1', level: 2, step: 'slow' });
@@ -330,7 +336,9 @@ describe('ladder', () => {
     expect(nextStep(secs, p, NOW, words(['s0']))!.wordsFirst).toBeUndefined();
     expect(nextStep(secs, p, NOW)!.wordsFirst).toBeUndefined();
     // Not in tempo, and not for a passage without words.
-    expect(nextStep(secs, withFull(prog([1, 1, 1, 1], { s0: { slow: 2 } }), { level: 1 }), NOW, words([]))!.wordsFirst).toBeUndefined();
+    const allSlow2 = { s0: { slow: 2 }, s1: { slow: 2 }, s2: { slow: 2 }, s3: { slow: 2 } };
+    expect(nextStep(secs, withFull(prog([1, 1, 1, 1], allSlow2), { level: 1 }), NOW, words([]))).toMatchObject({ sectionId: 's0', step: 'tempo' });
+    expect(nextStep(secs, withFull(prog([1, 1, 1, 1], allSlow2), { level: 1 }), NOW, words([]))!.wordsFirst).toBeUndefined();
     expect(nextStep(secs, withFull(prog([2, 2, 2, 1]), { level: 1 }), NOW, words([]))).toMatchObject({ sectionId: 's3', level: 2 });
     expect(nextStep(secs, withFull(prog([2, 2, 2, 1]), { level: 1 }), NOW, words([]))!.wordsFirst).toBeUndefined();
   });

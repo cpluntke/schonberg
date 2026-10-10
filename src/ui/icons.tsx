@@ -36,3 +36,6 @@ export const IconStop = ({ size = 22, color = '#0B0D1A' }: P) => (
 );
 export const IconList = (p: P) => <S {...p}><path d="M4 6h16M4 12h16M4 18h16" /></S>;
 export const IconShield = (p: P) => <S {...p}><path d="M12 3l8 3v6c0 4.5-3.4 7.8-8 9-4.6-1.2-8-4.5-8-9V6z" /><path d="M9 12l2 2 4-4" /></S>;
+export const IconChevron = (p: P) => <S {...p}><path d="M9 6l6 6-6 6" /></S>;
+export const IconChevronDown = (p: P) => <S {...p}><path d="M6 9l6 6 6-6" /></S>;
+export const IconClose = (p: P) => <S {...p}><path d="M6 6l12 12M18 6L6 18" /></S>;

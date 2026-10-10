@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { startPassage } from './helpers';
 
 // Pause and resume a run: the count-in is announced, the Resume button gets focus, and the screen
 // only shows the run again once playback is back.
@@ -8,7 +9,7 @@ test('pause and resume a simulated run', async ({ page }) => {
   await page.goto('/?simulate=perfect#/');
   await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
   await page.getByTestId('piece-row').first().click();
-  await page.getByLabel('Passages').getByRole('button', { name: /Level 1/ }).first().click();
+  await startPassage(page, /Level 1 · Notes · slow/);
   await page.getByTestId('hp-yes').click(); // level 1 asks "Headphones on?"
   await page.getByTestId('start').click();
 

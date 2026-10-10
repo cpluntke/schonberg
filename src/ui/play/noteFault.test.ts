@@ -8,9 +8,9 @@ const n = (o: Partial<NoteResult>): NoteResult => ({
 
 describe('noteFault', () => {
   it('small deviations in cents, big ones in plain words', () => {
-    expect(noteFault(n({ cents: -64 }), 50)).toBe('flat (−64¢)');
-    expect(noteFault(n({ cents: 90 }), 50)).toBe('sharp (+90¢)');
-    expect(noteFault(n({ cents: -140 }), 50)).toBe('flat (−140¢)');
+    expect(noteFault(n({ cents: -64 }), 50)).toBe('clearly flat (64 cents)');
+    expect(noteFault(n({ cents: 90 }), 50)).toBe('clearly sharp (90 cents)');
+    expect(noteFault(n({ cents: -140 }), 50)).toBe('clearly flat (140 cents)');
     expect(noteFault(n({ cents: -1000 }), 50)).toBe('a wrong note (about 10 semitones low)');
     expect(noteFault(n({ cents: 190 }), 50)).toBe('a wrong note (about 2 semitones high)');
     expect(noteFault(n({ cents: -1195 }), 50)).toBe('sung an octave low');
@@ -24,8 +24,9 @@ describe('faultOf / faultTag', () => {
   it('kinds and short tags', () => {
     const tag = (o: Partial<NoteResult>) => faultTag(faultOf(n(o), 50));
     expect(faultOf(n({ cents: -64 }), 50)).toEqual({ kind: 'flat', cents: -64 });
-    expect(tag({ cents: -64 })).toBe('↓ 64¢');
-    expect(tag({ cents: 90 })).toBe('↑ 90¢');
+    expect(tag({ cents: -64 })).toBe('↓ clearly flat');
+    expect(faultTag(faultOf(n({ cents: -30 }), 25))).toBe('↓ a little flat');
+    expect(tag({ cents: 90 })).toBe('↑ clearly sharp');
     expect(tag({ cents: -1000 })).toBe('↓ 10 semitones');
     expect(tag({ cents: 120 * 1.5 })).toBe('↑ 2 semitones');
     expect(tag({ cents: 160 })).toBe('↑ 2 semitones');

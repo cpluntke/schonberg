@@ -267,7 +267,7 @@ export function WordsPlay({ route }: { route: PlayRoute }) {
             <strong style={{ fontSize: 18 }}>Paused</strong>
             {resumeMsg && <span className="small" role="status">{resumeMsg}</span>}
             <button className="btn primary block" autoFocus disabled={resuming} onClick={() => { pushGuard(); void resume(); }}><IconPlay size={18} /> {resuming ? 'Resuming…' : 'Resume'}</button>
-            <button className="btn block" onClick={() => { sessionRef.current?.dispose(); sessionRef.current = null; start(); }}><IconRestart size={18} /> Restart section</button>
+            <button className="btn block" onClick={() => { sessionRef.current?.dispose(); sessionRef.current = null; start(); }}><IconRestart size={18} /> Restart passage</button>
             <button className="btn block" onClick={() => sessionRef.current?.finish()}>Finish &amp; see results</button>
             <div className="row" style={{ gap: 8 }}>
               <button className="btn block" data-testid="pause-back" onClick={() => leaveFor(up)}><IconBack size={18} /> Back to the piece</button>

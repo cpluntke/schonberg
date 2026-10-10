@@ -1,3 +1,4 @@
+import { levelLabel } from '../../progress/ladder';
 import React, { useEffect, useRef, useState } from 'react';
 import { IconPlay } from '../icons';
 import { go, type Route } from '../router';
@@ -104,7 +105,7 @@ function TryItNow({ onClose }: { onClose: () => void }) {
       <span className="eyebrow">Try it now · about 5 minutes</span>
       {step(1, setupDone, 'Put on headphones, do the voice setup', 'Choir code, a short do-re-mi, and the delay check', setupDone ? 'Redo' : 'Start voice setup',
         () => go({ name: 'setup' }), !setupDone)}
-      {first && first.name === 'play' && step(2, false, first.level <= 1 ? 'Sing level 1 of your first section' : `Sing your next step: level ${first.level}`,
+      {first && first.name === 'play' && step(2, false, first.level <= 1 ? 'Sing Level 1 · Notes of your first passage' : `Sing your next step: ${levelLabel(first.level)}`,
         firstPiece ? `${firstPiece.title}${first.level <= 1 ? ': slow, on “doo”, with your part playing' : ''}` : 'Slow, on “doo”, with your part playing', 'Sing it',
         () => go(first), setupDone)}
     </div>

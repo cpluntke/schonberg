@@ -1,6 +1,6 @@
 // Results: a few bars of your own staff with the notes that weren't right marked: the note in red
 // with a ring, a line at the height you sang it (like the voice ink while singing), and a short tag
-// over it ("↓ 62¢", "not sung"). Static, drawn with the score view's engraver (staff2d.ts).
+// over it ("↓ clearly flat", "not sung"). Static, drawn with the score view's engraver (staff2d.ts).
 import type { NotationMode } from '../../game/notation';
 import type { Part, Score } from '../../music/types';
 import { COLORS, type DrawState } from './highway2d';

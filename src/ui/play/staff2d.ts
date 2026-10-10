@@ -7,6 +7,7 @@
 // maps to a float step by piecewise-linear interpolation between the seven letters' pitches in the
 // current key (plus the accidental of the note being sung), so a note sung 30 cents flat sits just
 // below its notehead and a perfectly sung C♮ in D major sits exactly on the C.
+import { pitchShort } from '../../game/pitchwords';
 import { F_CLEF, G_CLEF, GLYPH_UNITS_PER_SPACE } from './clefGlyphs';
 import type { KeySig, NoteSpelling, Part, Score, TempoEvent } from '../../music/types';
 import type { Grade, PitchSample } from '../../game/types';
@@ -2333,7 +2334,7 @@ export function drawBubble(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: numbe
   let cents = (shown - target) * 100;
   if (Math.abs(cents) > 600) cents = ((cents % 1200) + 1800) % 1200 - 600;
   const rc = Math.round(Math.abs(cents));
-  const txt = `${rc === 0 ? '±' : cents > 0 ? '+' : '−'}${rc}¢`;
+  const txt = pitchShort(rc === 0 ? 0 : cents);
   c.font = '600 12px "JetBrains Mono", monospace';
   c.textBaseline = 'middle';
   c.textAlign = 'left';

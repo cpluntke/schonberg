@@ -26,7 +26,7 @@ words and go up to tempo in the same jump.
   `slow` reaches it, then in tempo. `ladder.stepFor(sp, L)` is the default step for starting level L:
   in tempo once L (or its slow step) was passed, else slow.
 - A counted pass at slow above the in-tempo level raises `slow` (a **step-up**: Results says
-  “Level 2 · Words · slow ✓” and offers **Now in tempo**); a counted pass in tempo raises the level (a
+  “Level 2 · slow ✓” and offers **Now in tempo** next to the next step); a counted pass in tempo raises the level (a
   **level-up**). A slow pass never reviews a passage, never clears a fix list and never moves the
   piece level. `store.recordAttempt` returns both (`stepUp`, `prevSlow`/`newSlow`, `prevLevel`/`newLevel`)
   and the piece milestone (`reached`).
@@ -122,9 +122,10 @@ don't ask (in tempo the app no longer needs every note).
 
 **Every note must be right** (`StepRules.everyNote`): a Level 1 slow attempt passes only when every note
 is graded *good* or *perfect* (±50¢ at 70% tempo, the usual grades, see [SCORING.md](SCORING.md)).
-One flat note fails it, and Results says which: “Bar 5: note 3 was flat (−62¢)” (big misses in
-words: “a wrong note (about 2 semitones low)”, “sung an octave low”), with a button to loop that bar
-slowly; that bar shows as “needs work” in the bar strip, and the grade letter shows at most a B.
+One flat note fails it, and Results says which, words first (the pitch word scale,
+`game/pitchwords.ts`: spot on ≤10 cents, a touch ≤25, a little ≤50, clearly beyond): “Not yet: one note to
+fix. The raised B (B♯) in bar 25 was clearly flat (65 cents).” (big misses in words: “a wrong note
+(about 2 semitones low)”, “sung an octave low”), and its first button loops that bar slowly (50%); that bar shows as “needs work” in the bar strip, and the grade letter shows at most a B.
 
 - **Notes the app can't judge reliably are let off** (`ladder.noteVerdict`): a note below *good*
   is forgiven when the scorer flags it as unsure (`NoteResult.unsure`): a **very short note** (its
@@ -185,7 +186,7 @@ For every level N = 1…5 (`store.recordFullRun`, `store.recordAttempt`):
    **“to fix at Level N”**.
 4. **The piece reaches level N as soon as every passage that slipped in that run has passed level N
    in tempo on its own** (or above; a slow pass doesn't fix). No second full run: the last fix grants
-   the level, and Results says “Fixed! Piece level N reached”. If nothing slipped, the piece reaches
+   the level, and Results says “Fixed! The whole piece reached Level N · …”. If nothing slipped, the piece reaches
    level N at once.
 5. **Too much slipped: practice.** A run opens the level only when **at most half of the passages
    slipped** and **its overall accuracy came within 10 points of the level's pass mark**
@@ -262,8 +263,9 @@ review of the full run (piece level ≥ 3, last passed full run more than 7 days
 reviews; after the whole piece reached level 5 on one day, the full run from memory again on a
 later day (day 2 of 2); the full run when every passage has reached a level above the piece's
 (“Level 3 in every passage: confirm it with a full run-through”); else the weakest passage at its
-current step (“Bars 22–29: Level 1 · Notes · slow. Last passage at Level 1.”; “… · in tempo. Slow is
-done: now in tempo.”). So Level 1 too gets one complete sing-through (in tempo) before Level 2: once
+current step: the lowest level, and of those a passage still on its slow step before one whose slow
+step is done, so the whole piece goes slow first (“Bars 22–29: Level 1 · Notes · slow. Last passage to
+sing slow.”; “… · in tempo. Slow is done: now in tempo.”). So Level 1 too gets one complete sing-through (in tempo) before Level 2: once
 every passage is at Level 1 in tempo, Next up is the full run at Level 1, then the passages that
 slipped in it, in their own (smaller) stretches. When the step is Level 2 slow and the passage's words
 in rhythm (`words.ts`, at least the first stage) aren't passed, Next up says so (`wordsFirst`), and
