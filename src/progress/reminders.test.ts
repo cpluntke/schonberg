@@ -297,13 +297,13 @@ describe('payloads', () => {
 // ---------------------------------------------------------------- the service worker's handlers
 
 describe('service worker (public/push-sw.js)', () => {
-  function loadSw(windows: { url: string; focus: () => Promise<void> }[] = []) {
+  function loadSw(windows: { url: string; focus: () => Promise<void> }[] = [], pushManager: unknown = null) {
     const handlers: Record<string, (e: unknown) => void> = {};
     const shown: { title: string; opts: { body: string; icon: string; tag: string; data: { url: string } } }[] = [];
     const opened: string[] = [];
     const self = {
       location: new URL('https://choir.example/schonberg/sw.js'),
-      registration: { scope: 'https://choir.example/schonberg/', showNotification: async (title: string, opts: never) => { shown.push({ title, opts }); } },
+      registration: { scope: 'https://choir.example/schonberg/', pushManager, showNotification: async (title: string, opts: never) => { shown.push({ title, opts }); } },
       clients: { matchAll: async () => windows, openWindow: async (u: string) => { opened.push(u); } },
       addEventListener: (t: string, h: (e: unknown) => void) => { handlers[t] = h; },
     };
@@ -341,5 +341,69 @@ describe('service worker (public/push-sw.js)', () => {
     const none = loadSw([]);
     await none.fire('notificationclick', { notification: { close, data: { url: 'https://choir.example/schonberg/#/' } } });
     expect(none.opened).toEqual(['https://choir.example/schonberg/#/']);
+  });
+
+  it('a renewed subscription goes to the server, which keeps the old one\'s time and zone', async () => {
+    const old = fakeSub('https://fcm.googleapis.com/fcm/send/old');
+    const renewed = fakeSub('https://fcm.googleapis.com/fcm/send/new');
+    await loadSw([], null).fire('pushsubscriptionchange', { oldSubscription: old, newSubscription: renewed });
+    expect(calls).toEqual([{ url: 'https://choir.example/schonberg/api/reminders', method: 'POST', body: {
+      subscription: { endpoint: renewed.endpoint, keys: { p256dh: expect.any(String), auth: expect.any(String) } },
+      replaces: old.endpoint,
+    } }]);
+    // No new one given (Chrome): the worker subscribes again with the old key.
+    calls = [];
+    const pm = { subscribe: vi.fn(async () => renewed) };
+    await loadSw([], pm).fire('pushsubscriptionchange', { oldSubscription: old, newSubscription: null });
+    expect(pm.subscribe).toHaveBeenCalledWith({ userVisibleOnly: true, applicationServerKey: old.options.applicationServerKey });
+    expect(calls.map((c) => c.body?.replaces)).toEqual([old.endpoint]);
+    // Not even the old one: the server key, a new subscription, and the app re-asserts it on its next start.
+    calls = [];
+    await loadSw([], pm).fire('pushsubscriptionchange', { oldSubscription: null, newSubscription: null });
+    expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual(['GET https://choir.example/schonberg/api/reminders/key']);
+    expect([...(pm.subscribe.mock.calls[1] as unknown as [{ applicationServerKey: Uint8Array }])[0].applicationServerKey]).toEqual([...keyBytes(KEY)]);
+  });
+});
+
+describe('what didn\'t reach the server goes again', () => {
+  it('a time changed offline is sent when back online', async () => {
+    await enableReminders();
+    const stop = startReminders();
+    await vi.waitFor(() => expect(calls.length).toBeGreaterThan(0));
+    answer = () => ({ status: 0 });
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('offline'); }));
+    expect(await setReminderTime('05:50')).toBe(false);
+    expect(loadReminder().assertedAt).toBeUndefined();
+    calls = [];
+    answer = (url, method) => (url.endsWith('/key') && method === 'GET' ? { status: 200, body: { publicKey: KEY } } : { status: 200, body: { ok: true } });
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit = {}) => {
+      calls.push({ url, method: init.method ?? 'GET', body: init.body ? JSON.parse(String(init.body)) : null });
+      const a = answer(url, init.method ?? 'GET');
+      return new Response(JSON.stringify(a.body ?? {}), { status: a.status });
+    }));
+    window.dispatchEvent(new Event('online'));
+    await vi.waitFor(() => expect(writes().map((c) => c.body?.time)).toEqual(['05:50']));
+    expect(loadReminder().assertedAt).toBeGreaterThan(0);
+    stop();
+  });
+
+  it('"practised today" sent offline goes again when back online', async () => {
+    await enableReminders();
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('offline'); }));
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const stop = startReminders();
+    practiseToday();
+    await vi.advanceTimersByTimeAsync(PRACTISED_DEBOUNCE_MS + 10);
+    expect(loadReminder().practisedSent).toBeUndefined();
+    calls = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit = {}) => {
+      calls.push({ url, method: init.method ?? 'GET', body: init.body ? JSON.parse(String(init.body)) : null });
+      return new Response('{}', { status: 200 });
+    }));
+    window.dispatchEvent(new Event('online'));
+    await vi.advanceTimersByTimeAsync(PRACTISED_DEBOUNCE_MS + 10);
+    expect(writes().map((c) => c.url)).toContain('/schonberg/api/reminders/practised');
+    expect(loadReminder().practisedSent).toBe(dayKey(Date.now()));
+    stop();
   });
 });

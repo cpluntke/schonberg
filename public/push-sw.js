@@ -36,3 +36,28 @@ self.addEventListener('notificationclick', (event) => {
     if (self.clients.openWindow) await self.clients.openWindow(url);
   })());
 });
+
+// The browser renewed the subscription (its push service changed it): tell the server, which keeps the
+// time and zone of the old one. Without the old one the app does it on its next start.
+self.addEventListener('pushsubscriptionchange', (event) => {
+  event.waitUntil((async () => {
+    const old = event.oldSubscription;
+    const api = new URL('api/reminders', self.registration.scope).href;
+    let sub = event.newSubscription;
+    if (!sub) {
+      let key = old && old.options && old.options.applicationServerKey;
+      if (!key) {
+        const r = await fetch(api + '/key');
+        const k = (await r.json()).publicKey.replace(/-/g, '+').replace(/_/g, '/');
+        key = Uint8Array.from(atob(k + '='.repeat((4 - (k.length % 4)) % 4)), (c) => c.charCodeAt(0));
+      }
+      sub = await self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+    }
+    if (!old || !sub || old.endpoint === sub.endpoint) return;
+    await fetch(api, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subscription: sub.toJSON(), replaces: old.endpoint }),
+    });
+  })().catch(() => { /* offline or no server: the app re-asserts on its next start */ }));
+});

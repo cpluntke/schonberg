@@ -255,7 +255,8 @@ let timeWaiters: ((ok: boolean) => void)[] = [];
 /** A new time: kept, and sent to the server (debounced) when the reminder is on. */
 export function setReminderTime(time: string): Promise<boolean> {
   if (!TIME_RE.test(time)) return Promise.resolve(false);
-  const st = saveReminder({ time });
+  // (not yet told to the server: the next start, or coming back online, sends it if this send fails)
+  const st = saveReminder({ time, assertedAt: undefined });
   if (!st.on) return Promise.resolve(true);
   if (timeTimer) clearTimeout(timeTimer);
   return new Promise<boolean>((resolve) => {
@@ -332,19 +333,42 @@ async function sendPractised(day: string): Promise<void> {
   if (!st.on || !st.endpoint || st.practisedSent === day || Date.now() - lastTry < RETRY_MS) return;
   lastTry = Date.now();
   const r = await call('/practised', 'POST', { endpoint: st.endpoint, day });
-  if (r?.ok) saveReminder({ practisedSent: day });
+  if (!r) lastTry = 0; // offline: tried again when the phone is back online or the app comes back
+  else if (r.ok) saveReminder({ practisedSent: day });
   else if (r?.status === 404) {
     // The server lost it (expired, removed after an error): subscribe again (the post carries today).
     await reassertReminder(true);
   }
 }
 
-/** On app start: re-assert the subscription, and report practice when the store changes. */
+/**
+ * On app start: re-assert the subscription, and report practice when the store changes. Back online or
+ * back in the foreground: what didn't reach the server (a new time, "practised today") goes again.
+ */
 export function startReminders(): () => void {
   void reassertReminder();
   notePractised();
   const off = onStoreChange(() => notePractised());
-  return () => { off(); if (practisedTimer) clearTimeout(practisedTimer); practisedTimer = null; };
+  const again = () => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+    if (!loadReminder().on) return;
+    void reassertReminder(); // (only sends when something wasn't sent yet, or every REASSERT_MS)
+    notePractised();
+  };
+  const hasWindow = typeof window !== 'undefined' && typeof window.addEventListener === 'function';
+  if (hasWindow) {
+    window.addEventListener('online', again);
+    document.addEventListener('visibilitychange', again);
+  }
+  return () => {
+    off();
+    if (hasWindow) {
+      window.removeEventListener('online', again);
+      document.removeEventListener('visibilitychange', again);
+    }
+    if (practisedTimer) clearTimeout(practisedTimer);
+    practisedTimer = null;
+  };
 }
 
 /** Tests only. */

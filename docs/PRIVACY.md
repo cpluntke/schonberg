@@ -140,28 +140,41 @@ account; it needs the browser's notification permission, asked only when the sin
 added to the Home Screen (iOS 16.4 or later).
 
 - **Sent** (`src/progress/reminders.ts`): when switched on, and again when the app starts (at most
-  every 6 hours, or when the subscription or the time zone changed), to `POST /schonberg/api/reminders`:
-  the browser's push subscription (the push service's address for this browser, e.g. at Google, Mozilla,
-  Apple or Microsoft, and the two keys that encrypt the message), the reminder time (`HH:MM`), the
-  phone's time zone (e.g. `Europe/Berlin`) and, if the singer already practised that day, the date.
-  After the day's first run (any run: counted or practice), once a day, to
+  every 6 hours, or when the subscription or the time zone changed, or a new time hasn't reached the
+  server yet: a time changed offline goes when the phone is back online or the app is opened again), to
+  `POST /schonberg/api/reminders`: the browser's push subscription (the push service's address for this
+  browser, e.g. at Google, Mozilla, Apple or Microsoft, and the two keys that encrypt the message), the
+  reminder time (`HH:MM`), the phone's time zone (e.g. `Europe/Berlin`) and, if the singer already
+  practised that day, the date. After the day's first run (any run: counted or practice), once a day, to
   `POST /schonberg/api/reminders/practised`: the push address and the date (`YYYY-MM-DD`) only, nothing
-  about the run. No name, no choir code, no account, no member token.
+  about the run (sent again when back online if the phone was offline). If the server answers that it
+  doesn't know the subscription (404, e.g. it expired), the app posts the subscription again as above.
+  When the browser renews its push subscription, the service worker posts the new one with the old
+  address (`replaces`) and no time or zone: the server copies them from the old one, which it then
+  deletes. No name, no choir code, no account, no member token.
+- **A confirmation**: a new subscription gets one visible notification within a minute, "Reminder set
+  for 18:00". That is how the server knows the subscription is real.
 - **Kept on the server** (`utils/schonberg_reminders.py`, `DATA_DIR/schonberg_reminders/subs.json`), per
   subscription: the push address and its two keys, the time, the time zone, the last day practised, the
-  last day a reminder was sent, the day it was made and the day the app was last in touch (to expire it).
-  The server's own signing key for push (VAPID) is made on the server and kept in the same folder.
+  last day a reminder was sent, the day it was made, the day the app was last in touch (to expire it),
+  whether a notification ever reached it, and how many sends in a row failed. The server's own signing
+  key for push (VAPID) is made on the server and kept in the same folder (never in the code repository,
+  the server image or its seed data).
 - **Deleted**: when the singer switches the reminder off (the browser drops the subscription too; if
-  the phone is offline, the app asks again on its next start), when the push service says the
-  subscription no longer exists (404/410, e.g. the app was removed or notifications were turned off),
-  and after 60 days without any contact from the app. Switching notifications off in the phone's
-  settings also switches the reminder off on the next start.
+  the phone is offline, the app asks again on its next start); when the push service says the
+  subscription doesn't exist or isn't valid (400, 403, 404 or 410, e.g. the app was removed or
+  notifications were turned off); after 5 failed sends in a row; when no notification (not even the
+  confirmation) reached a new subscription within 2 days; and after 60 days without any contact from
+  the app. Posting the subscription again doesn't extend the last three. Switching notifications off in
+  the phone's settings also switches the reminder off on the next start.
 - **Who sees it**: nobody. The server only uses it to send the reminder. The message is encrypted for
   the singer's browser; the push service (Google, Mozilla, Apple or Microsoft, depending on the browser)
   delivers it and sees when it is sent, not what it says.
-- **Abuse limits**: only addresses of the known push services are accepted, at most 5,000 reminders on
-  the server, 10 new ones an hour per client address (500 in all), 20 changes a minute per client
-  address (600 in all) besides the general limit; the client address is held in memory for the rate
-  limits only.
+- **Abuse limits**: only addresses of the known push services are accepted (checked strictly; the
+  server never follows a redirect, reads at most 64 KB of an answer and gives up on a push after 10
+  seconds), the encryption key must be a valid P-256 key, at most 5,000 reminders on the server; new
+  ones: 80 an hour per client address (a choir on one Wi-Fi), 200 per IPv6 /48 and 500 in all; 120
+  changes a minute per client address (600 in all) besides the general limit. The client address is
+  held in memory for the rate limits only.
 
 Recordings never leave the phone unless the singer shares one themselves.

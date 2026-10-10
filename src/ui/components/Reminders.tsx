@@ -59,7 +59,7 @@ export function ReminderSettings() {
         <input type="checkbox" checked disabled aria-readonly="true" />
       </label>
       {(note || error) && <span id="reminder-note" className="small muted" role={error ? 'alert' : undefined} data-testid="reminder-note" style={{ marginTop: 6 }}>{error || note}</span>}
-      {st.on && <span className="tiny muted" style={{ marginTop: 6 }}>The choir server keeps only what it needs to send it (no name): see Privacy.</span>}
+      {st.on && <span className="tiny muted" style={{ marginTop: 6 }}>A first notification, “Reminder set”, confirms it within a minute. The choir server keeps only what it needs to send it (no name): see Privacy.</span>}
     </div>
   );
 }
