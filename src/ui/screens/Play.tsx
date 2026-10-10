@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { Route } from '../router';
 import { dropGuard, go, leaveTo, practiceParent, pushGuard, useBackGuard } from '../router';
-import { getPiece, noteRangeFor, singableSections } from '../library';
+import { getPiece, noteRangeFor, singableSections, needsPartChoice, partChoices, rememberPart } from '../library';
 import { useMedia, useProfile, useWide } from '../hooks';
 import {
   MAX_LEVEL, OFF_BOOK_DAYS, effectiveTolerance, entriesOnTime, fixesBefore, fullRunCounts, pieceReadiness, sectionRunCounts,
@@ -121,6 +121,8 @@ function SingPlay({ route }: { route: PlayRoute }) {
   });
   const rate = rateOverride ?? spec?.rate ?? 1;
   const [phase, setPhase] = useState<'ready' | 'running' | 'paused' | 'micError'>('ready');
+  // A piece where the singer's part isn't obvious (a split section, unreadable names): ask once.
+  const [askPart, setAskPart] = useState(() => !!piece && route.mode === '2d' && !/~|^(row|leaps)-/.test(piece.id) && needsPartChoice(piece, profile.voice));
   const [micMsg, setMicMsg] = useState('');
   const [listened, setListened] = useState(false);
   const [hud, setHud] = useState<Hud>({ score: 0, combo: 0, count: 0, lyricIdx: -1, skip: null, done: 0, rd: null });
@@ -729,6 +731,17 @@ function SingPlay({ route }: { route: PlayRoute }) {
           <div className="overlay prerun">
             <div className="card precard" data-testid="prerun">
               <SessionStrip pieceId={piece.id} compact />
+              {askPart && (
+                <div className="col" data-testid="prerun-part-ask" style={{ gap: 6 }}>
+                  <strong className="t16">Which part do you sing in this piece?</strong>
+                  <div className="chips" role="group" aria-label="Your part in this piece">
+                    {partChoices(piece, profile.voice, { low: profile.rangeLow, high: profile.rangeHigh }).map(({ part: p }) => (
+                      <button key={p.id} className="chip" aria-pressed={p.id === part.id}
+                        onClick={() => { rememberPart(piece.id, p.id); setAskPart(false); if (p.id !== part.id) go({ ...route, partId: p.id }, true); }}>{p.name}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <span className="eb now" data-testid="step-label">{listenOnly ? 'Listen' : levelInfo?.label}</span>
               {cold ? (
                 <p className="task">

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { getPiece, singableSections, chosenPartId, rememberPart, registerVirtual, renameImported } from '../library';
+import { getPiece, singableSections, chosenPartId, rememberPart, registerVirtual, renameImported, needsPartChoice, partChoices, splitParts } from '../library';
 import { entryPiece } from '../generated';
 import { entryNotes } from '../../game/drills';
 import { useProfile, useStoreVersion } from '../hooks';
@@ -69,6 +69,8 @@ function troubleBar(piece: PieceInfo, part: Part, from: number, to: number): { m
   return spots.length ? { measure: spots[0][0], why: null } : null;
 }
 
+const SECTION_PLURAL: Record<string, string> = { S: 'sopranos', A: 'altos', T: 'tenors', B: 'basses' };
+
 export function PieceScreen({ pieceId }: { pieceId: string }) {
   const [profile] = useProfile();
   useStoreVersion();
@@ -77,6 +79,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
   const [showHelp, setShowHelp] = useState(false);
   const [editing, setEditing] = useState(false);
   const [partsOpen, setPartsOpen] = useState(false);
+  const [askPart, setAskPart] = useState(() => !!piece && needsPartChoice(piece, profile.voice));
   const [draft, setDraft] = useState({ title: piece?.title ?? '', composer: piece?.composer ?? '' });
   const [sheetId, setSheetId] = useState<string | null>(null);
   const pendingRef = useRef<(() => void) | null>(null);
@@ -133,7 +136,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
   const multi = sections.length > 1;
   const P = r.pieceLevel;
 
-  const pick = (id: string) => { setPartId(id); rememberPart(piece.id, id); setPartsOpen(false); };
+  const pick = (id: string) => { setPartId(id); rememberPart(piece.id, id); setPartsOpen(false); setAskPart(false); };
   // (no step: the passage's current step for that level, see Play)
   const playRoute = (sectionId: string, level: number, mode: '2d' | '3d' = '2d', step?: Step): Route =>
     ({ name: 'play', pieceId: piece.id, partId: part!.id, sectionId, level, mode, ...(step && mode === '2d' ? { step } : {}) });
@@ -201,6 +204,26 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
         </div>
       </div>
 
+      {askPart && !partsOpen && (
+        <div className="card part-pick" data-testid="part-ask">
+          <strong className="t16">Which part do you sing in this piece?</strong>
+          <span className="t14 muted">{splitParts(piece, profile.voice).length > 1
+            ? `The ${SECTION_PLURAL[profile.voice] ?? 'voices'} split here.` : 'Pick the part you sing.'} The app remembers it for this piece.</span>
+          <div className="chips" role="group" aria-label="Your part in this piece">
+            {(() => {
+              const cs = partChoices(piece, profile.voice, { low: profile.rangeLow, high: profile.rangeHigh });
+              // "fits your range" only says something when not every part does.
+              const fits = (f: number | null) => f != null && f >= 0.9;
+              const tell = cs.some((c) => !fits(c.fit));
+              return cs.map(({ part: p, fit }) => (
+                <button key={p.id} className="chip" data-testid={`part-ask-${p.id}`} onClick={() => pick(p.id)}>
+                  {p.name}{tell && fits(fit) ? <span className="muted"> · fits your range</span> : null}
+                </button>
+              ));
+            })()}
+          </div>
+        </div>
+      )}
       {partsOpen && (
         <div className="card part-pick" data-testid="part-picker">
           <strong className="t16">Your part</strong>

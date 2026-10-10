@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Score, Section } from '../music/types';
+import type { Part, Score, Section } from '../music/types';
 import { importScoreFile, PARSE_VERSION, upgradeStored } from '../music/import';
 import { computeSections } from '../music/sections';
 import { loadImportedScores, saveImportedScore, deleteImportedScore, loadCycle, saveCycle, subscribe } from '../progress/store';
@@ -406,18 +406,71 @@ export function noteRangeFor(p: PieceInfo, partId: string, from: number, to: num
 }
 
 /** Pick the part matching the singer's voice type, else the first vocal part. */
+/**
+ * The parts of a piece for this voice type, highest first (Bass I before Bass II): more than one when
+ * the section splits.
+ */
+export function splitParts(p: PieceInfo, voice: string): Part[] {
+  const own = p.score.parts.filter((x) => x.voiceType === voice && x.notes.length);
+  const mid = (x: Part) => {
+    const m = x.notes.map((n) => n.midi).sort((a, b) => a - b);
+    return m[m.length >> 1] ?? 0;
+  };
+  // Score order, unless it clearly contradicts the pitch (a lower part listed first).
+  return own.length > 1 ? [...own].sort((a, b) => mid(b) - mid(a) || own.indexOf(a) - own.indexOf(b)) : own;
+}
+
+/** The default part: the first of the singer's voice type (where the section splits, the upper one until they choose). */
 export function defaultPartId(p: PieceInfo, voice: string): string {
   const parts = p.score.parts;
   return (parts.find((x) => x.voiceType === voice) ?? parts.find((x) => x.voiceType !== 'other') ?? parts[0])?.id ?? '';
 }
 
-/** The part this singer practises in a piece: remembered choice, else by voice type. */
-export function chosenPartId(p: PieceInfo, voice: string): string {
+/**
+ * The sung parts a singer could take in this piece, best first: the share of the part's notes inside
+ * the singer's measured range (when known), then a part named for their voice type, then score order.
+ * Names alone aren't trusted ("Barytone", "Mezzo", "Chor II"): every sung part is offered.
+ */
+export function partChoices(p: PieceInfo, voice: string, range?: { low?: number; high?: number }): { part: Part; fit: number | null }[] {
+  const sung = p.score.parts.filter((x) => x.voiceType !== 'other' && x.notes.length);
+  const lo = range?.low, hi = range?.high;
+  const known = lo != null && hi != null && hi - lo >= 7;
+  const fitOf = (x: Part) => (known ? x.notes.filter((n) => n.midi >= lo! - 1 && n.midi <= hi! + 1).length / x.notes.length : null);
+  // Among parts that fit equally, the one sitting nearest the middle of the range (a bass 2 has the lower median).
+  const off = (x: Part) => {
+    if (!known) return 0;
+    const m = x.notes.map((n) => n.midi).sort((a, b) => a - b);
+    return Math.abs((m[m.length >> 1] ?? 0) - (lo! + hi!) / 2);
+  };
+  return sung
+    .map((part, i) => ({ part, fit: fitOf(part), off: off(part), i }))
+    .sort((a, b) => (b.fit ?? 0) - (a.fit ?? 0) || a.off - b.off
+      || Number(b.part.voiceType === voice) - Number(a.part.voiceType === voice) || a.i - b.i)
+    .map(({ part, fit }) => ({ part, fit }));
+}
+
+/**
+ * Ask which part is theirs: the piece has more than one sung part and not exactly one is named for
+ * the singer's voice type (a split section, or names the app can't read), and they haven't chosen yet.
+ */
+export function needsPartChoice(p: PieceInfo, voice: string): boolean {
+  if (savedPartId(p)) return false;
+  const sung = p.score.parts.filter((x) => x.voiceType !== 'other' && x.notes.length);
+  return sung.length > 1 && sung.filter((x) => x.voiceType === voice).length !== 1;
+}
+
+/** A part chosen for this piece by the singer (not the default), if any. */
+export function savedPartId(p: PieceInfo): string | null {
   try {
     const saved = localStorage.getItem(`sh:part:${p.id}`);
     if (saved && p.score.parts.some((x) => x.id === saved)) return saved;
   } catch { /* ignore */ }
-  return defaultPartId(p, voice);
+  return null;
+}
+
+/** The part this singer practises in a piece: their choice for this piece, else by voice type. */
+export function chosenPartId(p: PieceInfo, voice: string): string {
+  return savedPartId(p) ?? defaultPartId(p, voice);
 }
 
 export function rememberPart(pieceId: string, partId: string) {
