@@ -116,6 +116,26 @@ describe('ladder', () => {
     expect(entriesOnTime(part, run([300, 0, 0, 300, 0, 300]), 150)).toMatchObject({ ok: true, meanMs: 150 });
     expect(entriesOnTime(part, [])).toEqual({ ok: true, entries: 0, missed: 0, meanMs: null });
   });
+  it('entriesOnTime: forgives what the scorer cannot judge; one entry gets more room', () => {
+    const part = [
+      { start: 0, dur: 1 }, { start: 1, dur: 1 }, { start: 2, dur: 1 },
+      { start: 4, dur: 0.12 }, { start: 4.12, dur: 1 },
+      { start: 6.5, dur: 1 },
+    ];
+    const n = (index: number, onsetMs: number | null, extra: object = {}) => ({ index, onsetMs, voicedRatio: 1, ...extra });
+    // A short pickup the tracker couldn't judge (no onset, unsure, not clearly wrong) is left out.
+    expect(entriesOnTime(part, [n(0, 40), n(1, 0), n(2, 0), n(3, null, { unsure: 'short' }), n(4, 0), n(5, 60)]))
+      .toMatchObject({ ok: true, entries: 2, missed: 0 });
+    // Sung but never in tune: not a missed entry (the accuracy judges the pitch).
+    expect(entriesOnTime(part, [n(0, 40), n(1, 0), n(2, 0), n(3, null, { voicedRatio: 0.8 }), n(4, 0), n(5, 60)]))
+      .toMatchObject({ ok: true, missed: 0, meanMs: 50 });
+    // Clearly silent: missed, even when unsure.
+    expect(entriesOnTime(part, [n(0, 40), n(3, null, { unsure: 'short', clearly: 'silent' }), n(5, 60)]))
+      .toMatchObject({ ok: false, missed: 1 });
+    // A passage without rests has one entry: up to 2 × LATE_MS late is still fine.
+    expect(entriesOnTime(part, [n(0, 300), n(1, 0), n(2, 0)]).ok).toBe(true);
+    expect(entriesOnTime(part, [n(0, 400), n(1, 0), n(2, 0)]).ok).toBe(false);
+  });
   it('strictness scales tolerance', () => {
     expect(strictnessFactor('forgiving')).toBe(1.3);
     expect(effectiveTolerance(1, 'slow', 'forgiving')).toBe(65);
@@ -264,6 +284,12 @@ describe('ladder', () => {
     expect(half.reason).toBe('Bars 5–8: Level 1 · Notes · in tempo. Slow is done: now in tempo.');
     // A slow pass alone never confirms a level: still the section, not the full run.
     expect(nextStep(secs, prog([1, 0, 1, 1], { s1: { slow: 1 } }), NOW)).toMatchObject({ sectionId: 's1', level: 1, step: 'tempo' });
+    // One new thing at a time for the whole piece: a passage still on slow comes before one whose
+    // slow step is done (the designs' "Last passage slow").
+    const mid = nextStep(secs, prog([1, 0, 0, 0], { s1: { slow: 1 }, s2: { slow: 1 } }), NOW)!;
+    expect(mid).toMatchObject({ sectionId: 's3', level: 1, step: 'slow' });
+    expect(mid.reason).toBe('Bars 13–16: Level 1 · Notes · slow. Last passage to sing slow.');
+    expect(nextStep(secs, prog([1, 0, 0, 0], { s1: { slow: 1 }, s2: { slow: 1 }, s3: { slow: 1 } }), NOW)).toMatchObject({ sectionId: 's1', step: 'tempo' });
     // Every section at level ≥ 1, piece level 0: confirm level 1 with a full run.
     expect(nextStep(secs, prog([2, 1, 3, 1]), NOW)).toMatchObject({ sectionId: 'all', level: 1, kind: 'full' });
     expect(nextStep(secs, withFull(prog([2, 1, 3, 1]), { level: 1 }), NOW)).toMatchObject({ sectionId: 's1', level: 2, step: 'slow' });
@@ -330,7 +356,9 @@ describe('ladder', () => {
     expect(nextStep(secs, p, NOW, words(['s0']))!.wordsFirst).toBeUndefined();
     expect(nextStep(secs, p, NOW)!.wordsFirst).toBeUndefined();
     // Not in tempo, and not for a passage without words.
-    expect(nextStep(secs, withFull(prog([1, 1, 1, 1], { s0: { slow: 2 } }), { level: 1 }), NOW, words([]))!.wordsFirst).toBeUndefined();
+    const allSlow2 = { s0: { slow: 2 }, s1: { slow: 2 }, s2: { slow: 2 }, s3: { slow: 2 } };
+    expect(nextStep(secs, withFull(prog([1, 1, 1, 1], allSlow2), { level: 1 }), NOW, words([]))).toMatchObject({ sectionId: 's0', step: 'tempo' });
+    expect(nextStep(secs, withFull(prog([1, 1, 1, 1], allSlow2), { level: 1 }), NOW, words([]))!.wordsFirst).toBeUndefined();
     expect(nextStep(secs, withFull(prog([2, 2, 2, 1]), { level: 1 }), NOW, words([]))).toMatchObject({ sectionId: 's3', level: 2 });
     expect(nextStep(secs, withFull(prog([2, 2, 2, 1]), { level: 1 }), NOW, words([]))!.wordsFirst).toBeUndefined();
   });

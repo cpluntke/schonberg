@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { startPassage } from './helpers';
 
 // Microphone advice (src/audio/inputQuality.ts): the live mic check in the tuner, with a fake
 // microphone carrying mains hum and a voice driven into clipping, and Results for a run with hum.
@@ -49,7 +50,7 @@ test('Results gives the microphone advice and lets off the notes lost to it', as
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto('/?simulate=perfect#/');
   await page.getByTestId('piece-row').first().click();
-  await page.getByLabel('Passages').getByRole('button', { name: /Level 1/ }).first().click();
+  await startPassage(page, /Level 1 · Notes · slow/);
   await page.getByTestId('hp-yes').click();
   await page.getByTestId('start').click();
   await expect(page.getByTestId('pass-banner')).toBeVisible({ timeout: 90_000 });

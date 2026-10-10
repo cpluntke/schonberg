@@ -174,37 +174,44 @@ export interface EntriesCheck {
   ok: boolean;
   /** Entry notes in the run. */
   entries: number;
-  /** Entries not sung at all (no onset). */
+  /** Entries not sung at all (no voice in the note). */
   missed: number;
-  /** Mean onset of the sung entries (ms after the written start, minus `offsetMs`); null when none was sung. */
+  /** Mean onset of the entries that landed in tune (ms after the written start, minus `offsetMs`); null when none did. */
   meanMs: number | null;
 }
 
 /**
  * Level 1 in tempo: the entries must each be sung and, on average, on time. Entries as analysis.ts
  * defines them: the first note (of the part, or of the run) and every note after a rest of at least
- * ENTRY_REST_SEC. Each needs an onset (`onsetMs !== null`), and their mean onset must be at most
- * LATE_MS. `offsetMs` is taken off every onset first (the part of the delay the line-up showed to be
- * the device's, on a phone without a measured delay). A run without entries passes.
+ * ENTRY_REST_SEC. Entries the scorer can't judge reliably (`unsure` and not `clearly` wrong) are left
+ * out, as level 1 forgives them. An entry is missed only when it wasn't sung at all (no voice in it,
+ * or `clearly` silent); a sung entry that never landed in tune is a pitch matter, judged by the
+ * accuracy, not here. The mean onset of the timed entries must be at most LATE_MS (2 × LATE_MS when
+ * only one entry has an onset: one late breath shouldn't fail a passage without rests). `offsetMs`
+ * is taken off every onset first (the part of the delay the line-up showed to be the device's, on a
+ * phone without a measured delay). A run without entries passes.
  */
 export function entriesOnTime(
   partNotes: readonly Pick<ScoreNote, 'start' | 'dur'>[],
-  notes: readonly Pick<NoteResult, 'index' | 'onsetMs'>[],
+  notes: readonly (Pick<NoteResult, 'index' | 'onsetMs'> & Partial<Pick<NoteResult, 'unsure' | 'clearly' | 'voicedRatio'>>)[],
   offsetMs = 0,
 ): EntriesCheck {
   const sorted = [...notes].sort((a, b) => a.index - b.index);
   const entries = sorted.filter((n, k) => {
     const i = n.index;
+    if (n.unsure && !n.clearly) return false;
     if (k === 0 || i === 0) return true;
     const prev = partNotes[i - 1];
     const cur = partNotes[i];
     if (!prev || !cur) return false;
     return cur.start - (prev.start + prev.dur) >= ENTRY_REST_SEC - 1e-6;
   });
-  const sung = entries.filter((n) => n.onsetMs !== null);
-  const missed = entries.length - sung.length;
-  const meanMs = sung.length ? sung.reduce((a, n) => a + (n.onsetMs! - offsetMs), 0) / sung.length : null;
-  const ok = entries.length === 0 || (missed === 0 && meanMs !== null && meanMs <= LATE_MS);
+  const silent = (n: (typeof entries)[number]) => n.clearly === 'silent' || (n.onsetMs === null && (n.voicedRatio ?? 0) === 0);
+  const missed = entries.filter(silent).length;
+  const timed = entries.filter((n) => n.onsetMs !== null);
+  const meanMs = timed.length ? timed.reduce((a, n) => a + (n.onsetMs! - offsetMs), 0) / timed.length : null;
+  const bound = timed.length >= 2 ? LATE_MS : 2 * LATE_MS;
+  const ok = entries.length === 0 || (missed === 0 && (meanMs === null || meanMs <= bound));
   return { ok, entries: entries.length, missed, meanMs: meanMs == null ? null : Math.round(meanMs) };
 }
 
@@ -573,25 +580,31 @@ export function nextStep(sections: Section[], prog: PieceProgress | undefined, n
       return { sectionId: 'all', level: minSec, step: 'tempo', kind: 'full', reason };
     }
   }
-  // 6. Earliest section with the lowest level, at its current step. (A section already sung from
-  // memory today waits until tomorrow.)
+  // 6. Earliest section at the lowest step: the lowest level, and of those a section still on its
+  // slow step before one whose slow step is done (one new thing at a time, for the whole piece).
+  // (A section already sung from memory today waits until tomorrow.)
   let best: Section | null = null;
+  let bestRank = Infinity;
   let bestLevel = 5;
   for (const s of [...sections].sort((a, b) => a.index - b.index)) {
     const l = levelOf(prog, s.id);
     if (l === 4 && prog?.sections[s.id]?.offBookDays?.includes(today)) continue;
-    if (l < bestLevel) { best = s; bestLevel = l; }
+    const rank = 2 * l + (stepFor(prog?.sections[s.id], Math.min(MAX_LEVEL, l + 1)) === 'tempo' ? 1 : 0);
+    if (rank < bestRank) { best = s; bestRank = rank; bestLevel = l; }
   }
   if (!best || bestLevel >= MAX_LEVEL) return null;
   const sp = prog?.sections[best.id];
   const { level: target, step } = currentStep(sp);
   const left = sections.filter((s) => levelOf(prog, s.id) < target).length;
+  // Sections still to pass the target level's slow step (or in tempo).
+  const leftSlow = sections.filter((s) => stepFor(prog?.sections[s.id], target) === 'slow' && levelOf(prog, s.id) < target).length;
   const started = sections.some((s) => (prog?.sections[s.id]?.attempts ?? 0) > 0 || levelOf(prog, s.id) > 0);
   const tail = target === 5 && step === 'slow' ? ' Everything is concert-ready: now learn it by heart.'
     : step === 'tempo' ? ' Slow is done: now in tempo.'
       : multi && left === 1 ? ` Last passage at Level ${target}.`
-        : target === 1 && !started ? ' Learn the notes on “doo”.'
-          : '';
+        : multi && leftSlow === 1 ? ' Last passage to sing slow.'
+          : target === 1 && !started ? ' Learn the notes on “doo”.'
+            : '';
   const out: NextStep = { sectionId: best.id, level: target, step, kind: 'section', reason: `${best.label}: ${stepLabel(target, step)}.${tail}` };
   if (target === 2 && step === 'slow' && words?.(best.id) === false) out.wordsFirst = true;
   return out;

@@ -21,7 +21,7 @@ import {
 } from './store';
 import { barsKey, getBars, type BarMap, type BarStat } from './bars';
 import { getWords, wordsKey, type WordsProgress } from './words';
-import { apiBase, endSession, loadSession, onSessionChange, sessionFor, type Session } from './choir';
+import { accountMadeHere, apiBase, endSession, loadSession, onSessionChange, sessionFor, type Session } from './choir';
 import { mergeSyncedPoints, pointsForSync, type CyclePoints } from './points';
 
 /**
@@ -748,16 +748,18 @@ export async function pullForAccount(s: Session, merge = false): Promise<'merged
     throw new SyncError(r.status, r.status === 200 ? 'The progress saved with your account is damaged.' : errText(r));
   }
   // This phone's progress may be someone else's (another account before, another name, or no name):
-  // ask before merging it with progress the account already keeps. An account with no progress yet
-  // (just made on this phone) has nothing to merge: this phone's progress simply becomes its own,
-  // unless it already went with another singer's account.
+  // ask before merging. An account just made on this phone that keeps no progress yet has nothing to
+  // merge: this phone's progress simply becomes its own, unless it already went with another
+  // singer's account. (An empty account made elsewhere still asks: someone may be logging in on a
+  // friend's phone.)
   const meta = loadMeta();
   const here = loadProfile().name.trim();
   const sameName = !!here && nameKey(here) === nameKey(s.account.name);
   const mine = meta.account ? meta.account === s.account.id : sameName;
   const pieces = empty ? 0 : Object.keys((r.json!.data as Record<string, object>).p).length;
   const othersAccount = !!meta.account && meta.account !== s.account.id && !sameName;
-  if (!merge && !mine && allProgress().length > 0 && (pieces > 0 || othersAccount)) {
+  const madeHere = accountMadeHere() === s.account.id;
+  if (!merge && !mine && allProgress().length > 0 && (pieces > 0 || othersAccount || (!madeHere && !sameName))) {
     setQuestion({ account: s.account.id, accountName: s.account.name, here: here || 'no name', pieces, updatedAt: num(r.json?.updatedAt) });
     return 'ask';
   }
@@ -849,7 +851,8 @@ export async function uploadProgress(force = false, auto = false): Promise<{ ok:
 }
 
 function hasPassed(): boolean {
-  return allProgress().some((p) => (p.full?.level ?? 0) > 0 || Object.values(p.sections ?? {}).some((sp) => (sp.level ?? 0) > 0));
+  return allProgress().some((p) => (p.full?.level ?? 0) > 0
+    || Object.values(p.sections ?? {}).some((sp) => (sp.level ?? 0) > 0 || (sp.slow ?? 0) > 0));
 }
 
 /** Closing or hiding the app: send unsaved progress right away (keepalive, so the page may go). */

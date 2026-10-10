@@ -73,7 +73,7 @@ export function PieceMap({ score, part, sections, bars, onLoop }: {
     <div className="col" style={{ gap: 10 }} data-testid="piece-map">
       <span className="small muted">
         {sung === 0
-          ? 'Sing a section and every bar fills in here with how it went.'
+          ? 'Sing a passage and every bar fills in here with how it went.'
           : spots.length
             ? <>Trouble spots: {spots.map(([a, b]) => (a === b ? `bar ${label(a)}` : `bars ${label(a)}–${label(b)}`)).join(', ')}. Tap a bar to loop it.</>
             : <>No weak bars right now{sung < all.length ? ` (${all.length - sung} bars not sung yet)` : ''}. Tap a bar to loop it.</>}

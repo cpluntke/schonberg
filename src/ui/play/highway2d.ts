@@ -1,4 +1,5 @@
 // Canvas renderer for the practice "piano-roll" highway: time flows right→left, pitch is vertical.
+import { pitchShort } from '../../game/pitchwords';
 import type { Part, Score, KeySig } from '../../music/types';
 import type { PitchSample, Grade } from '../../game/types';
 import type { LiveScorer } from '../../game/scoring';
@@ -402,7 +403,7 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
       const shown = cnt ? sum / cnt : last.midi;
       let cents = (shown - target) * 100;
       if (Math.abs(cents) > 600) cents = ((cents % 1200) + 1800) % 1200 - 600; // show octave-folded
-      const txt = `${cents >= 0 ? '+' : '−'}${Math.round(Math.abs(cents))}¢`;
+      const txt = pitchShort(cents);
       c.font = '600 12px "JetBrains Mono", monospace';
       c.textBaseline = 'middle';
       const tw = c.measureText(txt).width;

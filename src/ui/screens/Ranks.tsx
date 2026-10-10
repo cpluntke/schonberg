@@ -284,7 +284,7 @@ function LevelsNote() {
     <div className="notice info row" role="status" data-testid="levels-note">
       <span className="grow small">
         <strong>Readiness was recalculated.</strong> A piece now reaches a level only when you sing it all through at that level in one go,
-        so section levels alone count half. Singers on an older app version are shown greyed until they update.
+        so passage levels alone count half. Singers on an older app version are shown greyed until they update.
       </span>
       <button className="btn ghost small" onClick={() => { try { localStorage.setItem(KEY, '1'); } catch { /* ignore */ } setShow(false); }}>OK</button>
     </div>

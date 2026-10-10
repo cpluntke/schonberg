@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { startPassage } from './helpers';
 
 // Navigation while practising (src/ui/router.ts): every practice screen sits right above its piece,
 // Play and Results replace each other, so back (←, the browser's, Android's) always lands on the
@@ -10,7 +11,7 @@ async function home(page: Page) {
 }
 
 async function singFirstSection(page: Page) {
-  await page.getByLabel('Passages').getByRole('button', { name: /Level 1/ }).first().click();
+  await startPassage(page, /Level 1 · Notes · slow/);
   const hp = page.getByTestId('hp-yes');
   if (await hp.isVisible()) await hp.click();
   await page.getByTestId('start').click();
@@ -31,8 +32,9 @@ test('Results: back lands on the piece, then Home; Again then back lands on the 
   await expect(page).toHaveURL(/#\/results$/);
   // The next step is in view without scrolling, with Again and the piece next to it.
   await expect(page.getByTestId('results-foot').locator('.btn.primary')).toBeInViewport();
-  await expect(page.getByTestId('again')).toBeInViewport();
+  await expect(page.getByTestId('results-foot').locator('.row .btn').first()).toBeInViewport();
   await expect(page.getByTestId('to-piece')).toBeInViewport();
+  await expect(page.getByTestId('finish-today')).toBeInViewport();
   await page.goBack();
   await expect(page).toHaveURL(pieceUrl);
   await page.goBack();
@@ -42,7 +44,7 @@ test('Results: back lands on the piece, then Home; Again then back lands on the 
 
   // Again from Results replaces it; back from that run (and its results) is the piece.
   await singFirstSection(page);
-  await page.getByTestId('again').click();
+  await page.getByTestId('results-foot').locator('.row .btn').first().click(); // Again / Now in tempo
   await expect(page.getByTestId('start')).toBeVisible();
   await page.goBack();
   await expect(page).toHaveURL(pieceUrl);
@@ -81,7 +83,7 @@ test('mid-run, ← and back pause and open the sheet; leaving from it lands on t
   await home(page);
   await page.getByTestId('piece-row').first().click();
   const pieceUrl = page.url();
-  await page.getByLabel('Passages').getByRole('button', { name: /Level 1/ }).first().click();
+  await startPassage(page, /Level 1 · Notes · slow/);
   await page.getByTestId('hp-yes').click();
   // One Start button on the ready screen.
   await expect(page.getByRole('button', { name: /Start|Sing it now/ })).toHaveCount(1);

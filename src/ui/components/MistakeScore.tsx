@@ -8,13 +8,17 @@ import type { Part } from '../../music/types';
 import type { PieceInfo } from '../library';
 import type { Route } from '../router';
 import { stepSpec, type Step } from '../../progress/ladder';
+import { toleranceWords } from '../../game/pitchwords';
+import { keyAtTimeIn } from '../../music/keymarks';
+import { nameKeysOf } from '../../progress/keymarks';
+import { noteInWords } from '../play/noteName';
 import { loadProfile } from '../../progress/store';
 import { slowRate } from '../../progress/struggle';
 import { barRangeLabel } from '../../music/sections';
 import { measureSpan } from '../play/staff2d';
 import { mistakeSpots, type Spot } from '../play/mistakeSpots';
 import { drawMistakes, layoutMistakes, type MistakeMark, type MistakeOpts } from '../play/mistakeScore';
-import { faultOf, noteFault } from '../play/noteFault';
+import { faultOf, noteFault, type FaultKind } from '../play/noteFault';
 import { IconPlay } from '../icons';
 
 const STAFF_BG = '#0F1226';
@@ -38,7 +42,27 @@ interface Props {
   to: number;
   /** Start a run (Results' goPlay). */
   play: (r: Extract<Route, { name: 'play' }>) => void;
+  /**
+   * The worst spot first, as the verdict's mini score (the UX review's B5): its bar, the note in
+   * words, the level's tolerance and a tip; the other spots follow as "Also to fix".
+   */
+  focus?: boolean;
+  /** The bar (measure index) to focus on (Results loops it); default: the worst spot. */
+  focusBar?: number;
+  /** Listen to bars m0..m1 (the focus card's "Hear it"). */
+  hear?: (m0: number, m1: number) => void;
 }
+
+/** A short tip for the usual kind of fault. */
+const TIPS: Record<FaultKind, string> = {
+  flat: 'Aim it a little higher, as if you were already reaching for the next note.',
+  sharp: 'Let it settle a little lower: relax rather than push it up.',
+  missed: 'Breathe before it and come in with the beat.',
+  octave: 'Sing it in the octave written: listen to the bar, then join in.',
+  wrong: 'Listen to the bar, then sing it slowly: find the note from the one before it.',
+  short: 'Hold it for its full length, right into the next note.',
+  unsteady: 'Hold it steady: keep the breath flowing through the note.',
+};
 
 /** Bumped when web fonts finish loading (the lyrics' widths change: draw again). */
 export function useFontsLoaded(): number {
@@ -119,7 +143,7 @@ export function nth(part: Part, i: number): number {
   return k;
 }
 
-/** The wrong notes of a snippet in words, bar by bar ("Bar 4: note 2 (“la”) was flat (−62¢)"). */
+/** The wrong notes of a snippet in words, bar by bar ("Bar 4: note 2 (“la”) was clearly flat (62 cents)"). */
 function Captions({ piece, part, spot, byIndex, tol }: { piece: PieceInfo; part: Part; spot: Spot; byIndex: Map<number, NoteResult>; tol: number }) {
   return (
     <div className="col" style={{ gap: 2 }}>
@@ -156,12 +180,12 @@ function Legend() {
         <svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M2 7h14" stroke="#FFB08F" strokeWidth="3" strokeLinecap="round" /></svg>
         where you sang it
       </span>
-      <span>↓ flat · ↑ sharp (100¢ = a semitone)</span>
+      <span>↓ flat · ↑ sharp (100 cents = a semitone)</span>
     </div>
   );
 }
 
-export function MistakeScore({ piece, part, notes, tol, level, step: runStep, from, to, play }: Props) {
+export function MistakeScore({ piece, part, notes, tol, level, step: runStep, from, to, play, focus, focusBar, hear }: Props) {
   const score = piece.score;
   const fonts = useFontsLoaded();
   const lvl = Math.max(1, level);
@@ -181,6 +205,7 @@ export function MistakeScore({ piece, part, notes, tol, level, step: runStep, fr
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const width = useWidth(wrapRef);
+  const [centHelp, setCentHelp] = useState(false);
   const [zoom, setZoom] = useState<number | null>(null);
   const pending = useRef<Extract<Route, { name: 'play' }> | null>(null);
 
@@ -255,31 +280,92 @@ export function MistakeScore({ piece, part, notes, tol, level, step: runStep, fr
     </div>
   );
 
+  // The worst spot (most wrong notes, then the biggest miss) first when focusing; the rest in score order.
+  const worst = (k: number) => spots[k].notes.length * 1000 + Math.max(...spots[k].notes.map((i) => Math.min(999, Math.abs(byIndex.get(i)?.cents ?? 999))));
+  const withBar = focusBar != null ? spots.findIndex((s) => s.bars.includes(focusBar)) : -1;
+  const fk = !focus ? -1 : withBar >= 0 ? withBar : spots.map((_, k) => k).sort((a, b) => worst(b) - worst(a) || a - b)[0];
+  const rest = spots.map((_, k) => k).filter((k) => k !== fk);
+  const num = (m: number) => score.measures[m]?.number ?? String(m + 1);
+  const sentence = (s: Spot) => {
+    const shown = s.notes.slice(0, 2).map((i) => {
+      const n = part.notes[i];
+      const key = keyAtTimeIn(nameKeysOf(score), n.start);
+      const name = noteInWords(n.midi, key, notation, n.spelling);
+      const where = n.measure === 0 && num(0) === '0' ? 'the upbeat' : `bar ${num(n.measure)}`;
+      return `${name.charAt(0).toUpperCase()}${name.slice(1)} in ${where} was ${noteFault(byIndex.get(i)!, tol)}.`;
+    });
+    const more = s.notes.length - shown.length;
+    return `${shown.join(' ')}${more > 0 ? ` And ${more} more note${more > 1 ? 's' : ''} here.` : ''}`;
+  };
+  const spotCard = (k: number) => {
+    const s = spots[k];
+    const label = `${barRangeLabel(score, s.m0, s.m1)} of your part, ${s.notes.length === 1 ? 'the wrong note' : `${s.notes.length} wrong notes`} marked`;
+    return (
+      <div key={`${s.m0}-${s.m1}`} className="card" style={{ padding: CARD_PAD, gap: 8, minWidth: 0 }} data-testid="mistake-spot">
+        <div className="row between" style={{ gap: 8 }}>
+          <strong className="t14">{barRangeLabel(score, s.m0, s.m1)}</strong>
+          <button className="btn ghost small" style={{ padding: '0 10px', gap: 6 }} onClick={() => open(k)}
+            aria-label={`Zoom in on ${barsText(s)}`} data-testid="mistake-zoom-btn">
+            <IconZoom /> Zoom
+          </button>
+        </div>
+        <div style={{ overflowX: 'auto', overflowY: 'hidden', borderRadius: 10, background: STAFF_BG, cursor: 'zoom-in', maxWidth: '100%' }}
+          onClick={() => open(k)} data-testid="mistake-snippet">
+          <SnippetCanvas piece={piece} part={part} spot={s} marks={marks[k]} opts={miniOpts} fonts={fonts} label={label} />
+        </div>
+        <Captions piece={piece} part={part} spot={s} byIndex={byIndex} tol={tol} />
+        {practise(s, 'card')}
+      </div>
+    );
+  };
+  const focusCard = (k: number) => {
+    const s = spots[k];
+    const first = byIndex.get(s.notes[0]);
+    const kind = first ? faultOf(first, tol).kind : null;
+    const title = barRangeLabel(score, s.bars[0], s.bars[s.bars.length - 1]);
+    return (
+      <div className="focus-bar" data-testid="mistake-spot">
+        <div className="row between" style={{ padding: '2px 4px 0 6px', gap: 6 }}>
+          <strong className="t16">{title}</strong>
+          <div className="row" style={{ gap: 4 }}>
+            {hear && <button className="btn ghost small" data-testid="hear-it" onClick={() => hear(s.bars[0], s.bars[s.bars.length - 1])}>♪ Hear it</button>}
+            <button className="icon-btn" onClick={() => open(k)} aria-label={`Zoom in on ${barsText(s)}`} data-testid="mistake-zoom-btn"><IconZoom /></button>
+          </div>
+        </div>
+        <div style={{ overflowX: 'auto', overflowY: 'hidden', borderRadius: 10, background: STAFF_BG, cursor: 'zoom-in', maxWidth: '100%' }}
+          onClick={() => open(k)} data-testid="mistake-snippet">
+          <SnippetCanvas piece={piece} part={part} spot={s} marks={marks[k]} opts={miniOpts} fonts={fonts}
+            label={`${title} of your part, ${s.notes.length === 1 ? 'the note to fix' : `${s.notes.length} notes to fix`} marked`} />
+        </div>
+        <div className="fixline" data-testid="wrong-bar">
+          <strong>{sentence(s)}</strong>
+          <span className="t14 muted">
+            At Level {lvl} a note may be up to {toleranceWords(tol)} off.{' '}
+            <button className="link inline" aria-expanded={centHelp} data-testid="cent-help-btn" onClick={() => setCentHelp(!centHelp)}>What’s a cent?</button>
+          </span>
+        </div>
+        {centHelp && (
+          <p className="t14 cent-help" data-testid="cent-help">
+            A cent is a hundredth of a semitone: 100 cents take you from C to C♯. Within about 10 cents a note sounds spot on;
+            over 50 cents it is clearly flat or sharp, nearer the next note than its own.
+          </p>
+        )}
+        {kind && <p className="t14 tip">{TIPS[kind]}</p>}
+      </div>
+    );
+  };
+
   return (
     <div className="col" style={{ gap: 8 }} data-testid="wrong-notes">
-      <h2 style={{ fontSize: 16 }}>What to fix</h2>
-      <Legend />
       <div ref={wrapRef} className="col" style={{ gap: 10, width: '100%', minWidth: 0 }}>
-        {spots.map((s, k) => {
-          const label = `${barRangeLabel(score, s.m0, s.m1)} of your part, ${s.notes.length === 1 ? 'the wrong note' : `${s.notes.length} wrong notes`} marked`;
-          return (
-            <div key={`${s.m0}-${s.m1}`} className="card" style={{ padding: CARD_PAD, gap: 8, minWidth: 0 }} data-testid="mistake-spot">
-              <div className="row between" style={{ gap: 8 }}>
-                <strong className="small">{barRangeLabel(score, s.m0, s.m1)}</strong>
-                <button className="btn ghost small" style={{ height: 36, padding: '0 10px', gap: 6 }} onClick={() => open(k)}
-                  aria-label={`Zoom in on ${barsText(s)}`} data-testid="mistake-zoom-btn">
-                  <IconZoom /> Zoom
-                </button>
-              </div>
-              <div style={{ overflowX: 'auto', overflowY: 'hidden', borderRadius: 10, background: STAFF_BG, cursor: 'zoom-in', maxWidth: '100%' }}
-                onClick={() => open(k)} data-testid="mistake-snippet">
-                <SnippetCanvas piece={piece} part={part} spot={s} marks={marks[k]} opts={miniOpts} fonts={fonts} label={label} />
-              </div>
-              <Captions piece={piece} part={part} spot={s} byIndex={byIndex} tol={tol} />
-              {practise(s, 'card')}
-            </div>
-          );
-        })}
+        {fk >= 0 && focusCard(fk)}
+        {rest.length > 0 && (
+          <>
+            <h2 style={{ fontSize: 16, marginTop: fk >= 0 ? 6 : 0 }}>{fk >= 0 ? 'Also to fix' : 'What to fix'}</h2>
+            <Legend />
+            {rest.map(spotCard)}
+          </>
+        )}
       </div>
       {hiddenBars.length > 0 && (
         <span className="tiny muted" data-testid="mistake-more">

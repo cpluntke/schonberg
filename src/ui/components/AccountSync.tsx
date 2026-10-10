@@ -41,7 +41,9 @@ export function MergeQuestionCard() {
   return (
     <div className="notice col" role="alert" data-testid="merge-question" style={{ gap: 6 }}>
       <span className="small">
-        <strong>This phone has progress under “{q.here}”.</strong> Merge it with the progress kept for {q.accountName} ({q.pieces} piece{q.pieces === 1 ? '' : 's'})?
+        <strong>This phone has progress under “{q.here}”.</strong> {q.pieces > 0
+          ? <>Merge it with the progress kept for {q.accountName} ({q.pieces} piece{q.pieces === 1 ? '' : 's'})?</>
+          : <>Keep it with {q.accountName}’s account?</>}
         If they're not the same person, this mixes two singers' progress, and can't be undone.
       </span>
       <div className="row wrap" style={{ gap: 6 }}>

@@ -638,15 +638,23 @@ export const lookupInvite = (token: string) =>
   call<{ code: string; choirName: string; invite: InviteInfo }>('/invites/lookup', { method: 'POST', ...json({ token }) });
 export async function acceptInvite(token: string, name: string, password: string): Promise<Session> {
   const s = await call<Session>('/invites/accept', { method: 'POST', ...json({ token, name, password }) });
+  rawSet(MADE_HERE_KEY, s.account.id);
   adoptSession(s);
   return s;
 }
 /** A singer makes their own account in their choir (the choir code is enough, no invite). */
 export async function signUp(code: string, name: string, password: string): Promise<Session> {
   const s = await call<Session>(`/choirs/${enc(code.toLowerCase())}/members`, { method: 'POST', ...json({ name, password }) });
+  rawSet(MADE_HERE_KEY, s.account.id);
   adoptSession(s);
   return s;
 }
+/**
+ * The account last made on this phone (sign-up or invite): its progress so far is this phone's, so
+ * its first sync takes this phone's progress without asking (sync.pullForAccount).
+ */
+const MADE_HERE_KEY = 'sh:accountMadeHere';
+export const accountMadeHere = (): string | null => rawGet(MADE_HERE_KEY);
 /** A member deletes their own account and the progress it kept. */
 export async function deleteMyAccount(password: string): Promise<void> {
   const s = loadSession();

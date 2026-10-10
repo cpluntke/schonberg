@@ -606,6 +606,7 @@ describe('sync with the choir account', () => {
       writeJSON(progressKey('other', 'P1'), piece({ pieceId: 'other', partId: 'P1', sections: { a: sec({ level: 3, lastPassed: T }) } }));
       let confirmations = 0;
       const off = onAccountConfirmed(() => { confirmations++; });
+      rawSet('sh:accountMadeHere', session({ name: account }).account.id);
       saveSession(session({ name: account }));
       expect(await uploadProgress()).toEqual({ ok: true });
       off();
@@ -617,6 +618,27 @@ describe('sync with the choir account', () => {
       expect(calls.at(-1)!.method).toBe('PUT');
       expect(Object.keys((server!.data as ProgressSnapshot).p)).toEqual(['other|P1']);
     }
+  });
+
+  it('an empty account made on another phone still asks when the names differ (logging in on a friend\'s phone)', async () => {
+    fakeServer();
+    saveProfile({ ...DEFAULT_PROFILE, name: 'Ben Other', onboarded: true, choirCode: 'kammerchor' });
+    writeJSON(progressKey('other', 'P1'), piece({ pieceId: 'other', partId: 'P1', sections: { a: sec({ level: 3, lastPassed: T }) } }));
+    saveSession(session({ name: 'Anna Example' }));
+    expect(await uploadProgress()).toEqual({ ok: false, ask: true });
+    expect(server).toBeNull();
+    expect(loadProfile().name).toBe('Ben Other');
+  });
+
+  it('slow steps alone are progress worth saving', async () => {
+    fakeServer();
+    saveProfile({ ...DEFAULT_PROFILE, name: 'Anna Example', onboarded: true, choirCode: 'kammerchor' });
+    writeJSON(progressKey('other', 'P1'), piece({ pieceId: 'other', partId: 'P1', sections: { a: sec({ level: 0, slow: 1, lastPracticed: T }) } }));
+    saveSession(session({ name: 'Anna Example' }));
+    const r = await uploadProgress();
+    expect(r.ok).toBe(true);
+    expect((r as { skipped?: boolean }).skipped).toBeFalsy();
+    expect(Object.keys((server!.data as ProgressSnapshot).p)).toEqual(['other|P1']);
   });
 
   it('an account saved with no pieces counts as empty: the same singer is not asked', async () => {
