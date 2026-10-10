@@ -2,7 +2,8 @@
 
 Practice data lives on the singer's phone. Four things can reach the choir server (the
 messiermarathon Flask app, `/schonberg/api`): the choir's leaderboard and progress shared with the
-section lead (both part of joining a choir), and two things that are the singer's own choice. Settings → Privacy shows a short version of this page.
+section lead (both part of joining a choir), and things that are the singer's own choice (usage
+statistics, a choir account, the daily practice reminder). Settings → Privacy shows a short version of this page.
 
 ## In short: who sees what, by name
 
@@ -16,6 +17,8 @@ section lead (both part of joining a choir), and two things that are the singer'
 - **The super admin**: anonymous usage totals (daily, and hourly for the last two days), never linked to a name.
 - **Everyone in the choir, live**: how many singers of each voice part have the singing screen open right
   now (counts only, no names; see 0a).
+- **Nobody**: the daily practice reminder (if switched on) is known to the server only by the
+  browser's push address, with no name and no link to a choir or an account (see 4).
 
 ## 0. The choir's leaderboard (every choir member with a name)
 
@@ -127,5 +130,38 @@ Purpose: to see how the app is used and where it fails, so it can be improved.
 Keeps the singer's progress on the server so it follows them to another phone (see
 `utils/schonberg_sync.py`). Admins see members' names in People and can remove them (their progress
 goes too).
+
+## 4. The daily practice reminder (optional, off by default)
+
+A notification at a time the singer picks ("Time for today's practice · About 10 minutes: your plan
+is ready."), only on days they haven't practised yet. Works for singers with or without a choir
+account; it needs the browser's notification permission, asked only when the singer switches it on
+(You → Practice, or the one-time offer on Today done). On iPhone and iPad it works only in the app
+added to the Home Screen (iOS 16.4 or later).
+
+- **Sent** (`src/progress/reminders.ts`): when switched on, and again when the app starts (at most
+  every 6 hours, or when the subscription or the time zone changed), to `POST /schonberg/api/reminders`:
+  the browser's push subscription (the push service's address for this browser, e.g. at Google, Mozilla,
+  Apple or Microsoft, and the two keys that encrypt the message), the reminder time (`HH:MM`), the
+  phone's time zone (e.g. `Europe/Berlin`) and, if the singer already practised that day, the date.
+  After the day's first run (any run: counted or practice), once a day, to
+  `POST /schonberg/api/reminders/practised`: the push address and the date (`YYYY-MM-DD`) only, nothing
+  about the run. No name, no choir code, no account, no member token.
+- **Kept on the server** (`utils/schonberg_reminders.py`, `DATA_DIR/schonberg_reminders/subs.json`), per
+  subscription: the push address and its two keys, the time, the time zone, the last day practised, the
+  last day a reminder was sent, the day it was made and the day the app was last in touch (to expire it).
+  The server's own signing key for push (VAPID) is made on the server and kept in the same folder.
+- **Deleted**: when the singer switches the reminder off (the browser drops the subscription too; if
+  the phone is offline, the app asks again on its next start), when the push service says the
+  subscription no longer exists (404/410, e.g. the app was removed or notifications were turned off),
+  and after 60 days without any contact from the app. Switching notifications off in the phone's
+  settings also switches the reminder off on the next start.
+- **Who sees it**: nobody. The server only uses it to send the reminder. The message is encrypted for
+  the singer's browser; the push service (Google, Mozilla, Apple or Microsoft, depending on the browser)
+  delivers it and sees when it is sent, not what it says.
+- **Abuse limits**: only addresses of the known push services are accepted, at most 5,000 reminders on
+  the server, 10 new ones an hour per client address (500 in all), 20 changes a minute per client
+  address (600 in all) besides the general limit; the client address is held in memory for the rate
+  limits only.
 
 Recordings never leave the phone unless the singer shares one themselves.

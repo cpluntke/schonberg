@@ -21,7 +21,11 @@ export default defineConfig({
         orientation: 'portrait',
         icons: [{ src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' }],
       },
-      workbox: { globPatterns: ['**/*.{js,css,html,svg,json,musicxml,xml,mxl,mid}'] },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,svg,json,musicxml,xml,mxl,mid}'],
+        // The daily practice reminder: push and notificationclick handlers (public/push-sw.js).
+        importScripts: ['push-sw.js'],
+      },
     }),
   ],
   test: { environment: 'jsdom', include: ['src/**/*.test.ts'] },
