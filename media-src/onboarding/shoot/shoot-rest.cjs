@@ -1,5 +1,6 @@
-// node shoot-rest.cjs <what> [seconds into the run]: toggle | score 8 | highway 9.5 | fix | home | laptop 14
-// → img/practice-toggle, practice-score, practice-highway, results-fix, home, fullscore-laptop.
+// node shoot-rest.cjs <what> [seconds into the run]: toggle | score 8 | highway 9.5 | fix | laptop 14
+// → img/practice-toggle, practice-score, practice-highway, results-fix, fullscore-laptop.
+// (img/home comes from shoot-today.cjs: Today with seeded progress; 'home' here is a fresh, unseeded Home.)
 // Frames depend on timing: check that the blue ink still sits just under a note before re-measuring video.html.
 const { open, importPieces, setCycle, sleep, base } = require('./common.cjs');
 const what = process.argv[2];

@@ -1,9 +1,9 @@
 // Today on Home (the UX review's A1–A8): the plan card, the week, Today done, the rehearsal check-in,
-// the calm status line, and the session strip on the screens inside today's session.
-import React, { useEffect, useState } from 'react';
-import { go, openAt } from '../router';
+// the calm status line, and the session strip and footer on the screens inside today's session.
+import React, { useEffect, useMemo, useState } from 'react';
+import { go, leaveTo, openAt } from '../router';
 import { getPiece } from '../library';
-import { daysUntil } from '../hooks';
+import { daysUntil, useDay, useStoreVersion } from '../hooks';
 import { IconPlay } from '../icons';
 import { LevelMeter } from './LevelMeter';
 import { meterNodes, pathStatus, lowerLabel, joinLabels } from '../path';
@@ -12,14 +12,13 @@ import { attemptLog, loadCycle, loadProfile, type Cycle } from '../../progress/s
 import { nextRehearsal } from '../../progress/rehearsal';
 import { loadLab } from '../../game/intonation';
 import {
-  addDays, addLabRounds, bestWeek, countedDays, dayOf, loadReached, loadRehearsals, minutesBetween, movedOn, notesBetween, pace,
-  saveRehearsal, stepsTo, weekDots, type Pace, type PlanStatus, type TodayPlan, type TodayStep,
+  PLAN_MIN, addDays, addLabRounds, bestWeek, countedDays, dayOf, loadReached, loadRehearsals, minutesBetween, mondayOf, movedOn, notesBetween, pace,
+  planStatus, saveRehearsal, stepsTo, weekDots, type Pace, type PlanStatus, type TodayPlan, type TodayStep,
 } from '../../progress/today';
 import {
-  finishToday, goStep, lastRehearsal, planPieces, rehearsalOn, replanToday, shortLabel, shortTitle, startToday, todaySession,
-  tomorrowPlan, computePlan, tickContext, weekDays, weekGoalOf, dateWords,
+  closeStaleSession, finishToday, goStep, lastRehearsal, planPieces, rehearsalOn, replanToday, shortLabel, shortTitle, startToday, staleSession,
+  todaySession, tomorrowPlan, computePlan, tickContext, weekDays, weekGoalOf, dateWords, stepShort,
 } from '../today';
-import { planStatus } from '../../progress/today';
 
 const fmtDay = (day: string, o: Intl.DateTimeFormatOptions = { weekday: 'short', day: 'numeric', month: 'short' }) => dateWords(day, o);
 /** "12 Dec". */
@@ -58,14 +57,20 @@ export function StepList({ steps, done, next, interactive, testid = 'plan-steps'
 
 // ---------------------------------------------------------------- the plan card
 
-export function PlanCard({ plan, status, labOn, secondary, rehearsalTime }: {
-  plan: TodayPlan; status: PlanStatus; labOn: boolean; secondary?: boolean; rehearsalTime?: string;
+/** "about 12 min", or, when the programme holds less than a full day, "A short day: 6 min". */
+const planMinutes = (plan: TodayPlan) => (plan.minutes < PLAN_MIN && plan.mode === 'normal' ? `A short day: ${plan.minutes} min` : `about ${plan.minutes} min`);
+
+/** `started`: today's plan is under way (frozen): Carry on, and Finish for today, from then on. */
+export function PlanCard({ plan, status, labOn, secondary, rehearsalTime, started }: {
+  plan: TodayPlan; status: PlanStatus; labOn: boolean; secondary?: boolean; rehearsalTime?: string; started?: boolean;
 }) {
-  const started = status.done.some(Boolean);
+  const going = !!started || status.done.some(Boolean);
   const mins = plan.minutes;
   const start = () => startToday(labOn);
   const btn = `btn block start-today${secondary ? '' : ' primary'}`;
   const icon = <IconPlay size={18} {...(secondary ? { color: '#FF7A45' } : {})} />;
+  const at = status.next >= 0 ? status.next + 1 : 1;
+  const finish = going && <button className="link" data-testid="finish-today-home" onClick={() => finishToday()}>Finish for today</button>;
   if (plan.mode === 'rehearsal') {
     return (
       <section className="card plan-card" data-testid="plan-card" data-mode="rehearsal">
@@ -76,8 +81,9 @@ export function PlanCard({ plan, status, labOn, secondary, rehearsalTime }: {
         </div>
         <p className="t14 muted" style={{ margin: 0 }}>No full practice today: rehearsal is practice too.</p>
         <StepList steps={plan.steps} done={status.done} next={status.next} interactive />
-        <button className={btn} data-testid="start-today" onClick={start}>{icon} {started ? 'Carry on warming up' : `Warm up · ${mins} min`}</button>
+        <button className={btn} data-testid="start-today" onClick={start}>{icon} {going ? `Carry on warming up · step ${at} of ${plan.steps.length}` : `Warm up · ${mins} min`}</button>
         <span className="t14 muted center">Best in the hour before you leave.</span>
+        {finish}
       </section>
     );
   }
@@ -89,8 +95,9 @@ export function PlanCard({ plan, status, labOn, secondary, rehearsalTime }: {
           <span className="t14 muted" data-testid="plan-minutes">about {mins} min</span>
         </div>
         <StepList steps={plan.steps} done={status.done} next={status.next} interactive />
-        <button className={btn} data-testid="start-today" onClick={start}>{icon} {started ? 'Carry on' : `Start · ${mins} min`}</button>
+        <button className={btn} data-testid="start-today" onClick={start}>{icon} {going ? `Carry on · step ${at} of ${plan.steps.length}` : `Start · ${mins} min`}</button>
         <span className="t14 muted center">That's enough for today. Your usual plan returns tomorrow.</span>
+        {finish}
       </section>
     );
   }
@@ -98,13 +105,13 @@ export function PlanCard({ plan, status, labOn, secondary, rehearsalTime }: {
     <section className="card plan-card" data-testid="plan-card" data-mode="normal">
       <div className="row between" style={{ alignItems: 'baseline' }}>
         <h2>Today</h2>
-        <span className="t14 muted" data-testid="plan-minutes">about {mins} min</span>
+        <span className="t14 muted" data-testid="plan-minutes">{planMinutes(plan)}</span>
       </div>
       <StepList steps={plan.steps} done={status.done} next={status.next} interactive />
       {plan.moved?.length ? <span className="t14 muted" data-testid="plan-moved">Moved to tomorrow: {plan.moved.join(', ')}.</span> : null}
-      <button className={btn} data-testid="start-today" onClick={start}>{icon} {started ? `Carry on · step ${status.next + 1} of ${plan.steps.length}` : 'Start today’s practice'}</button>
-      {!started && plan.steps.length >= 3 && <span className="t14 muted center">Short on time? Steps 1 and 2 matter most.</span>}
-      {started && <button className="link" data-testid="finish-today-home" onClick={() => finishToday()}>Finish for today</button>}
+      <button className={btn} data-testid="start-today" onClick={start}>{icon} {going ? `Carry on · step ${at} of ${plan.steps.length}` : 'Start today’s practice'}</button>
+      {!going && plan.steps.length >= 3 && <span className="t14 muted center">Short on time? Steps 1 and 2 matter most.</span>}
+      {finish}
     </section>
   );
 }
@@ -118,12 +125,34 @@ export function useWeek(now = new Date()) {
   const { practised, confirmed } = weekDays();
   const cycle = loadCycle();
   const w = weekDots(today, practised, confirmed, rehearsalOn(cycle));
-  const best = bestWeek(countedDays(practised, confirmed));
-  return { goal, today, ...w, best, practised, confirmed };
+  const counted = countedDays(practised, confirmed);
+  const best = bestWeek(counted);
+  // (the best of the weeks before this one: is this week the best so far?)
+  const monday = mondayOf(today);
+  const prevBest = bestWeek(new Set([...counted].filter((d) => mondayOf(d) !== monday)));
+  /** Days left in the week after today (0 on Sunday). */
+  const daysLeft = 6 - Math.max(0, w.dots.findIndex((d) => d.today));
+  return { goal, today, ...w, best, prevBest, daysLeft, practised, confirmed };
 }
 
-/** "3 days · goal 4" / "4 of 4 days ✓". */
-export const weekText = (count: number, goal: number) => (count >= goal ? `${count} of ${goal} days ✓` : `${count} day${count === 1 ? '' : 's'} · goal ${goal}`);
+/** "3 days · goal 4" / "4 of 4 days ✓" / "5 days ✓ (goal 4)". */
+export const weekText = (count: number, goal: number) => (count > goal ? `${count} days ✓ (goal ${goal})`
+  : count === goal ? `${count} of ${goal} days ✓` : `${count} day${count === 1 ? '' : 's'} · goal ${goal}`);
+
+/** After today's practice: where the week stands, honestly (no "tomorrow" on a Sunday). */
+export function weekLine(w: { count: number; goal: number; prevBest: { days: number } | null; daysLeft: number }): string {
+  const prev = w.prevBest?.days ?? 0;
+  if (w.count < w.goal) {
+    const need = w.goal - w.count;
+    if (need > w.daysLeft) return w.daysLeft === 0 ? 'a new week starts tomorrow' : 'every day you sing still counts';
+    return `${need} more day${need === 1 ? '' : 's'} to reach your goal`;
+  }
+  if (prev > 1 && w.count > prev) return 'your best week so far';
+  if (prev > 1 && w.count === prev) return 'matches your best week';
+  if (prev > w.count && prev - w.count === 1 && w.daysLeft > 0) return `practise tomorrow to match your best week (${prev})`;
+  if (prev > w.count && prev - w.count <= w.daysLeft) return `your best week: ${prev} days`;
+  return 'goal reached';
+}
 
 export function WeekDots({ dots }: { dots: ReturnType<typeof useWeek>['dots'] }) {
   return (
@@ -178,14 +207,20 @@ function paceOf(set: ReturnType<typeof planPieces>, target: number, days: number
 /**
  * One calm line: "Rehearsal Tue 19:30 · in 3 days · Concert 12 Dec · on track". The pace is the
  * concert's (every piece to Level 4 by then; without a concert date, the rehearsal pieces to Level 3
- * by the next rehearsal) at the week goal's days; orange only when clearly behind.
+ * by the next rehearsal) at the week goal's days; orange only when clearly behind; none on the day
+ * itself. With nothing ahead, a prompt to set the dates (none once the concert is over: Home says so).
  */
-export function StatusLine({ cycle = loadCycle(), rehearsalDay }: { cycle?: Cycle; rehearsalDay?: boolean }) {
-  const nr = nextRehearsal(cycle);
-  const toConcert = daysUntil(cycle.concertDate);
+export function StatusLine({ cycle, rehearsalDay }: { cycle: Cycle; rehearsalDay?: boolean }) {
+  const v = useStoreVersion();
+  const day = useDay();
   const goal = weekGoalOf(loadProfile().weekGoal);
-  const pieces = planPieces(Date.now(), cycle);
-  if (!nr && (toConcert == null || toConcert < 0)) {
+  // (cycle: read fresh on every render; the pieces are planned once per change of the store or the day)
+  const pieces = useMemo(() => planPieces(Date.now(), cycle), [v, day]);
+  const nr0 = nextRehearsal(cycle);
+  const nr = nr0 && nr0.days >= 0 && !nr0.over ? nr0 : null;
+  const toConcert = daysUntil(cycle.concertDate);
+  const concertAhead = toConcert != null && toConcert >= 0;
+  if (!nr && !concertAhead) {
     if (cycle.concertDate) return null; // (the concert is over: Home says so)
     return (
       <div className="row status-line" style={{ gap: 4, flexWrap: 'wrap' }} data-testid="status-line">
@@ -202,15 +237,16 @@ export function StatusLine({ cycle = loadCycle(), rehearsalDay }: { cycle?: Cycl
     // (a weekly rehearsal works on pieces for weeks: only without a concert date does it set the pace)
     if (!cycle.concertDate) paces.push(paceOf(focus.length ? focus : pieces, 3, nr.days, goal));
   }
-  if (cycle.concertDate && toConcert != null && toConcert >= 0) {
-    parts.push(`Concert ${shortDate(cycle.concertDate)}`);
-    paces.push(paceOf(pieces, 4, toConcert, goal));
+  if (cycle.concertDate && concertAhead) {
+    parts.push(toConcert === 0 ? 'Concert today' : `Concert ${shortDate(cycle.concertDate)}`);
+    if (toConcert! > 0) paces.push(paceOf(pieces, 4, toConcert!, goal));
   }
   const rank = (p: Pace) => (p.kind === 'behind' ? 2 : p.kind === 'tight' ? 1 : 0);
   const worst = paces.reduce<Pace | null>((a, p) => (!a || rank(p) > rank(a) ? p : a), null);
   const word = !worst || !pieces.length ? '' : worst.kind === 'on-track' ? 'on track'
     : worst.kind === 'tight' ? `a little tight: about ${worst.perDay} steps a day` : `behind: about ${worst.perDay} steps a day to catch up`;
-  const ready = nr && nr.days >= 0 && !rehearsalDay ? focus.filter((p) => p.readiness.rehearsalReady && !p.readiness.concertReady) : [];
+  const ready = nr && !rehearsalDay ? focus.filter((p) => p.readiness.rehearsalReady && !p.readiness.concertReady) : [];
+  if (!parts.length && !ready.length) return null;
   return (
     <div className="col status-line" style={{ gap: 2 }} data-testid="status-line">
       {parts.length > 0 && (
@@ -225,9 +261,9 @@ export function StatusLine({ cycle = loadCycle(), rehearsalDay }: { cycle?: Cycl
 
 // ---------------------------------------------------------------- the day after rehearsal
 
-/** "How was rehearsal?": confirm you were there (the day counts) and say what felt shaky. */
+/** "How was rehearsal?": confirm you were there (the day counts) and say what felt shaky. Up to 3 days after. */
 export function RehearsalCheck({ labOn }: { labOn: boolean }) {
-  const today = dayOf(new Date());
+  const today = useDay();
   const cycle = loadCycle();
   const date = lastRehearsal(today, cycle);
   const [open, setOpen] = useState(false);
@@ -235,7 +271,6 @@ export function RehearsalCheck({ labOn }: { labOn: boolean }) {
   const a = loadRehearsals()[date] ?? {};
   // (answered on another day: nothing more to say)
   if (a.answered && a.on !== today) return null;
-  if (!a.answered && daysUntil(date) != null && (daysUntil(date) ?? 0) < -2) return null;
   const weekday = fmtDay(date, { weekday: 'short' });
   const pieces = planPieces(Date.now(), cycle);
   const focus = pieces.filter((p) => p.focus);
@@ -257,7 +292,7 @@ export function RehearsalCheck({ labOn }: { labOn: boolean }) {
         <div className="li">
           <span className="check done" aria-hidden="true">✓</span>
           <span className="grow t16">{shaky.length ? <>You said: <strong>{shaky.map((s) => s.label).join(', ')}</strong></> : 'You said: all fine'}</span>
-          <button className="link inline" data-testid="rehearsal-change" onClick={() => setOpen(true)}>change</button>
+          <button className="link inline" data-testid="rehearsal-change" aria-label="Change your answer" onClick={() => setOpen(true)}>change</button>
         </div>
       </section>
     );
@@ -289,18 +324,16 @@ export function RehearsalCheck({ labOn }: { labOn: boolean }) {
 
 /** Today done (A2): one stats line, what moved, tomorrow, and practising more as an option. */
 export function TodayDone({ plan, labOn }: { plan: TodayPlan; labOn: boolean }) {
-  const today = dayOf(new Date());
+  const v = useStoreVersion();
+  const today = useDay();
   const tomorrow = addDays(today, 1);
-  const log = attemptLog();
+  const log = useMemo(() => attemptLog(), [v, today]);
   // (the lab keeps no log: its steps done today count with their planned minutes)
-  const labDone = planStatus(plan, tickContext(today));
-  const mins = minutesBetween(log, today, tomorrow) + plan.steps.reduce((a, s, i) => a + (s.kind === 'lab' && labDone.done[i] ? s.minutes : 0), 0);
+  const status = useMemo(() => planStatus(plan, tickContext(today, log)), [plan, log, today]);
+  const mins = minutesBetween(log, today, tomorrow) + plan.steps.reduce((a, s, i) => a + (s.kind === 'lab' && status.done[i] ? s.minutes : 0), 0);
   const notes = notesBetween(today, tomorrow);
   const w = useWeek();
-  const tmr = tomorrowPlan(labOn);
-  const weekLine = w.count >= w.goal
-    ? (w.best && w.best.days > w.count ? `practise tomorrow to match your best week (${w.best.days})` : w.count > 1 && w.best && w.best.days <= w.count ? 'your best week so far' : 'goal reached')
-    : `${w.goal - w.count} more day${w.goal - w.count === 1 ? '' : 's'} to reach your goal`;
+  const tmr = useMemo(() => tomorrowPlan(labOn), [v, today, labOn]);
   const more = () => {
     const fresh = computePlan(new Date(), labOn);
     const st = planStatus(fresh, tickContext(today));
@@ -309,15 +342,15 @@ export function TodayDone({ plan, labOn }: { plan: TodayPlan; labOn: boolean }) 
   };
   return (
     <>
-      <section className="card done-band" data-testid="today-done" role="status">
-        <h2>Today done ✓</h2>
+      <section className="card done-band" data-testid="today-done">
+        <h2 role="status">Today done ✓</h2>
         <span className="t16" data-testid="done-stats">{[`${Math.max(1, mins)} min`, notes > 0 ? `${notes.toLocaleString('en-GB')} notes sung right` : ''].filter(Boolean).join(' · ')}</span>
         <span className="t14 muted">You can stop here. Your progress is saved.</span>
         <div className="divider" />
-        <span className="t14"><strong>{weekText(w.count, w.goal)}</strong> <span className="muted">· {weekLine}</span></span>
+        <span className="t14"><strong>{weekText(w.count, w.goal)}</strong> <span className="muted">· {weekLine(w)}</span></span>
         <button className="link between" data-testid="see-progress" onClick={() => go({ name: 'progress' })}>See your progress <span aria-hidden="true">›</span></button>
       </section>
-      <WhatMoved plan={plan} />
+      <WhatMoved plan={plan} log={log} status={status} />
       {tmr.steps.length > 0 && (
         <section className="card" data-testid="tomorrow">
           <div className="row between" style={{ alignItems: 'baseline' }}>
@@ -332,33 +365,42 @@ export function TodayDone({ plan, labOn }: { plan: TodayPlan; labOn: boolean }) 
   );
 }
 
+/** "on bars 22–29", "on both passages", "on all 4 passages", "on bars 1–5 · 6–13 · 14–21". */
+export function onPassages(ids: string[], total: number, label: (id: string) => string): string {
+  if (total > 1 && ids.length === total) return total === 2 ? 'on both passages' : `on all ${total} passages`;
+  if (ids.length <= 3) return `on ${lowerLabel(joinLabels(ids.map(label)))}`;
+  return `on ${ids.length} passages`;
+}
+
 /** Only real moves today: steps passed for the first time, levels the whole piece reached, lab steps passed. */
-function WhatMoved({ plan }: { plan: TodayPlan }) {
-  const today = dayOf(new Date());
-  const moved = movedOn(attemptLog(), today);
+function WhatMoved({ plan, log, status }: { plan: TodayPlan; log: ReturnType<typeof attemptLog>; status: PlanStatus }) {
+  const today = useDay();
+  const moved = movedOn(log, today);
   const reached = loadReached();
   const lab = loadLab();
-  const labPassed = plan.steps.filter((s) => s.kind === 'lab' && s.lab && lab[s.lab.interval].rung > s.lab.rung);
+  const pieces = moved.length ? planPieces(Date.now(), loadCycle(), loadProfile().voice, log) : [];
+  const labPassed = plan.steps.filter((s, i) => s.kind === 'lab' && s.lab && !s.lab.tuneUp && status.done[i] && lab[s.lab.interval].rung > s.lab.rung);
   const rows = moved.map((m) => {
     const piece = getPiece(m.pieceId);
-    if (!piece) return null;
-    const prog = planPieces(Date.now()).find((p) => p.pieceId === m.pieceId && p.partId === m.partId);
-    if (!prog) return null;
+    const prog = pieces.find((p) => p.pieceId === m.pieceId && p.partId === m.partId);
+    if (!piece || !prog) return null;
     const ps = pathStatus(prog.sections, prog.prog);
     const n = prog.sections.length;
     const label = (id: string) => prog.sections.find((s) => s.id === id)?.label ?? id;
     const lines = m.steps.map((g) => {
-      const all = n > 1 && prog.sections.every((s) => {
+      const all = prog.sections.filter((s) => {
         const sp = prog.prog?.sections[s.id];
         return (sp?.level ?? 0) >= g.level || (g.step === 'slow' && (sp?.slow ?? 0) >= g.level);
-      });
-      const where = all ? `on all ${n} passages` : g.sectionIds.length === 1 ? `on ${lowerLabel(label(g.sectionIds[0]))}` : `on ${lowerLabel(joinLabels(g.sectionIds.map(label)))}`;
-      return `Level ${g.level} · ${stepWord(g.step)} ✓ ${n === 1 ? '' : where}`.trim();
+      }).map((s) => s.id);
+      const ids = all.length === n ? all : g.sectionIds;
+      return `Level ${g.level} · ${stepWord(g.step)} ✓${n === 1 ? '' : ` ${onPassages(ids, n, label)}`}`;
     });
     const r = reached[`${m.pieceId}|${m.partId}`] ?? {};
     const lv = Object.entries(r).filter(([, t]) => dayOf(t) === today).map(([l]) => Number(l)).sort((a, b) => b - a)[0];
     const milestone = lv ? `The whole piece reached Level ${lv}${lv === 3 ? ': rehearsal-ready' : lv === 4 ? ': concert-ready' : lv === 5 ? ': memorised' : ''}` : null;
-    const next = ps.working ? `Next: Level ${ps.working.level} ${stepWord(ps.working.step)}` : null;
+    const next = ps.working
+      ? `Next: Level ${ps.working.level} ${stepWord(ps.working.step)}${ps.allInTempo ? ', the whole piece' : n > 1 && ps.todo.length ? ` ${onPassages(ps.todo, n, label)}` : ''}`
+      : null;
     return { key: `${m.pieceId}|${m.partId}`, title: piece.title, lines: [milestone, ...lines].filter(Boolean) as string[], next,
       nodes: meterNodes({ level: ps.pieceLevel, slow: ps.half && ps.working ? ps.working.level : 0, now: ps.working }) };
   }).filter((x): x is NonNullable<typeof x> => !!x);
@@ -392,15 +434,18 @@ function WhatMoved({ plan }: { plan: TodayPlan }) {
   );
 }
 
-// ---------------------------------------------------------------- the session strip
+// ---------------------------------------------------------------- the session strip and footer
 
 /**
- * "Today · step 2 of 4 ●◐○○ · 5 min left" on the screens inside today's session (the pre-run card,
- * Results, the lab). Nothing outside a session. On the lab it also counts rounds (the lab keeps no
- * dates) and offers the next step.
+ * "Today · step 2 of 4 ●◐○○ · 5 min" on the screens inside today's session (the pre-run card,
+ * Results, the words, the lab). Nothing outside a session. A session left from yesterday says so and
+ * leads to today's plan. On the lab it also counts rounds (the lab keeps no dates) and offers the
+ * next step.
  */
 export function SessionStrip({ pieceId, lab, compact }: { pieceId?: string; lab?: boolean; compact?: boolean }) {
   const [, setTick] = useState(0);
+  useStoreVersion();
+  useDay();
   const ses = todaySession({ pieceId, lab });
   const labStep = lab && ses?.step.kind === 'lab' ? ses.step.lab : undefined;
   useEffect(() => {
@@ -420,23 +465,68 @@ export function SessionStrip({ pieceId, lab, compact }: { pieceId?: string; lab?
     }, 700);
     return () => clearInterval(t);
   }, [labStep?.interval, labStep?.rung]);
-  if (!ses) return null;
+  if (!ses) {
+    if (!staleSession({ pieceId, lab })) return null;
+    return (
+      <div className={`session${compact ? ' compact' : ''}`} data-testid="session-stale" role="status">
+        <span>That was yesterday’s plan</span>
+        <span className="grow" />
+        <button className="link inline" data-testid="session-today" onClick={() => { closeStaleSession(); leaveTo({ name: 'home' }); }}>Today ›</button>
+      </div>
+    );
+  }
   const n = ses.plan.steps.length;
   const curDone = ses.status.done[ses.index];
   const head = curDone ? `Today · ${ses.doneCount} of ${n} done` : `Today · step ${ses.index + 1} of ${n}`;
   return (
     <div className={`session${compact ? ' compact' : ''}`} data-testid="session-strip" role="status">
-      <span>{head}</span>
+      <span className="nowrap">{head}</span>
       <span className="ticks" aria-hidden="true">
         {ses.plan.steps.map((s, i) => <i key={s.id} className={ses.status.done[i] ? 'done' : i === ses.index ? 'now' : ''} />)}
       </span>
       <span className="grow" />
-      <span className="muted mono">{ses.status.minutesLeft} min left</span>
+      <span className="muted mono nowrap" aria-label={`${ses.status.minutesLeft} minutes left`}>{ses.status.minutesLeft} min</span>
       {lab && (
         ses.next
-          ? <button className="link inline" data-testid="session-next" onClick={() => goStep(ses.next!)}>{curDone ? 'Next step ›' : 'Skip ›'}</button>
+          ? <button className="link inline" data-testid="session-next" onClick={() => goStep(ses.next!)}>{curDone ? 'Next ›' : 'Skip ›'}</button>
           : <button className="link inline" data-testid="session-finish" onClick={() => { finishToday(); go({ name: 'home' }); }}>Finish</button>
       )}
     </div>
   );
+}
+
+/** One action of a practice screen's footer (Results, the words). */
+export interface FootAction { label: React.ReactNode; why?: React.ReactNode; onClick: () => void; testid?: string; repeats?: boolean }
+
+/**
+ * The footer inside today's session. Once the step is done, the primary is the next step of today
+ * ("Next: Abendlied · sing it all", "step 3 of 4 · 3 min"; the last step's is "Finish for today") and
+ * the screen's own next step becomes the second button (unless it starts the same run); "Finish for
+ * today" stays a quiet link. After a miss the screen's own buttons stay, with "Skip to next step" as a
+ * link. Outside a session nothing changes; a session left from yesterday gets no "Next" (its strip
+ * leads to today's plan). `own`: what the screen's primary would start, to spot a duplicate.
+ */
+export function sessionFoot(pieceId: string, primary: FootAction, again: FootAction | null, finish: boolean, own?: { sectionId: string; level: number; step?: string }): {
+  primary: FootAction; again: FootAction | null; skip: FootAction | null; finish: boolean; session: boolean;
+} {
+  const ses = todaySession({ pieceId });
+  if (!ses) return { primary, again, skip: null, finish: finish && !staleSession({ pieceId }), session: false };
+  const n = ses.plan.steps.length;
+  if (!ses.status.done[ses.index]) {
+    const skip = ses.next ? { label: 'Skip to next step', testid: 'skip-step', onClick: () => goStep(ses.next!, true) } : null;
+    return { primary, again, skip, finish: true, session: true };
+  }
+  const nx = ses.next;
+  const dup = !!nx && !!own && nx.pieceId === pieceId.split('~')[0] && nx.sectionId === own.sectionId && nx.level === own.level && (!own.step || nx.step === own.step);
+  const demoted = primary.repeats || dup || primary.testid === 'arcade-run' || primary.testid === 'finish-primary' ? null
+    : { label: primary.label, testid: primary.testid, onClick: primary.onClick };
+  return {
+    primary: nx
+      ? { label: <><IconPlay size={18} /> Next: {stepShort(nx)}</>, testid: 'today-next', why: `step ${ses.nextIndex + 1} of ${n} · ${nx.minutes} min`, onClick: () => goStep(nx, true) }
+      : { label: 'Finish for today', testid: 'today-finish', why: 'Every step of today is done.', onClick: () => { finishToday(); leaveTo({ name: 'home' }); } },
+    again: demoted ?? again,
+    skip: null,
+    finish: !!nx,
+    session: true,
+  };
 }

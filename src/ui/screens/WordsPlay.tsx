@@ -15,6 +15,7 @@ import { getWords, recordWords } from '../../progress/words';
 import type { AttemptResult } from '../../game/types';
 import { NotFound } from '../components/NotFound';
 import { PracticeBar } from '../components/PracticeBar';
+import { SessionStrip } from '../components/Today';
 
 type PlayRoute = Extract<Route, { name: 'play' }>;
 
@@ -205,7 +206,8 @@ export function WordsPlay({ route }: { route: PlayRoute }) {
         <canvas ref={canvasRef} aria-label="Words lane" role="img" />
         {phase === 'ready' && (
           <div className="overlay">
-            <div className="card">
+            <div className="card words-card">
+              <SessionStrip pieceId={piece.id} compact />
               <span className="eyebrow">Words in rhythm</span>
               <strong style={{ fontSize: 18 }}>{section.label}</strong>
               {syl.length === 0 ? (

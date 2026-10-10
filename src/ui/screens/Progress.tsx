@@ -2,9 +2,9 @@
 // level ladder, and "Getting better" when the data shows it. Reached from Today's week card and Settings.
 import React from 'react';
 import { back, go, openAt } from '../router';
-import { useStoreVersion, daysUntil } from '../hooks';
+import { useStoreVersion, useDay, daysUntil } from '../hooks';
 import { IconBack } from '../icons';
-import { attemptLog, loadCycle, loadProfile, logStep } from '../../progress/store';
+import { attemptLog, getProgress, loadCycle, loadProfile, logStep } from '../../progress/store';
 import { nextRehearsal } from '../../progress/rehearsal';
 import { cyclePoints } from '../../progress/points';
 import { pitchDegree } from '../../game/pitchwords';
@@ -32,6 +32,7 @@ function reachedDates(pieceId: string, partId: string, single: boolean): Record<
 
 export function ProgressScreen() {
   useStoreVersion();
+  useDay();
   const now = new Date();
   const today = dayOf(now);
   const monday = mondayOf(today);
@@ -54,7 +55,8 @@ export function ProgressScreen() {
   const nr = nextRehearsal(cycle);
   const toConcert = daysUntil(cycle.concertDate);
   const pieces = planPieces(Date.now(), cycle);
-  const better = gettingBetter(log, Date.now());
+  // (only passages whose counted attempts are all in the kept log: their first run there is their first)
+  const better = gettingBetter(log, Date.now(), (pieceId, partId, sectionId) => getProgress(pieceId, partId)?.sections[sectionId]?.attempts ?? 0);
 
   return (
     <main className="screen wide progress-screen">
@@ -138,7 +140,7 @@ export function ProgressScreen() {
                         <span className="good-text">Level {P} reached ✓</span>
                         <span className="muted">{at ? ` ${fmt(at, { weekday: 'short', day: 'numeric', month: 'short' })}` : ''}{after1 ? `, ${after1} days after Level 1` : ''}{next ? ` · ${next}` : ''}</span>
                       </span>
-                    ) : <span className="t14 muted">Working on {ps.here}</span>}
+                    ) : <span className="t14 muted">{started(p) ? `Working on ${ps.here}` : 'Not started'}</span>}
                   </button>
                   <LevelMeter nodes={nodes} label={p.title} />
                 </div>
@@ -183,4 +185,9 @@ function BetterBar({ label, value, frac, now }: { label: string; value: string; 
       <div className="better-bar"><span className={now ? 'now' : ''} style={{ width: `${Math.max(4, Math.round(frac * 100))}%` }} /></div>
     </div>
   );
+}
+
+/** Anything sung in the piece yet (a level, a slow step, an attempt)? */
+function started(p: { sections: { id: string }[]; prog?: { sections: Record<string, { level: number; slow?: number; attempts: number }> } }): boolean {
+  return p.sections.some((x) => { const sp = p.prog?.sections[x.id]; return !!sp && (sp.level > 0 || (sp.slow ?? 0) > 0 || sp.attempts > 0); });
 }

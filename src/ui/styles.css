@@ -236,7 +236,7 @@ input[type='range'] { accent-color: var(--accent); width: 100%; }
    (down into the overlay padding, its shadow hiding what scrolls under it). */
 .overlay .start-sticky { position: sticky; bottom: -14px; z-index: 1; box-shadow: 0 0 0 10px var(--surface); }
 
-.heat { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 4px; }
+.heat { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 4px; }
 .heat button { height: 44px; border: none; padding: 0; border-radius: 3px; }
 
 .grade-tile {
@@ -522,6 +522,7 @@ html:has(.results-foot) { scroll-padding-bottom: 200px; }
   .results-foot > .btn.primary { grid-column: 1; grid-row: 1; }
   .results-foot > .row { grid-column: 2; grid-row: 1; }
   .results-foot > .link { grid-column: 3; grid-row: 1; justify-self: start; }
+  .results-foot > .foot-links { grid-column: 3; grid-row: 1; justify-self: start; justify-content: flex-start; }
   .results-foot .row > .btn { flex: none; min-width: 120px; padding: 0 18px; height: 48px; }
 }
 
@@ -824,10 +825,13 @@ button.step-row { cursor: pointer; }
 .session .ticks i { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid #3a4170; display: block; }
 .session .ticks i.done { background: var(--good); border-color: var(--good); }
 .session .ticks i.now { border: 2px solid var(--accent); }
-.session .link.inline { margin: 0; min-height: 44px; font-size: 14px; }
+.session .link.inline { margin: 0; min-height: 44px; min-width: 44px; justify-content: center; font-size: 14px; }
+.session { gap: 8px; }
+.results-foot .foot-links { display: flex; align-items: center; justify-content: center; gap: 4px 20px; flex-wrap: wrap; }
 .screen > .session { margin: -16px -16px -18px; }
 .screen > .session + .practice-bar { margin-top: 0; }
-.precard > .session.compact { margin: -16px -16px 0; border-radius: 22px 22px 0 0; padding: 0 16px; }
+.precard > .session.compact, .words-card > .session.compact { margin: -16px -16px 0; border-radius: 18px 18px 0 0; padding: 0 16px; }
+.precard > .session.compact { border-radius: 22px 22px 0 0; }
 @media (min-width: 700px) { .screen > .session { margin-left: -24px; margin-right: -24px; } }
 @media (min-width: 900px) and (min-height: 480px) {
   .screen.practice > .session { max-width: none; width: auto; margin: -16px calc(-1 * var(--gutter)) -18px; padding-left: var(--gutter); padding-right: var(--gutter); }

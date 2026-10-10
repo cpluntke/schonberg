@@ -10,6 +10,8 @@ export interface NextRehearsal {
   days: number;
   /** e.g. "Thu 19:30". */
   label: string;
+  /** A one-off rehearsal today that has finished (about 2½ hours after it began). */
+  over?: boolean;
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -36,8 +38,10 @@ export function nextRehearsal(c: Pick<Cycle, 'rehearsalWeekday' | 'rehearsalTime
   }
   if (!at) return null;
   const days = Math.round((dayStart(at) - dayStart(now)) / 86400_000);
+  // (a weekly one moves on to next week by then; a one-off date stays, marked as over)
+  const over = c.rehearsalWeekday == null && days === 0 && now.getTime() > at.getTime() + 2.5 * 3600_000;
   const label = at.toLocaleDateString(undefined, { weekday: 'short' }) + (c.rehearsalWeekday != null ? ` ${pad(at.getHours())}:${pad(at.getMinutes())}` : ` ${at.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`);
-  return { at, iso: isoDate(at), days, label };
+  return { at, iso: isoDate(at), days, label, ...(over ? { over } : {}) };
 }
 
 export const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
