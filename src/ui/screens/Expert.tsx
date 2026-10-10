@@ -63,7 +63,7 @@ export function Expert() {
           {(forms[form] ?? row).map((pc, i) => (
             <div key={i} style={{ height: 48, borderRadius: 8, background: 'var(--expert-surface)', color: 'var(--expert-text)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
               <span className="mono" style={{ fontWeight: 600, fontSize: '0.875rem' }}>{sym(pc)}</span>
-              <span style={{ fontSize: '0.8125rem' }}>{NAMES[pc]}</span>
+              <span style={{ fontSize: '0.875rem' }}>{NAMES[pc]}</span>
             </div>
           ))}
         </div>
@@ -79,7 +79,7 @@ export function Expert() {
         <strong>Leap drill from your repertoire</strong>
         {drillPairs.length ? (
           <>
-            <span className="small" style={{ color: 'var(--expert-text)' }}>The {drillPairs.length} hardest intervals in your parts of this cycle, one per bar.</span>
+            <span className="small" style={{ color: 'var(--expert-text)' }}>The {drillPairs.length} hardest intervals in your parts of the programme, one per bar.</span>
             <div className="col" style={{ gap: 4 }}>
               {drillPairs.slice(0, 6).map((l, i) => (
                 <div key={i} className="row small"><span className="mono" style={{ width: 52, color: 'var(--expert)' }}>{l.label}</span><span className="muted ellipsis">{l.where}</span></div>
@@ -93,7 +93,7 @@ export function Expert() {
             </div>
           </>
         ) : (
-          <span className="small muted">Add pieces to your cycle to get leap drills.</span>
+          <span className="small muted">Add pieces to your programme to get leap drills.</span>
         )}
       </section>
       </div>

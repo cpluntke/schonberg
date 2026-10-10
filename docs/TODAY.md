@@ -1,6 +1,6 @@
 # Today: the daily loop
 
-Home is **Today**: what to do today, when today is done, the week, and what changed. The plan is
+The Today tab (`#/`, `screens/Home.tsx`): what to do today, when today is done, the week, and what changed. The plan is
 worked out by `src/progress/today.ts` (pure functions, tested in `today.test.ts`); `src/ui/today.ts`
 builds its input from the library and the store, keeps the plan for the day and runs today's session;
 the cards are in `src/ui/components/Today.tsx`; Your progress is `src/ui/screens/Progress.tsx`.
@@ -66,7 +66,7 @@ one listen for a passage never sung; whole minutes, 1–6. Lab rungs: 5, 5, 4, 5
 - **Singing before the day's first look at Today**: the day's plan starts with that work, ticked
   (`stepsSungOn`: one step per passage at the latest level and step sung, when it counts as done),
   then the next steps.
-- Home plans once per change of the store or of the day (`useDay`: midnight, or the app coming back
+- Today plans once per change of the store or of the day (`useDay`: midnight, or the app coming back
   from the background) and stores the plan after drawing, never while drawing.
 - A step is **done** (`stepDone`) when today's attempt log has a **counted pass** of it (a pass in
   tempo at that level or above also ticks a slow step), or **two counted runs of exactly that step**
@@ -96,7 +96,7 @@ once the step is done, the primary button is the next step of today ("Next: Aben
 "step 3 of 4 · 3 min"), with Results' own next step as the second button (unless it is the same run)
 and **Finish for today** under it; the last step's primary is **Finish for today**. After a miss
 Results keeps its help and its second button, with **Skip to next step** as a link. The words screen
-and its Results take part the same way (`sessionFoot`). Back on Home the session pauses; Home shows
+and its Results take part the same way (`sessionFoot`). Back on Today the session pauses; Today shows
 "Carry on · step N of M" and **Finish for today** once the plan is under way. Outside a session
 nothing changes. A session left open over midnight (or until the app is opened the next day) ends:
 the strip says "That was yesterday's plan" and leads to today's, and Results no longer offers
@@ -105,7 +105,7 @@ yesterday's next step.
 ## The week
 
 The week goal (`Profile.weekGoal`, 1–7, default 4; Settings → Your week) replaces the daily streak on
-Home. A day counts when the singer practised (this phone's log and the account copy's days) or
+Today. A day counts when the singer practised (this phone's log and the account copy's days) or
 confirmed a rehearsal. The card shows "3 days · goal 4" (✓ only once the goal is met: "4 of 4 days ✓"),
 a dot per day (♪ on rehearsal days, ringed for today), the best week, and **See your progress ›**. The
 streak is still computed (sync and the leaderboard use it) but no longer shown as something to lose.

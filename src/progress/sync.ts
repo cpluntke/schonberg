@@ -952,9 +952,17 @@ export async function uploadProgress(force = false, auto = false): Promise<{ ok:
   return { ok: false, error: 'Your progress kept changing on another phone. Try again.' };
 }
 
-function hasPassed(): boolean {
+/** Something worth keeping: a passed step of a piece, or progress in an intonation course (a step passed or rounds taken). */
+export function hasPassed(): boolean {
   return allProgress().some((p) => (p.full?.level ?? 0) > 0
-    || Object.values(p.sections ?? {}).some((sp) => (sp.level ?? 0) > 0 || (sp.slow ?? 0) > 0));
+    || Object.values(p.sections ?? {}).some((sp) => (sp.level ?? 0) > 0 || (sp.slow ?? 0) > 0))
+    || Object.values(loadLab()).some((t) => t.rung > 1 || Object.values(t.logs ?? {}).some((l) => l.length > 0));
+}
+
+/** Is everything up to `at` (ms) saved with the account? (the course page says so only then) */
+export function savedSince(at: number): boolean {
+  const m = loadMeta();
+  return syncEnabled() && m.rev != null && !m.error && (m.savedAt ?? 0) >= at;
 }
 
 /** Closing or hiding the app: send unsaved progress right away (keepalive, so the page may go). */

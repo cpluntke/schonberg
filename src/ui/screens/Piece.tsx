@@ -442,7 +442,7 @@ function MoreWays({ piece, part, sections, prog, r, P, label, play, showHelp, se
                   <button key={l} className={cls} data-testid={`full-${l}`} style={{ position: 'relative' }}
                     aria-label={`Sing it all at ${stepLabel(l, 'tempo')}${l <= P ? ' (passed)' : ''}${star ? ' (clean run)' : ''}${fixes.length ? ` (${fixes.length} passage${fixes.length > 1 ? 's' : ''} to fix)` : ''}`}
                     onClick={() => play('all', l, '2d', 'tempo')}>
-                    {l} <span style={{ fontWeight: 600, fontSize: '0.8125rem' }}>{SHORT[l]}</span>
+                    {l} <span style={{ fontWeight: 600, fontSize: 'min(0.875rem, 3.4vw)' }}>{SHORT[l]}</span>
                     {star && <span aria-hidden="true" data-testid={`star-${l}`} style={{ position: 'absolute', top: 1, right: 4, fontSize: '0.8125rem', color: 'var(--star)' }}>★</span>}
                   </button>
                 );

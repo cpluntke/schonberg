@@ -96,7 +96,7 @@ export function Results() {
   }
   if (lr.words) return <WordsResults lr={lr} words={lr.words} />;
   // (the leap drill started from Train; from expert mode it keeps the usual Results)
-  if (/^leaps-/.test(lr.pieceId) && lr.mode === '2d' && upOf(piece.id).name === 'train') return <LeapResults lr={lr} piece={piece} />;
+  if (/^leaps-/.test(lr.pieceId) && lr.mode === '2d') return <LeapResults lr={lr} piece={piece} />;
   const r = lr.result;
   const part = piece.score.parts.find((p) => p.id === lr.partId);
   const section = piece.sections.find((s) => s.id === lr.sectionId);
@@ -178,7 +178,9 @@ export function Results() {
   const listenHelp = step === 'slow' && lr.level === 1;
 
   // What was sung, inside a sentence: "bars 22–29", "the whole piece".
-  const whatSung = section ? lowerLabel(section.label) : lr.sectionId === 'all' ? 'the whole piece'
+  // (a drill made for the day: the twelve-tone row; its runs never touch a piece's levels)
+  const drill = /^(row|leaps)-/.test(lr.pieceId);
+  const whatSung = section ? lowerLabel(section.label) : drill ? (/^leaps-/.test(lr.pieceId) ? 'your tricky leaps' : 'the twelve-tone row') : lr.sectionId === 'all' ? 'the whole piece'
     : (() => {
       const a = ms.findIndex((m) => lr.from >= m.start - 1e-3 && lr.from < m.start + m.dur - 1e-3);
       let b = Math.max(0, a);
@@ -339,7 +341,7 @@ export function Results() {
     ? (step === 'tempo' && !lr.full ? { level: lr.level, step: 'slow' } : lr.level > 1 ? { level: lr.level - 1, step: 'tempo' } : null)
     : null;
   const easierStep: FootStep | null = easier
-    ? { label: `Easier: ${easier.level === lr.level ? stepWord(easier.step) : `${lr.sectionId === 'all' ? 'the whole piece at ' : ''}Level ${easier.level} in tempo`}`, testid: 'easier', onClick: () => play(lr.sectionId, easier.level, '2d', easier.step) }
+    ? { label: `Easier: ${easier.level === lr.level ? stepWord(easier.step) : `${lr.sectionId === 'all' && !drill ? 'the whole piece at ' : ''}Level ${easier.level} in tempo`}`, testid: 'easier', onClick: () => play(lr.sectionId, easier.level, '2d', easier.step) }
     : null;
   const againStep: FootStep = {
     label: <><IconRestart size={16} /> {lr.slow != null ? 'Again, slowly' : 'Again'}</>,
@@ -427,7 +429,7 @@ export function Results() {
     <main className="screen practice has-foot results">
       <SessionStrip pieceId={piece.id} />
       <PracticeBar up={up} heading title={piece.title}
-        sub={[part?.name, section ? lowerLabel(section.label) : (lr.sectionId === 'all' ? 'sing it all' : lr.sectionId === 'cold' ? 'cold start' : lr.sectionId === 'entries' ? 'entry drill' : whatSung), spec ? stepLabel(lr.level, step) : ''].filter(Boolean).join(' · ')} />
+        sub={[part?.name, section ? lowerLabel(section.label) : (lr.sectionId === 'all' && !drill ? 'sing it all' : lr.sectionId === 'cold' ? 'cold start' : lr.sectionId === 'entries' ? 'entry drill' : whatSung), spec ? stepLabel(lr.level, step) : ''].filter(Boolean).join(' · ')} />
 
       {/* Wide screens: what happened (the verdict, the path) beside what to fix (the notes, bar by bar); the rest under it. */}
       <div className="lay res-cols">
@@ -566,7 +568,7 @@ export function Results() {
               const v = r.perMeasure[m];
               // Level 1: a bar with a wrong note needs work, whatever its average.
               const bg = wrongBars.has(m) ? 'var(--accent)' : v >= 0.85 ? 'var(--voice)' : v >= 0.6 ? 'var(--voice-deep)' : 'var(--accent)';
-              return <button key={m} aria-label={`${cellName(m)}: ${Math.round(v * 100)}%`} title={`${cellName(m)} · ${Math.round(v * 100)}%`} style={{ background: bg, color: bg === 'var(--voice-deep)' ? 'var(--text)' : 'var(--accent-ink)', fontSize: '0.8125rem', fontWeight: 700, fontFamily: 'var(--mono)' }} onClick={() => playLoop(m - 1, m + 1)}>{cellText(m)}</button>;
+              return <button key={m} aria-label={`${cellName(m)}: ${Math.round(v * 100)}%`} title={`${cellName(m)} · ${Math.round(v * 100)}%`} style={{ background: bg, color: bg === 'var(--voice-deep)' ? 'var(--text)' : 'var(--accent-ink)', fontSize: '0.875rem', fontWeight: 700, fontFamily: 'var(--mono)' }} onClick={() => playLoop(m - 1, m + 1)}>{cellText(m)}</button>;
             })}
           </div>
           <div className="row t14 muted" style={{ gap: 14 }}>
@@ -612,7 +614,8 @@ export function Results() {
       )}
 
       <div className="col" style={{ gap: 8 }}>
-        <button className="btn ghost block" onClick={() => go({ name: 'ranks' })}>Leaderboard</button>
+        {/* (a leaderboard is a choir's: none without one) */}
+        {loadProfile().choirCode && <button className="btn ghost block" onClick={() => go({ name: 'ranks' })}>Leaderboard</button>}
         <AccountTip />
         <ShareRecording pieceId={lr.pieceId} partId={lr.partId} />
       </div>
@@ -653,7 +656,7 @@ function PracticeNotice({ lr, speakerRun, wrongCount }: { lr: LR; speakerRun: bo
             : lr.full ? <>, so it doesn't count toward the piece's level.{lr.level === 5 && /peeked|showing/.test(lr.notCounted ?? '') ? ' When you feel ready, choose “Test: all hidden” and sing it without peeking.' : ' Sing it all in one go, in tempo, for it to count.'}</>
               : lr.level === 5 && !/stopped early/.test(lr.notCounted ?? '') ? <>, so it doesn't count toward memorising the passage yet. When you feel ready, choose “Test: all hidden” and sing it without peeking.</>
                 : <>. Sing the whole passage at the step's tempo for it to count.</>}
-          {lr.timingUnsure != null && <> <button className="linklike" onClick={() => go({ name: 'setup' })}>Open Voice setup</button></>}
+          {lr.timingUnsure != null && <> <button className="linklike inline" onClick={() => go({ name: 'setup' })}>Open Voice setup</button></>}
           </>}
       </p>
     </div>
@@ -1019,7 +1022,7 @@ function WordsResults({ lr, words }: { lr: NonNullable<ReturnType<typeof getLast
           {measureIdx.map((m) => {
             const v = res.perMeasure[m];
             const bg = v >= 0.85 ? 'var(--voice)' : v >= 0.6 ? 'var(--voice-deep)' : 'var(--accent)';
-            return <span key={m} aria-label={`${cellName(m)}: ${Math.round(v * 100)}%`} style={{ background: bg, height: 30, borderRadius: 3, color: bg === 'var(--voice-deep)' ? 'var(--text)' : 'var(--accent-ink)', fontSize: '0.8125rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--mono)' }}>{cellText(m)}</span>;
+            return <span key={m} aria-label={`${cellName(m)}: ${Math.round(v * 100)}%`} style={{ background: bg, height: 30, borderRadius: 3, color: bg === 'var(--voice-deep)' ? 'var(--text)' : 'var(--accent-ink)', fontSize: '0.875rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--mono)' }}>{cellText(m)}</span>;
           })}
         </div>
       )}

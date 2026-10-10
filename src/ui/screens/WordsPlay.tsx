@@ -256,7 +256,7 @@ export function WordsPlay({ route }: { route: PlayRoute }) {
           <div className="grow" />
           {running ? (
             <>
-              <button className="btn small" onClick={() => sessionRef.current?.finish()}><IconStop size={14} /> Finish</button>
+              <button className="btn small" onClick={() => sessionRef.current?.finish()}><IconStop size={14} /> Stop</button>
               <button className="big-play" aria-label="Pause" onClick={() => { sessionRef.current?.pause(); setPhase('paused'); }}><IconPause /></button>
             </>
           ) : (

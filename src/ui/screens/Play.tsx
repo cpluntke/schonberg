@@ -70,6 +70,9 @@ function SingPlay({ route }: { route: PlayRoute }) {
   const [profile, updateProfile] = useProfile();
   const piece = getPiece(route.pieceId);
   const part = piece?.score.parts.find((p) => p.id === route.partId);
+  // A drill made for the day (the tricky leaps, the twelve-tone row): no piece levels, no passages.
+  const drill = !!piece && /^(row|leaps)-/.test(piece.id);
+  const drillWhat = piece && /^leaps-/.test(piece.id) ? 'your tricky leaps' : 'the twelve-tone row';
   const level = Math.max(0, Math.min(MAX_LEVEL, route.level | 0));
   const listenOnly = level === 0;
   // The step (docs/LEVELS.md): from the route, else the passage's current step for this level. Full
@@ -91,7 +94,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
       const from = route.from ?? 0;
       const to = route.to ?? piece.score.duration;
       const bar = piece.score.measures.find((m) => Math.abs(m.start - from) < 1e-3);
-      const label = route.sectionId === 'all' ? 'Whole piece' : route.sectionId === 'entries' ? 'Entry drill'
+      const label = route.sectionId === 'all' ? (drill ? (/^leaps-/.test(piece.id) ? 'Your tricky leaps' : 'The row') : 'Whole piece') : route.sectionId === 'entries' ? 'Entry drill'
         : route.sectionId === 'cold' ? `Cold start: bar ${bar?.number ?? ''}` : 'Drill';
       return { id: route.sectionId, label, start: from, end: to };
     }
@@ -203,7 +206,8 @@ function SingPlay({ route }: { route: PlayRoute }) {
   // The score view on a phone: the live reading in big words above the music (not in landscape,
   // where the height is the music's); the canvas then draws only the voice dot, not its bubble.
   const short = useMedia('(max-height: 520px)');
-  const readoutOn = route.mode === '2d' && display === 'score' && !fullScore && !listenOnly && !short;
+  // (not off book: the hidden notes have no reading to show, it would say "Listening…" all run)
+  const readoutOn = route.mode === '2d' && display === 'score' && !fullScore && !listenOnly && !short && !offBook;
   // A run over more than one passage (the whole piece, a long stretch): a strip of its bars.
   const progress = useMemo(() => (piece && section && route.mode === '2d' ? runProgress(piece.score, piece.sections, section.start, section.end) : null),
     [piece, section, route.mode]);
@@ -355,7 +359,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
     const fullTempo = rateOverride == null || rateOverride >= (spec?.rate ?? 1) - 1e-6;
     // A run-through of the whole piece earns the piece level (docs/LEVELS.md), but only in one go:
     // not stopped early, not paused and resumed, at the level's tempo.
-    const isFull = section.id === 'all';
+    const isFull = section.id === 'all' && !drill;
     const resumed = !!sess?.resumed;
     const arcade = route.mode === '3d';
     // Level 1 counts only with headphones on (the answer on the pre-run card); without, it's practice.
@@ -636,7 +640,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
   const levelInfo = spec ?? null;
   const running = phase === 'running';
   // A run of the whole piece: the sections still to fix at this level (it can't count until they're done).
-  const isFullRun = section.id === 'all' && !listenOnly;
+  const isFullRun = section.id === 'all' && !listenOnly && !drill;
   // Level 1 counts only with headphones on: ask before a run that could count (a section or the
   // whole piece; drills and cold starts never count). Remembered on this phone.
   const askHeadphones = !listenOnly && !!spec?.headphones && (isFullRun || !GENERATED_SECTIONS.has(section.id));
@@ -659,7 +663,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
   const fullFixes = isFullRun ? fixesBefore(fullSecs, getProgress(piece.id, part.id), level) : [];
 
   // What the run covers, inside a sentence: "bars 22–29", "the whole piece".
-  const what = section.id === 'all' ? 'the whole piece'
+  const what = drill ? drillWhat : section.id === 'all' ? 'the whole piece'
     : realSec ? lowerLabel(section.label)
       : (() => { const [a, b] = sectionBars(piece.score, section.start, section.end); return barRangeLabel(piece.score, a, b, true); })();
   // A passage's note gone wrong most lately: "Watch bar 25."
@@ -860,7 +864,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
                         ? <span>The full score: your part is the staff with the <span style={{ color: 'var(--voice)' }}>blue</span> band, the other voices are drawn plainly. The white line moves through the bars: sing the note it's on in your staff (it glows <span style={{ color: 'var(--accent)' }}>orange</span>).</span>
                         : <span>Your part as sheet music. The white line moves through the bar: sing the note it's on (it glows <span style={{ color: 'var(--accent)' }}>orange</span>).</span>}
                       <span><span style={{ color: 'var(--voice)' }}>━</span> Your voice draws a blue line at its exact height on the staff: just under the note means flat, just over means sharp (light orange when out of tune).</span>
-                      <span>Notes turn <span style={{ color: 'var(--voice)' }}>blue</span> when sung well, <span style={{ color: 'var(--warn)' }}>yellow</span> when close, <span style={{ color: 'var(--bad)' }}>red</span> when missed. The bubble says how close you are: spot on, a touch, a little or clearly flat or sharp. Prefer moving bars? Choose Highway under Display &amp; tempo.</span>
+                      <span>Notes turn <span style={{ color: 'var(--voice)' }}>blue</span> when sung well, <span style={{ color: 'var(--warn)' }}>yellow</span> when close, <span style={{ color: 'var(--bad)' }}>red</span> when missed. {readoutOn ? 'The box above the music says' : 'The bubble says'} how close you are: spot on, a touch, a little or clearly flat or sharp. Prefer moving bars? Choose Highway under Display &amp; tempo.</span>
                     </>
                   ) : (
                     <>
@@ -973,7 +977,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
             );
           })}
         </div>
-        {/* With Peek too, Restart and Finish show only their icons on a phone (Pause always fits). */}
+        {/* With Peek too, Restart and Stop show only their icons on a phone (Pause always fits). */}
         {/* While singing: Restart (an icon on a phone), then Stop and Pause, equal and plain (no
             orange while you sing). Otherwise the round ▶ to carry on. */}
         <div className={`row play-actions${offBook && running && hiddenRef.current.size > 0 ? ' compact' : ''}`}>

@@ -18,7 +18,7 @@ await page.getByRole('button', { name: 'Resume' }).click(); await sleep(3000); a
 await page.getByRole('button', { name: 'Restart' }).first().click(); await sleep(1000); await st('after restart'); await shot(page, '07-after-restart');
 // finish early
 await sleep(4000);
-await page.getByRole('button', { name: 'Finish' }).click(); await sleep(2000); await st('after finish');
+await page.getByRole('button', { name: 'Stop', exact: true }).click(); await sleep(2000); await st('after finish');
 await shot(page, '07-finish-early-results');
 console.log((await page.innerText('main')).replace(/\n+/g,' | ').slice(0, 400));
 // pause during count-in then quit
@@ -33,7 +33,7 @@ await page.getByRole('button', { name: 'Quit' }).click(); await sleep(1500); awa
 // Finish during count-in
 await open(PLAY);
 await page.getByTestId('start').click(); await sleep(500);
-await page.getByRole('button', { name: 'Finish' }).click(); await sleep(2000); await st('finish during count-in');
+await page.getByRole('button', { name: 'Stop', exact: true }).click(); await sleep(2000); await st('finish during count-in');
 await shot(page, '07-finish-countin');
 console.log((await page.innerText('main')).replace(/\n+/g,' | ').slice(0, 300));
 // back during play

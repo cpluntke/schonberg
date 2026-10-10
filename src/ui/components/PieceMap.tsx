@@ -93,14 +93,14 @@ export function PieceMap({ score, part, sections, bars, onLoop }: {
                   aria-label={`Bar ${label(m)}: ${empty ? 'rest' : LABEL[k]}${g.length ? ` (${[...new Set(g.map((x) => x[1]))].join(', ')})` : ''}. Loop this bar`}
                   style={{
                     position: 'relative', minHeight: 44, padding: '3px 2px 2px', border: 'none', borderRadius: 6,
-                    background: empty ? 'transparent' : k === 'none' ? MASTERY_COLOR[k] : mix(MASTERY_COLOR[k], 20),
+                    background: empty ? 'transparent' : k === 'none' ? 'var(--map-none)' : k === 'ok' ? 'var(--map-ok)' : mix(MASTERY_COLOR[k], 20),
                     outline: empty ? '1px dashed var(--line)' : `1px solid ${MASTERY_COLOR[k]}`, outlineOffset: -1,
                     display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 1,
                   }}>
-                  <span className="mono" style={{ fontSize: '0.8125rem', color: 'var(--muted)', textAlign: 'left', lineHeight: 1 }}>{label(m)}</span>
+                  <span className="mono" style={{ fontSize: 'min(0.875rem, 3.4vw)', color: 'var(--muted)', textAlign: 'left', lineHeight: 1 }}>{label(m)}</span>
                   <Contour part={part} score={score} m={m} color={k === 'none' ? 'var(--muted)' : k === 'ok' ? 'var(--voice)' : MASTERY_COLOR[k]} />
                   {g.length > 0 && (
-                    <span style={{ position: 'absolute', top: 1, right: 3, fontSize: '0.8125rem', fontWeight: 800, color: 'var(--accent-text)' }}>{[...new Set(g.map((x) => x[0]))].slice(0, 2).join('')}</span>
+                    <span style={{ position: 'absolute', top: 1, right: 3, fontSize: 'min(0.875rem, 3.4vw)', fontWeight: 800, color: 'var(--accent-text)' }}>{[...new Set(g.map((x) => x[0]))].slice(0, 2).join('')}</span>
                   )}
                 </button>
               );

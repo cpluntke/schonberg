@@ -504,7 +504,7 @@ export function SessionStrip({ pieceId, lab, compact }: { pieceId?: string; lab?
         {ses.plan.steps.map((s, i) => <i key={s.id} className={ses.status.done[i] ? 'done' : i === ses.index ? 'now' : ''} />)}
       </span>
       <span className="grow" />
-      <span className="muted mono nowrap" aria-label={`${ses.status.minutesLeft} minutes left`}>{ses.status.minutesLeft} min</span>
+      {ses.status.minutesLeft > 0 && <span className="muted mono nowrap" aria-label={`${ses.status.minutesLeft} minutes left`}>{ses.status.minutesLeft} min</span>}
       {lab && (
         ses.next
           ? <button className="link inline" data-testid="session-next" onClick={() => goStep(ses.next!)}>{curDone ? 'Next ›' : 'Skip ›'}</button>

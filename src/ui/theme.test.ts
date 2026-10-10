@@ -91,7 +91,7 @@ describe('contrast (WCAG AA: 4.5:1 for text)', () => {
     it(`${name}: text colours on every ground`, () => {
       const grounds = ['bg', 'bg-2', 'surface', 'surface-2'];
       const fails: string[] = [];
-      for (const fg of ['text', 'muted', 'accent-text', 'voice', 'good', 'bad']) {
+      for (const fg of ['text', 'muted', 'accent-text', 'voice', 'good', 'bad', 'warn', 'accent', 'star', 'expert']) {
         for (const bg of grounds) if (contrast(t[fg], t[bg]) < 4.5) fails.push(`${fg} on ${bg}: ${contrast(t[fg], t[bg]).toFixed(2)}`);
       }
       // Tinted grounds and what is written on them.

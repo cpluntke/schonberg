@@ -134,7 +134,8 @@ export function App() {
   const isAdmin = ADMIN_ROUTES.includes(route.name);
   // Phones: the tab bar under the four tabs (and the staff screens); sub-screens have their back arrow.
   // Wide screens: the sidebar on sub-screens too; never while practising.
-  const showNav = showsTabBar(route);
+  // (a staff screen opened to log in, with no staff login on this phone: a sub-screen with its back arrow, no tab bar)
+  const showNav = showsTabBar(route) && !(isAdmin && !staff.label);
   const sidebar = showsSidebar(route);
 
   let body: React.ReactNode;

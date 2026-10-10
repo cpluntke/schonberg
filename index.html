@@ -6,6 +6,17 @@
     <meta name="theme-color" content="#0B0D1A" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- Settings → Display before any CSS paints (no flash of the dark theme); ui/theme.ts takes over. -->
+    <script>
+      try {
+        var p = JSON.parse(localStorage.getItem('sh:profile') || '{}'), d = document.documentElement;
+        if (p.appearance === 'light' || (p.appearance === 'system' && matchMedia('(prefers-color-scheme: light)').matches)) {
+          d.setAttribute('data-theme', 'light');
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#F5F6FA');
+        }
+        if (p.textSize === 'large' || p.textSize === 'larger') d.setAttribute('data-text', p.textSize);
+      } catch (e) { /* storage blocked: the defaults */ }
+    </script>
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png" />
     <title>Schönberg Hero</title>

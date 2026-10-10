@@ -56,8 +56,12 @@ describe('the score view on a phone', () => {
       expect(sp).toBeGreaterThanOrEqual(14);
       expect(Number(/(\d+)px/.exec(nameFontFor(sp))![1])).toBeGreaterThanOrEqual(15);
     }
-    // A small phone with big text: one big system rather than two small ones.
-    expect(staffSpace(375, 330, 15.5).sp).toBeGreaterThanOrEqual(14);
+    // A small phone with big text, scrolling: one big system rather than two small ones…
+    expect(staffSpace(375, 330, 15.5, true).sp).toBeGreaterThanOrEqual(14);
+    // …turning pages: still two systems (the next line in view at a turn), down to 9.5 px spaces.
+    const page = staffSpace(375, 330, 15.5, false).sp;
+    expect(page).toBeGreaterThanOrEqual(9.5);
+    expect(2 * 15.5 * page).toBeLessThanOrEqual(330);
     // Landscape and laptops: as before.
     expect(staffSpace(844, 300, 12).sp).toBeLessThanOrEqual(12);
   });

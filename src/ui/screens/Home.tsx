@@ -123,7 +123,7 @@ export function Home() {
         <span className="t14 muted" data-testid="rehearsal-focus">
           The next rehearsal also works on{' '}
           {focusMissing.map((w, i) => (
-            <span key={w.title}>{i ? ', ' : ''}<button className="linklike" onClick={() => go({ name: 'pieces' })}>{w.title}</button></span>
+            <span key={w.title}>{i ? ', ' : ''}<button className="linklike inline" onClick={() => go({ name: 'pieces' })}>{w.title}</button></span>
           ))}{' '}(import your score first).
         </span>
       )}
@@ -302,7 +302,7 @@ function IntonationCard({ inProgramme = false }: { inProgramme?: boolean }) {
       onClick={() => go({ name: 'intonation' })}>
       <div className="row between">
         <strong>Intonation courses</strong>
-        <span className="badge">{inProgramme ? 'Your choir recommends' : 'Train'}</span>
+        {inProgramme ? <span className="crs-rec" style={{ whiteSpace: 'nowrap', flex: 'none' }}>Your choir recommends</span> : <span className="badge">Train</span>}
       </div>
       <span className="small muted">Find the pure fifth and the pure major third by ear: listen, tune by hand, then sing.</span>
       <span className="tiny mono" style={{ color: 'var(--voice)' }}>Fifth: {step('fifth')} · Third: {step('third')}</span>

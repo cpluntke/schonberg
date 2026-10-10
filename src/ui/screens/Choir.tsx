@@ -927,7 +927,7 @@ export function SuperAdmin() {
     <>
       <div className="row wrap" style={{ gap: 8, alignItems: 'center' }}>
         <button className="btn small" data-testid="open-usage" onClick={() => go({ name: 'usage' })}>Usage insights</button>
-        <button className="linklike" style={{ minHeight: 44 }} data-testid="super-logout" onClick={() => void superLogout()}>Log out of super admin</button>
+        <button className="linklike" style={{ minHeight: 44 }} data-testid="super-logout" onClick={() => { void superLogout().then(() => go({ name: 'home' })); }}>Log out of super admin</button>
       </div>
       {err && <div className="notice" role="alert">{err}</div>}
       {created ? (

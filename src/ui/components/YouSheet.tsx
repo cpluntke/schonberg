@@ -125,7 +125,7 @@ export function YouSheet({ onClose }: { onClose: (then?: () => void) => void }) 
 
   const rows: Row[] = [
     { id: 'voice', icon: <IconUser />, title: 'You & voice', sub: `${voiceName(profile.voice)} · ${range} · voice setup`, open: settingsAt('settings-voice') },
-    { id: 'practice', icon: <IconTimer />, title: 'Practice', sub: `${goal} day${goal === 1 ? '' : 's'} a week · ${reminder.on ? `reminder ${reminder.time}` : 'reminder'} · note names · strictness`, open: settingsAt('settings-practice') },
+    { id: 'practice', icon: <IconTimer />, title: 'Practice', sub: `${goal} day${goal === 1 ? '' : 's'} a week · ${reminder.on ? `reminder ${reminder.time}` : 'no reminder'} · note names · strictness`, open: settingsAt('settings-practice') },
     { id: 'progress', icon: <IconChart />, title: 'Your progress', sub: 'Weeks, levels, getting better', open: to({ name: 'progress' }) },
     {
       id: 'choir', icon: <IconPeople />, title: 'Choir & account',

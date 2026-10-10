@@ -12,7 +12,7 @@ import {
   throttle, TOTAL_BUDGET, uploadProgress, type ProgressSnapshot, SNAPSHOT_VERSION, encodeSection, decodeSection,
 } from './sync';
 import { saveSession, type Session } from './choir';
-import { decodeLab, encodeLab, mergeLab } from './sync';
+import { decodeLab, encodeLab, hasPassed, mergeLab } from './sync';
 import { loadLab, saveLab, type LabProgress, type LabTrack } from '../game/intonation';
 
 const DAY = 86_400_000;
@@ -978,5 +978,17 @@ describe('fix round: the lab merge after a slipped check', () => {
     expect(m.fifth.review).toEqual({ due: '2026-10-19' });
     expect(m.fifth.lastCheck).toEqual({ day: '2026-10-11', kept: true });
     expect(m.fifth.redoneOn).toBe('2026-10-12');
+  });
+});
+
+describe('what is worth saving with the account', () => {
+  it('progress in an intonation course alone counts (rounds taken or a step passed)', () => {
+    expect(hasPassed()).toBe(false);
+    saveLab({ fifth: { rung: 1, logs: { 1: [0, 1] } }, third: { rung: 1, logs: {} } });
+    expect(hasPassed()).toBe(true);
+    saveLab({ fifth: { rung: 2, logs: {} }, third: { rung: 1, logs: {} } });
+    expect(hasPassed()).toBe(true);
+    saveLab({ fifth: { rung: 1, logs: {} }, third: { rung: 1, logs: {} } });
+    expect(hasPassed()).toBe(false);
   });
 });

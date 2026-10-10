@@ -15,7 +15,7 @@ Every singer has them; there is no admin or programme gate any more. A choir **r
 putting the lab into a cycle's programme, like a piece (the cycle editor, "Intonation lab" under
 Pieces, or the choir's Library, "Put it in the programme"); in a programme it is the id
 `lab:intonation` (`LAB_ID`): not a score, so piece lists, readiness and ranks skip it. Then the course
-page and Train's course card say "Your choir recommends", Home keeps its "Intonation courses" card,
+page and Train's course card say "Your choir recommends", Today keeps its "Intonation courses" card,
 and Today offers the warm-up (below).
 
 - **Train** (C1): today's warm-up (the active course's next step, while it isn't done today), the tools

@@ -16,7 +16,7 @@ console.log('restart->complete:', await T(200));
 // 3 finish at ~60% of section
 await page.goto(BASE + '?simulate=perfect#/play/bach-bwv315/P3/s0-m0-5?level=2'); await sleep(1500);
 await page.getByTestId('start').click(); await sleep(16000);
-await page.getByRole('button', { name: 'Finish' }).click();
+await page.getByRole('button', { name: 'Stop', exact: true }).click();
 await page.waitForFunction(() => location.hash.includes('results'), null, { timeout: 30000 }); await sleep(600);
 console.log('finish at ~60%:', await T(450)); await shot(page, '17-finish-partial');
 // 4 due for review

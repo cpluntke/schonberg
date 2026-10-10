@@ -37,10 +37,9 @@ export function pitchTag(cents: number): string {
   return d === 'spot on' ? d : `${cents < 0 ? '↓' : '↑'} ${pitchWords(cents)}`;
 }
 
-/** The live readout while singing (a small bubble): "spot on", "↓ a touch", "↑ a little", "↓ clearly". */
+/** The live bubble while singing (highway, landscape, laptop): "spot on", "↓ a touch flat", "↑ a little sharp" (as the readout and pitchTag). */
 export function pitchShort(cents: number): string {
-  const d = pitchDegree(cents);
-  return d === 'spot on' ? d : `${cents < 0 ? '↓' : '↑'} ${d}`;
+  return pitchTag(cents);
 }
 
 /**

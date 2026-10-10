@@ -26,7 +26,7 @@ import { dateWords, finishToday, goStep, shortTitle, stepShort, todaySession } f
 import { dayOf, daysBetween } from '../../progress/today';
 import { loadCycle, loadProfile } from '../../progress/store';
 import { getPiece, chosenPartId, type PieceInfo } from '../library';
-import { syncEnabled, syncProgressSoon } from '../../progress/sync';
+import { savedSince, syncEnabled, syncProgressSoon } from '../../progress/sync';
 
 type LabRoute = Extract<Route, { name: 'intonation' }>;
 
@@ -126,14 +126,15 @@ function GoalLines({ goal, how }: { goal: string; how?: React.ReactNode }) {
 function Tries({ label, results, ok, total, more, done }: { label: string; results: number[]; ok: (v: number) => boolean; total: number; more: string; done?: boolean }) {
   // (passed, or a quick check finished: all its tries, no ring for a next one)
   const passed = more === 'Passed' || !!done;
-  const shown = passed ? results.slice(-total) : results.slice(-(total - 1));
+  // (the window the rule counts: the last `total` answers; the next one's ring is numbered until the window is full)
+  const shown = results.slice(-total);
   const pure = results.slice(-total).filter(ok).length;
   return (
     <div className="crs-tries" role="group" aria-label={`${label}: ${pure} of the last ${Math.min(total, results.length)} · ${more}`} data-testid="lab-tries">
       <strong className="t16">{label}</strong>
       <span className="row crs-checks" aria-hidden="true">
         {shown.map((v, i) => <Check key={i} state={ok(v) ? 'done' : 'miss'} />)}
-        {!passed && <Check state="now" n={results.length + 1} />}
+        {!passed && <Check state="now" n={results.length < total ? results.length + 1 : undefined} />}
       </span>
       <span className={`t14 crs-more${more === 'Passed' ? ' good-text' : ''}`}>{more}</span>
     </div>
@@ -371,7 +372,8 @@ function CourseOverview({ iv, lab, root }: { iv: LabInterval; lab: LabProgress; 
             <span className="sub">Step {cur} · {c.steps[cur - 1].minutes} min</span>
           </button>
         )}
-        <span className="t14 muted center">{syncEnabled() ? 'Saved to your account · picks up on any phone' : 'Saved on this phone (and with your choir account, once you join it)'}</span>
+        <span className="t14 muted center" data-testid="lab-saved">{!syncEnabled() ? 'Saved on this phone (and with your choir account, once you join it)'
+          : savedSince(t.at ?? 0) ? 'Saved to your account · picks up on any phone' : 'Saved on this phone · goes to your account in a moment'}</span>
       </div>
     </main>
   );
@@ -509,7 +511,7 @@ function CourseDone({ iv, lab }: { iv: LabInterval; lab: LabProgress }) {
       </div>
       <section className="band" aria-labelledby="crs-done-h">
         <span className="eb good-text">Course complete{doneDay ? ` · ${dateWords(doneDay)}` : ''}</span>
-        <h2 id="crs-done-h">{c.done}</h2>
+        <h1 id="crs-done-h">{c.done}</h1>
         <div className="row" style={{ gap: 10 }}><CourseChecks iv={iv} lab={lab} /><span className="t14 muted">all {RUNGS} steps</span></div>
         <ul className="crs-cando">
           {c.canDo.map((x) => <li key={x} className="t16">{x}</li>)}

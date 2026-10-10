@@ -1408,7 +1408,7 @@ export function lyricFontFor(sp: number) {
 // (Phones: a staff space of 14 px gives 15 px note names and 18 px words; laptops' full score keeps
 // its 10–11 px. Both grow with Settings → Display → Text size.)
 // (a phone-sized staff, 12 px spaces and up, never has names under 15 px or words under 16 px)
-const lyricPx = (sp: number) => fpx(Math.max(sp >= 12 ? 16 : 11, Math.min(18, sp * 1.3)));
+const lyricPx = (sp: number) => fpx(sp >= 12 ? Math.max(16, Math.min(18, sp * 1.3)) : Math.max(11, Math.min(15, sp * 1.45)));
 const namePx = (sp: number) => fpx(Math.max(sp >= 12 ? 15 : 10, Math.min(17, sp * 1.1)));
 
 /** Note names: a little smaller than the words, in their own row between the staff and the words. */
@@ -1455,14 +1455,18 @@ export function nameMeasure(c: Ctx, font: string, notation: NotationMode): NameW
 /** A phone held upright (its canvas can be about square on a small phone under big text), or a tall view. */
 export const uprightView = (W: number, H: number) => (W < 600 ? H > W * 0.6 : H > W * 1.15);
 
+/** Turning pages on an upright phone keeps two systems down to this staff space (px). */
+export const PAGE_MIN_SP = 9.5;
+
 /** Staff-space size: a portrait phone gets two big systems (or two rows of the scrolling line), filling
  *  the height, so the sung line's height against the notes reads and the note names are 15 px+
  *  (a 390 px phone: 15 px spaces, a 60 px staff); landscape shows two smaller systems. */
-export function staffSpace(W: number, H: number, perSys: number): { sp: number; floor: number } {
+export function staffSpace(W: number, H: number, perSys: number, scroll = true): { sp: number; floor: number } {
   if (uprightView(W, H)) {
-    // (two systems when they fit at a 12 px staff space; a small phone with big text: one, larger)
+    // Two systems when they fit at a 12 px staff space (turning pages: down to 9.5 px, so the next
+    // line is always in view at a turn); a small phone with big text, scrolling: one, larger.
     const two = (H - 8) / (2 * perSys);
-    const sp = Math.max(6.5, Math.min(16, W / 26, two >= 12 ? two : (H - 8) / perSys));
+    const sp = Math.max(6.5, Math.min(16, W / 26, two >= (scroll ? 12 : PAGE_MIN_SP) ? two : scroll ? (H - 8) / perSys : PAGE_MIN_SP));
     return { sp, floor: Math.max(6.5, Math.min(sp, W / 34)) };
   }
   const sp = Math.max(6.5, Math.min(12, (H - 8) / (2 * perSys), W / 44));
@@ -1494,25 +1498,35 @@ function getLayout(c: Ctx, W: number, H: number, s: DrawState): Cached {
   let { nameOff, lyricOff } = rows(12);
   let below = lyricOff + 1.3;
   let perSys = above + 4 + below;
-  let { sp, floor } = staffSpace(W, H, perSys);
-  let layout: StaffLayout;
-  // Bigger staff, but a bar never squeezed much below its natural width (shrink until it fits).
-  for (let guard = 0; ; guard++) {
-    const nameW = names ? nameMeasure(c, nameFontFor(sp), s.notation) : undefined;
-    c.font = lyricFontFor(sp);
-    const textW = (t: string) => c.measureText(t).width;
-    layout = layoutStaff(s.score, s.part, m0, m1, { width: W, sp, textW, nameW, maxBars: W < 520 ? 3 : W < 860 ? 4 : 6, ...(s.scroll ? { scroll: SCROLL_BARS } : {}) });
-    // (a scrolling line is never squeezed: it is as long as it needs to be)
-    if (s.scroll) break;
-    let worst = Infinity;
-    for (const sy of layout.systems) worst = Math.min(worst, sy.squeeze);
-    if (worst >= 0.9 || sp <= floor + 1e-6 || guard >= 6) break;
-    sp = Math.max(floor, sp * 0.92);
-  }
-  if (names) {
-    ({ nameOff, lyricOff } = rows(sp));
-    below = lyricOff + 1.3;
-    perSys = above + 4 + below;
+  let { sp, floor } = staffSpace(W, H, perSys, !!s.scroll);
+  let layout!: StaffLayout;
+  const lay = () => {
+    // Bigger staff, but a bar never squeezed much below its natural width (shrink until it fits).
+    for (let guard = 0; ; guard++) {
+      const nameW = names ? nameMeasure(c, nameFontFor(sp), s.notation) : undefined;
+      c.font = lyricFontFor(sp);
+      const textW = (t: string) => c.measureText(t).width;
+      layout = layoutStaff(s.score, s.part, m0, m1, { width: W, sp, textW, nameW, maxBars: W < 520 ? 3 : W < 860 ? 4 : 6, ...(s.scroll ? { scroll: SCROLL_BARS } : {}) });
+      // (a scrolling line is never squeezed: it is as long as it needs to be)
+      if (s.scroll) break;
+      let worst = Infinity;
+      for (const sy of layout.systems) worst = Math.min(worst, sy.squeeze);
+      if (worst >= 0.9 || sp <= floor + 1e-6 || guard >= 6) break;
+      sp = Math.max(floor, sp * 0.92);
+    }
+    if (names) {
+      ({ nameOff, lyricOff } = rows(sp));
+      below = lyricOff + 1.3;
+      perSys = above + 4 + below;
+    }
+  };
+  lay();
+  // Turning pages upright: two whole systems (the rows were sized for a typical staff; once more if
+  // the names and words at this size make a system too tall for two).
+  if (!s.scroll && uprightView(W, H) && 2 * perSys * sp > H - 8 && sp > PAGE_MIN_SP + 1e-6) {
+    sp = Math.max(PAGE_MIN_SP, ((H - 8) / (2 * perSys)) * 0.99);
+    floor = Math.min(floor, sp);
+    lay();
   }
   cache = {
     key, layout, above, below, band: perSys * sp, lyricFont: lyricFontFor(sp), lyricOff,
@@ -1758,7 +1772,11 @@ function drawStaffScroll(c: Ctx, W: number, H: number, s: DrawState) {
     for (let j = 0; j < systems.length; j++) {
       const sy = systems[j];
       if (sy.x1 - off2 < pinned - 2 * sp || sy.prefixEnd - off2 > W + 2 * sp) continue;
-      if (!key2 && sy.x1 - off2 > pinned) key2 = sy.key;
+      // (the key in force at row 2's left edge: the bar there, not the stretch's start)
+      if (!key2 && sy.x1 - off2 > pinned) {
+        const m = sy.measures.find((q) => q.x1 - off2 > pinned);
+        key2 = m ? keyAtBeat(s.score, m.sm.startBeat) : sy.key;
+      }
       drawSystem(c, { j, sys: sy, sd: sysDraw(L, j, s), top: top2, mid: top2 + 2 * sp }, layout, L, s, v);
     }
     c.restore();

@@ -25,8 +25,8 @@ describe('the pitch word scale', () => {
     expect(pitchTag(-65)).toBe('↓ clearly flat');
     expect(pitchTag(40)).toBe('↑ a little sharp');
     expect(pitchTag(-2)).toBe('spot on');
-    expect(pitchShort(-30)).toBe('↓ a little');
-    expect(pitchShort(70)).toBe('↑ clearly');
+    expect(pitchShort(-30)).toBe('↓ a little flat');
+    expect(pitchShort(70)).toBe('↑ clearly sharp');
     expect(pitchShort(5)).toBe('spot on');
   });
 

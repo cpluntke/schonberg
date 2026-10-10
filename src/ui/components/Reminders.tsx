@@ -52,7 +52,7 @@ export function ReminderSettings() {
             setTime(v);
             void setReminderTime(v).then((ok) => { if (!ok && loadReminder().on) setError("Couldn't reach the choir server: the new time is kept on this phone and sent next time."); });
           }}
-          style={{ width: 120, minHeight: 44, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--line)', padding: '0 8px' }} />
+          style={{ width: '8.5rem', minHeight: 44, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--line)', padding: '0 8px' }} />
       </label>
       <label className="toggle-row"><span>Only on days you haven't practised yet
         <span className="tiny muted" style={{ display: 'block' }}>Always on: once you've sung today, today's reminder doesn't come.</span></span>

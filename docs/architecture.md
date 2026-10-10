@@ -164,9 +164,8 @@ at the bottom of Diagnostics (and `#/superadmin`).
   sub-screen with its own back arrow. Wide screens keep the sidebar on sub-screens too. Practice
   screens (Play, Results, the words, the lyrics quiz, the memory map), voice setup and a course's
   steps and quick check have neither.
-- **The lit tab** (`tabOf`): Your progress → Today; Ranks → Choir; Expert, the tuner, the drone, the
-  courses → Train.
-  A piece, Settings and Diagnostics light the tab they were opened from (remembered per browser tab in
+- **The lit tab** (`tabOf`): Ranks → Choir; Expert, the tuner, the drone, the courses → Train.
+  A piece, Settings, Diagnostics and Your progress light the tab they were opened from (remembered per browser tab in
   `sessionStorage['sh:fromTab']`); opened straight from a link: Pieces (a piece) or Today.
 - **Old addresses**: `#/library` is the Pieces tab; `#/ranks` and `#/settings` are still screens of
   their own (reached from the Choir tab's "See all" and the You sheet).
