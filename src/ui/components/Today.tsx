@@ -381,7 +381,9 @@ function WhatMoved({ plan, log, status }: { plan: TodayPlan; log: ReturnType<typ
   const reached = loadReached();
   const lab = loadLab();
   const pieces = moved.length ? planPieces(Date.now(), loadCycle(), loadProfile().voice, log) : [];
-  const labPassed = plan.steps.filter((s, i) => s.kind === 'lab' && s.lab && !s.lab.tuneUp && status.done[i] && lab[s.lab.interval].rung > s.lab.rung);
+  const labPassed = plan.steps.filter((s, i) => s.kind === 'lab' && s.lab && !s.lab.tuneUp && !s.lab.check && status.done[i] && lab[s.lab.interval].rung > s.lab.rung);
+  // The course's quick check (taken today) and the redo after a slip (passed today) get their own lines.
+  const labChecks = plan.steps.filter((s) => s.kind === 'lab' && s.lab && ((s.lab.check && lab[s.lab.interval].lastCheck?.day === today) || (s.lab.redo && lab[s.lab.interval].redoneOn === today)));
   const rows = moved.map((m) => {
     const piece = getPiece(m.pieceId);
     const prog = pieces.find((p) => p.pieceId === m.pieceId && p.partId === m.partId);
@@ -406,7 +408,7 @@ function WhatMoved({ plan, log, status }: { plan: TodayPlan; log: ReturnType<typ
     return { key: `${m.pieceId}|${m.partId}`, title: piece.title, lines: [milestone, ...lines].filter(Boolean) as string[], next,
       nodes: meterNodes({ level: ps.pieceLevel, slow: ps.half && ps.working ? ps.working.level : 0, now: ps.working }) };
   }).filter((x): x is NonNullable<typeof x> => !!x);
-  if (!rows.length && !labPassed.length) return null;
+  if (!rows.length && !labPassed.length && !labChecks.length) return null;
   return (
     <section className="card" data-testid="what-moved">
       <h2 className="h3">What moved</h2>
@@ -431,6 +433,21 @@ function WhatMoved({ plan, log, status }: { plan: TodayPlan; log: ReturnType<typ
             </div>
           </div>
         ))}
+        {labChecks.map((s) => {
+          const t = lab[s.lab!.interval];
+          const held = s.lab!.check ? t.lastCheck?.kept === true : true;
+          return (
+            <div key={s.id} className="li" style={{ alignItems: 'flex-start' }} data-testid="moved-check">
+              <span className={`check ${held ? 'done' : 'miss'}`} aria-hidden="true">{held ? '✓' : '✗'}</span>
+              <div className="grow col" style={{ gap: 2 }}>
+                <strong className="t16">{s.lab!.interval === 'third' ? 'Pure third' : 'Pure fifth'}</strong>
+                <span className="t14 muted">{s.lab!.check
+                  ? (held ? 'Quick check: it held ✓' : 'Quick check: it slipped · sing it by ear once more')
+                  : 'Sing it by ear, once more ✓ · it locks again'}</span>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </section>
   );

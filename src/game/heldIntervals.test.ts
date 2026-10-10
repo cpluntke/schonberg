@@ -41,6 +41,9 @@ describe('"use it in your music": held fifths and thirds against another voice',
     const organ = { ...makePart('O', [whole(50), whole(50)]), name: 'Organ' };
     const held = makePart('A', [whole(57), whole(57)]);
     expect(heldIntervalSpot(makeScore([held, organ]), 'A', 7)).toBeNull();
+    // An instrument part with a short name ("Pno.") is voiceType 'other': left out too.
+    const pno = { ...makePart('P', [whole(50), whole(50)]), name: 'Pno.', voiceType: 'other' as const };
+    expect(heldIntervalSpot(makeScore([held, pno]), 'A', 7)).toBeNull();
     expect(heldIntervalSpot(makeScore([held]), 'A', 7)).toBeNull();
     expect(heldIntervalSpot(makeScore([held]), 'nope', 7)).toBeNull();
   });

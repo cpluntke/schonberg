@@ -5,7 +5,8 @@ import type { LastResult } from '../play/lastResult';
 import type { PieceInfo } from '../library';
 import { getPiece } from '../library';
 import { cycleLeaps, leapPiece, type Leap } from '../generated';
-import { go, leaveTo, setDrillHome, practiceParent } from '../router';
+import { go, leaveTo, practiceParent } from '../router';
+import { barsLabel } from '../../game/heldIntervals';
 import { registerVirtual } from '../library';
 import { PracticeBar } from '../components/PracticeBar';
 import { IconPlay, IconRestart } from '../icons';
@@ -44,24 +45,29 @@ export function LeapResults({ lr, piece }: { lr: LastResult; piece: PieceInfo })
   const hard = hardestLeap(out);
   const hardLeap = hard && where ? where[hard.i] : null;
   const hardPiece = hardLeap ? getPiece(hardLeap.pieceId) : undefined;
+  // The leap's bars: from the bar it starts in to the bar it lands in (a leap across a bar line is two).
+  const m0 = hardLeap ? Math.min(hardLeap.startMeasure ?? hardLeap.measure, hardLeap.measure) : 0;
   const bar = hardLeap && hardPiece ? hardPiece.score.measures[hardLeap.measure] : undefined;
+  const bar0 = hardLeap && hardPiece ? hardPiece.score.measures[m0] : undefined;
+  const bars = hardLeap && hardPiece ? barsLabel(hardPiece.score, m0, hardLeap.measure) : '';
   const semis = (i: number) => (part ? part.notes[2 * i + 1].midi - part.notes[2 * i].midi : 0);
   const up = practiceParent({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: 'all', level: 1, mode: '2d' }) ?? { name: 'train' };
+  const backLabel = up.name === 'train' ? 'Back to Train' : 'Back to expert mode';
   const day = dayOf(new Date());
   const today = loadToday(day);
   const dayOpen = !!today && today.started && !today.finished;
   const better = before ? landed - before.landed : 0;
 
   const practiseBar = () => {
-    if (!hardLeap || !bar) return;
-    go({ name: 'play', pieceId: hardLeap.pieceId, partId: hardLeap.partId, sectionId: 'drill', level: 1, step: 'slow', mode: '2d', from: bar.start, to: bar.start + bar.dur }, true);
+    if (!hardLeap || !bar || !bar0) return;
+    go({ name: 'play', pieceId: hardLeap.pieceId, partId: hardLeap.partId, sectionId: 'drill', level: 1, step: 'slow', mode: '2d', from: bar0.start, to: bar.start + bar.dur }, true);
   };
   const again = () => {
     const p = leapPiece();
     if (!p) return;
     registerVirtual(p);
-    setDrillHome('train');
-    go({ name: 'play', pieceId: p.id, partId: 'drill', sectionId: 'all', level: lr.level || 1, mode: '2d', step: 'slow' }, true);
+    // (the drill home stays where it was; the same level and step again)
+    go({ name: 'play', pieceId: p.id, partId: 'drill', sectionId: 'all', level: lr.level || 1, mode: '2d', step: lr.step ?? 'slow' }, true);
   };
 
   return (
@@ -88,7 +94,7 @@ export function LeapResults({ lr, piece }: { lr: LastResult; piece: PieceInfo })
       {hard && (
         <section className="card crs-hard" data-testid="leap-hardest">
           <span className="eb">Hardest today</span>
-          <strong className="h3">{leapWords(semis(hard.i))}{hardLeap ? ` · ${shortTitle(getPiece(hardLeap.pieceId)?.title ?? '')} bar ${bar?.number ?? hardLeap.measure + 1}` : ''}</strong>
+          <strong className="h3">{leapWords(semis(hard.i))}{hardLeap ? ` · ${shortTitle(getPiece(hardLeap.pieceId)?.title ?? '')} ${bars}` : ''}</strong>
           <span className="t16">
             {hard.note === 'start'
               ? (hard.cents == null ? 'The note it leaps from wasn’t heard clearly.' : `The note it leaps from was ${pitchPhrase(hard.cents)}.`)
@@ -98,14 +104,14 @@ export function LeapResults({ lr, piece }: { lr: LastResult; piece: PieceInfo })
       )}
       <div className="results-foot" data-testid="results-foot">
         {hardLeap && bar ? (
-          <button className="btn primary block" data-testid="leap-practise-bar" onClick={practiseBar}><IconPlay size={18} /> Practise bar {bar.number} slowly</button>
+          <button className="btn primary block" data-testid="leap-practise-bar" onClick={practiseBar}><IconPlay size={18} /> Practise {bars} slowly</button>
         ) : (
           <button className="btn primary block" data-testid={dayOpen ? 'finish-today' : 'leap-back'}
-            onClick={() => { if (dayOpen) { finishToday(); leaveTo({ name: 'home' }); } else leaveTo(up); }}>{dayOpen ? 'Finish for today' : 'Back to Train'}</button>
+            onClick={() => { if (dayOpen) { finishToday(); leaveTo({ name: 'home' }); } else leaveTo(up); }}>{dayOpen ? 'Finish for today' : backLabel}</button>
         )}
         <div className="row" style={{ gap: 8 }}>
           <button className="btn small" data-testid="again" onClick={again}><IconRestart size={16} /> Again</button>
-          {(hardLeap && bar || dayOpen) && <button className="btn small" data-testid="to-piece" onClick={() => leaveTo(up)}>Back to Train</button>}
+          {(hardLeap && bar || dayOpen) && <button className="btn small" data-testid="to-piece" onClick={() => leaveTo(up)}>{backLabel}</button>}
         </div>
         {dayOpen && hardLeap && bar && (
           <div className="foot-links"><button className="link" data-testid="finish-today" onClick={() => { finishToday(); leaveTo({ name: 'home' }); }}>Finish for today</button></div>

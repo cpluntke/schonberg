@@ -26,7 +26,7 @@ export interface HeldSpot {
   seconds: number;
 }
 
-const INSTRUMENT = /organ|orgel|piano|klavier|keyboard|accomp|continuo|harp|guitar|cembalo|harpsichord|instr/i;
+const INSTRUMENT = /organ|orgel|\borg\b|piano|\bpno\b|klavier|keyboard|accomp|continuo|harp|guitar|cembalo|harpsichord|instr|violin|\bvln\b|viol|cello|\bvc\b|bass(?:o)? continuo|flute|oboe|clarinet|bassoon|horn|trumpet|trombone|timpani/i;
 
 /** Semitones above the lower note: 7 (fifth) or 4 (major third). */
 export function heldIntervalSpot(score: Score, partId: string, semis: 7 | 4): HeldSpot | null {
@@ -34,7 +34,8 @@ export function heldIntervalSpot(score: Score, partId: string, semis: 7 | 4): He
   if (!mine || !mine.notes.length) return null;
   let best: HeldSpot | null = null;
   for (const other of score.parts) {
-    if (other.id === partId || INSTRUMENT.test(other.name) || !other.notes.length) continue;
+    // Sung parts only (as fullscore.voiceParts: an instrument is voiceType 'other'; "Pno.", "Org."…), the names a second guard.
+    if (other.id === partId || other.voiceType === 'other' || INSTRUMENT.test(other.name) || !other.notes.length) continue;
     // Held time per bar (of the singer's note) against this voice.
     const perBar = new Map<number, { n: number; s: number }>();
     let j = 0;

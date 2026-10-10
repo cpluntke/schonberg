@@ -69,7 +69,7 @@ export interface TodayStep {
    * A lab step; `tuneUp`: a short go at a rung already passed (it ticks only on rounds sung today);
    * `check`: the course's quick check a week after it was done (it ticks once taken today).
    */
-  lab?: { interval: LabInterval; rung: number; tuneUp?: boolean; check?: boolean };
+  lab?: { interval: LabInterval; rung: number; tuneUp?: boolean; check?: boolean; redo?: boolean };
   minutes: number;
   /** "Dieu! qu'il la fait · bars 22–29". */
   title: string;
@@ -284,7 +284,7 @@ export function labStep(lab: NonNullable<PlanContext['lab']>, short = false): To
   const tuneUp = short || lab.done || lab.rung > 5;
   return {
     id: `lab:${lab.interval}:${rung}${tuneUp ? ':tune' : ''}`, kind: 'lab', level: rung, step: 'tempo', minutes, why: 'warm-up',
-    lab: { interval: lab.interval, rung, ...(tuneUp ? { tuneUp: true } : {}) },
+    lab: { interval: lab.interval, rung, ...(tuneUp ? { tuneUp: true } : {}), ...(lab.redo ? { redo: true } : {}) },
     title: short ? (lab.interval === 'third' ? 'Pure-third tune-up' : 'Pure-fifth tune-up') : `Warm-up · ${LAB_NAME[lab.interval]}`,
     reason: short ? (lab.interval === 'third' ? 'So your third rings in the chord' : 'So your fifth rings in the chord')
       : lab.redo ? `${LAB_RUNG_NAMES[rung - 1]}, once more · it slipped a little` : lab.done ? `${LAB_RUNG_NAMES[rung - 1]} · keeps your ear ready` : `Step ${rung} of 5 · ${LAB_RUNG_NAMES[rung - 1]}`,
@@ -464,6 +464,8 @@ export interface TickContext {
   lab?: LabDay | null;
   /** The day each interval's quick check was last taken. */
   labChecked?: Partial<Record<LabInterval, string>>;
+  /** The day each interval's redo (rung 4 once more after a slipped check) was passed. */
+  labRedone?: Partial<Record<LabInterval, string>>;
   /** When the words of a passage were last practised (ms), 0 = never. */
   wordsAt?: (pieceId: string, partId: string, sectionId: string) => number;
 }
@@ -483,6 +485,8 @@ export const TRIES_TO_TICK = 2;
 export function stepDone(s: TodayStep, t: TickContext): boolean {
   if (s.kind === 'lab' && s.lab) {
     if (s.lab.check) return t.labChecked?.[s.lab.interval] === t.day;
+    // (the redo: passed again today, like the sheet that says so; or a full go at it)
+    if (s.lab.redo && t.labRedone?.[s.lab.interval] === t.day) return true;
     if (!s.lab.tuneUp && (t.labRung?.[s.lab.interval] ?? 0) > s.lab.rung) return true;
     const n = t.lab && t.lab.day === t.day ? t.lab.rounds[`${s.lab.interval}:${s.lab.rung}`] ?? 0 : 0;
     return n >= labRoundsFor(s.lab.rung);
