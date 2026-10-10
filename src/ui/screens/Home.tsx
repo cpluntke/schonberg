@@ -5,9 +5,9 @@ import { go } from '../router';
 import { getProgress, loadCycle, practiceDays, sameWork } from '../../progress/store';
 import { levelLabel, levelSpec, stepWord } from '../../progress/ladder';
 import { nextRehearsal } from '../../progress/rehearsal';
-import { rowOfTheDay } from '../../game/twelvetone';
 import { IconMic } from '../icons';
 import { IntroVideoButton } from '../components/IntroVideo';
+import { YouButton } from '../components/YouSheet';
 import { meterNodes, pathStatus } from '../path';
 import { LevelMeter } from '../components/LevelMeter';
 import { PlanCard, RehearsalCheck, StatusLine, TodayDone, WeekCard } from '../components/Today';
@@ -25,7 +25,6 @@ import { labInProgramme, loadLab, RUNGS } from '../../game/intonation';
 
 export { pieceStatus, type PieceStatus };
 
-function pcSym(p: number) { return p === 10 ? 't' : p === 11 ? 'e' : String(p); }
 
 export function greeting(now = new Date()): string {
   const h = now.getHours();
@@ -49,7 +48,6 @@ export function Home() {
   const logo = choir ? choirLogo() : null;
   const betweenCycles = !!choir && choir.code === profile.choirCode && Array.isArray(choir.cycles) && !choirCycleNow(choir);
   const nextCycle = betweenCycles ? choirCycleNext(choir) : null;
-  const row = rowOfTheDay(new Date());
   const nr = nextRehearsal(cycle);
   const toConcert = daysUntil(cycle.concertDate);
   const focusMissing = (cycle.wanted ?? []).filter((w) => w.focus && !statuses.some((s) => sameWork(s.piece.title, w.title)));
@@ -76,10 +74,7 @@ export function Home() {
           <span style={{ fontWeight: 800, fontSize: 20, letterSpacing: '-0.02em' }}>Schönberg</span>
           <span className="badge">Hero</span>
         </div>
-        <button className="icon-btn filled" aria-label="Voice setup" onClick={() => go({ name: 'setup' })}
-          style={{ border: '2px solid var(--voice)', fontWeight: 700, fontSize: 14 }}>
-          {profile.name ? initials(profile.name) : profile.voice}
-        </button>
+        <YouButton />
       </div>
 
       <div className="row" style={{ gap: 12, alignItems: 'center' }}>
@@ -126,7 +121,7 @@ export function Home() {
         <span className="t14 muted" data-testid="rehearsal-focus">
           The next rehearsal also works on{' '}
           {focusMissing.map((w, i) => (
-            <span key={w.title}>{i ? ', ' : ''}<button className="linklike" onClick={() => go({ name: 'library' })}>{w.title}</button></span>
+            <span key={w.title}>{i ? ', ' : ''}<button className="linklike" onClick={() => go({ name: 'pieces' })}>{w.title}</button></span>
           ))}{' '}(import your score first).
         </span>
       )}
@@ -137,11 +132,11 @@ export function Home() {
         : plan.steps.length > 0 ? (
           <PlanCard plan={plan} status={status} labOn={labOn} secondary={!profile.onboarded} rehearsalTime={rehearsalTime} />
         ) : statuses.length && !betweenCycles ? (
-          <div className="notice info" data-testid="all-ready">Everything in this cycle is concert-ready. Try the arcade mode or today's Zwölfton row.</div>
+          <div className="notice info" data-testid="all-ready">Everything in this cycle is concert-ready. Keep them fresh, or train your ear under Train.</div>
         ) : !betweenCycles ? (
           <div className="notice info" data-testid="no-pieces">{labInProgramme()
             ? 'No scores in this cycle yet. Start with the intonation lab below.'
-            : "No pieces in this cycle yet. Add some from the Library or import your choir's MusicXML."}</div>
+            : "No pieces in this cycle yet. Add some under Pieces or import your choir's MusicXML."}</div>
         ) : null}
 
       {plan.mode === 'rehearsal' && !done && <TonightsFocus statuses={statuses} />}
@@ -188,7 +183,7 @@ export function Home() {
       <section className="col home-rep" style={{ gap: 2 }}>
         <div className="row between">
           <h2>Repertoire</h2>
-          <button className="btn ghost small" onClick={() => go({ name: 'library' })}>Library</button>
+          <button className="btn ghost small" onClick={() => go({ name: 'pieces' })}>All pieces</button>
         </div>
         {statuses.map((s) => (
           <button key={s.piece.id} className="list-row" data-testid="piece-row" onClick={() => go({ name: 'piece', pieceId: s.piece.id })}>
@@ -207,7 +202,7 @@ export function Home() {
           </button>
         ))}
         {(cycle.wanted ?? []).filter((w) => !statuses.some((s) => sameWork(s.piece.title, w.title))).map((w) => (
-          <button key={w.title} className="list-row" onClick={() => go({ name: 'library' })} data-testid="wanted-row">
+          <button key={w.title} className="list-row" onClick={() => go({ name: 'pieces' })} data-testid="wanted-row">
             <div className="mono-tile" style={{ color: 'var(--muted)', border: '1px dashed var(--line)', background: 'transparent' }}>+</div>
             <div className="grow col" style={{ gap: 2 }}>
               <span className="ellipsis" style={{ fontWeight: 600, fontSize: 15 }}>{w.title}</span>
@@ -225,18 +220,6 @@ export function Home() {
 
       {labOn && !labInProgramme() && <IntonationCard />}
 
-      <button className="card expert" style={{ textAlign: 'left', color: 'inherit' }} onClick={() => go({ name: 'expert' })}>
-        <div className="row between">
-          <strong>Zwölfton of the day</strong>
-          <span className="badge expert">Expert</span>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, minmax(0,1fr))', gap: 3 }}>
-          {row.map((pc, i) => (
-            <span key={i} className="mono" style={{ height: 26, borderRadius: 6, background: '#262257', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#D4CCFF' }}>{pcSym(pc)}</span>
-          ))}
-        </div>
-        <span className="small" style={{ color: '#D4CCFF' }}>Plus leap drills built from the hardest intervals in your parts.</span>
-      </button>
       </div>
       </div>
     </main>

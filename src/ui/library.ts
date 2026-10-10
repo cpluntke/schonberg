@@ -242,7 +242,7 @@ export function syncChoirNow(): Promise<Awaited<ReturnType<typeof syncChoir>>> {
     }, (id) => pieces.has(id), (id) => {
       // The singer's own imports stay in the cycle when the choir's programme arrives (not the choir's scores).
       const p = pieces.get(id);
-      return !!p && !p.builtin && !id.startsWith('choir-') && !p.score.choir;
+      return !!p && isOwnPiece(p);
     }, (id) => {
       // A choir score stored by an older importer (e.g. without the notes' written spelling) is
       // downloaded again; until then (offline) the stored one keeps working.
@@ -320,6 +320,11 @@ export function getPiece(id: string): PieceInfo | undefined {
     }
   }
   return undefined;
+}
+
+/** A score the singer imported themselves (not built in, not one of the choir's). */
+export function isOwnPiece(p: Pick<PieceInfo, 'id' | 'builtin' | 'score'>): boolean {
+  return !p.builtin && !p.id.startsWith('choir-') && !p.score.choir;
 }
 
 export function registerVirtual(p: PieceInfo) {

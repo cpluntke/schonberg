@@ -866,3 +866,83 @@ input[type='range'] { height: 44px; margin: 0; }
 .toggle-row input[type='checkbox'] { width: 26px; height: 26px; }
 .toggle-row:has(input) { cursor: pointer; }
 .overlay.prerun .start-sticky { bottom: 0; box-shadow: none; }
+
+/* ===================================================================== navigation (Phase 3a)
+   Tabs Today · Pieces · Train · Choir (nav.ts); the avatar and its "You" sheet; the Pieces, Train
+   and Choir tabs (the UX review's A7, D1, D2). 16 px body, 14 px small text, 44 px+ targets. */
+.tab-head { min-height: 52px; gap: 12px; }
+.tab-head h1.hero { min-width: 0; }
+.avatar-btn {
+  width: 44px; height: 44px; border-radius: 22px; border: 2px solid var(--voice); background: var(--surface); color: var(--text);
+  display: inline-flex; align-items: center; justify-content: center; font: 800 15px var(--font); flex: none; padding: 0;
+}
+.avatar-btn.big { width: 52px; height: 52px; border-radius: 26px; font-size: 18px; }
+@media (hover: hover) and (pointer: fine) { button.avatar-btn:hover { background: var(--surface-2); } }
+.pill.voice { background: var(--voice-bg); color: var(--voice); font-size: 14px; }
+
+/* The You sheet: who you are, whether your progress is safe, one row per part of Settings. */
+.you-sheet { gap: 12px; }
+.you-sheet h2 { font-size: 20px; }
+.you-saved { display: flex; gap: 10px; align-items: center; background: var(--good-bg); border: 1px solid #24583a; border-radius: 14px; padding: 8px 12px; min-height: 44px; }
+.you-saved .tick { width: 24px; height: 24px; border-radius: 12px; background: var(--good); color: var(--accent-ink); display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; flex: none; }
+.you-unsaved { min-height: 44px; text-align: left; background: var(--bg-2); border: 1px solid var(--line); border-radius: 14px; padding: 8px 12px; color: inherit; }
+.you-rows { display: flex; flex-direction: column; }
+.you-row {
+  display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 0; background: none; border: none; border-top: 1px solid var(--line);
+  color: inherit; text-align: left; width: 100%;
+}
+.you-row:first-child { border-top: none; }
+.you-ic { width: 36px; height: 36px; border-radius: 10px; background: var(--surface-2); color: var(--voice); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.you-ic svg { width: 20px; height: 20px; }
+@media (hover: hover) and (pointer: fine) { .you-row:hover strong { color: var(--accent-text); } }
+
+/* Pieces: the programme as one card of rows, what's coming, your own, importing. */
+.piece-list { padding: 4px 16px; gap: 0; }
+.piece-row {
+  display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 14px 0; background: none; border: none;
+  border-top: 1px solid var(--line); color: inherit; text-align: left; width: 100%;
+}
+.piece-row:first-child { border-top: none; }
+.piece-row .title { font-weight: 800; }
+@media (hover: hover) and (pointer: fine) { .piece-row:hover .title { color: var(--accent-text); } }
+.card.coming { background: transparent; border-style: dashed; gap: 8px; }
+.btn.dashed { background: transparent; border: 1px dashed var(--line); min-height: 52px; font-weight: 700; font-size: 16px; }
+.chip.dashed { border-style: dashed; background: transparent; color: var(--muted); }
+.chips .chip { font-size: 15px; }
+
+/* Train. */
+.train-row { flex-direction: row; align-items: center; gap: 12px; text-align: left; color: inherit; min-height: 64px; }
+
+/* Choir: the choir's head, the rehearsal card, your section, the short board, what's shared. */
+.choir-head { min-height: 56px; }
+.choir-logo { width: 52px; height: 52px; border-radius: 14px; object-fit: contain; padding: 4px; flex: none; }
+.choir-logo.tile { display: inline-flex; align-items: center; justify-content: center; background: var(--surface-2); border: 1px dashed var(--line); font-weight: 800; font-size: 17px; color: var(--muted); padding: 0; }
+.card.voice { background: var(--voice-bg); border-color: var(--voice-deep); }
+.rehearsal-card { gap: 10px; }
+.rehearsal-card .when { font-size: 22px; font-weight: 800; letter-spacing: -0.01em; }
+.focus-box { background: rgba(5, 6, 13, 0.35); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+.big-count { font-size: 30px; font-weight: 800; letter-spacing: -0.01em; }
+.section-dots { display: flex; flex-wrap: wrap; gap: 6px; }
+.section-dots i { width: 28px; height: 28px; border-radius: 50%; background: var(--surface-2); display: block; }
+.section-dots i.on { background: var(--voice); }
+.section-dots i.me { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text); }
+.board-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.board-rows li { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 4px 10px; border-radius: 12px; }
+.board-rows li.me { background: var(--voice-bg); border: 1px solid var(--voice-deep); }
+.board-rows .rank { width: 20px; flex: none; }
+.board-rows .ini { width: 36px; height: 36px; border-radius: 18px; background: var(--surface-2); display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; flex: none; }
+.board-rows li.me .ini { border: 2px solid var(--voice); }
+.board-rows .pts { font-weight: 700; font-size: 16px; }
+.board-rows li.me .pts { color: var(--voice); }
+.link.between-link { justify-content: space-between; border-top: 1px solid var(--line); padding-top: 4px; }
+.choir-member .card.flat { gap: 8px; }
+.settings section[id], .settings [id='account'] { scroll-margin-top: 12px; }
+
+@media (min-width: 900px) and (min-height: 480px) {
+  .pieces-cols, .choir-cols { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(300px, 1fr); gap: 24px 28px; align-items: start; }
+  .pieces-main, .pieces-side, .choir-main, .choir-side { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+  .train-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 24px; align-items: start; }
+  .tab-head h1.hero { font-size: 36px; }
+}
+.choir-head h1.hero { font-size: 26px; overflow-wrap: anywhere; }
+@media (min-width: 900px) and (min-height: 480px) { .choir-head h1.hero { font-size: 34px; } }

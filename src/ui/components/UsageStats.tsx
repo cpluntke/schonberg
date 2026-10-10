@@ -9,7 +9,7 @@ export function UsageStats() {
   useEffect(() => onUsageStatsChange(() => setV((x) => x + 1)), []);
   const on = usageStatsOn();
   return (
-    <section className="col" style={{ gap: 8 }} data-testid="usage-stats">
+    <section className="col" style={{ gap: 8, scrollMarginTop: 12 }} id="settings-privacy" data-testid="usage-stats">
       <h2 className="eyebrow">Privacy</h2>
       <label className="toggle-row">
         <span>Send anonymous usage statistics

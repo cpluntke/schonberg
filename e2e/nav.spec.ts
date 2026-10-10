@@ -26,7 +26,7 @@ test('Results: back lands on the piece, then Home; Again then back lands on the 
   await page.getByTestId('piece-row').first().click();
   await expect(page.getByRole('heading', { name: 'Passages' })).toBeVisible();
   // The piece page keeps the tab it was opened from lit.
-  await expect(page.getByRole('navigation').getByRole('button', { name: 'Home' })).toHaveAttribute('aria-current', 'true');
+  await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Today' })).toHaveAttribute('aria-current', 'true');
   const pieceUrl = page.url();
   await singFirstSection(page);
   await expect(page).toHaveURL(/#\/results$/);
@@ -110,4 +110,84 @@ test('mid-run, ← and back pause and open the sheet; leaving from it lands on t
   await expect(page).toHaveURL(pieceUrl);
   await page.goBack();
   await expect(page).toHaveURL(/#\/$/);
+});
+
+// The tabs (src/ui/nav.ts): Today · Pieces · Train · Choir; Settings behind the avatar's You sheet.
+test('tabs: Today, Pieces, Train, Choir; old addresses land on the new homes; the lit tab follows where a piece was opened', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await home(page);
+  const nav = page.getByRole('navigation', { name: 'Main' });
+  await expect(nav.getByRole('button')).toHaveText(['Today', 'Pieces', 'Train', 'Choir']);
+  await expect(nav.getByRole('button', { name: 'Today' })).toHaveAttribute('aria-current', 'page');
+
+  await nav.getByRole('button', { name: 'Pieces' }).click();
+  await expect(page).toHaveURL(/#\/pieces$/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Pieces');
+  await expect(page.getByLabel('Choose score files')).toBeAttached();
+  await expect(page.getByTestId('pieces-row').first()).toContainText('Abendlied');
+  // A piece opened from Pieces keeps Pieces lit.
+  await page.getByTestId('pieces-row').first().click();
+  await expect(page).toHaveURL(/#\/piece\//);
+  await expect(nav.getByRole('button', { name: 'Pieces' })).toHaveAttribute('aria-current', 'true');
+
+  await page.goto('/#/library');
+  await expect(page).toHaveURL(/#\/library$/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Pieces');
+  await expect(nav.getByRole('button', { name: 'Pieces' })).toHaveAttribute('aria-current', 'page');
+
+  await nav.getByRole('button', { name: 'Train' }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Train');
+  await page.getByTestId('train-tuner').click();
+  await expect(page).toHaveURL(/#\/tuner$/);
+  await expect(nav.getByRole('button', { name: 'Train' })).toHaveAttribute('aria-current', 'true');
+  await page.getByRole('button', { name: 'Back' }).click();
+  await expect(page).toHaveURL(/#\/train$/);
+
+  await nav.getByRole('button', { name: 'Choir' }).click();
+  await expect(page).toHaveURL(/#\/choir$/);
+  await expect(page.getByTestId('choir-title')).toBeVisible();
+  // Ranks is part of the Choir tab now.
+  await page.goto('/#/ranks');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Ranks');
+  await expect(nav.getByRole('button', { name: 'Choir' })).toHaveAttribute('aria-current', 'true');
+  expect(errors).toEqual([]);
+});
+
+test('phones: the tab bar on the tabs only; sub-screens have their back arrow', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await home(page);
+  await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible();
+  await page.getByTestId('piece-row').first().click();
+  await expect(page.getByRole('heading', { name: 'Passages' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Main' })).toBeHidden();
+  await page.goto('/#/settings');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Settings');
+  await expect(page.getByRole('navigation', { name: 'Main' })).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Back', exact: true })).toBeVisible();
+});
+
+test('the avatar opens the You sheet; its rows open Settings on the right part; no Super admin for singers', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await home(page);
+  await page.getByTestId('you-button').click();
+  const sheet = page.getByTestId('you-sheet');
+  await expect(sheet).toBeVisible();
+  await expect(sheet.locator('.you-row strong')).toHaveText(['You & voice', 'Practice', 'Your progress', 'Choir & account', 'Display', 'Privacy', 'Help & intro video', 'Your data']);
+  // (staff rows only with a staff login)
+  await expect(sheet.getByTestId('you-row-super')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(sheet).toBeHidden();
+
+  await page.getByTestId('you-button').click();
+  await page.getByTestId('you-row-privacy').click();
+  await expect(page).toHaveURL(/#\/settings$/);
+  await expect(page.getByTestId('usage-stats')).toBeInViewport();
+  await expect(page.getByTestId('settings-super-link')).toHaveCount(0);
+  await expect(page.locator('main')).not.toContainText('Super admin');
+
+  await page.goBack();
+  await page.getByTestId('you-button').click();
+  await page.getByTestId('you-row-progress').click();
+  await expect(page).toHaveURL(/#\/progress$/);
 });

@@ -101,10 +101,10 @@ test('a member sees no Admin tab and reaches no staff data', async ({ browser })
   await expect(m.page.getByTestId('nav-admin')).toHaveCount(0);
   await expect(m.page.getByTestId('admin-tabs')).toHaveCount(0);
   await expect(m.page.getByTestId('programme-editor')).toHaveCount(0);
-  // Settings: the small way in for the super admin, nothing else.
+  // Settings: nothing of the super admin for a member (its login is in Diagnostics, or #/superadmin).
   await m.page.goto('./#/settings');
-  await expect(m.page.getByTestId('settings-super-link')).toHaveText('Super admin');
-  await expect(m.page.getByTestId('settings-super-logout')).toHaveCount(0);
+  await expect(m.page.getByTestId('settings-super-link')).toHaveCount(0);
+  await expect(m.page.getByTestId('settings-super')).toHaveCount(0);
   await shoot(m.page, 'member-settings', [SIZES[1]]);
   expect(m.errors).toEqual([]);
   await m.ctx.close();
@@ -187,7 +187,7 @@ test('a choir admin sees Choir and Sections; the last sub-tab is remembered', as
   await a.page.getByTestId('all-sections').click();
   await expect(a.page.getByTestId('choir-summary')).toBeVisible();
   // Remembered: Home, then the Admin tab opens Sections again (also after a reload).
-  await a.page.getByRole('button', { name: 'Home', exact: true }).click();
+  await a.page.getByRole('button', { name: 'Today', exact: true }).click();
   await a.page.reload();
   await a.page.getByTestId('nav-admin').click();
   await expect(a.page.getByTestId('admin-tab-sections')).toHaveAttribute('aria-pressed', 'true');
@@ -201,8 +201,8 @@ test('the super admin logs in once, stays logged in over a reload, and logs out'
   const s = await phone(browser, '10.70.4.1');
   await s.page.goto('./#/');
   await expect(s.page.getByTestId('nav-admin')).toHaveCount(0);
-  // The small link at the bottom of Settings.
-  await s.page.goto('./#/settings');
+  // The small link at the bottom of Diagnostics.
+  await s.page.goto('./#/diagnostics');
   await s.page.getByTestId('settings-super-link').click();
   await expect(s.page).toHaveURL(/#\/superadmin$/);
   await expect(s.page.getByRole('heading', { level: 1 })).toHaveText('Super admin');
@@ -232,7 +232,7 @@ test('the super admin logs in once, stays logged in over a reload, and logs out'
   await expect(s.page.getByTestId('admin-tab-usage')).toHaveAttribute('aria-pressed', 'true');
   // A login the server rejects (as after a password change): the password prompt again, the tab goes.
   // (The app checks the login when it starts: the Admin tab goes before anything is opened.)
-  await s.page.goto('./#/settings');
+  await s.page.goto('./#/diagnostics');
   await s.page.evaluate(() => localStorage.setItem('schonberg:superSession', JSON.stringify({ token: 'x'.repeat(43), expiresAt: Date.now() + 86400000 })));
   await s.page.reload();
   await expect(s.page.getByTestId('settings-super-link')).toBeVisible();
@@ -255,6 +255,8 @@ test('the super admin logs in once, stays logged in over a reload, and logs out'
   await s.page.goto('./#/settings');
   await expect(s.page.getByTestId('settings-super')).toContainText('Logged in as super admin');
   await s.page.getByTestId('settings-super-logout').click();
+  await expect(s.page.getByTestId('settings-super')).toHaveCount(0);
+  await s.page.goto('./#/diagnostics');
   await expect(s.page.getByTestId('settings-super-link')).toBeVisible();
   await expect(s.page.getByTestId('nav-admin')).toHaveCount(0);
   expect(s.errors).toEqual([]);

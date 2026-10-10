@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 
 export type Route =
+  /** The Today tab (#/). */
   | { name: 'home' }
-  | { name: 'library' }
+  /** The Pieces tab (#/pieces; the old #/library lands here too). */
+  | { name: 'pieces' }
+  /** The Train tab: the warm-up, the tuner, the drills (#/train). */
+  | { name: 'train' }
   | { name: 'piece'; pieceId: string }
   | {
     name: 'play'; pieceId: string; partId: string; sectionId: string; level: number; mode: '2d' | '3d'; from?: number; to?: number; words?: boolean;
@@ -31,6 +35,7 @@ export type Route =
   | { name: 'diagnostics' }
   | { name: 'lyrics'; pieceId: string; partId: string }
   | { name: 'memorymap'; pieceId: string; partId: string }
+  /** The Choir tab: the choir, its programme and the next rehearsal, your section, the ranks; joining. */
   | { name: 'choir' }
   | { name: 'choiradmin' }
   | { name: 'section' }
@@ -47,7 +52,10 @@ export function parseHash(hash: string): Route {
   });
   const q = new URLSearchParams(query);
   switch (seg[0]) {
-    case 'library': return { name: 'library' };
+    // (the Library tab became Pieces)
+    case 'pieces':
+    case 'library': return { name: 'pieces' };
+    case 'train': return { name: 'train' };
     case 'piece': if (seg[1]) return { name: 'piece', pieceId: seg[1] }; break;
     case 'play':
     case 'arcade':

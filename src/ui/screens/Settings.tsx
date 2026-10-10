@@ -4,7 +4,8 @@ import { setLastRun } from '../play/runExport';
 import { useProfile, useStoreVersion, toast, daysUntil, useWide } from '../hooks';
 import { nextRehearsal, WEEKDAYS } from '../../progress/rehearsal';
 import { getPiece } from '../library';
-import { go } from '../router';
+import { back, go } from '../router';
+import { IconBack } from '../icons';
 import { loadCycle, saveCycle, exportBackup, importBackup } from '../../progress/store';
 import { cachedChoir, loadSuperSession, superLogout } from '../../progress/choir';
 import { useSession } from './Choir';
@@ -62,12 +63,51 @@ export function Settings() {
 
   return (
     <main className="screen wide settings">
-      <div className="topbar"><h1>Settings</h1></div>
+      <div className="topbar">
+        <button className="icon-btn" aria-label="Back" onClick={() => back()}><IconBack /></button>
+        <h1>Settings</h1>
+      </div>
 
-      {/* Wide screens: two columns of cards (how you practise and your cycle; your voice, account and data). */}
+      {/* In the order of the You sheet's rows (each opens its part here). Wide screens: two columns of cards. */}
       <div className="lay settings-cols">
       <div className="lay settings-col">
-      <section className="col" style={{ gap: 8 }} data-testid="settings-week-goal">
+      <section className="col" style={{ gap: 8 }} id="settings-voice">
+        <h2 className="eyebrow">You &amp; voice</h2>
+        <div className="toggle-row"><span>Name</span><span className="muted">{profile.name || '–'}</span></div>
+        <div className="toggle-row"><span>Voice part</span>
+          <select aria-label="Voice part" value={profile.voice} onChange={(e) => update({ voice: e.target.value as typeof profile.voice })}
+            style={{ minHeight: 40, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--line)', padding: '0 8px' }}>
+            <option value="S">Soprano</option><option value="A">Alto</option><option value="T">Tenor</option><option value="B">Bass</option>
+          </select>
+        </div>
+        <label className="toggle-row"><span>Headphone/mic delay (ms)</span>
+          <input type="number" min={0} max={600} step={5} value={delayText ?? String(profile.latencyMs)} aria-label="Delay in milliseconds"
+            onChange={(e) => {
+              const ms = Math.max(0, Math.min(600, Math.round(Number(e.target.value)) || 0));
+              setDelayText(e.target.value.trim() === '' ? '' : String(ms));
+              update({ latencyMs: ms, latencySource: 'measured' });
+            }}
+            onBlur={() => setDelayText(null)}
+            style={{ width: 90, minHeight: 40, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--line)', padding: '0 8px' }} />
+        </label>
+        <label className="toggle-row"><span>Practice beat<span className="tiny muted" style={{ display: 'block' }}>A soft click keeps the tempo where you sing on your own.</span></span>
+          <select aria-label="Practice beat" value={profile.beat ?? 'alone'} onChange={(e) => update({ beat: e.target.value as 'off' | 'alone' | 'always' })}
+            style={{ minHeight: 40, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--line)', padding: '0 8px' }}>
+            <option value="alone">When I sing alone</option>
+            <option value="always">Always</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
+        <label className="toggle-row"><span>Keep a recording of my last run<span className="tiny muted" style={{ display: 'block' }}>Only on this phone, so you can share it if the scoring seems off.</span></span>
+          <input type="checkbox" checked={profile.keepRecording !== false} onChange={(e) => { update({ keepRecording: e.target.checked }); if (!e.target.checked) setLastRun(null); }} />
+        </label>
+        <div className="row">
+          <button className="btn small grow" onClick={() => go({ name: 'setup' })}>Run voice setup again</button>
+          <button className="btn small grow" onClick={() => go({ name: 'tuner' })}>Tuner</button>
+        </div>
+      </section>
+
+      <section className="col" style={{ gap: 8 }} id="settings-practice" data-testid="settings-week-goal">
         <h2 className="eyebrow" id="settings-goal-label">Your week</h2>
         <span className="t14">Days a week you mean to practise (a rehearsal you were at counts too)</span>
         <div className="seg" role="group" aria-labelledby="settings-goal-label">
@@ -89,48 +129,6 @@ export function Settings() {
           ))}
         </div>
         <span className="small muted" data-testid="notation-example">Shown with the same four notes, D E F♯ G (in D major), as an example. In practice, movable do and the numbers follow each piece's own key, key changes included.</span>
-      </section>
-
-      <section className="col" style={{ gap: 8 }}>
-        <h2 className="eyebrow">Practice display</h2>
-        <div className="seg" role="group" aria-label="Practice display" data-testid="settings-display">
-          {([[undefined, 'Automatic'], ['score', 'Score'], ['highway', 'Highway']] as const).map(([d, label]) => (
-            <button key={label} aria-pressed={profile.display === d} onClick={() => update({ display: d, displayChosen: d !== undefined, scoreDefaultNote: false })}>{label}</button>
-          ))}
-        </div>
-        <span className="small muted">
-          {profile.display === 'highway' ? 'Your notes as bars moving towards a line, with your voice as a line.'
-            : `Your part as sheet music, with your voice drawn on the staff${profile.display ? '' : ' (the default at every level)'}.`} You can also switch before each run.
-        </span>
-        {profile.display !== 'highway' && (
-          <>
-            <span className="small" id="settings-scroll-label">Sheet music while you sing</span>
-            <div className="seg" role="group" aria-labelledby="settings-scroll-label" data-testid="settings-scroll">
-              <button aria-pressed={!profile.scorePages} onClick={() => update({ scorePages: undefined })}>Scrolls</button>
-              <button aria-pressed={!!profile.scorePages} onClick={() => update({ scorePages: true })}>Turns pages</button>
-            </div>
-            <span className="small muted">
-              {profile.scorePages ? 'Line after line, like a printed page: the next line slides in when you reach the end of one.'
-                : 'One long line gliding past a fixed “now” line, with the clef and key kept at the left: nothing jumps while you sing.'}
-            </span>
-          </>
-        )}
-        {wide && profile.display !== 'highway' && (
-          <>
-            <span className="small" id="settings-staves-label">Sheet music on a wide screen (laptop, tablet in landscape) shows</span>
-            <div className="seg" role="group" aria-labelledby="settings-staves-label" data-testid="settings-staves">
-              {([[undefined, 'Automatic'], ['mine', 'My part'], ['voices', 'All voices'], ['all', '+ Accomp.']] as const).map(([d, label]) => (
-                <button key={label} aria-pressed={profile.scoreStaves === d} onClick={() => update({ scoreStaves: d })}>{label}</button>
-              ))}
-            </div>
-            <span className="small muted">
-              {profile.scoreStaves === 'mine' ? 'Only your part, large.'
-                : profile.scoreStaves === 'voices' ? 'The full score of the voices, your part highlighted.'
-                  : profile.scoreStaves === 'all' ? 'All voices and the piano or organ, your part highlighted (the accompaniment drops out if the screen is too small).'
-                    : 'All voices, plus the piano or organ when the score stays readable (up to 6 voices, a not-too-busy accompaniment).'}
-            </span>
-          </>
-        )}
       </section>
 
       <section className="col" style={{ gap: 8 }}>
@@ -161,15 +159,7 @@ export function Settings() {
         </button>
       </section>
 
-      <section className="col" style={{ gap: 8 }}>
-        <h2 className="eyebrow">Your choir</h2>
-        <button className="btn block" onClick={() => go({ name: 'choir' })} data-testid="settings-choir">
-          {profile.choirCode ? `Choir: ${cachedChoir()?.name ?? profile.choirCode}` : 'Join your choir'}
-        </button>
-        {cycle.preset?.startsWith('choir:') && <span className="tiny muted">The programme below comes from your choir; your changes last until the choir publishes a new one.</span>}
-      </section>
-
-      <section className="col" style={{ gap: 8 }}>
+      <section className="col" style={{ gap: 8 }} id="settings-cycle">
         <h2 className="eyebrow">This cycle</h2>
         <label className="field"><span>Name</span>
           <input type="text" value={cycle.name} onChange={(e) => setCycle({ name: e.target.value })} placeholder="e.g. Spring concert" />
@@ -219,56 +209,74 @@ export function Settings() {
             })}
           </div>
         )}
-        <button className="btn small" onClick={() => go({ name: 'library' })}>Choose the cycle's pieces</button>
+        <button className="btn small" onClick={() => go({ name: 'pieces' })}>Choose the cycle's pieces</button>
       </section>
-
       </div>
 
       <div className="lay settings-col">
-      <section className="col" style={{ gap: 8 }}>
-        <h2 className="eyebrow">Voice &amp; audio</h2>
-        <div className="toggle-row"><span>Name</span><span className="muted">{profile.name || '–'}</span></div>
-        <div className="toggle-row"><span>Voice part</span>
-          <select aria-label="Voice part" value={profile.voice} onChange={(e) => update({ voice: e.target.value as typeof profile.voice })}
-            style={{ minHeight: 40, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--line)', padding: '0 8px' }}>
-            <option value="S">Soprano</option><option value="A">Alto</option><option value="T">Tenor</option><option value="B">Bass</option>
-          </select>
-        </div>
-        <label className="toggle-row"><span>Headphone/mic delay (ms)</span>
-          <input type="number" min={0} max={600} step={5} value={delayText ?? String(profile.latencyMs)} aria-label="Delay in milliseconds"
-            onChange={(e) => {
-              const ms = Math.max(0, Math.min(600, Math.round(Number(e.target.value)) || 0));
-              setDelayText(e.target.value.trim() === '' ? '' : String(ms));
-              update({ latencyMs: ms, latencySource: 'measured' });
-            }}
-            onBlur={() => setDelayText(null)}
-            style={{ width: 90, minHeight: 40, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--line)', padding: '0 8px' }} />
-        </label>
-        <label className="toggle-row"><span>Practice beat<span className="tiny muted" style={{ display: 'block' }}>A soft click keeps the tempo where you sing on your own.</span></span>
-          <select aria-label="Practice beat" value={profile.beat ?? 'alone'} onChange={(e) => update({ beat: e.target.value as 'off' | 'alone' | 'always' })}
-            style={{ minHeight: 40, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--line)', padding: '0 8px' }}>
-            <option value="alone">When I sing alone</option>
-            <option value="always">Always</option>
-            <option value="off">Off</option>
-          </select>
-        </label>
-        <label className="toggle-row"><span>Keep a recording of my last run<span className="tiny muted" style={{ display: 'block' }}>Only on this phone, so you can share it if the scoring seems off.</span></span>
-          <input type="checkbox" checked={profile.keepRecording !== false} onChange={(e) => { update({ keepRecording: e.target.checked }); if (!e.target.checked) setLastRun(null); }} />
-        </label>
-        <div className="row">
-          <button className="btn small grow" onClick={() => go({ name: 'setup' })}>Run voice setup again</button>
-          <button className="btn small grow" onClick={() => go({ name: 'tuner' })}>Tuner</button>
-        </div>
-        <IntroVideoButton label="Watch the intro video again" className="btn small" compact />
-        <button className="btn small" onClick={() => go({ name: 'diagnostics' })}>Diagnostics &amp; problem report</button>
+      <section className="col" style={{ gap: 8 }} id="settings-choir">
+        <h2 className="eyebrow">Your choir</h2>
+        <button className="btn block" onClick={() => go({ name: 'choir' })} data-testid="settings-choir">
+          {profile.choirCode ? `Choir: ${cachedChoir()?.name ?? profile.choirCode}` : 'Join your choir'}
+        </button>
+        {cycle.preset?.startsWith('choir:') && <span className="tiny muted">The programme below comes from your choir; your changes last until the choir publishes a new one.</span>}
       </section>
 
       <AccountSync />
 
+      <section className="col" style={{ gap: 8 }} id="settings-display-block">
+        <h2 className="eyebrow">Practice display</h2>
+        <div className="seg" role="group" aria-label="Practice display" data-testid="settings-display">
+          {([[undefined, 'Automatic'], ['score', 'Score'], ['highway', 'Highway']] as const).map(([d, label]) => (
+            <button key={label} aria-pressed={profile.display === d} onClick={() => update({ display: d, displayChosen: d !== undefined, scoreDefaultNote: false })}>{label}</button>
+          ))}
+        </div>
+        <span className="small muted">
+          {profile.display === 'highway' ? 'Your notes as bars moving towards a line, with your voice as a line.'
+            : `Your part as sheet music, with your voice drawn on the staff${profile.display ? '' : ' (the default at every level)'}.`} You can also switch before each run.
+        </span>
+        {profile.display !== 'highway' && (
+          <>
+            <span className="small" id="settings-scroll-label">Sheet music while you sing</span>
+            <div className="seg" role="group" aria-labelledby="settings-scroll-label" data-testid="settings-scroll">
+              <button aria-pressed={!profile.scorePages} onClick={() => update({ scorePages: undefined })}>Scrolls</button>
+              <button aria-pressed={!!profile.scorePages} onClick={() => update({ scorePages: true })}>Turns pages</button>
+            </div>
+            <span className="small muted">
+              {profile.scorePages ? 'Line after line, like a printed page: the next line slides in when you reach the end of one.'
+                : 'One long line gliding past a fixed “now” line, with the clef and key kept at the left: nothing jumps while you sing.'}
+            </span>
+          </>
+        )}
+        {wide && profile.display !== 'highway' && (
+          <>
+            <span className="small" id="settings-staves-label">Sheet music on a wide screen (laptop, tablet in landscape) shows</span>
+            <div className="seg" role="group" aria-labelledby="settings-staves-label" data-testid="settings-staves">
+              {([[undefined, 'Automatic'], ['mine', 'My part'], ['voices', 'All voices'], ['all', '+ Accomp.']] as const).map(([d, label]) => (
+                <button key={label} aria-pressed={profile.scoreStaves === d} onClick={() => update({ scoreStaves: d })}>{label}</button>
+              ))}
+            </div>
+            <span className="small muted">
+              {profile.scoreStaves === 'mine' ? 'Only your part, large.'
+                : profile.scoreStaves === 'voices' ? 'The full score of the voices, your part highlighted.'
+                  : profile.scoreStaves === 'all' ? 'All voices and the piano or organ, your part highlighted (the accompaniment drops out if the screen is too small).'
+                    : 'All voices, plus the piano or organ when the score stays readable (up to 6 voices, a not-too-busy accompaniment).'}
+            </span>
+          </>
+        )}
+      </section>
+
       <UsageStats />
 
-      <section className="col" style={{ gap: 8 }}>
-        <h2 className="eyebrow">Backup file (without a choir account)</h2>
+      <section className="col" style={{ gap: 8 }} id="settings-help">
+        <h2 className="eyebrow">Help</h2>
+        <span className="small muted">The intro shows the voice setup, the practice screen, the levels and what to do after a run.</span>
+        <IntroVideoButton label="Watch the intro video again" className="btn small" compact />
+        <button className="btn small" onClick={() => go({ name: 'diagnostics' })}>Diagnostics &amp; problem report</button>
+      </section>
+
+      <section className="col" style={{ gap: 8 }} id="settings-data">
+        <h2 className="eyebrow">Your data: a backup file</h2>
         <span className="small muted">Without a choir account your progress lives only on this device. A backup file keeps everything, including your full practice history, to move it to another phone yourself (imported scores need to be imported again).</span>
         <div className="row">
           <button className="btn small grow" onClick={download}>Save backup file</button>
@@ -292,18 +300,14 @@ export function Settings() {
         <span>Built-in score: an original warm-up chorale. Scores from your choir's library show their edition and licence in the Library.</span>
       </section>
 
-      {/* For whoever runs the choir server: small, out of the singers' way. */}
-      <div className="row wrap tiny muted" style={{ justifyContent: 'center', gap: 4 }} data-testid="settings-super">
-        {loadSuperSession() ? (
-          <>
-            <span>Logged in as super admin ·</span>
-            <button className="linklike tiny" style={{ minHeight: 44 }} data-testid="settings-super-logout"
-              onClick={() => { void superLogout().then(() => toast('Logged out of super admin')); }}>Log out of super admin</button>
-          </>
-        ) : (
-          <button className="linklike tiny muted" style={{ minHeight: 44 }} data-testid="settings-super-link" onClick={() => go({ name: 'superadmin' })}>Super admin</button>
-        )}
-      </div>
+      {/* A super-admin login on this phone (the login itself: #/superadmin, or Diagnostics). Singers never see this. */}
+      {loadSuperSession() && (
+        <div className="row wrap tiny muted" style={{ justifyContent: 'center', gap: 4 }} data-testid="settings-super">
+          <span>Logged in as super admin ·</span>
+          <button className="linklike tiny" style={{ minHeight: 44 }} data-testid="settings-super-logout"
+            onClick={() => { void superLogout().then(() => toast('Logged out of super admin')); }}>Log out of super admin</button>
+        </div>
+      )}
     </main>
   );
 }

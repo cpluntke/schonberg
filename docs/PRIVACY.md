@@ -24,7 +24,7 @@ section lead (both part of joining a choir), and two things that are the singer'
   points, streak and the 7-day readiness gain. Joining a choir with a code puts the singer on its board; **Settings → Privacy → "Show me on the
   choir's leaderboard"** takes them off: the app stops posting and asks the server to delete all
   entries under their name (`DELETE …/entries/<name>`).
-- **Who sees it**: anyone who opens Ranks with the choir's code, by name.
+- **Who sees it**: anyone who opens Ranks (or the Choir tab's short board) with the choir's code, by name.
 
 ## 0a. Practising now (every choir member, counts only)
 

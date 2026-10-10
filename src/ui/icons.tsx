@@ -39,3 +39,14 @@ export const IconShield = (p: P) => <S {...p}><path d="M12 3l8 3v6c0 4.5-3.4 7.8
 export const IconChevron = (p: P) => <S {...p}><path d="M9 6l6 6-6 6" /></S>;
 export const IconChevronDown = (p: P) => <S {...p}><path d="M6 9l6 6 6-6" /></S>;
 export const IconClose = (p: P) => <S {...p}><path d="M6 6l12 12M18 6L6 18" /></S>;
+// The tabs (Today · Pieces · Train · Choir; Pieces is IconMusic, Train IconEar) and the You sheet's rows.
+export const IconSun = (p: P) => <S {...p}><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></S>;
+export const IconPeople = (p: P) => <S {...p}><circle cx="8" cy="8" r="3" /><circle cx="16" cy="8" r="3" /><path d="M2 20c0-3.3 2.7-6 6-6s6 2.7 6 6M12 20c0-3.3 2.7-6 6-6 1.5 0 2.9.5 4 1.4" /></S>;
+export const IconUser = (p: P) => <S {...p}><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8" /></S>;
+export const IconTimer = (p: P) => <S {...p}><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2.5 2.5M9 2h6" /></S>;
+export const IconChart = (p: P) => <S {...p}><path d="M4 19V5M4 19h16M8 15l4-4 3 3 5-6" /></S>;
+export const IconText = (p: P) => <S {...p}><path d="M4 7V5h16v2M9 19h6M12 5v14" /></S>;
+export const IconLock = (p: P) => <S {...p}><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></S>;
+export const IconHelp = (p: P) => <S {...p}><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01" /></S>;
+export const IconData = (p: P) => <S {...p}><ellipse cx="12" cy="6" rx="7" ry="3" /><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3" /></S>;
+export const IconGauge = (p: P) => <S {...p}><path d="M4 18a8 8 0 1 1 16 0" /><path d="M12 18l4-6" /><path d="M4 21h16" /></S>;

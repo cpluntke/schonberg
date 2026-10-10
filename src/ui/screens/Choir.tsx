@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useProfile, useStoreVersion, toast } from '../hooks';
+import { useProfile, useStoreVersion, toast, initials } from '../hooks';
 import { back, go } from '../router';
 import { allPieces, syncChoirNow } from '../library';
 import { IconBack } from '../icons';
@@ -9,11 +9,14 @@ import {
   loadSession, loggedOutNotice, login, logout, onSessionChange, refreshSession, refreshSessionSoon, saveChoirCycle, sessionFor, superCreate, superDelete,
   superList, superPurgeMembers, superRename, uploadChoirPiece, withdrawProgress, fetchChoirUsage, mb, type Auth, type ChoirInfo, type ChoirSummary, type ChoirUsage,
   type ServerUsage, type Session, localPieceId, sharingEnded, sharingNeedsOk, startSharing, type LibraryPiece, addLibraryPiece, loadSuperSession, superLogin, superLogout, superLoggedOutNotice,
-  fetchCycles, createCycle, updateCycle, deleteCycle, type ChoirCycle, type CyclesReply, choirCycleNow,
+  fetchCycles, createCycle, updateCycle, deleteCycle, type ChoirCycle, type CyclesReply, choirCycleNow, choirLogo,
 } from '../../progress/choir';
 import { LibraryPanel, type ProgrammeDraft } from '../components/ChoirLibrary';
+import { ChoirOverview } from '../components/ChoirOverview';
+import { YouButton } from '../components/YouSheet';
+import { voiceName } from './Home';
 import { LAB_ID, LAB_TITLE, scoresOf } from '../../game/intonation';
-import { ChoirLogoEditor } from '../components/ChoirLogo';
+import { ChoirLogoEditor, LOGO_TILE } from '../components/ChoirLogo';
 import { SectionInsights } from '../components/SectionInsights';
 import { fetchSectionInsights, type SectionInsightsView } from '../../progress/insights';
 import { InviteLinkBox, PeoplePanel, roleText, VOICE_NAME, VOICES } from '../components/People';
@@ -22,15 +25,6 @@ import { shareMyProgress, shareError } from '../play/shareProgress';
 
 const inputStyle: React.CSSProperties = { minHeight: 44, borderRadius: 10, border: '1px solid var(--line)', background: 'var(--surface)', padding: '0 12px' };
 const errStyle: React.CSSProperties = { color: 'var(--accent-text)' };
-
-function Top({ title }: { title: string }) {
-  return (
-    <div className="topbar">
-      <button className="icon-btn" aria-label="Back" onClick={() => back({ name: 'settings' })}><IconBack /></button>
-      <h1>{title}</h1>
-    </div>
-  );
-}
 
 function Offline() {
   return <div className="notice">Choirs need the online version of the app (it talks to the choir server).</div>;
@@ -89,56 +83,85 @@ export function JoinChoir({ onJoined, compact = false }: { onJoined?: (c: ChoirI
 
 // ------------------------------------------------------------------ member
 
+/**
+ * The Choir tab (#/choir). A member: the choir's name and logo, the overview (the next rehearsal,
+ * the programme, your section this week, the short board, what's shared), then the membership
+ * (sync, leave, sharing with the section lead) and the staff login. Without a choir: joining.
+ */
 export function ChoirScreen() {
   const [profile, update] = useProfile();
   useStoreVersion();
   const [syncMsg, setSyncMsg] = useState('');
   const choir = cachedChoir();
   const joined = !!profile.choirCode && choir?.code === profile.choirCode;
-  if (!apiBase()) return <main className="screen"><Top title="Your choir" /><Offline /></main>;
+  const logo = joined ? choirLogo() : null;
+  const head = (
+    <div className="row choir-head" style={{ gap: 12 }}>
+      {joined && (logo
+        ? <img src={logo} alt={`${choir!.name} logo`} className="choir-logo" style={{ background: LOGO_TILE }} />
+        : <span className="choir-logo tile" aria-hidden="true">{initials(choir!.name)}</span>)}
+      <div className="grow col" style={{ gap: 2, minWidth: 0 }}>
+        <h1 className="hero" data-testid="choir-title">{joined ? choir!.name : 'Your choir'}</h1>
+        <span className="t14 muted">{joined ? `You sing ${voiceName(profile.voice)}` : 'Programme, scores and rehearsals from your choir'}</span>
+      </div>
+      <YouButton />
+    </div>
+  );
+  if (!apiBase()) {
+    return (
+      <main className="screen wide choir-tab">
+        {head}
+        <Offline />
+        <button className="link start" onClick={() => go({ name: 'ranks' })}>Ranks: compare with codes from your choir’s chat ›</button>
+      </main>
+    );
+  }
   return (
-    <main className="screen">
-      <Top title="Your choir" />
+    <main className="screen wide choir-tab">
+      {head}
       {!joined ? (
-        <div className="card">
-          <strong>Join your choir</strong>
-          <span className="small muted">The code from your choir connects you to its programme, its scores and its leaderboard.</span>
+        <div className="card choir-join" data-testid="choir-join">
+          <h2>Join your choir</h2>
+          <span className="t16 muted">The code from your choir brings in its programme, its scores and its rehearsal dates, and puts you on its board.</span>
           <JoinChoir onJoined={() => update({})} />
+          <span className="t14 muted">No code? Ask your choir director or section lead. Everything else works without a choir: import your own scores under Pieces.</span>
         </div>
       ) : (
         <>
-          <div className="card" data-testid="choir-card">
-            <span className="eyebrow">Choir</span>
-            <strong style={{ fontSize: 20 }}>{choir!.name}</strong>
-            <span className="small muted">
-              {choirCycleNow(choir) ? `Programme: ${choirCycleNow(choir)!.name} · ` : ''}{choir!.pieces.length} score{choir!.pieces.length === 1 ? '' : 's'} from the choir
-            </span>
-            <div className="row wrap">
-              <button className="btn small" onClick={async () => {
-                setSyncMsg('Syncing…');
-                const r = await syncChoirNow();
-                setSyncMsg(r.ok ? `Up to date${r.newPieces ? `: ${r.newPieces} new score${r.newPieces > 1 ? 's' : ''}` : ''}${r.programme ? ', programme updated' : ''}.` : r.error ?? 'Could not sync.');
-              }}>Sync now</button>
-              <button className="btn small ghost" onClick={() => { if (confirm('Leave this choir on this phone? Your own practice stays.')) { leaveChoir(); update({}); } }}>Leave</button>
+          <ChoirOverview />
+          <section className="col choir-member" style={{ gap: 12 }} id="choir-membership" aria-labelledby="choir-membership-h">
+            <h2 id="choir-membership-h" className="eyebrow">Membership</h2>
+            <div className="card flat" data-testid="choir-card">
+              <strong>{choir!.name}</strong>
+              <span className="t14 muted">
+                {choirCycleNow(choir) ? `Programme: ${choirCycleNow(choir)!.name} · ` : ''}{choir!.pieces.length} score{choir!.pieces.length === 1 ? '' : 's'} from the choir
+              </span>
+              <div className="row wrap">
+                <button className="btn small" onClick={async () => {
+                  setSyncMsg('Syncing…');
+                  const r = await syncChoirNow();
+                  setSyncMsg(r.ok ? `Up to date${r.newPieces ? `: ${r.newPieces} new score${r.newPieces > 1 ? 's' : ''}` : ''}${r.programme ? ', programme updated' : ''}.` : r.error ?? 'Could not sync.');
+                }}>Sync now</button>
+                <button className="btn small ghost" onClick={() => { if (confirm('Leave this choir on this phone? Your own practice stays.')) { leaveChoir(); update({}); } }}>Leave</button>
+              </div>
+              {syncMsg && <span className="small muted" role="status">{syncMsg}</span>}
             </div>
-            {syncMsg && <span className="small muted" role="status">{syncMsg}</span>}
-          </div>
-          <div className="card">
-            <strong>{profile.shareProgress ? 'Shared with your section lead' : 'Not shared with your section lead'}</strong>
-            {profile.shareOptOut && !profile.shareProgress && <span className="small muted" data-testid="share-optout">You switched this off (Settings → Privacy).</span>}
-            {!profile.shareProgress && sharingEnded() && <span className="small" role="status" style={errStyle}>Your choir account was removed or deleted, so nothing is sent. Log in again (or leave and rejoin the choir) to share again.</span>}
-            {sharingNeedsOk() && (
-              <button className="btn primary small" style={{ alignSelf: 'flex-start' }} data-testid="start-sharing"
-                onClick={() => { startSharing(); void shareMyProgress(true).then(() => update({})); update({}); }}>Start sharing</button>
-            )}
-            <span className="small muted" data-testid="share-note">How each bar is going and which notes keep going wrong, so they know what to rehearse. Your lead and the admins see these only as section totals (in a small section they may still tell which are yours), and your voice range by name. The leaderboard shows everyone in the choir your first name, voice and readiness. Both can be switched off in Settings → Privacy.</span>
-            {!profile.name.trim() && !sessionFor(profile.choirCode) && profile.shareProgress && <span className="small" style={errStyle}>Add your name in Voice setup first.</span>}
-            {profile.name.trim() && profile.shareProgress && shareError() && <span className="small" role="alert" style={errStyle}>Not shared yet: {shareError()}</span>}
-          </div>
-          <AccountCard choir={choir!} />
+            <div className="card flat">
+              <strong>{profile.shareProgress ? 'Shared with your section lead' : 'Not shared with your section lead'}</strong>
+              {profile.shareOptOut && !profile.shareProgress && <span className="small muted" data-testid="share-optout">You switched this off (Settings → Privacy).</span>}
+              {!profile.shareProgress && sharingEnded() && <span className="small" role="status" style={errStyle}>Your choir account was removed or deleted, so nothing is sent. Log in again (or leave and rejoin the choir) to share again.</span>}
+              {sharingNeedsOk() && (
+                <button className="btn small" style={{ alignSelf: 'flex-start' }} data-testid="start-sharing"
+                  onClick={() => { startSharing(); void shareMyProgress(true).then(() => update({})); update({}); }}>Start sharing</button>
+              )}
+              <span className="small muted" data-testid="share-note">How each bar is going and which notes keep going wrong, so they know what to rehearse. Your lead and the admins see these only as section totals (in a small section they may still tell which are yours), and your voice range by name. The leaderboard shows everyone in the choir your first name, voice and readiness. Both can be switched off in Settings → Privacy.</span>
+              {!profile.name.trim() && !sessionFor(profile.choirCode) && profile.shareProgress && <span className="small" style={errStyle}>Add your name in Voice setup first.</span>}
+              {profile.name.trim() && profile.shareProgress && shareError() && <span className="small" role="alert" style={errStyle}>Not shared yet: {shareError()}</span>}
+            </div>
+            <AccountCard choir={choir!} />
+          </section>
         </>
       )}
-      <button className="linklike tiny muted" style={{ alignSelf: 'center', marginTop: 'auto', minHeight: 44 }} onClick={() => go({ name: 'superadmin' })}>Setting up choirs? (super admin)</button>
     </main>
   );
 }
@@ -158,7 +181,7 @@ function AccountCard({ choir }: { choir: ChoirInfo }) {
         <strong>Your account</strong>
         <LoggedOutNotice />
         <span className="small muted">Log in with your own name and password. Singers can make an account in Settings (Keep my progress across phones); admins and section leads get an invite link from a choir admin.</span>
-        <LoginForm code={choir.code} legacy={!!choir.legacyLogin} />
+        <LoginForm code={choir.code} legacy={!!choir.legacyLogin} quiet />
       </div>
     );
   }
@@ -169,7 +192,7 @@ function AccountCard({ choir }: { choir: ChoirInfo }) {
       <strong data-testid="account-name">{s.account.name}</strong>
       <span className="small muted" data-testid="account-role">{roleText(s.account.role, s.account.voices)}</span>
       <div className="row wrap">
-        {admin && <button className="btn small primary" onClick={() => go({ name: 'choiradmin' })}>Choir admin</button>}
+        {admin && <button className="btn small" onClick={() => go({ name: 'choiradmin' })}>Choir admin</button>}
         {s.account.role !== 'member' && <button className="btn small" onClick={() => go({ name: admin ? 'choirinsights' : 'section' })}>{admin ? 'Sections' : 'Your section'}</button>}
         <button className="btn small ghost" onClick={() => setChanging(!changing)} aria-expanded={changing}>Change password</button>
         <button className="btn small ghost" data-testid="logout" onClick={() => void logout()}>Log out</button>
@@ -180,7 +203,8 @@ function AccountCard({ choir }: { choir: ChoirInfo }) {
 }
 
 /** Choir code + name + password → logged in (a session token on this phone; the password isn't kept). */
-export function LoginForm({ code, legacy = false }: { code: string; legacy?: boolean }) {
+/** `quiet`: on a screen whose one primary action is another (the Choir tab), the Log in button isn't orange. */
+export function LoginForm({ code, legacy = false, quiet = false }: { code: string; legacy?: boolean; quiet?: boolean }) {
   const [name, setName] = useState('');
   const [pw, setPw] = useState('');
   const [err, setErr] = useState('');
@@ -200,7 +224,7 @@ export function LoginForm({ code, legacy = false }: { code: string; legacy?: boo
       <label className="field"><span>Password</span>
         <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="current-password" data-testid="login-password" />
       </label>
-      <button className="btn primary block" disabled={busy || !name.trim() || !pw} data-testid="login">{busy ? '…' : 'Log in'}</button>
+      <button className={quiet ? 'btn block' : 'btn primary block'} disabled={busy || !name.trim() || !pw} data-testid="login">{busy ? '…' : 'Log in'}</button>
       {err && <span className="small" role="alert" style={errStyle}>{err}</span>}
       <span className="tiny muted">Forgot your password? A choir admin can make you a reset link (Admin → Choir → People → Reset password).</span>
       {legacy && (

@@ -1,13 +1,15 @@
 import React, { useEffect } from 'react';
 import { releaseTracker } from './play/session';
 import { useRoute, go, type Route } from './router';
+import { TAB_LABEL, TAB_NAMES, isTab, showsSidebar, showsTabBar, tabOf, type TabName } from './nav';
 import { adoptLibraryIds, useLibrary } from './library';
 import { upgradeAllFullRuns } from './plan';
 import { subscribe } from '../progress/store';
 import { useToast } from './hooks';
-import { IconHome, IconMusic, IconRanks, IconShield, IconSliders } from './icons';
+import { IconEar, IconMusic, IconPeople, IconShield, IconSun } from './icons';
 import { Home } from './screens/Home';
-import { Library } from './screens/Library';
+import { Pieces } from './screens/Pieces';
+import { Train } from './screens/Train';
 import { PieceScreen } from './screens/Piece';
 import { PlayScreen } from './screens/Play';
 import { Results } from './screens/Results';
@@ -38,12 +40,8 @@ import { LOGO_TILE } from './components/ChoirLogo';
 import { shareMyProgress } from './play/shareProgress';
 import { retryPrivacyRemovals } from './play/privacy';
 
-const TABS: { name: Route['name']; label: string; icon: React.ReactNode }[] = [
-  { name: 'home', label: 'Home', icon: <IconHome /> },
-  { name: 'library', label: 'Library', icon: <IconMusic /> },
-  { name: 'ranks', label: 'Ranks', icon: <IconRanks /> },
-  { name: 'settings', label: 'Settings', icon: <IconSliders /> },
-];
+// Today · Pieces · Train · Choir (nav.ts: which screen lights which tab, where the tab bar shows).
+const TAB_ICON: Record<TabName, React.ReactNode> = { home: <IconSun />, pieces: <IconMusic />, train: <IconEar />, choir: <IconPeople /> };
 
 export function App() {
   const route = useRoute();
@@ -112,23 +110,23 @@ export function App() {
     }, 60);
     return () => clearTimeout(t);
   }, [route, lib.ready]);
-  // The piece page belongs to the tab it was opened from (Home or Library): that tab stays lit.
-  // (a piece opened straight from a link, the app's first screen: Home, its natural parent)
-  const [fromTab, setFromTab] = React.useState<Route['name']>(() => {
-    if (route.name === 'piece') return 'home';
-    try { return (sessionStorage.getItem('sh:fromTab') as Route['name'] | null) ?? 'home'; } catch { return 'home'; }
+  // A piece (and Settings, Diagnostics) lights the tab it was opened from; opened straight from a
+  // link, its own default (nav.ts). Remembered for the tab's session, so a reload keeps it.
+  const [fromTab, setFromTab] = React.useState<TabName | null>(() => {
+    if (isTab(route.name)) return route.name;
+    try { const t = sessionStorage.getItem('sh:fromTab'); return t && isTab(t) ? t : null; } catch { return null; }
   });
   useEffect(() => {
-    if (!TABS.some((t) => t.name === route.name)) return;
+    if (!isTab(route.name)) return;
     setFromTab(route.name);
     try { sessionStorage.setItem('sh:fromTab', route.name); } catch { /* storage blocked */ }
   }, [route.name]);
-  // Settings' own pages (the choir, the tuner, diagnostics) keep the sidebar on wide screens (no tab bar on phones).
-  const settingsPage = ['choir', 'tuner', 'diagnostics'].includes(route.name);
-  const tab = route.name === 'piece' ? fromTab : settingsPage ? 'settings' : route.name === 'progress' ? 'home' : route.name;
+  const tab = tabOf(route, fromTab);
   const isAdmin = ADMIN_ROUTES.includes(route.name);
-  const showNav = ['home', 'library', 'ranks', 'settings', 'piece', 'expert', 'progress'].includes(route.name) || isAdmin;
-  const sidebar = showNav || settingsPage;
+  // Phones: the tab bar under the four tabs (and the staff screens); sub-screens have their back arrow.
+  // Wide screens: the sidebar on sub-screens too; never while practising.
+  const showNav = showsTabBar(route);
+  const sidebar = showsSidebar(route);
 
   let body: React.ReactNode;
   if (!lib.ready && route.name !== 'setup' && route.name !== 'tuner') {
@@ -136,7 +134,8 @@ export function App() {
   } else {
     switch (route.name) {
       case 'home': body = <Home />; break;
-      case 'library': body = <Library />; break;
+      case 'pieces': body = <Pieces />; break;
+      case 'train': body = <Train />; break;
       case 'piece': body = <PieceScreen key={route.pieceId} pieceId={route.pieceId} />; break;
       case 'play': body = <PlayScreen key={JSON.stringify(route)} route={route} />; break;
       case 'results': body = <Results />; break;
@@ -177,10 +176,10 @@ export function App() {
             <span className="badge">Hero</span>
           </div>
           <div className="nav-inner">
-            {TABS.map((t) => (
-              <button key={t.name} aria-current={tab === t.name ? (route.name === t.name ? 'page' : 'true') : undefined} onClick={() => go({ name: t.name } as Route)}>
-                {t.icon}
-                {t.label}
+            {TAB_NAMES.map((t) => (
+              <button key={t} data-testid={`tab-${t}`} aria-current={tab === t ? (route.name === t ? 'page' : 'true') : undefined} onClick={() => go({ name: t } as Route)}>
+                {TAB_ICON[t]}
+                {TAB_LABEL[t]}
               </button>
             ))}
             {/* Only with a staff login on this phone: "Section" for a section lead, else "Admin". */}

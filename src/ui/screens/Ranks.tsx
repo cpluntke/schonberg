@@ -7,7 +7,8 @@ import {
   combineEntries, ALL_PIECES,
   type LeaderboardEntry, type RankBy,
 } from '../../progress/leaderboard';
-import { IconShare } from '../icons';
+import { IconBack, IconShare } from '../icons';
+import { back } from '../router';
 import { myBoardEntry, postBoardEntry } from '../play/boardEntry';
 
 const TABS: { by: RankBy; label: string; sub: string }[] = [
@@ -122,6 +123,7 @@ export function Ranks() {
   return (
     <main className="screen wide ranks">
       <div className="topbar">
+        <button className="icon-btn" aria-label="Back" onClick={() => back({ name: 'choir' })}><IconBack /></button>
         <h1>Ranks</h1>
         {pieces.length > 0 && (
           <select aria-label="Piece" value={pieceId} onChange={(e) => setPieceId(e.target.value)}

@@ -305,7 +305,7 @@ export function TodayDone({ plan, labOn }: { plan: TodayPlan; labOn: boolean }) 
     const fresh = computePlan(new Date(), labOn);
     const st = planStatus(fresh, tickContext(today));
     const s = fresh.steps.find((_, i) => !st.done[i]);
-    if (s) go(s.route as never); else go({ name: 'library' });
+    if (s) go(s.route as never); else go({ name: 'pieces' });
   };
   return (
     <>

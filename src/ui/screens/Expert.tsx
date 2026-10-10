@@ -37,7 +37,7 @@ export function Expert() {
   return (
     <main className="screen wide expert-screen" style={{ background: '#0C0A1F' }}>
       <div className="topbar">
-        <button className="icon-btn" aria-label="Back" onClick={() => back()}><IconBack /></button>
+        <button className="icon-btn" aria-label="Back" onClick={() => back({ name: 'train' })}><IconBack /></button>
         <div className="grow col" style={{ gap: 0 }}>
           <h1 style={{ fontSize: 20 }}>Expert mode</h1>
           <span className="small" style={{ color: '#B8B0E0' }}>Atonal training: no key, no tonic to lean on</span>
