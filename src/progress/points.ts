@@ -6,6 +6,7 @@ import { noteVerdict } from './ladder';
 import { cachedChoir, choirCycleNow } from './choir';
 import { dayKey, loadCycle, loadProfile, practiceDays, readJSON, writeJSON } from './store';
 import type { AttemptResult } from '../game/types';
+import { addDayNotes } from './today';
 
 const KEY = 'sh:cyclePoints';
 export interface CyclePoints { k: string; n: number; since: number }
@@ -50,6 +51,7 @@ export function addCyclePoints(n: number, now = Date.now()): number {
   const s = stored();
   const base = same(s, c) ? { ...s, k: c.key } : { k: c.key, n: 0, since: now };
   const out = { ...base, n: base.n + Math.max(0, Math.round(n)) };
+  addDayNotes(n, now);
   writeJSON(KEY, out);
   return out.n;
 }

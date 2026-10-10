@@ -97,7 +97,7 @@ export interface ProgressSnapshot {
 const PROFILE_KEYS = [
   'name', 'voice', 'notation', 'strictness', 'tuning', 'latencyMs', 'beat', 'keepRecording', 'rangeLow', 'rangeHigh',
   'onboarded', 'leaderboardOptIn', 'choirCode', 'shareProgress', 'display', 'displayChosen', 'scoreStaves', 'scorePages',
-  'boardHidden', 'presenceHidden', 'shareOptOut',
+  'boardHidden', 'presenceHidden', 'shareOptOut', 'weekGoal',
 ] as const;
 
 const B64 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_';
@@ -415,6 +415,7 @@ const PROFILE_CHECKS: Record<(typeof PROFILE_KEYS)[number], (v: unknown) => bool
   boardHidden: isBool,
   presenceHidden: isBool,
   shareOptOut: isBool,
+  weekGoal: (v) => Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 7,
 };
 
 /** Only the settings the app knows, each of the right type (anything else in a saved copy is ignored). */

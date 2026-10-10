@@ -95,6 +95,8 @@ export interface Profile {
    * Unset = on; false = the singer turned it off.
    */
   sync?: boolean;
+  /** Days a week the singer means to practise (Today's week card; default 4). Rehearsals count. */
+  weekGoal?: number;
 }
 
 /** The practice display (the singer's choice, else sheet music at every level). */
@@ -209,6 +211,8 @@ export interface AttemptLog {
   score: number;
   passed: boolean;
   durationSec?: number;
+  /** Mean distance from the note of the notes sung (cents, rounded; Your progress, "Getting better"). */
+  cents?: number;
 }
 
 /** The step of a logged attempt: entries saved before the steps were level 1 at 70% (slow), the rest in tempo. */
@@ -696,6 +700,8 @@ export function recordAttempt(
 
   const entry: AttemptLog = { at: now, pieceId, partId, sectionId, level: lvl, ...(lvl > 0 ? { step } : {}), accuracy, score, passed };
   if (durationSec != null && Number.isFinite(durationSec)) entry.durationSec = durationSec;
+  const sung = (result.notes ?? []).map((n) => n.cents).filter((c): c is number => typeof c === 'number' && Number.isFinite(c) && Math.abs(c) < 100);
+  if (lvl > 0 && sung.length) entry.cents = Math.round(sung.reduce((a, c) => a + Math.abs(c), 0) / sung.length);
   const log = attemptLog();
   log.push(entry);
   writeJSON(K.log, log.length > LOG_CAP ? log.slice(log.length - LOG_CAP) : log, false);

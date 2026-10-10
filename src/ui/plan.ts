@@ -1,10 +1,12 @@
-// Today's plan, shared by Home ("Next up") and the intro video's "Try it now" step.
+// Piece status for Home and the plan (ui/today.ts), and the intro video's "Try it now" step.
 
 import { chosenPartId, singableSections, getPiece, type PieceInfo } from './library';
 import { getProgress, dueForReview, attemptLog, loadCycle, loadProfile, allProgress, upgradeFullRuns, type Cycle } from '../progress/store';
 import { pieceReadiness, nextStep, fullRunDue, type Readiness } from '../progress/ladder';
 import type { Route } from './router';
 import { wordsDoneFor } from '../progress/words';
+import { dayOf, loadToday, planStatus } from '../progress/today';
+import { computePlan, tickContext } from './today';
 
 export interface PieceStatus extends Readiness {
   piece: PieceInfo;
@@ -54,14 +56,25 @@ export function todaysPlan(statuses: PieceStatus[], cycle: Cycle = loadCycle()):
   return ordered.filter((s) => s.next && (!s.concertReady || urgent(s))).slice(0, 3);
 }
 
-/** The run Home's "Next up" starts (null when there's nothing to practise). */
+/**
+ * The run today's plan starts with (its first piece step not done yet; the intro video's "Try it
+ * now"), null when there's nothing to practise.
+ */
 export function nextUpRoute(): { route: Route; piece: PieceInfo; level: number } | null {
+  const now = new Date();
+  const day = dayOf(now);
+  const plan = loadToday(day)?.plan ?? computePlan(now, false);
+  const status = planStatus(plan, tickContext(day));
+  const s = plan.steps.find((x, i) => x.kind !== 'lab' && x.route.name === 'play' && !status.done[i]);
+  const piece = s?.pieceId ? getPiece(s.pieceId) : undefined;
+  if (s && piece && s.route.name === 'play') return { route: s.route as Route, piece, level: s.level };
+  // (nothing left today: the first programme piece's next step)
   const cycle = loadCycle();
   const voice = loadProfile().voice;
   const statuses = cycle.pieceIds.map((id) => getPiece(id)).filter((p): p is PieceInfo => !!p).map((p) => pieceStatus(p, voice));
-  const s = todaysPlan(statuses, cycle)[0];
-  if (!s?.next) return null;
-  return { route: { name: 'play', pieceId: s.piece.id, partId: s.partId, sectionId: s.next.sectionId, level: s.next.level, step: s.next.step, mode: '2d' }, piece: s.piece, level: s.next.level };
+  const t = todaysPlan(statuses, cycle)[0];
+  if (!t?.next) return null;
+  return { route: { name: 'play', pieceId: t.piece.id, partId: t.partId, sectionId: t.next.sectionId, level: t.next.level, step: t.next.step, mode: '2d' }, piece: t.piece, level: t.next.level };
 }
 
 /**
