@@ -70,7 +70,8 @@ Singers start from scratch but aren't held back (`src/progress/struggle.ts`):
 
 ## Streak and cycle points
 
-Home shows the practice streak (consecutive days with any run, listening too) and the **notes sung
+Home (Today, [TODAY.md](TODAY.md)) shows the **week** (days practised against the week goal; the practice
+streak, consecutive days with any run, is still kept for sync and the leaderboard) and Your progress the **notes sung
 right this cycle** (`src/progress/points.ts`): every sung run adds its notes graded right (practice
 runs too). A choir's **cycles** have dates (Admin → Cycles: start date, optional end date, each with
 its own programme). A cycle runs from its start date until its end date or until the next cycle (by
@@ -94,7 +95,7 @@ whole programme (what it leaves out, e.g. the concert, is cleared); a change of 
 rest. The library's "Put it in the programme" adds to the cycle being edited. Without a choir, the
 singer's own cycle name decides (the starting "Demo cycle" and "This cycle" count as one).
 
-Results show the run's notes right, the cycle total and the streak. Both travel with the choir
+Results show the run's notes right, the cycle total and the week ("3 days · goal 4 this week"). Both travel with the choir
 account's copy (`ProgressSnapshot.pts`, `days`): another phone's practice days keep the streak, and
 the larger count of the same cycle wins.
 
@@ -269,8 +270,8 @@ sing slow.”; “… · in tempo. Slow is done: now in tempo.”). So Level 1 t
 every passage is at Level 1 in tempo, Next up is the full run at Level 1, then the passages that
 slipped in it, in their own (smaller) stretches. When the step is Level 2 slow and the passage's words
 in rhythm (`words.ts`, at least the first stage) aren't passed, Next up says so (`wordsFirst`), and
-the piece screen offers **Say it in rhythm first**. Home also offers “Know it already? Sing the whole
-piece at Level N”.
+the piece screen offers **Say it in rhythm first** (in today's plan it is a words step,
+[TODAY.md](TODAY.md)). The piece screen offers “Know it already?” (in tempo, or any level).
 
 The cycle target (`ladder.targetForDate`, e.g. “Rehearsal in 3 days: get 3 more passages to Level 3
 · Alone (about 1 a day), then sing it all through at that level”) counts the passages not yet at the
