@@ -93,7 +93,7 @@ export function LyricsQuiz({ pieceId, partId }: { pieceId: string; partId: strin
   if (!piece) {
     if (!lib.ready) return <Shell title="Lyrics quiz" up={up}><p className="muted" role="status">Loading the piece…</p></Shell>;
     return <Shell title="Not found" up={up}><p className="muted">{missingText(pieceId, 'piece')}</p>
-      <button className="btn primary block" onClick={() => leaveTo({ name: 'home' })}>Home</button></Shell>;
+      <button className="btn primary block" onClick={() => leaveTo({ name: 'home' })}>Today</button></Shell>;
   }
   const sub = `${part ? `${part.name} · ` : ''}Lyrics quiz`;
   if (!part) {

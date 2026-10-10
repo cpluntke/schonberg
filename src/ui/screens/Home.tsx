@@ -157,7 +157,7 @@ export function Home() {
           <span className="t14">Your choir now shares everyone's practice with the section leads: which bars are hard for the section (as totals) and your voice range. Yours isn't shared yet.</span>
           <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
             <button className="btn small" onClick={() => { startSharing(); void shareMyProgress(true); }}>Start sharing</button>
-            <button className="btn small ghost" onClick={() => go({ name: 'choir' })}>What's shared</button>
+            <button className="btn small ghost" onClick={() => openAt({ name: 'choir' }, 'choir-membership')}>What's shared</button>
           </div>
         </div>
       )}
@@ -186,7 +186,7 @@ export function Home() {
       <div className="lay home-side">
       <section className="col home-rep" style={{ gap: 2 }}>
         <div className="row between">
-          <h2>Repertoire</h2>
+          <h2>Your pieces</h2>
           <button className="btn ghost small" onClick={() => go({ name: 'pieces' })}>All pieces</button>
         </div>
         {statuses.map((s) => (

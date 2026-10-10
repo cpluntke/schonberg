@@ -19,7 +19,7 @@ export function NotFound({ pieceId, what, title = 'Not found', backLabel = 'Back
     <main className="screen" data-testid="not-found">
       <div className="topbar"><button className="icon-btn" aria-label={backLabel} onClick={() => back()}><IconBack /></button><h1>{title}</h1></div>
       <p className="muted">{missingText(pieceId, what)}</p>
-      <button className="btn primary block" onClick={() => go({ name: 'home' }, true)}>Home</button>
+      <button className="btn primary block" onClick={() => go({ name: 'home' }, true)}>Today</button>
     </main>
   );
 }

@@ -7,7 +7,7 @@ test('pause and resume a simulated run', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto('/?simulate=perfect#/');
-  await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: 'Your pieces' })).toBeVisible({ timeout: 20_000 });
   await page.getByTestId('piece-row').first().click();
   await startPassage(page, /Level 1 · Notes · slow/);
   await page.getByTestId('hp-yes').click(); // level 1 asks "Headphones on?"

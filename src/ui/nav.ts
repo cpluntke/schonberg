@@ -6,10 +6,11 @@
 //   screen is a sub-screen with its own back arrow: no tab bar on phones, the sidebar stays on wide
 //   screens (with the tab it belongs to lit). Practice screens (Play, Results, the words, the
 //   lyrics quiz, the memory map) and voice setup have neither.
-// - A sub-screen lights the tab it belongs to: Your progress → Today; Ranks → Choir; Expert, the
-//   tuner, the intonation lab → Train. Screens reached from several tabs light the tab they were
-//   opened from: a piece (Today, Pieces or Choir; opened straight from a link: Pieces), Settings and
-//   Diagnostics (from the avatar's "You" sheet, on every tab; opened from a link: Today).
+// - A sub-screen lights the tab it belongs to: Ranks → Choir; Expert, the tuner, the intonation lab
+//   → Train. Screens reached from several tabs light the tab they were opened from: a piece (Today,
+//   Pieces or Choir; opened straight from a link: Pieces), Settings, Diagnostics and Your progress
+//   (from the avatar's "You" sheet, on every tab; opened from a link: Today). That tab is stamped on
+//   the screen's history entry, so back and forward across several tabs keep it.
 
 import type { Route } from './router';
 
@@ -24,7 +25,6 @@ export const isAdminRoute = (name: string) => ADMIN.includes(name);
 
 /** Sub-screens and the tab they belong to (a piece: see tabOf). */
 const PARENT: Partial<Record<Route['name'], TabName>> = {
-  progress: 'home',
   ranks: 'choir',
   expert: 'train',
   tuner: 'train',
@@ -32,7 +32,35 @@ const PARENT: Partial<Record<Route['name'], TabName>> = {
 };
 
 /** Screens reached from several tabs: they light the tab they were opened from, else this one. */
-const FROM: Partial<Record<Route['name'], TabName>> = { piece: 'pieces', settings: 'home', diagnostics: 'home' };
+const FROM: Partial<Record<Route['name'], TabName>> = { piece: 'pieces', settings: 'home', diagnostics: 'home', progress: 'home' };
+
+/** A screen that lights the tab it was opened from (its history entry remembers that tab). */
+export const isFromScreen = (name: string): boolean => name in FROM;
+
+/** The tab stamped on the current history entry (App.tsx stamps it when a FROM screen is entered). */
+export function stampedTab(): TabName | null {
+  try {
+    const t = (history.state as { shTab?: string } | null)?.shTab;
+    return t && isTab(t) ? t : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The tab shown last (this browser tab's session). */
+export function lastTab(): TabName | null {
+  try {
+    const t = sessionStorage.getItem('sh:fromTab');
+    return t && isTab(t) ? t : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Where ← on a FROM screen opened cold goes: the tab it lights. */
+export function backTab(name: Route['name']): Route {
+  return { name: tabOf({ name }, stampedTab() ?? lastTab()) ?? 'home' } as Route;
+}
 
 /**
  * The tab lit for a route (null: a staff screen, which lights its own tab, or a screen without one).

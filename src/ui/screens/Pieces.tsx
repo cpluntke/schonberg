@@ -144,7 +144,9 @@ export function Pieces() {
                 <button className="link start" onClick={() => go({ name: 'choiradmin' })} data-testid="pieces-choir-library">Add scores for the whole choir (Admin › Choir) ›</button>
               )}
             </section>
-            <span className="t14 muted">Built in: an original warm-up chorale. Your choir's scores, including public-domain pieces your choir admin adds from the choir library, arrive when you join your choir.</span>
+            <span className="t14 muted">Built in: an original warm-up chorale. {profile.choirCode
+              ? 'Your choir’s scores, including public-domain pieces your choir admin adds from the choir library, arrive with the choir sync.'
+              : 'Your choir’s scores, including public-domain pieces your choir admin adds from the choir library, arrive when you join your choir (the Choir tab).'}</span>
           </div>
         </div>
       )}

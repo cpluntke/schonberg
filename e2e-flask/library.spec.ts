@@ -128,7 +128,7 @@ test('admin adds the Madrigal from the library; a member gets it; solo phones an
   // ---- a solo phone: only the Abendlied
   const solo = await phone(browser, 'T');
   await solo.page.goto('./#/');
-  await expect(solo.page.getByText('Repertoire')).toBeVisible({ timeout: 30_000 });
+  await expect(solo.page.getByRole('heading', { name: 'Your pieces' })).toBeVisible({ timeout: 30_000 });
   await expect(solo.page.getByTestId('piece-row')).toHaveCount(1);
   await expect(solo.page.getByTestId('piece-row')).toContainText('Abendlied');
   await shoot(solo.page, 'solo-home');

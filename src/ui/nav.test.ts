@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { avatarInitials, showsSidebar, showsTabBar, tabOf } from './nav';
+import { avatarInitials, backTab, showsSidebar, showsTabBar, stampedTab, tabOf } from './nav';
 import { parseHash, type Route } from './router';
 
 describe('tabs', () => {
@@ -8,7 +8,6 @@ describe('tabs', () => {
   });
 
   it('sub-screens light the tab they belong to', () => {
-    expect(tabOf({ name: 'progress' })).toBe('home');
     expect(tabOf({ name: 'ranks' })).toBe('choir');
     expect(tabOf({ name: 'expert' })).toBe('train');
     expect(tabOf({ name: 'tuner' })).toBe('train');
@@ -24,6 +23,9 @@ describe('tabs', () => {
     expect(tabOf({ name: 'settings' }, 'train')).toBe('train');
     expect(tabOf({ name: 'settings' })).toBe('home');
     expect(tabOf({ name: 'diagnostics' }, 'pieces')).toBe('pieces');
+    // Your progress: from Today's week card, or from the You sheet on any tab
+    expect(tabOf({ name: 'progress' })).toBe('home');
+    expect(tabOf({ name: 'progress' }, 'train')).toBe('train');
   });
 
   it('staff screens and practice screens light no singer tab', () => {
@@ -67,5 +69,24 @@ describe('avatar initials', () => {
     expect(avatarInitials('Clara Maria Weiß', 'A')).toBe('CW');
     expect(avatarInitials('  ', 'T')).toBe('T');
     expect(avatarInitials('Zoë', 'S')).toBe('ZO');
+  });
+});
+
+describe('the tab a history entry was opened from', () => {
+  it('is read from the entry; ← on a screen opened cold goes to the tab it lights', () => {
+    sessionStorage.removeItem('sh:fromTab');
+    history.replaceState(null, '', '#/piece/x');
+    expect(stampedTab()).toBeNull();
+    expect(backTab('piece')).toEqual({ name: 'pieces' });
+    expect(backTab('settings')).toEqual({ name: 'home' });
+    history.replaceState({ shTab: 'choir' }, '', '#/piece/x');
+    expect(stampedTab()).toBe('choir');
+    expect(backTab('piece')).toEqual({ name: 'choir' });
+    history.replaceState({ shTab: 'nonsense' }, '', '#/piece/x');
+    expect(stampedTab()).toBeNull();
+    sessionStorage.setItem('sh:fromTab', 'train');
+    expect(backTab('progress')).toEqual({ name: 'train' });
+    sessionStorage.removeItem('sh:fromTab');
+    history.replaceState(null, '', '#/');
   });
 });

@@ -158,7 +158,7 @@ test('lead sees aggregates and ranges; admin sees S|A|T|B; usage reaches the sup
   await phone.goto('./#/');
   await phone.evaluate(() => localStorage.setItem('sh:profile', JSON.stringify({ name: 'X', voice: 'A', notation: 'letter', strictness: 'standard', tuning: 'equal', latencyMs: 120, latencySource: 'measured', onboarded: true, leaderboardOptIn: false })));
   await phone.goto('./?simulate=perfect#/');
-  await expect(phone.getByText('Repertoire')).toBeVisible({ timeout: 30_000 });
+  await expect(phone.getByRole('heading', { name: 'Your pieces' })).toBeVisible({ timeout: 30_000 });
   await phone.getByTestId('piece-row').first().click();
   await phone.getByLabel('Sections').getByRole('button', { name: /level 1/ }).first().click();
   await phone.getByTestId('hp-yes').click(); // level 1 counts with headphones on

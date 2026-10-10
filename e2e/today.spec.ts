@@ -7,14 +7,14 @@ const PROFILE = { name: 'Clara Weber', voice: 'A', notation: 'letter', strictnes
 
 async function seeded(page: Page, url: string, extra: (now: number) => Record<string, unknown> = () => ({})) {
   await page.goto('/#/');
-  await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: 'Your pieces' })).toBeVisible({ timeout: 20_000 });
   await page.evaluate(({ profile, extra }) => {
     localStorage.setItem('sh:profile', JSON.stringify(profile));
     for (const [k, v] of Object.entries(extra)) localStorage.setItem(k, JSON.stringify(v));
   }, { profile: PROFILE, extra: extra(Date.now()) });
   await page.goto(url);
   await page.reload(); // (the same address only changes the hash: load the seeded state)
-  await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: 'Your pieces' })).toBeVisible({ timeout: 20_000 });
 }
 
 async function sing(page: Page) {
@@ -155,7 +155,7 @@ test('a miss in the session: the help stays, “Skip to next step” moves on', 
 test('a words step in the session: the strip on the words screen, then the next step', async ({ page }) => {
   test.setTimeout(180_000);
   await page.goto('/#/');
-  await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: 'Your pieces' })).toBeVisible({ timeout: 20_000 });
   const { partId, ids } = await abendlied(page);
   const t = Date.now() - 2 * 86_400_000;
   await seeded(page, '/?simulate=perfect#/', () => ({

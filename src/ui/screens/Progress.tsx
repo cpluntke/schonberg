@@ -2,6 +2,7 @@
 // level ladder, and "Getting better" when the data shows it. Reached from Today's week card and Settings.
 import React from 'react';
 import { back, go, openAt } from '../router';
+import { backTab } from '../nav';
 import { useStoreVersion, useDay, daysUntil } from '../hooks';
 import { IconBack } from '../icons';
 import { attemptLog, getProgress, loadCycle, loadProfile, logStep } from '../../progress/store';
@@ -61,7 +62,7 @@ export function ProgressScreen() {
   return (
     <main className="screen wide progress-screen">
       <div className="topbar">
-        <button className="icon-btn" aria-label="Back" onClick={() => back({ name: 'home' })}><IconBack /></button>
+        <button className="icon-btn" aria-label="Back" onClick={() => back(backTab('progress'))}><IconBack /></button>
         <span className="t14 muted">Today</span>
       </div>
       <div className="col" style={{ gap: 2 }}>

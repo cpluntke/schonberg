@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useProfile } from '../hooks';
-import { go, back } from '../router';
+import { go, back, setDrillHome } from '../router';
 import { registerVirtual } from '../library';
 import { rowOfTheDay, rowForms } from '../../game/twelvetone';
 import { rowPiece, leapPiece, cycleLeaps, singerRange, ROW_FORMS } from '../generated';
@@ -21,6 +21,7 @@ export function Expert() {
   function playRow(level: number, mode: '2d' | '3d') {
     const p = rowPiece(new Date(), form);
     registerVirtual(p);
+    setDrillHome('expert');
     go({ name: 'play', pieceId: p.id, partId: p.score.parts[0].id, sectionId: 'all', level, mode });
   }
 
@@ -30,6 +31,7 @@ export function Expert() {
     const p = leapPiece();
     if (!p) return;
     registerVirtual(p);
+    setDrillHome('expert');
     // (level 1 here is the slow step: "Slow, with guide")
     go({ name: 'play', pieceId: p.id, partId: 'drill', sectionId: 'all', level, mode, ...(level === 1 && mode === '2d' ? { step: 'slow' as const } : {}) });
   }

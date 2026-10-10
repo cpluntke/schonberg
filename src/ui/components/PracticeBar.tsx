@@ -20,7 +20,7 @@ export function PracticeBar({ up, title, sub, heading, extra, onBack, onHome, cl
   onHome?: () => void;
   className?: string;
 }) {
-  const backLabel = up.name === 'piece' ? 'Back to the piece' : up.name === 'expert' ? 'Back to expert mode' : 'Back';
+  const backLabel = up.name === 'piece' ? 'Back to the piece' : up.name === 'expert' ? 'Back to expert mode' : up.name === 'train' ? 'Back to Train' : 'Back';
   return (
     <div className={`practice-bar${className ? ` ${className}` : ''}`} data-testid="practice-bar">
       <button className="icon-btn" aria-label={backLabel} data-testid="bar-back" onClick={onBack ?? (() => leaveTo(up))}><IconBack /></button>
@@ -31,7 +31,7 @@ export function PracticeBar({ up, title, sub, heading, extra, onBack, onHome, cl
         {sub && <span className="tiny muted ellipsis">{sub}</span>}
       </div>
       {extra}
-      <button className="icon-btn" aria-label="Home" data-testid="bar-home" onClick={onHome ?? (() => leaveTo({ name: 'home' }))}><IconHome /></button>
+      <button className="icon-btn" aria-label="Today" data-testid="bar-home" onClick={onHome ?? (() => leaveTo({ name: 'home' }))}><IconHome /></button>
     </div>
   );
 }

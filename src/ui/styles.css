@@ -951,3 +951,9 @@ input[type='range'] { height: 44px; margin: 0; }
 .choir-head h1.hero { font-size: 26px; overflow-wrap: anywhere; }
 @media (min-width: 900px) and (min-height: 480px) { .choir-head h1.hero { font-size: 34px; } }
 .train .eb, .choir-tab .eb { font-size: 14px; }
+
+/* Wide screens: the You sheet is a centred panel, without the phone's grab handle. */
+@media (min-width: 700px) { .you-sheet .grab { display: none; } }
+/* 44 px targets: Settings' selects, the Ranks piece select. */
+.settings .toggle-row select { min-height: 44px !important; }
+.ranks .topbar select { min-height: 44px !important; }

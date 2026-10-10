@@ -8,26 +8,40 @@ import { shortTitle } from './today';
 
 const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
+/** Monday 00:00 (local) of the week `now` is in: "this week" on the Choir tab. */
+export function weekStart(now: Date = new Date()): number {
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d.getTime();
+}
+
+/**
+ * An entry's points count for this week only when it was posted this week: weeklyScore is the sum
+ * of the 7 days before it was posted, so an older entry's points are last week's (or older).
+ */
+const thisWeek = (e: LeaderboardEntry, since: number) => e.updatedAt >= since && e.weeklyScore > 0;
+
 /**
  * This week in your section: of the singers of your voice on the choir's board (entries combined
- * over the programme, one per singer), how many have points this week. You count with your own
- * entry (computed on this phone), whether or not you're on the board.
+ * over the programme, one per singer), how many practised this week (points, posted this week). You
+ * count with your own entry (computed on this phone now), whether or not you're on the board.
  */
-export function sectionWeek(entries: LeaderboardEntry[], voice: string, me: LeaderboardEntry | null): { practised: number; total: number; me: boolean } {
+export function sectionWeek(entries: LeaderboardEntry[], voice: string, me: LeaderboardEntry | null, since: number): { practised: number; total: number; me: boolean } {
   const mine = entries.filter((e) => e.voice === voice && !(me && same(e.name, me.name)));
   const all = me && me.voice === voice ? [...mine, me] : mine;
-  return { practised: all.filter((e) => e.weeklyScore > 0).length, total: all.length, me: !!me && me.voice === voice && me.weeklyScore > 0 };
+  const meIn = !!me && me.voice === voice && thisWeek(me, since);
+  return { practised: all.filter((e) => thisWeek(e, since)).length, total: all.length, me: meIn };
 }
 
 export interface WeekRow { rank: number; entry: LeaderboardEntry; me: boolean }
 
 /**
- * The short board: the top `n` by this week's points (singers with none left out), and you (with
- * your place) when you're further down. Your own entry replaces the board's copy of you.
+ * The short board: the top `n` by this week's points (singers without points this week left out),
+ * and you (with your place) when you're further down. Your own entry replaces the board's copy of you.
  */
-export function weekBoard(entries: LeaderboardEntry[], me: LeaderboardEntry | null, n = 3): WeekRow[] {
-  const others = entries.filter((e) => !(me && same(e.name, me.name)));
-  const all = (me ? [...others, me] : others).filter((e) => e.weeklyScore > 0 || e === me);
+export function weekBoard(entries: LeaderboardEntry[], me: LeaderboardEntry | null, since: number, n = 3): WeekRow[] {
+  const others = entries.filter((e) => !(me && same(e.name, me.name)) && thisWeek(e, since));
+  const all = me ? [...others, me] : others;
   const ranked = [...all].sort((a, b) => b.weeklyScore - a.weeklyScore || a.name.localeCompare(b.name));
   const rows = ranked.map((entry, i) => ({ rank: i + 1, entry, me: entry === me }));
   const top = rows.slice(0, n);

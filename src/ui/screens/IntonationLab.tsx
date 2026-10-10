@@ -52,12 +52,12 @@ export function IntonationLab({ route }: { route: LabRoute }) {
     return (
       <main className="screen">
         <div className="topbar">
-          <button className="icon-btn" aria-label="Back" onClick={() => back({ name: 'home' })}><IconBack /></button>
+          <button className="icon-btn" aria-label="Back" onClick={() => back({ name: 'train' })}><IconBack /></button>
           <h1>Intonation lab</h1>
         </div>
         <div className="notice info">{profile.choirCode
-          ? 'The intonation lab isn’t in your choir’s programme right now. When your choir adds it to a cycle, it appears on Home.'
-          : 'The intonation lab comes with a choir’s programme: join your choir (Settings → Your choir) to get it when your choir adds it.'}</div>
+          ? 'The intonation lab isn’t in your choir’s programme right now. When your choir adds it to a cycle, it appears on Today and under Train.'
+          : 'The intonation lab comes with a choir’s programme: join your choir (the Choir tab) to get it when your choir adds it.'}</div>
       </main>
     );
   }
@@ -77,7 +77,7 @@ function Ladder({ iv, lab }: { iv: LabInterval; lab: LabProgress }) {
   return (
     <main className="screen" data-testid="lab-ladder">
       <div className="topbar">
-        <button className="icon-btn" aria-label="Back" onClick={() => back({ name: 'home' })}><IconBack /></button>
+        <button className="icon-btn" aria-label="Back" onClick={() => back({ name: 'train' })}><IconBack /></button>
         <h1>Intonation lab</h1>
         {!labInProgramme() && <span className="badge" style={{ marginLeft: 'auto' }}>Preview</span>}
       </div>

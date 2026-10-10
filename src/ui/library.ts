@@ -322,6 +322,14 @@ export function getPiece(id: string): PieceInfo | undefined {
   return undefined;
 }
 
+/**
+ * The programme's pieces on this phone: the cycle's pieces that are here, the singer's own imports
+ * included (an import can fill a wanted slot, rehearsal focus too). The Choir tab and Ranks use this.
+ */
+export function programmePieces(cycle: { pieceIds: string[] } = loadCycle()): PieceInfo[] {
+  return cycle.pieceIds.map((id) => getPiece(id)).filter((p): p is PieceInfo => !!p);
+}
+
 /** A score the singer imported themselves (not built in, not one of the choir's). */
 export function isOwnPiece(p: Pick<PieceInfo, 'id' | 'builtin' | 'score'>): boolean {
   return !p.builtin && !p.id.startsWith('choir-') && !p.score.choir;

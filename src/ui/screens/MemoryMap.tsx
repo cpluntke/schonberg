@@ -141,7 +141,7 @@ export function MemoryMap({ pieceId, partId }: { pieceId: string; partId: string
   if (!piece) {
     if (!lib.ready) return <Shell title="Memory map" up={up}><p className="muted" role="status">Loading the piece…</p></Shell>;
     return <Shell title="Not found" up={up}><p className="muted">{missingText(pieceId, 'piece')}</p>
-      <button className="btn primary block" onClick={() => leaveTo({ name: 'home' })}>Home</button></Shell>;
+      <button className="btn primary block" onClick={() => leaveTo({ name: 'home' })}>Today</button></Shell>;
   }
   if (!map || !map.sections.length) {
     return <Shell title={piece.title} sub="Memory map" up={up}><p className="muted">This part has no notes to map. Go back and pick your part again.</p></Shell>;

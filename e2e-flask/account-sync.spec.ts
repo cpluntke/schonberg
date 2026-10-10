@@ -56,7 +56,7 @@ test('member: level 1 on phone A, account, phone B gets it; lead sees one entry;
   await expect.poll(async () => (await section(request, code, lead)).ranges.map((m) => m.name), { timeout: 15_000 }).toEqual(['Anna']);
 
   await pa.goto('./?simulate=perfect#/');
-  await expect(pa.getByText('Repertoire')).toBeVisible({ timeout: 30_000 });
+  await expect(pa.getByRole('heading', { name: 'Your pieces' })).toBeVisible({ timeout: 30_000 });
   await pa.getByTestId('piece-row').first().click();
   await pa.getByLabel('Sections').getByRole('button', { name: /level 1/ }).first().click();
   await pa.getByTestId('hp-yes').click(); // level 1 counts with headphones on
@@ -108,7 +108,7 @@ test('member: level 1 on phone A, account, phone B gets it; lead sees one entry;
   const pb = await b.newPage();
   pb.on('pageerror', (e) => errors.push(String(e)));
   await pb.goto('./#/');
-  await expect(pb.getByText('Repertoire')).toBeVisible({ timeout: 30_000 });
+  await expect(pb.getByRole('heading', { name: 'Your pieces' })).toBeVisible({ timeout: 30_000 });
   expect(await progressOf(pb)).toEqual({});
   await pb.getByTestId('home-account').click();
   await expect(pb.getByTestId('account-form')).toBeVisible();

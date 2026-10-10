@@ -5,6 +5,7 @@ import { useProfile, useStoreVersion, toast, daysUntil, useWide } from '../hooks
 import { nextRehearsal, WEEKDAYS } from '../../progress/rehearsal';
 import { getPiece } from '../library';
 import { back, go } from '../router';
+import { backTab } from '../nav';
 import { IconBack } from '../icons';
 import { loadCycle, saveCycle, exportBackup, importBackup } from '../../progress/store';
 import { cachedChoir, loadSuperSession, superLogout } from '../../progress/choir';
@@ -64,7 +65,7 @@ export function Settings() {
   return (
     <main className="screen wide settings">
       <div className="topbar">
-        <button className="icon-btn" aria-label="Back" onClick={() => back()}><IconBack /></button>
+        <button className="icon-btn" aria-label="Back" onClick={() => back(backTab('settings'))}><IconBack /></button>
         <h1>Settings</h1>
       </div>
 
@@ -191,7 +192,7 @@ export function Settings() {
           <span className="small" role="alert" style={{ color: 'var(--accent-text)' }}>The concert is before the next rehearsal: check the dates.</span>
         )}
         {[cycle.rehearsalWeekday == null ? cycle.rehearsalDate : undefined, cycle.concertDate].some((d) => d && (daysUntil(d) ?? 0) < 0) && (
-          <span className="small" style={{ color: 'var(--accent-text)' }}>A date is in the past. Set the next rehearsal so Home can pace your practice.</span>
+          <span className="small" style={{ color: 'var(--accent-text)' }}>A date is in the past. Set the next rehearsal so Today can pace your practice.</span>
         )}
         {cycle.pieceIds.some((id) => getPiece(id)) && (
           <div className="col" style={{ gap: 0 }}>

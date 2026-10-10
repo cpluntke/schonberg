@@ -3,7 +3,7 @@
 // (the tuner), the leap drill from your music and the Zwölfton row of the day (Expert mode). The
 // courses of the UX review's C1 come later and replace this.
 import React from 'react';
-import { go } from '../router';
+import { go, setDrillHome } from '../router';
 import { useProfile, useStoreVersion } from '../hooks';
 import { registerVirtual, useLibrary } from '../library';
 import { cycleLeaps, leapPiece } from '../generated';
@@ -11,10 +11,16 @@ import { rowOfTheDay } from '../../game/twelvetone';
 import { labInProgramme, loadLab, RUNGS } from '../../game/intonation';
 import { IconChevron, IconEar, IconGauge, IconPlay } from '../icons';
 import { YouButton } from '../components/YouSheet';
+import { shortTitle } from '../today';
 import { useStaff } from './Admin';
 import { labEnabled } from './IntonationLab';
 
 const sym = (p: number) => (p === 10 ? 't' : p === 11 ? 'e' : String(p));
+/** "Dieu! qu'il la fait bon regarder, bar 12" → "Dieu!, bar 12": the bar number stays in view at 390 px. */
+export function shortWhere(where: string): string {
+  const m = /^(.*), (bar .+)$/.exec(where);
+  return m ? `${shortTitle(m[1])}, ${m[2]}` : where;
+}
 
 export function Train() {
   useProfile();
@@ -31,6 +37,7 @@ export function Train() {
     const p = leapPiece();
     if (!p) return;
     registerVirtual(p);
+    setDrillHome('train'); // (leaving the drill comes back here)
     // (level 1 is the slow step: "Slow, with guide", as in Expert mode)
     go({ name: 'play', pieceId: p.id, partId: 'drill', sectionId: 'all', level: 1, mode: '2d', step: 'slow' });
   }
@@ -76,7 +83,7 @@ export function Train() {
               <span className="t14 muted">The {leaps.length} hardest intervals in your parts of this programme, one per bar.</span>
               <div className="col" style={{ gap: 2 }}>
                 {leaps.slice(0, 3).map((l, i) => (
-                  <span key={i} className="row t14" style={{ gap: 8 }}><span className="mono" style={{ width: 56, color: 'var(--voice)', flex: 'none' }}>{l.label}</span><span className="muted ellipsis">{l.where}</span></span>
+                  <span key={i} className="row t14" style={{ gap: 8 }}><span className="mono" style={{ width: 56, color: 'var(--voice)', flex: 'none' }}>{l.label}</span><span className="muted ellipsis">{shortWhere(l.where)}</span></span>
                 ))}
               </div>
               <div className="row wrap" style={{ gap: 8 }}>

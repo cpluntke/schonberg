@@ -259,7 +259,7 @@ function ChoirStep({ profile, update, onNext }: { profile: Profile; update: (p: 
       <button className="btn primary block" style={{ marginTop: 'auto' }} onClick={onNext} data-testid="choir-step-next">
         {joined ? 'Continue' : 'Practise on my own'}
       </button>
-      {!joined && <span className="tiny muted" style={{ textAlign: 'center' }}>You can join a choir later in Settings.</span>}
+      {!joined && <span className="tiny muted" style={{ textAlign: 'center' }}>You can join a choir later on the Choir tab.</span>}
     </>
   );
 }

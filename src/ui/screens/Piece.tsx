@@ -4,6 +4,7 @@ import { entryPiece } from '../generated';
 import { entryNotes } from '../../game/drills';
 import { useProfile, useStoreVersion } from '../hooks';
 import { go, back, type Route } from '../router';
+import { backTab } from '../nav';
 import { getProgress, dueForReview, loadCycle } from '../../progress/store';
 import {
   LEVELS, OFF_BOOK_DAYS, pieceReadiness, nextStep, levelLabel, stepFor, stepLabel, stepSpec, stepWord, type Step, type NextStep,
@@ -189,7 +190,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
   return (
     <main className="screen wide piece-screen">
       <div className="piece-head">
-        <button className="icon-btn filled" aria-label="Back" onClick={() => back()}><IconBack /></button>
+        <button className="icon-btn filled" aria-label="Back" onClick={() => back(backTab('piece'))}><IconBack /></button>
         <div className="grow col" style={{ gap: 2 }}>
           <h1>{piece.title}</h1>
           <span className="t14 muted">

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getPiece, useLibrary, type PieceInfo } from '../library';
+import { getPiece, programmePieces, useLibrary, type PieceInfo } from '../library';
 import { useProfile, useStoreVersion, toast, initials } from '../hooks';
 import { attemptLog, loadCycle } from '../../progress/store';
 import {
@@ -24,7 +24,7 @@ export function Ranks() {
   const [profile, update] = useProfile();
   useStoreVersion();
   const cycle = loadCycle();
-  const pieces = cycle.pieceIds.map((id) => getPiece(id)).filter(Boolean) as PieceInfo[];
+  const pieces = programmePieces(cycle);
   useLibrary(); // redraw when the choir's scores arrive
   // "All pieces" first (the default): each singer over the whole programme; or one piece.
   const [chosen, setPieceId] = useState(ALL_PIECES);

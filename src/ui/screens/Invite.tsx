@@ -73,7 +73,7 @@ export function InviteScreen({ token: fromUrl }: { token?: string }) {
         <button className="btn primary block" onClick={() => go({ name: admin ? 'choiradmin' : 'section' }, true)}>
           {admin ? 'Open choir admin' : 'See your section'}
         </button>
-        <button className="btn ghost block" onClick={() => go({ name: 'home' }, true)}>Home</button>
+        <button className="btn ghost block" onClick={() => go({ name: 'home' }, true)}>Today</button>
       </main>
     );
   }

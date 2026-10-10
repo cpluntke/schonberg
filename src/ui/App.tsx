@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { releaseTracker } from './play/session';
 import { useRoute, go, type Route } from './router';
-import { TAB_LABEL, TAB_NAMES, isTab, showsSidebar, showsTabBar, tabOf, type TabName } from './nav';
+import { TAB_LABEL, TAB_NAMES, isFromScreen, isTab, lastTab, showsSidebar, showsTabBar, stampedTab, tabOf, type TabName } from './nav';
 import { adoptLibraryIds, useLibrary } from './library';
 import { upgradeAllFullRuns } from './plan';
 import { subscribe } from '../progress/store';
@@ -112,16 +112,20 @@ export function App() {
   }, [route, lib.ready]);
   // A piece (and Settings, Diagnostics) lights the tab it was opened from; opened straight from a
   // link, its own default (nav.ts). Remembered for the tab's session, so a reload keeps it.
-  const [fromTab, setFromTab] = React.useState<TabName | null>(() => {
-    if (isTab(route.name)) return route.name;
-    try { const t = sessionStorage.getItem('sh:fromTab'); return t && isTab(t) ? t : null; } catch { return null; }
-  });
+  const [fromTab, setFromTab] = React.useState<TabName | null>(() => (isTab(route.name) ? route.name : lastTab()));
   useEffect(() => {
     if (!isTab(route.name)) return;
     setFromTab(route.name);
     try { sessionStorage.setItem('sh:fromTab', route.name); } catch { /* storage blocked */ }
   }, [route.name]);
-  const tab = tabOf(route, fromTab);
+  // Such a screen's history entry keeps the tab it was opened from (back and forward over several
+  // tabs light the right one); stamped when the screen is entered.
+  const stamped = isFromScreen(route.name) ? stampedTab() : null;
+  useEffect(() => {
+    if (!isFromScreen(route.name) || stampedTab() || !fromTab) return;
+    try { history.replaceState({ ...((history.state as object | null) ?? {}), shTab: fromTab }, '', location.href); } catch { /* ignore */ }
+  }, [route]); // eslint-disable-line react-hooks/exhaustive-deps
+  const tab = tabOf(route, stamped ?? fromTab);
   const isAdmin = ADMIN_ROUTES.includes(route.name);
   // Phones: the tab bar under the four tabs (and the staff screens); sub-screens have their back arrow.
   // Wide screens: the sidebar on sub-screens too; never while practising.

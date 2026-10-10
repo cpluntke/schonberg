@@ -164,10 +164,19 @@ export function href(r: Route): string {
 const PRACTICE: Route['name'][] = ['play', 'results', 'lyrics', 'memorymap'];
 export const isPractice = (r: Route) => PRACTICE.includes(r.name);
 
-/** The page a practice screen sits on: its piece (a virtual drill's real piece), or expert mode for its drills. */
+/** Where the generated drills (the Zwölfton row, the leap drill) were started: Train or Expert mode. */
+export function setDrillHome(where: 'train' | 'expert'): void {
+  try { sessionStorage.setItem('sh:drillHome', where); } catch { /* storage blocked: Expert mode */ }
+}
+function drillHome(): Route {
+  try { if (sessionStorage.getItem('sh:drillHome') === 'train') return { name: 'train' }; } catch { /* ignore */ }
+  return { name: 'expert' };
+}
+
+/** The page a practice screen sits on: its piece (a virtual drill's real piece), or where its generated drill was started. */
 export function practiceParent(r: Route): Route | null {
   if (r.name !== 'play' && r.name !== 'lyrics' && r.name !== 'memorymap') return null;
-  if (/^(row|leaps)-/.test(r.pieceId)) return { name: 'expert' };
+  if (/^(row|leaps)-/.test(r.pieceId)) return drillHome();
   return { name: 'piece', pieceId: r.pieceId.split('~')[0] };
 }
 

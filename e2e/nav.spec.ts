@@ -7,7 +7,7 @@ import { startPassage } from './helpers';
 
 async function home(page: Page) {
   await page.goto('/?simulate=perfect#/');
-  await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: 'Your pieces' })).toBeVisible({ timeout: 20_000 });
 }
 
 async function singFirstSection(page: Page) {
@@ -76,7 +76,7 @@ test('Start today\u2019s practice on Home: back from Play goes to the piece, the
   await singFirstSection(page);
   await page.getByTestId('bar-home').click();
   await expect(page).toHaveURL(/#\/$/);
-  await expect(page.getByText('Repertoire')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Your pieces' })).toBeVisible();
 });
 
 test('mid-run, ← and back pause and open the sheet; leaving from it lands on the piece', async ({ page }) => {
@@ -178,6 +178,14 @@ test('the avatar opens the You sheet; its rows open Settings on the right part; 
   await expect(sheet.getByTestId('you-row-super')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(sheet).toBeHidden();
+  // The browser's (Android's) back closes the sheet and stays on the screen.
+  await page.getByTestId('you-button').click();
+  await expect(sheet).toBeVisible();
+  await page.goBack();
+  await expect(sheet).toBeHidden();
+  await expect(page).toHaveURL(/#\/$/);
+  await expect(page.getByTestId('greeting')).toBeVisible();
+  await expect(page.getByTestId('you-button')).toHaveAccessibleName(/^You \(\S+\): /);
 
   await page.getByTestId('you-button').click();
   await page.getByTestId('you-row-privacy').click();

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { arrivalScroll, go, href, leaveTo, openAt, parseHash, practiceParent, pushGuard, isDroppingGuard } from './router';
+import { arrivalScroll, go, href, leaveTo, openAt, parseHash, practiceParent, pushGuard, isDroppingGuard, setDrillHome } from './router';
 
 /** history.back() and wait until it has landed. */
 function back(): Promise<void> {
@@ -88,6 +88,14 @@ describe('practice screens sit right above their piece', () => {
     expect(practiceParent({ ...play, pieceId: 'p1~entries~S' })).toEqual({ name: 'piece', pieceId: 'p1' });
     expect(practiceParent({ ...play, pieceId: 'row-2026-10-07-P0' })).toEqual({ name: 'expert' });
     expect(practiceParent({ name: 'results' })).toBeNull();
+  });
+
+  it('a generated drill started from Train goes back to Train; from Expert mode, to Expert mode', () => {
+    setDrillHome('train');
+    expect(practiceParent({ ...play, pieceId: 'leaps-2026-10-10' })).toEqual({ name: 'train' });
+    setDrillHome('expert');
+    expect(practiceParent({ ...play, pieceId: 'leaps-2026-10-10' })).toEqual({ name: 'expert' });
+    sessionStorage.removeItem('sh:drillHome');
   });
 
   it('a Play opened cold (nothing below): Again keeps it unstamped, so ← replaces it with the piece', async () => {

@@ -16,24 +16,68 @@ import {
   IconChart, IconChevron, IconClose, IconData, IconHelp, IconLock, IconPeople, IconShield, IconText, IconTimer, IconUser,
 } from '../icons';
 
-/** The avatar button; opens the You sheet. */
+type SheetState = { youSheet?: boolean } | null;
+const sheetEntry = (): boolean => {
+  try { return !!(history.state as SheetState)?.youSheet; } catch { return false; }
+};
+
+/**
+ * The avatar button; opens the You sheet. The open sheet is a history entry (as the passage sheet
+ * on a piece): the browser's and Android's back close it instead of leaving the screen.
+ */
 export function YouButton() {
   const [profile] = useProfile();
   const [open, setOpen] = useState(false);
+  const pending = useRef<(() => void) | null>(null);
+  const ini = avatarInitials(profile.name, profile.voice);
+  // A sheet's entry left over from before a reload (the sheet is closed now): step down onto the
+  // screen's own entry, so back doesn't land on the same screen again.
+  useEffect(() => {
+    if (!sheetEntry()) return;
+    try {
+      history.replaceState({ ...(history.state as object), youSheet: undefined }, '', location.href);
+      if (history.length > 1) history.back();
+    } catch { /* ignore */ }
+  }, []);
+  useEffect(() => {
+    if (!open) return;
+    const onPop = () => {
+      setOpen(false);
+      const then = pending.current;
+      pending.current = null;
+      then?.();
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [open]);
+  const show = () => {
+    try { history.pushState({ ...((history.state as object | null) ?? {}), youSheet: true }, '', location.href); } catch { /* ignore */ }
+    setOpen(true);
+  };
+  /** Close the sheet (stepping back over its entry), then do `then` (e.g. open another screen). */
+  const close = (then?: () => void) => {
+    if (sheetEntry()) {
+      pending.current = then ?? null;
+      history.back();
+    } else {
+      setOpen(false);
+      then?.();
+    }
+  };
   return (
     <>
-      <button className="avatar-btn" aria-label="You: your voice, settings and account" aria-haspopup="dialog" aria-expanded={open}
-        data-testid="you-button" onClick={() => setOpen(true)}>
-        {avatarInitials(profile.name, profile.voice)}
+      <button className="avatar-btn" aria-label={`You (${ini}): your voice, settings and account`} aria-haspopup="dialog" aria-expanded={open}
+        data-testid="you-button" onClick={show}>
+        {ini}
       </button>
-      {open && <YouSheet onClose={() => setOpen(false)} />}
+      {open && <YouSheet onClose={close} />}
     </>
   );
 }
 
 interface Row { id: string; icon: React.ReactNode; title: string; sub: string; open: () => void }
 
-export function YouSheet({ onClose }: { onClose: () => void }) {
+export function YouSheet({ onClose }: { onClose: (then?: () => void) => void }) {
   const [profile] = useProfile();
   useStoreVersion();
   const staff = useStaff();
@@ -69,8 +113,8 @@ export function YouSheet({ onClose }: { onClose: () => void }) {
 
   const choir = profile.choirCode ? cachedChoir() : null;
   const choirName = choir && choir.code === profile.choirCode ? choir.name : profile.choirCode ? profile.choirCode : '';
-  const settingsAt = (id: string) => () => { onClose(); openAt({ name: 'settings' }, id); };
-  const to = (r: Route) => () => { onClose(); go(r); };
+  const settingsAt = (id: string) => () => onClose(() => openAt({ name: 'settings' }, id));
+  const to = (r: Route) => () => onClose(() => go(r));
   const range = profile.rangeLow != null && profile.rangeHigh != null ? `range ${letterName(profile.rangeLow)}–${letterName(profile.rangeHigh)}` : 'range not measured yet';
   const goal = weekGoalOf(profile.weekGoal);
   const session = loadSession();
@@ -82,7 +126,7 @@ export function YouSheet({ onClose }: { onClose: () => void }) {
     { id: 'progress', icon: <IconChart />, title: 'Your progress', sub: 'Weeks, levels, getting better', open: to({ name: 'progress' }) },
     {
       id: 'choir', icon: <IconPeople />, title: 'Choir & account',
-      sub: [choirName || 'No choir yet', apiBase() ? (session ? 'signed in' : 'sign-in') : '', choirName ? 'change choir' : 'join'].filter(Boolean).join(' · '),
+      sub: [choirName || 'No choir yet', apiBase() ? (session ? 'signed in' : 'account') : '', choirName ? 'change choir' : 'join'].filter(Boolean).join(' · '),
       open: settingsAt('settings-choir'),
     },
     { id: 'display', icon: <IconText />, title: 'Display', sub: 'Score or highway · how the music moves', open: settingsAt('settings-display-block') },
@@ -107,7 +151,7 @@ export function YouSheet({ onClose }: { onClose: () => void }) {
             <h2 id="you-sheet-name" className="ellipsis">{profile.name.trim() || 'You'}</h2>
             <span className="t14 muted ellipsis">{[voiceName(profile.voice), choirName].filter(Boolean).join(' · ')}</span>
           </div>
-          <button ref={closeRef} className="icon-btn filled" aria-label="Close" data-testid="you-close" onClick={onClose}><IconClose /></button>
+          <button ref={closeRef} className="icon-btn filled" aria-label="Close" data-testid="you-close" onClick={() => onClose()}><IconClose /></button>
         </div>
 
         {saved ? (

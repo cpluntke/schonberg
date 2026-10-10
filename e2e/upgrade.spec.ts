@@ -29,7 +29,7 @@ test('an old install with former built-in pieces upgrades without errors and kee
 
   // Home (a fresh start of the app): only the Abendlied, the old preset's pieces to come are gone, and a notice says why.
   await page.goto('/?updated=1#/');
-  await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: 'Your pieces' })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId('piece-row')).toHaveCount(1);
   await expect(page.getByTestId('piece-row')).toContainText('Abendlied');
   await expect(page.getByTestId('wanted-row')).toHaveCount(0);
@@ -60,7 +60,7 @@ test('a new solo singer gets the Abendlied as the programme, and no library file
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto('/#/');
-  await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: 'Your pieces' })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId('piece-row')).toHaveCount(1);
   await expect(page.getByTestId('piece-row')).toContainText('Abendlied');
   // No made-up dates; setup is the one primary action until it's done.
@@ -71,8 +71,8 @@ test('a new solo singer gets the Abendlied as the programme, and no library file
   // A link to a piece this phone never had: Back and Home, no "any more".
   await page.goto('/#/play/choir-nope/P1/all?level=1');
   await expect(page.getByTestId('not-found')).toContainText('This choir piece isn\'t on this device');
-  await page.getByRole('button', { name: 'Home' }).click();
-  await expect(page.getByText('Repertoire')).toBeVisible();
+  await page.getByRole('button', { name: 'Today' }).click();
+  await expect(page.getByRole('heading', { name: 'Your pieces' })).toBeVisible();
   await page.goto('/#/library');
   await expect(page.locator('main')).not.toContainText('Debussy');
   for (const f of ['pieces/repertoire.json', 'pieces/cycle.json', 'pieces/pd/debussy-dieu.mxl']) {

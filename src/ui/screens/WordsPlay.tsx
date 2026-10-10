@@ -273,7 +273,7 @@ export function WordsPlay({ route }: { route: PlayRoute }) {
             <button className="btn block" onClick={() => sessionRef.current?.finish()}>Finish &amp; see results</button>
             <div className="row" style={{ gap: 8 }}>
               <button className="btn block" data-testid="pause-back" onClick={() => leaveFor(up)}><IconBack size={18} /> Back to the piece</button>
-              <button className="btn block" data-testid="pause-home" onClick={() => leaveFor({ name: 'home' })}><IconHome size={18} /> Home</button>
+              <button className="btn block" data-testid="pause-home" onClick={() => leaveFor({ name: 'home' })}><IconHome size={18} /> Today</button>
             </div>
             <span className="tiny muted" style={{ textAlign: 'center' }}>Leaving discards this run (it doesn’t count).</span>
           </div>

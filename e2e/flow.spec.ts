@@ -12,7 +12,7 @@ test('a perfect simulated singer passes Level 1 slow, then Level 1 in tempo', as
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto('/?simulate=perfect#/');
-  await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: 'Your pieces' })).toBeVisible({ timeout: 20_000 });
 
   // Open the first piece in the cycle.
   await page.getByTestId('piece-row').first().click();
@@ -141,7 +141,7 @@ test('What to fix: loop the bar slowly, then the passage again; the zoom drills 
 // is the page before the piece (the sheet leaves no history behind).
 test('the passage sheet closes with Escape, back and the scrim', async ({ page }) => {
   await page.goto('/#/');
-  await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: 'Your pieces' })).toBeVisible({ timeout: 20_000 });
   await page.getByTestId('piece-row').first().click();
   const sheet = page.getByTestId('passage-sheet');
   await page.getByTestId('passage-row').first().click();
@@ -226,7 +226,7 @@ test('score view: switch display, sing level 1 from sheet music, reach results',
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto('/?simulate=perfect#/');
-  await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: 'Your pieces' })).toBeVisible({ timeout: 20_000 });
   await page.getByTestId('piece-row').first().click();
   await startPassage(page, /Level 1 · Notes · slow/); // a passage, not the full run
 
@@ -271,7 +271,7 @@ test('new singer: level 3 opens in score view, a 1280-wide screen shows every vo
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto('/?simulate=perfect#/');
-  await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: 'Your pieces' })).toBeVisible({ timeout: 20_000 });
   await page.getByTestId('piece-row').first().click();
   await startPassage(page, /Level 3/); // a passage, not the full run
   await openDisplay(page);
@@ -447,7 +447,7 @@ test('progress saved under the earlier rules is upgraded on load', async ({ page
 
 test('a flat simulated singer does not pass level 4', async ({ page }) => {
   await page.goto('/?simulate=flat#/');
-  await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: 'Your pieces' })).toBeVisible({ timeout: 20_000 });
   await page.getByTestId('piece-row').first().click();
   await startPassage(page, /Level 4/); // a passage, not the full run
   await page.getByTestId('start').click();
@@ -475,7 +475,7 @@ test('diagnostics mic test reads the fake microphone', async ({ page }) => {
 
 test('onboarding video opens from Home and loads', async ({ page }) => {
   await page.goto('/#/');
-  await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: 'Your pieces' })).toBeVisible({ timeout: 20_000 });
   await page.getByTestId('intro-open').first().click();
   const v = page.getByTestId('intro-video');
   await expect(v).toBeVisible();
@@ -488,7 +488,7 @@ test('a real-microphone run can be shared as a recording (WAV + run.json)', asyn
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto('/#/');
-  await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: 'Your pieces' })).toBeVisible({ timeout: 20_000 });
   await page.getByTestId('piece-row').first().click();
   await startPassage(page, /Level 1 · Notes · slow/); // a passage, not the full run
   await page.getByTestId('hp-yes').click();
@@ -572,12 +572,12 @@ test('setup: Skip with a choir code asks for the first name before finishing', a
   expect((await stored()).onboarded).toBeFalsy();
   await page.getByPlaceholder('First name').fill('Sophie');
   await page.getByTestId('setup-skip').click();
-  await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: 'Your pieces' })).toBeVisible({ timeout: 20_000 });
   expect(await stored()).toMatchObject({ name: 'Sophie', onboarded: true, choirCode: 'kammerchor' });
 });
 
 test('setup: Skip without a choir finishes at once, name or not', async ({ page }) => {
   await page.goto('/#/setup');
   await page.getByTestId('setup-skip').click();
-  await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: 'Your pieces' })).toBeVisible({ timeout: 20_000 });
 });

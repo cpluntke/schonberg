@@ -180,7 +180,7 @@ function AccountCard({ choir }: { choir: ChoirInfo }) {
       <div className="card flat" data-testid="account-card">
         <strong>Your account</strong>
         <LoggedOutNotice />
-        <span className="small muted">Log in with your own name and password. Singers can make an account in Settings (Keep my progress across phones); admins and section leads get an invite link from a choir admin.</span>
+        <span className="small muted">Log in with your own name and password. Singers can make an account under You, your avatar (Choir & account → Keep my progress across phones); admins and section leads get an invite link from a choir admin.</span>
         <LoginForm code={choir.code} legacy={!!choir.legacyLogin} quiet />
       </div>
     );
@@ -378,17 +378,30 @@ export function ChoirAdmin() {
   const [edVer, setEdVer] = useState<number | undefined>(undefined);
   const edFor = useRef<string | null>(null);
   const justSaved = useRef(false);
+  // A piece this screen added from the library changes the cycle on the server too: that new version
+  // is ours, not another admin's. With unsaved changes the editor keeps them (the piece went into
+  // them) and takes the new version as its base; without, it simply loads the new version.
+  const ownChange = useRef(0); // (when; a version arriving within 15 s of it is ours)
+  const ours = () => Date.now() - ownChange.current < 15_000;
+  const accepted = useRef<number | undefined>(undefined);
   useEffect(() => {
-    if (!sel || (edFor.current === sel.id && edVer === sel.updatedAt)) return;
-    if (edFor.current === sel.id && !justSaved.current && draft.current.ids
+    if (!sel || (edFor.current === sel.id && (edVer === sel.updatedAt || accepted.current === sel.updatedAt))) return;
+    if (edFor.current === sel.id && ours() && draft.current.ids) {
+      ownChange.current = 0;
+      accepted.current = sel.updatedAt;
+      return;
+    }
+    if (edFor.current === sel.id && !justSaved.current && !ours() && draft.current.ids
       && !confirm(`“${sel.name}” was changed meanwhile (by another admin?). Load the new version? Your unsaved changes would be lost.`)) return;
     justSaved.current = false;
+    ownChange.current = 0;
+    accepted.current = undefined;
     edFor.current = sel.id;
     setEdVer(sel.updatedAt);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sel?.id, sel?.updatedAt]);
   if (!apiBase()) return <><Offline /></>;
-  if (!code) return <><div className="notice">Join your choir first (Settings → Your choir).</div></>;
+  if (!code) return <><div className="notice">Join your choir first (the Choir tab).</div></>;
   const auth: Auth | null = token ? { bearer: token } : !session ? lastAuth : null;
   if (!auth) {
     return (
@@ -432,7 +445,7 @@ export function ChoirAdmin() {
         <ProgrammeEditor key={`${info?.code}:${sel.id}:${edVer ?? 0}`} code={code} auth={auth} info={info} cycle={sel} all={cycles?.cycles ?? []}
           base={cycles?.cycleUpdatedAt ?? 0} library={library}
           draft={draft.current} onDraft={() => setDraftV((v) => v + 1)}
-          onLibraryAdded={(i) => { if (i) setInfo(i); void refresh(); reloadCycles(); }}
+          onLibraryAdded={(i) => { ownChange.current = Date.now(); if (i) setInfo(i); void refresh(); reloadCycles(); }}
           onSaved={(r) => { justSaved.current = true; gotCycles(r); void refresh(); }} onConflict={reloadCycles} />
       )}
       <ScoresEditor code={code} auth={auth} info={info} onChanged={refresh} />
@@ -440,7 +453,7 @@ export function ChoirAdmin() {
       <div className="lay admin-col">
       {session && (
         <LibraryPanel code={code} auth={auth} info={info} draft={draft.current} cycle={sel} onList={setLibrary}
-          onAdded={(i) => { if (i) setInfo(i); void refresh(); reloadCycles(); }} />
+          onAdded={(i) => { ownChange.current = Date.now(); if (i) setInfo(i); void refresh(); reloadCycles(); }} />
       )}
       {session && (
         <div className="card" data-testid="people-editor">
@@ -533,7 +546,7 @@ function ProgrammeEditor({ code, auth, info, cycle, all, base, library, draft, o
               <button className="chip grow" style={{ textAlign: 'left' }} aria-pressed={on} onClick={() => { setIds(toggle(ids, p.id)); if (on) setFocus(focus.filter((x) => x !== p.id)); }}>
                 {p.title}{p.composer && <span className="tiny muted"> · {p.composer}</span>}
               </button>
-              <button className="chip" aria-pressed={focus.includes(p.id)} disabled={!on} aria-label={`Next rehearsal: ${p.title}`} onClick={() => setFocus(toggle(focus, p.id))}>★</button>
+              <button className="chip" style={{ minWidth: 44 }} aria-pressed={focus.includes(p.id)} disabled={!on} aria-label={`Next rehearsal: ${p.title}`} onClick={() => setFocus(toggle(focus, p.id))}>★</button>
             </div>
           );
         })}
@@ -582,7 +595,7 @@ function ProgrammeEditor({ code, auth, info, cycle, all, base, library, draft, o
         <div key={k} className="row" style={{ gap: 6 }}>
           <input type="text" aria-label="Title" value={w.title} onChange={(e) => setWanted(wanted.map((x, j) => (j === k ? { ...x, title: e.target.value } : x)))} placeholder="Title" style={{ ...inputStyle, flex: 2, minWidth: 0 }} />
           <input type="text" aria-label="Composer" value={w.composer} onChange={(e) => setWanted(wanted.map((x, j) => (j === k ? { ...x, composer: e.target.value } : x)))} placeholder="Composer" style={{ ...inputStyle, flex: 1, minWidth: 0 }} />
-          <button className="btn small ghost" aria-label="Remove" onClick={() => setWanted(wanted.filter((_, j) => j !== k))}>✕</button>
+          <button className="btn small ghost" style={{ minWidth: 44 }} aria-label="Remove" onClick={() => setWanted(wanted.filter((_, j) => j !== k))}>✕</button>
         </div>
       ))}
       <button className="btn small ghost" onClick={() => setWanted([...wanted, { title: '', composer: '' }])}>+ Add a piece to come</button>
@@ -842,7 +855,7 @@ export function SectionLead() {
     return () => { alive = false; };
   }, [token, code, shown]);
   if (!apiBase()) return <><Offline /></>;
-  if (!code) return <><div className="notice">Join your choir first (Settings → Your choir).</div></>;
+  if (!code) return <><div className="notice">Join your choir first (the Choir tab).</div></>;
   if (!session || session.account.role === 'member') {
     return (
       <>

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { onStorageSaveFailed, storageSaveFailed } from '../../progress/store';
-import { go } from '../router';
+import { openAt } from '../router';
 
 /**
  * Shown once, the first time progress can't be saved on this device (its storage is full, e.g.
@@ -16,10 +16,10 @@ export function StorageFullNotice({ hidden }: { hidden: boolean }) {
       style={{ bottom: 'auto', top: 'calc(12px + var(--safe-top))', display: 'flex', flexDirection: 'column', gap: 8, width: 'min(420px, 90vw)' }}>
       <span>
         <b>Progress can't be saved on this device: its storage is full.</b> It's kept until you close the app.
-        To keep it, download a backup or log in to your choir account in Settings.
+        To keep it, save a backup file or log in to your choir account (You, your avatar → Your data).
       </span>
       <div className="row" style={{ gap: 8 }}>
-        <button className="btn small primary" onClick={() => { setDismissed(true); go({ name: 'settings' }); }}>Settings</button>
+        <button className="btn small primary" onClick={() => { setDismissed(true); openAt({ name: 'settings' }, 'settings-data'); }}>Save a backup</button>
         <button className="btn small ghost" onClick={() => setDismissed(true)}>OK</button>
       </div>
     </div>

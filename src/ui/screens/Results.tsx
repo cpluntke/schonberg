@@ -89,7 +89,7 @@ export function Results() {
             Open {lastPiece.title}
           </button>
         )}
-        <button className={`btn block${lastPiece ? '' : ' primary'}`} onClick={() => leaveTo({ name: 'home' })}>Home</button>
+        <button className={`btn block${lastPiece ? '' : ' primary'}`} onClick={() => leaveTo({ name: 'home' })}>Today</button>
       </main>
     );
   }
@@ -249,7 +249,7 @@ export function Results() {
   // The sticky footer: one next step (with why), then a second choice and the piece.
   const up = upOf(piece.id);
   const toPiece = () => leaveTo(up);
-  const expertDrill = up.name === 'expert';
+  const expertDrill = up.name === 'expert' || up.name === 'train';
   const nextText = (n: NonNullable<typeof next>) => `Next: ${nextLabel(n, label)}`;
   const fixesLeft = nextFix ? fixesBefore(sections, prog, lr.level).length : 0;
   const play = (sectionId: string, level: number, mode: '2d' | '3d' = '2d', st?: Step) =>
@@ -271,7 +271,7 @@ export function Results() {
     primary = { label: <><IconPlay size={18} /> Another cold start</>, why: 'A new bar at random: find your way in from memory.', testid: 'cold-again', onClick: () => { startColdStart(piece, lr.partId, lr.from, true); } };
   } else if (!lr.ladder && !lr.notCounted) {
     primary = expertDrill
-      ? { label: 'Back to expert mode', onClick: toPiece }
+      ? { label: up.name === 'train' ? 'Back to Train' : 'Back to expert mode', onClick: toPiece }
       : { label: 'Back to the piece', why: 'Drills are practice: they don’t change your levels.', testid: 'back-to-piece', onClick: toPiece };
   } else if (speakerRun) {
     primary = {

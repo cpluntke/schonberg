@@ -25,14 +25,14 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode; 
       <main className="screen" role="alert">
         <h1 className="hero">Something went wrong</h1>
         <p className="muted">
-          This screen crashed. Your progress is saved. You can go back to Home, or reload the app.
-          If it keeps happening, open Settings → Diagnostics and send the report to whoever set this up.
+          This screen crashed. Your progress is saved. You can go back to Today, or reload the app.
+          If it keeps happening, open You (your avatar) → Help & intro video → Diagnostics and send the report to whoever set this up.
         </p>
         <pre className="small" style={{ whiteSpace: 'pre-wrap', background: 'var(--surface)', padding: 12, borderRadius: 10, maxHeight: 160, overflow: 'auto' }}>
           {String(this.state.error.message || this.state.error)}
         </pre>
         <div className="row">
-          <a className="btn primary" href="#/" onClick={() => this.setState({ error: null })}>Home</a>
+          <a className="btn primary" href="#/" onClick={() => this.setState({ error: null })}>Today</a>
           <button className="btn" onClick={() => location.reload()}>Reload</button>
         </div>
       </main>
