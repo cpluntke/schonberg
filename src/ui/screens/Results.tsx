@@ -32,6 +32,7 @@ import { nextRehearsal } from '../../progress/rehearsal';
 import { daysUntil, useDay } from '../hooks';
 import { SessionStrip, sessionFoot, useWeek, weekText } from '../components/Today';
 import { finishToday } from '../today';
+import { LeapResults } from './LeapResults';
 import type { Section } from '../../music/types';
 
 /** Start a run from Results: it takes Results' place in history (router: practice screens replace each other). */
@@ -94,6 +95,7 @@ export function Results() {
     );
   }
   if (lr.words) return <WordsResults lr={lr} words={lr.words} />;
+  if (/^leaps-/.test(lr.pieceId) && lr.mode === '2d') return <LeapResults lr={lr} piece={piece} />;
   const r = lr.result;
   const part = piece.score.parts.find((p) => p.id === lr.partId);
   const section = piece.sections.find((s) => s.id === lr.sectionId);

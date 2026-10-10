@@ -382,3 +382,21 @@ describe('fix round', () => {
     expect(loadToday('2026-10-10')).toBeNull();
   });
 });
+
+describe('the course quick check and a redo in the plan', () => {
+  it('the quick check: 1 minute, ticks once taken today', () => {
+    const plan = buildPlan(ctx({ pieces: [dieu()], rehearsal: null, lab: { interval: 'fifth', rung: 4, done: true, check: true } }));
+    const s = plan.steps[0];
+    expect(s).toMatchObject({ kind: 'lab', minutes: 1, title: 'Quick check · the pure fifth', route: { name: 'intonation', interval: 'fifth', rung: 4, check: true } });
+    expect(stepDone(s, { log: [], day: '2026-10-10', labRung: { fifth: 6 } })).toBe(false);
+    expect(stepDone(s, { log: [], day: '2026-10-10', labRung: { fifth: 6 }, labChecked: { fifth: '2026-10-09' } })).toBe(false);
+    expect(stepDone(s, { log: [], day: '2026-10-10', labRung: { fifth: 6 }, labChecked: { fifth: '2026-10-10' } })).toBe(true);
+  });
+
+  it('a redo of "Sing it by ear" after a slip: the step\'s minutes, ticks on rounds sung today', () => {
+    const plan = buildPlan(ctx({ pieces: [dieu()], rehearsal: null, lab: { interval: 'fifth', rung: 4, done: true, redo: true } }));
+    const s = plan.steps[0];
+    expect(s).toMatchObject({ minutes: 5, reason: 'Sing it by ear, once more · it slipped a little', lab: { rung: 4, tuneUp: true } });
+    expect(stepDone(s, { log: [], day: '2026-10-10', labRung: { fifth: 6 }, lab: { day: '2026-10-10', rounds: { 'fifth:4': 4 } } })).toBe(true);
+  });
+});

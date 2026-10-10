@@ -10,7 +10,8 @@ import { wordsDoneFor, getWords } from '../progress/words';
 import { getNoteStats } from '../progress/notestats';
 import { troubleNote, troubleWords } from './path';
 import { WEEKDAYS, nextRehearsal } from '../progress/rehearsal';
-import { loadLab, RUNGS } from '../game/intonation';
+import { loadLab } from '../game/intonation';
+import { courseWarmUp } from '../game/courses';
 import {
   MAX_STEPS, addDays, buildPlan, confirmedRehearsals, dayOf, loadAnyToday, loadLabDay, loadRehearsals, loadToday, planStatus, saveToday, stepDone, stepsSungOn,
   type PlanContext, type PlanPiece, type PlanStatus, type StoredToday, type TickContext, type TodayPlan, type TodayStep,
@@ -87,13 +88,12 @@ export function lastRehearsal(today: string, cycle: Cycle = loadCycle()): string
   return null;
 }
 
-/** The intonation lab's next step (the fifth first, then the third), or null when it's off for this singer. */
-export function labNext(labOn: boolean): PlanContext['lab'] {
-  if (!labOn) return null;
-  const lab = loadLab();
-  if (lab.fifth.rung <= RUNGS) return { interval: 'fifth', rung: lab.fifth.rung, done: false };
-  if (lab.third.rung <= RUNGS) return { interval: 'third', rung: lab.third.rung, done: false };
-  return { interval: 'third', rung: RUNGS, done: true };
+/**
+ * Today's warm-up from the intonation courses (game/courses courseWarmUp): only when the choir
+ * recommends the courses (`labOn`: the lab is in the choir's programme) or the singer started one.
+ */
+export function labNext(labOn: boolean, now = new Date()): PlanContext['lab'] {
+  return courseWarmUp(loadLab(), labOn, dayOf(now));
 }
 
 /** The planner's input for the day of `now`. */
@@ -108,7 +108,7 @@ export function planContext(now: Date, labOn: boolean): PlanContext {
   return {
     now: now.getTime(),
     pieces: planPieces(now.getTime(), cycle),
-    lab: labNext(labOn),
+    lab: labNext(labOn, now),
     rehearsal: nr && nr.days >= 0 && !nr.over
       ? { days: nr.days, weekday: WEEKDAYS[nr.at.getDay()], ...(cycle.rehearsalWeekday != null ? { time: cycle.rehearsalTime ?? '19:30' } : {}) }
       : null,
@@ -146,6 +146,7 @@ export function tickContext(day: string, log: AttemptLog[] = attemptLog()): Tick
   return {
     log, day, lab: loadLabDay(),
     labRung: { fifth: lab.fifth.rung, third: lab.third.rung },
+    labChecked: { fifth: lab.fifth.review?.checked, third: lab.third.review?.checked },
     wordsAt: (pieceId, partId, sectionId) => getWords(pieceId, partId)[sectionId]?.at ?? 0,
   };
 }

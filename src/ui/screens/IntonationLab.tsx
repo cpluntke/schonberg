@@ -1,148 +1,155 @@
-// The intonation lab (preview: admins only). Find a pure fifth and a pure major third by ear, one
-// interval at a time, up a ladder where the help fades: listen, tune by hand, sing with the pulse
-// shown, sing blind, sing it in a chord. docs/INTONATION.md has the why.
+// The intonation courses (the lab): find a pure fifth and a pure major third by ear, one interval at
+// a time, up a ladder where the help fades: listen, tune by hand, sing with the pulse shown, sing it by
+// ear, sing it in a chord. Every singer has them (Train); a choir can recommend them by putting the
+// lab into its programme. The course page (C2), a step (C3), a step done (C4), the course done (C6)
+// and its quick check a week later. docs/INTONATION.md has the why.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { back, go, type Route } from '../router';
 import { useProfile } from '../hooks';
-import { useStaff } from './Admin';
-import type { Staff } from '../../progress/choir';
-import { IconBack, IconCheck, IconEar, IconPause, IconPlay } from '../icons';
+import { IconBack, IconCheck, IconClock, IconEar, IconPause, IconPlay, IconChevron } from '../icons';
 import { getAudioContext, unlockAudio } from '../../audio/context';
 import { Drone } from '../../audio/drone';
 import { midiToHz } from '../../audio/pitch';
 import { getTracker } from '../play/session';
 import { micErrorText } from '../components/Tuner';
 import {
-  CHECK_PASS, CHECK_ROUNDS, HOLD_SEC, HoldDetector, INTERVAL_DEGREE, PASS, ROUNDS, RUNGS, RUNG_NAMES, RATIO, TOL_HAND, TOL_SING,
-  centsAbove, labInProgramme, loadLab, logRound, median, pianoCents, pureCents, rootFor, saveLab, shownBeats, wobbleWord,
+  CHECK_HOLDS, CHECK_KEEP, CHECK_ROUNDS, HOLD_SEC, HoldDetector, INTERVAL_DEGREE, ROUNDS, RUNGS, RUNG_NAMES, RATIO, TOL_HAND, TOL_SING,
+  centsAbove, labInProgramme, loadLab, logCheck, logRound, median, pianoCents, pureCents, rootFor, saveLab, shownBeats, wobbleWord,
   type Degree, type LabInterval, type LabProgress,
 } from '../../game/intonation';
+import {
+  COURSES, COURSE_MINUTES, activeCourse, checkLine, courseStatus, feelAdvice, feelWords, moreToPass, reviewState, stepStates, suggestedCourse,
+} from '../../game/courses';
+import { heldIntervalSpot, barsLabel, type HeldSpot } from '../../game/heldIntervals';
+import { dateWords, finishToday, goStep, shortTitle, stepShort, todaySession } from '../today';
+import { dayOf, daysBetween } from '../../progress/today';
+import { loadCycle, loadProfile } from '../../progress/store';
+import { getPiece, chosenPartId, type PieceInfo } from '../library';
+import { syncEnabled, syncProgressSoon } from '../../progress/sync';
 
 type LabRoute = Extract<Route, { name: 'intonation' }>;
 
-/** Who gets the lab: choir admins and the super admin always (preview); singers while their choir's programme has it. */
-export const labEnabled = (staff: Staff) => staff.admin || staff.superAdmin || labInProgramme();
+/** Does the singer's choir recommend the courses? (the lab is in its running cycle's programme) */
+export const courseRecommended = () => labInProgramme();
 
-const IV_NAME: Record<LabInterval, string> = { fifth: 'Pure fifth', third: 'Pure major third' };
 const DEG_NAME: Record<Degree, string> = { do: 'do', mi: 'mi', sol: 'sol' };
-const RUNG_SUB = [
-  'What a pure interval sounds like, and what to listen for. Then a quick check.',
-  'The app plays both notes; you move one until the pulse stops.',
-  'Sing against the drone; the screen shows how much it pulses.',
-  'The same, ears only. You see where you landed afterwards.',
-  'The app sings the other notes of the chord; you lock yours in.',
-];
-const RUNG_HELP = ['ears', 'no singing', 'feedback', 'no feedback', 'with others'];
 
 export function IntonationLab({ route }: { route: LabRoute }) {
-  const staff = useStaff();
   const [profile] = useProfile();
   const [lab, setLab] = useState<LabProgress>(loadLab);
   const root = rootFor(profile.voice, profile.rangeLow, profile.rangeHigh);
   // (from storage, not this render's copy: the mic's callbacks outlive renders)
   const record = (iv: LabInterval, rung: number, value: number) => {
+    const before = loadLab()[iv];
     const r = logRound(loadLab(), iv, rung, value);
     saveLab(r.p);
     setLab(r.p);
-    return r.passed;
+    const after = r.p[iv];
+    const opened = after.rung > before.rung;
+    if (opened || (before.redo && !after.redo)) syncProgressSoon();
+    // The course is done: its page says so (C6).
+    if (opened && rung === RUNGS) {
+      const here = location.hash;
+      window.setTimeout(() => { if (location.hash === here) go({ name: 'intonation', interval: iv, done: true }, true); }, 900);
+    }
+    return { passed: r.passed, opened: opened || (!!before.redo && !after.redo) };
   };
 
-  if (!labEnabled(staff)) {
-    return (
-      <main className="screen">
-        <div className="topbar">
-          <button className="icon-btn" aria-label="Back" onClick={() => back({ name: 'train' })}><IconBack /></button>
-          <h1>Intonation lab</h1>
-        </div>
-        <div className="notice info">{profile.choirCode
-          ? 'The intonation lab isn’t in your choir’s programme right now. When your choir adds it to a cycle, it appears on Today and under Train.'
-          : 'The intonation lab comes with a choir’s programme: join your choir (the Choir tab) to get it when your choir adds it.'}</div>
-      </main>
-    );
-  }
-  const iv = route.interval ?? (lab.fifth.rung > RUNGS ? 'third' : 'fifth');
+  const iv = route.interval ?? activeCourse(lab) ?? suggestedCourse(lab) ?? 'fifth';
+  const done = lab[iv].rung > RUNGS;
+  if (route.done && done) return <CourseDone iv={iv} lab={lab} />;
+  if (route.check && done) return <QuickCheck iv={iv} root={root} lab={lab} onLab={setLab} />;
   const rung = route.rung;
-  if (!route.interval || !rung || rung > lab[iv].rung) return <Ladder iv={iv} lab={lab} />;
+  if (!route.interval || !rung || rung > lab[iv].rung) return <CourseOverview iv={iv} lab={lab} root={root} />;
   const props = { iv, root, lab, record };
   return rung === 1 ? <ListenRung {...props} />
     : rung === 2 ? <TuneRung {...props} />
     : <SingRung {...props} rung={rung} />;
 }
 
-// ---------- the ladder ----------
+// ---------- shared pieces ----------
 
-function Ladder({ iv, lab }: { iv: LabInterval; lab: LabProgress }) {
-  const cur = lab[iv].rung;
+interface RungProps {
+  iv: LabInterval; root: number; lab: LabProgress;
+  record: (iv: LabInterval, rung: number, v: number) => { passed: boolean; opened: boolean };
+}
+
+/** Check circles: ✓ done, ✗ missed, a number for a step or try still to come, the orange ring for now. */
+function Check({ state, n, label }: { state: 'done' | 'miss' | 'now' | 'todo'; n?: number; label?: string }) {
   return (
-    <main className="screen" data-testid="lab-ladder">
-      <div className="topbar">
-        <button className="icon-btn" aria-label="Back" onClick={() => back({ name: 'train' })}><IconBack /></button>
-        <h1>Intonation lab</h1>
-        {!labInProgramme() && <span className="badge" style={{ marginLeft: 'auto' }}>Preview</span>}
-      </div>
-      <div className="col" style={{ gap: 6 }}>
-        <strong style={{ fontSize: 22, lineHeight: 1.15 }}>Hear it, tune it, sing it</strong>
-        <span className="small muted">Each interval is a ladder: first your ears, then your hands, then your voice. Help fades as you climb.</span>
-      </div>
-      <div className="seg" role="group" aria-label="Interval">
-        {(['fifth', 'third'] as const).map((k) => (
-          <button key={k} aria-pressed={k === iv} data-testid={`lab-track-${k}`} onClick={() => go({ name: 'intonation', interval: k }, true)}>
-            {IV_NAME[k]}
-            <span className="sub">{lab[k].rung > RUNGS ? 'done ✓' : k === 'fifth' ? '+2¢ vs piano' : '−14¢ vs piano'}</span>
-          </button>
-        ))}
-      </div>
-      <ol className="col" style={{ gap: 0, listStyle: 'none', padding: 0, margin: 0 }}>
-        {RUNG_NAMES.map((name, i) => {
-          const n = i + 1, done = n < cur, now = n === cur, open = n <= cur;
-          return (
-            <li key={n} className="row" style={{ alignItems: 'stretch', gap: 12 }}>
-              <div className="col" style={{ alignItems: 'center', gap: 0, width: 32, flex: 'none' }}>
-                <span className="mono" aria-hidden="true" style={{
-                  width: 32, height: 32, borderRadius: 16, boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 600,
-                  border: `2px solid ${done ? 'var(--good)' : now ? 'var(--accent)' : 'var(--line)'}`,
-                  background: done ? 'var(--good)' : now ? 'var(--accent-soft)' : 'transparent',
-                  color: done ? 'var(--accent-ink)' : now ? 'var(--accent)' : 'var(--muted)',
-                }}>{done ? <IconCheck size={16} /> : n}</span>
-                {n < RUNGS && <span style={{ width: 2, flex: 1, minHeight: 12, background: done ? 'var(--good)' : 'var(--line)' }} />}
-              </div>
-              <button className="list-row grow" disabled={!open} data-testid={`lab-rung-${n}`} aria-current={now ? 'step' : undefined}
-                style={{ textAlign: 'left', alignItems: 'flex-start', padding: '4px 0 14px', opacity: open ? 1 : 0.55, flexDirection: 'column', gap: 2 }}
-                onClick={() => go({ name: 'intonation', interval: iv, rung: n })}>
-                <span className="row between" style={{ width: '100%' }}>
-                  <strong style={{ color: now ? 'var(--accent-text)' : undefined }}>{name}<span className="sr-only">{done ? ' (done)' : now ? ' (next)' : !open ? ' (locked)' : ''}</span></strong>
-                  <span className="tiny muted mono">{RUNG_HELP[i]}</span>
-                </span>
-                <span className="small muted">{RUNG_SUB[i]}{!open ? ' (opens after the step before)' : ''}</span>
-              </button>
-            </li>
-          );
-        })}
-      </ol>
-      <button className="btn primary block" data-testid="lab-continue"
-        onClick={() => go({ name: 'intonation', interval: iv, rung: Math.min(cur, RUNGS) })}>
-        {cur > RUNGS ? 'Practise the chord again' : `Continue: ${RUNG_NAMES[cur - 1].toLowerCase()}`}
-      </button>
-      <span className="tiny muted">Use headphones for the singing steps: the app's notes must not reach the microphone. Progress stays on this phone.</span>
-    </main>
+    <span className={`check${state === 'todo' ? '' : ` ${state}`}`} aria-hidden={label ? undefined : true} aria-label={label}>
+      {state === 'done' ? <IconCheck size={14} /> : state === 'miss' ? '✗' : n}
+    </span>
   );
 }
 
-// ---------- shared pieces ----------
+/** The course's steps as check circles (done, the one you're on, still to come). */
+export function CourseChecks({ iv, lab, size }: { iv: LabInterval; lab: LabProgress; size?: 'sm' }) {
+  const cur = lab[iv].rung;
+  return (
+    <span className={`row crs-checks${size ? ` ${size}` : ''}`} role="img" aria-label={cur > RUNGS ? `All ${RUNGS} steps done` : `Step ${cur} of ${RUNGS}`}>
+      {Array.from({ length: RUNGS }, (_, i) => <Check key={i} n={i + 1} state={i + 1 < cur ? 'done' : i + 1 === cur ? 'now' : 'todo'} />)}
+    </span>
+  );
+}
 
-interface RungProps { iv: LabInterval; root: number; lab: LabProgress; record: (iv: LabInterval, rung: number, v: number) => boolean }
-
-function RungTop({ iv, rung, title, children }: { iv: LabInterval; rung: number; title: string; children?: React.ReactNode }) {
+/** The top of a step: back to the course, which course and step. */
+function RungTop({ iv, rung, children }: { iv: LabInterval; rung: number | 'check'; children?: React.ReactNode }) {
   return (
     <>
       <div className="topbar">
-        <button className="icon-btn" aria-label="Back to the ladder" onClick={() => back({ name: 'intonation', interval: iv })}><IconBack /></button>
-        <h1>{title}</h1>
+        <button className="icon-btn filled" aria-label="Back to the course" onClick={() => back({ name: 'intonation', interval: iv })}><IconBack /></button>
+        <h1 className="crs-where">{COURSES[iv].title} · {rung === 'check' ? 'Quick check' : `Step ${rung} of ${RUNGS}`}</h1>
       </div>
-      <span className="tiny muted mono">{IV_NAME[iv]} · step {rung} of {RUNGS}</span>
       {children}
     </>
+  );
+}
+
+/** "Sing mi so the chord goes still, then hold it for 2 seconds." and how, under it. */
+function GoalLines({ goal, how }: { goal: string; how?: React.ReactNode }) {
+  return (
+    <div className="col" style={{ gap: 6 }}>
+      <h2 className="crs-goal" data-testid="lab-goal">{goal}</h2>
+      {how && <span className="t16 muted">{how}</span>}
+    </div>
+  );
+}
+
+/**
+ * Labelled progress: "Pure tries ✓ ✓ ✗ ④ · 1 more to pass". The last tries of the rung's window and
+ * the next one (an orange ring), then how many more pure ones would pass it.
+ */
+function Tries({ label, results, ok, total, more }: { label: string; results: number[]; ok: (v: number) => boolean; total: number; more: string }) {
+  const passed = more === 'Passed';
+  const shown = passed ? results.slice(-total) : results.slice(-(total - 1));
+  const pure = results.slice(-total).filter(ok).length;
+  return (
+    <div className="crs-tries" role="group" aria-label={`${label}: ${pure} of the last ${Math.min(total, results.length)} · ${more}`} data-testid="lab-tries">
+      <strong className="t16">{label}</strong>
+      <span className="row crs-checks" aria-hidden="true">
+        {shown.map((v, i) => <Check key={i} state={ok(v) ? 'done' : 'miss'} />)}
+        {!passed && <Check state="now" n={results.length + 1} />}
+      </span>
+      <span className={`t14 crs-more${passed ? ' good-text' : ''}`}>{more}</span>
+    </div>
+  );
+}
+
+/** "What's a cent?": a quiet link that opens a short answer in place. */
+function CentHelp() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="col" style={{ gap: 6 }}>
+      <button className="link start" aria-expanded={open} data-testid="lab-cent" onClick={() => setOpen(!open)}>What’s a cent?</button>
+      {open && (
+        <div className="cent-help t14" role="note">
+          A cent is a hundredth of a semitone: a very small step. Most ears notice about 5 to 10 cents between two notes
+          held together, as a slow pulse. Pure and the piano differ by 2 cents for a fifth and 14 cents for a major third.
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -197,56 +204,365 @@ function Landed({ deg, value, tol }: { deg: Degree; value: number; tol: number }
   const showPiano = Math.abs(piano - pure) >= 3;
   return (
     <svg viewBox="0 0 320 112" width="100%" style={{ maxWidth: 400 }} role="img" data-testid="lab-landed"
-      aria-label={`You: ${Math.round(value)} cents above do. Pure: ${Math.round(pure)}${showPiano ? `, the piano: ${piano}` : ''}.`}>
+      aria-label={`You: ${Math.round(value - pure)} cents from pure${showPiano ? `; the piano is ${Math.round(piano - pure)} cents above pure` : ''}.`}>
       <rect x={x(pure - tol)} y={44} width={x(pure + tol) - x(pure - tol)} height={24} rx={6} fill="var(--good)" opacity={0.16} />
       <line x1={10} x2={310} y1={56} y2={56} stroke="var(--line)" strokeWidth={2} />
       <line x1={x(pure)} x2={x(pure)} y1={22} y2={70} stroke="var(--good)" strokeWidth={2.5} />
-      <text x={x(pure)} y={16} textAnchor="middle" fontSize={12} fontWeight={600} fill="var(--good)">pure {Math.round(pure)}</text>
+      <text x={x(pure)} y={16} textAnchor="middle" fontSize={14} fontWeight={600} fill="var(--good)">pure</text>
       {showPiano && <>
         <line x1={x(piano)} x2={x(piano)} y1={22} y2={70} stroke="var(--muted)" strokeWidth={2} strokeDasharray="4 3" />
-        <text x={x(piano)} y={16} textAnchor="middle" fontSize={12} fill="var(--muted)">piano {piano}</text>
+        <text x={x(piano)} y={16} textAnchor="middle" fontSize={14} fill="var(--muted)">piano</text>
       </>}
       <circle cx={x(value)} cy={56} r={8} fill="var(--voice)" stroke="var(--bg)" strokeWidth={3} />
-      <text x={Math.max(40, Math.min(280, x(value)))} y={96} textAnchor="middle" fontSize={13} fontWeight={800} fill="var(--voice)">
-        you {Math.round(value)}{value < lo ? ' ◂' : value > hi ? ' ▸' : ''}
+      <text x={Math.max(40, Math.min(280, x(value)))} y={96} textAnchor="middle" fontSize={14} fontWeight={800} fill="var(--voice)">
+        you{value < lo ? ' ◂' : value > hi ? ' ▸' : ''}
       </text>
     </svg>
   );
 }
 
-function verdict(deg: Degree, off: number, tol: number): { title: string; good: boolean; text: string } {
+/** What to do after a try `off` cents from pure (null: it counted as pure). The piano's third gets its own words. */
+function advice(deg: Degree, off: number, tol: number): string | null {
   const pure = pureCents(deg), piano = pianoCents(deg);
-  if (Math.abs(off) <= tol) return { title: 'Pure: you found it', good: true, text: `${Math.abs(Math.round(off))}¢ from pure. Remember how still that sounded.` };
-  if (Math.abs(piano - pure) >= 3 && Math.abs(pure + off - piano) <= 4) return { title: 'That’s the piano’s note', good: false, text: 'Most of us learned it from the piano. Go lower, until the pulse settles.' };
-  return { title: off > 0 ? 'A little high' : 'A little low', good: false, text: `${Math.abs(Math.round(off))}¢ ${off > 0 ? 'above' : 'below'} pure: some pulse is left.` };
+  if (Math.abs(off) <= tol) return null;
+  if (Math.abs(piano - pure) >= 3 && Math.abs(pure + off - piano) <= 4) return 'That’s the piano’s note: most of us learned it there. Go a little lower, until the pulse settles.';
+  return feelAdvice(off, tol);
 }
 
-/** The last rounds of a rung as dots (pure / not). */
-function Rounds({ results, tol, total = ROUNDS }: { results: number[]; tol: number; total?: number }) {
-  const last = results.slice(-total);
+/** The result of a try: words first ("Almost still · a touch high (6 cents)"), what to do, where it landed. */
+function TryResult({ deg, off, tol, title = 'Your last try', note, practice }: { deg: Degree; off: number; tol: number; title?: string; note?: string; practice?: boolean }) {
+  const good = Math.abs(off) <= tol;
+  const a = advice(deg, off, tol);
   return (
-    <div className="row" style={{ gap: 6 }} role="img" aria-label={`${last.filter((v) => Math.abs(v) <= tol).length} of the last ${last.length} pure`}>
-      {Array.from({ length: total }, (_, i) => {
-        const v = last[i];
-        const bg = v == null ? 'var(--line)' : Math.abs(v) <= tol ? 'var(--good)' : 'var(--bad)';
-        return <span key={i} style={{ flex: 1, height: 6, borderRadius: 3, background: bg }} />;
-      })}
+    <div className={`card crs-result${good ? ' good' : ''}`} role="status" data-testid="lab-verdict">
+      <div className="row between">
+        <span className="t14 muted">{title}{practice ? ' · practice round' : ''}</span>
+        <span className="t14 mono" style={{ color: good ? 'var(--good)' : 'var(--voice)' }}>{wobbleWord(off)}</span>
+      </div>
+      <strong className="crs-feel" data-testid="lab-feel">{feelWords(off)}</strong>
+      <span className="t16">{good ? 'Pure: you found it. Remember how still that sounded.' : a}</span>
+      <Landed deg={deg} value={pureCents(deg) + off} tol={tol} />
+      {note && <span className="t14 muted">{note}</span>}
     </div>
   );
 }
 
-function PassedNote({ iv, rung }: { iv: LabInterval; rung: number }) {
-  const next = rung < RUNGS ? rung + 1 : null;
-  const other: LabInterval = iv === 'fifth' ? 'third' : 'fifth';
-  const otherOpen = loadLab()[other].rung <= RUNGS;
+// ---------- the course page (C2) ----------
+
+/** A weekday for a step's day: "today", "tomorrow", "Sun". */
+function dayWord(day: string, today: string): string {
+  if (day === today) return 'today';
+  const t = new Date(`${today}T12:00:00`);
+  const tm = dayOf(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1, 12));
+  if (day === tm) return 'tomorrow';
+  return dateWords(day, { weekday: 'short' });
+}
+
+function CourseOverview({ iv, lab, root }: { iv: LabInterval; lab: LabProgress; root: number }) {
+  const c = COURSES[iv];
+  const t = lab[iv];
+  const today = dayOf(new Date());
+  const states = stepStates(t, today);
+  const done = t.rung > RUNGS;
+  const rv = reviewState(t, today);
+  const recommended = courseRecommended();
+  const drone = useDrone();
+  const [playing, setPlaying] = useState<'off' | 'pure' | null>(null);
+  const stopTimer = useRef(0);
+  useEffect(() => () => clearTimeout(stopTimer.current), []);
+  const deg = INTERVAL_DEGREE[iv];
+  async function demo(which: 'off' | 'pure') {
+    const d = await drone.get();
+    if (!d) return;
+    clearTimeout(stopTimer.current);
+    d.stop();
+    if (playing === which) { setPlaying(null); return; }
+    const off = which === 'off' ? c.demo.off.cents : 0;
+    d.set(iv === 'third'
+      ? { do: midiToHz(root), sol: toneHz(root, 'sol'), mi: toneHz(root, 'mi', off) }
+      : { do: midiToHz(root), sol: toneHz(root, 'sol', off) });
+    setPlaying(which);
+    stopTimer.current = window.setTimeout(() => { d.stop(); setPlaying(null); }, 5000);
+  }
+  const cur = Math.min(t.rung, RUNGS);
+  const go1 = (n: number) => go({ name: 'intonation', interval: iv, rung: n });
   return (
-    <div className="notice info col" style={{ gap: 8 }} data-testid="lab-passed">
-      <strong>{next ? `Step ${rung} done. “${RUNG_NAMES[next - 1]}” is open.` : `${IV_NAME[iv]}: the whole ladder is done.`}</strong>
-      <button className="btn primary small" style={{ alignSelf: 'flex-start' }}
-        onClick={() => go(next ? { name: 'intonation', interval: iv, rung: next } : { name: 'intonation', interval: otherOpen ? other : iv }, true)}>
-        {next ? `Go to step ${next}` : otherOpen ? `On to the ${other}` : 'Back to the ladder'}
-      </button>
+    <main className="screen has-foot crs-page" data-testid="lab-ladder">
+      <div className="topbar">
+        <button className="icon-btn filled" aria-label="Back to Train" onClick={() => back({ name: 'train' })}><IconBack /></button>
+        <span className="t16 muted grow">Train</span>
+        {recommended && <span className="crs-rec" data-testid="lab-recommended">Your choir recommends</span>}
+      </div>
+      <div className="col" style={{ gap: 8 }}>
+        <span className="eb">Course · Intonation</span>
+        <h1 className="crs-title">{c.title}</h1>
+        <p className="t16" style={{ margin: 0 }}><strong>{c.outcome}</strong> {c.about}</p>
+      </div>
+      <div className="col" style={{ gap: 6 }}>
+        <div className="row crs-demo">
+          {(['off', 'pure'] as const).map((w) => (
+            <button key={w} className="btn two grow" aria-pressed={playing === w} data-testid={`lab-demo-${w}`} onClick={() => void demo(w)}>
+              <span className="row" style={{ gap: 6 }}>{playing === w ? <IconPause size={16} /> : <IconPlay size={16} color="currentColor" />} {c.demo[w].title}</span>
+              <span className="sub">{c.demo[w].sub}</span>
+            </button>
+          ))}
+        </div>
+        <span className="t14 muted">Play one, then the other: hear the {iv === 'third' ? 'shimmer' : 'wobble'} stop.</span>
+      </div>
+      <div className="col" style={{ gap: 4 }}>
+        <span className="t16">{RUNGS} steps · about {COURSE_MINUTES} min · one step a day</span>
+        <span className="t14 muted">Headphones for steps 3–5, so the drone stays out of the microphone.</span>
+        <CentHelp />
+      </div>
+
+      <ol className="card crs-steps" aria-label="Steps">
+        {c.steps.map((s, i) => {
+          const st = states[i];
+          const n = i + 1;
+          const open = n <= cur || done;
+          const when = st.state === 'done' ? (st.day ? `done ${dayWord(st.day, today) === 'today' ? 'today' : dateWords(st.day, { weekday: 'short' })}` : 'done')
+            : `${dayWord(st.day!, today)} · ${s.minutes} min`;
+          return (
+            <li key={n} className={st.state}>
+              <button className="crs-step" disabled={!open} data-testid={`lab-rung-${n}`} aria-current={st.state === 'now' ? 'step' : undefined} onClick={() => go1(n)}>
+                <Check state={st.state === 'done' ? 'done' : st.state === 'now' ? 'now' : 'todo'} n={n} />
+                <span className="grow col" style={{ gap: 2 }}>
+                  <span className="row between" style={{ alignItems: 'baseline', gap: 8 }}>
+                    <strong className="t16">{s.name}<span className="sr-only">{st.state === 'done' ? ' (done)' : st.state === 'now' ? ' (next)' : ' (opens after the step before)'}</span></strong>
+                    <span className={`t14 nowrap ${st.state === 'done' ? 'good-text' : st.state === 'now' ? 'crs-now' : 'muted'}`}>{when}</span>
+                  </span>
+                  <span className="t14 muted">{s.goal}</span>
+                  {st.state !== 'done' && <span className="t14 muted">{s.rule}</span>}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+      {done ? (
+        <button className="card crs-row" data-testid="lab-done-link" onClick={() => go({ name: 'intonation', interval: iv, done: true })}>
+          <span className="grow col" style={{ gap: 2 }}>
+            <strong className="t16">Course done ✓{t.passed?.[RUNGS] ? ` · ${dateWords(t.passed[RUNGS])}` : ''}</strong>
+            <span className="t14 muted">{reviewLine(t.review?.due, rv, today)}</span>
+          </span>
+          <IconChevron size={20} color="var(--muted)" />
+        </button>
+      ) : (
+        <span className="t14 muted">After the course: a quick check a week later, and a passage in your music to use it in.</span>
+      )}
+
+      <div className="crs-foot">
+        {rv === 'due' ? (
+          <button className="btn primary block two" data-testid="lab-continue" onClick={() => go({ name: 'intonation', interval: iv, check: true })}>
+            <span><IconPlay size={18} /> Quick check</span><span className="sub">1 min · three holds</span>
+          </button>
+        ) : t.redo ? (
+          <button className="btn primary block two" data-testid="lab-continue" onClick={() => go1(t.redo!)}>
+            <span><IconPlay size={18} /> {RUNG_NAMES[t.redo - 1]}, once more</span><span className="sub">Step {t.redo} · {c.steps[t.redo - 1].minutes} min</span>
+          </button>
+        ) : done ? (
+          <button className="btn block" data-testid="lab-continue" onClick={() => go1(RUNGS)}>Practise the chord again</button>
+        ) : (
+          <button className="btn primary block two" data-testid="lab-continue" onClick={() => go1(cur)}>
+            <span><IconPlay size={18} /> {courseStatus(t) === 'new' ? 'Start' : 'Continue'}: {RUNG_NAMES[cur - 1]}</span>
+            <span className="sub">Step {cur} · {c.steps[cur - 1].minutes} min</span>
+          </button>
+        )}
+        <span className="t14 muted center">{syncEnabled() ? 'Saved to your account · picks up on any phone' : 'Saved on this phone (and with your choir account, once you join it)'}</span>
+      </div>
+    </main>
+  );
+}
+
+/** "in 7 days", "tomorrow", "today". */
+function inDays(today: string, day: string): string {
+  const n = daysBetween(today, day);
+  return n <= 0 ? 'today' : n === 1 ? 'tomorrow' : `in ${n} days`;
+}
+
+function reviewLine(due: string | undefined, rv: ReturnType<typeof reviewState>, today: string): string {
+  if (rv === 'due') return 'Quick check today: one minute, three holds.';
+  if (rv === 'booked' && due) return `Quick check ${dayWord(due, today) === 'tomorrow' ? 'tomorrow' : dateWords(due)}: one minute, three holds.`;
+  if (rv === 'kept') return 'Quick check: it held ✓';
+  if (rv === 'slipped') return 'Quick check: it slipped a little. Sing it by ear once more.';
+  return 'See what you can do now.';
+}
+
+// ---------- step done (C4) ----------
+
+/**
+ * A quiet card when a step is passed: what you can do now, the course's progress, then (inside today's
+ * session) today's next step; outside it, "next step tomorrow" and back to Train.
+ */
+function StepDone({ iv, rung, onKeep }: { iv: LabInterval; rung: number; onKeep: () => void }) {
+  // (the last step: the course's own page follows, C6)
+  if (rung >= RUNGS) return null;
+  return <StepDoneSheet iv={iv} rung={rung} onKeep={onKeep} />;
+}
+
+function StepDoneSheet({ iv, rung, onKeep }: { iv: LabInterval; rung: number; onKeep: () => void }) {
+  const c = COURSES[iv];
+  const lab = loadLab();
+  const ses = todaySession({ lab: true });
+  const nx = ses?.next ?? null;
+  const n = ses?.plan.steps.length ?? 0;
+  const sheetRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    sheetRef.current?.querySelector<HTMLElement>('button')?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onKeep(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const next = rung < RUNGS ? rung + 1 : null;
+  const sub = `${c.title} · ${c.steps[rung - 1].rule.replace(/^To pass: /, '')}`;
+  return (
+    <div className="psheet-scrim" data-testid="lab-step-done-scrim">
+      <div ref={sheetRef} className="psheet crs-sheet" role="dialog" aria-modal="true" aria-labelledby="lab-done-h" data-testid="lab-passed">
+        <span className="grab" aria-hidden="true" />
+        <div className="crs-donecard">
+          <span className="crs-star" aria-hidden="true">★</span>
+          <div className="col" style={{ gap: 4 }}>
+            <h2 id="lab-done-h">Step {rung} done ✓</h2>
+            <span className="t14 muted">{sub}</span>
+          </div>
+        </div>
+        <p className="t16" style={{ margin: 0 }}>{c.stepCanDo[rung - 1]}</p>
+        <div className="row" style={{ gap: 12 }}>
+          <CourseChecks iv={iv} lab={lab} />
+          {next && <span className="t14 muted">Step {next} of the course waits for tomorrow.</span>}
+        </div>
+        {ses ? (
+          <>
+            {nx ? (
+              <button className="btn primary block two" data-testid="today-next" onClick={() => goStep(nx, true)}>
+                <span>Next: {stepShort(nx)}</span><span className="sub">step {ses.nextIndex + 1} of {n} · {nx.minutes} min</span>
+              </button>
+            ) : (
+              <button className="btn primary block" data-testid="today-finish" onClick={() => { finishToday(); go({ name: 'home' }); }}>Finish for today</button>
+            )}
+            <button className="btn block" data-testid="lab-keep" onClick={onKeep}>Keep practising this step</button>
+            {nx && <button className="link" data-testid="finish-today" onClick={() => { finishToday(); go({ name: 'home' }); }}>Finish for today</button>}
+          </>
+        ) : (
+          <>
+            <button className="btn primary block" data-testid="lab-to-train" onClick={() => go({ name: 'train' })}>Back to Train</button>
+            <button className="btn block" data-testid="lab-keep" onClick={onKeep}>Keep practising this step</button>
+            {next && <button className="link" data-testid="lab-go-next" onClick={() => go({ name: 'intonation', interval: iv, rung: next }, true)}>Or go on to step {next} now</button>}
+          </>
+        )}
+      </div>
     </div>
+  );
+}
+
+// ---------- the course done (C6) ----------
+
+export interface MusicSpot { piece: PieceInfo; partId: string; spot: HeldSpot }
+
+/** A passage of the singer's programme where their part holds this interval against another voice. */
+export function spotInMusic(iv: LabInterval): MusicSpot | null {
+  const voice = loadProfile().voice;
+  let best: MusicSpot | null = null;
+  for (const id of loadCycle().pieceIds) {
+    const piece = getPiece(id);
+    if (!piece) continue;
+    const partId = chosenPartId(piece, voice);
+    const spot = heldIntervalSpot(piece.score, partId, iv === 'fifth' ? 7 : 4);
+    if (spot && (!best || spot.seconds > best.spot.seconds)) best = { piece, partId, spot };
+  }
+  return best;
+}
+
+function CourseDone({ iv, lab }: { iv: LabInterval; lab: LabProgress }) {
+  const c = COURSES[iv];
+  const t = lab[iv];
+  const today = dayOf(new Date());
+  const doneDay = t.passed?.[RUNGS] ?? today;
+  const rv = reviewState(t, today);
+  const music = useMemo(() => spotInMusic(iv), [iv]);
+  const other: LabInterval = iv === 'fifth' ? 'third' : 'fifth';
+  const otherOpen = lab[other].rung <= RUNGS;
+  const ses = todaySession({ lab: true });
+  const nx = ses?.next ?? null;
+  const where = music ? `${shortTitle(music.piece.title)} ${barsLabel(music.piece.score, music.spot.m0, music.spot.m1)}` : '';
+  const sing = () => {
+    if (!music) return;
+    const ms = music.piece.score.measures;
+    go({ name: 'play', pieceId: music.piece.id, partId: music.partId, sectionId: 'drill', level: 1, step: 'slow', mode: '2d', from: ms[music.spot.m0].start, to: ms[music.spot.m1].start + ms[music.spot.m1].dur });
+  };
+  const toOther = () => go({ name: 'intonation', interval: other, rung: Math.min(lab[other].rung, RUNGS) });
+  return (
+    <main className="screen has-foot crs-page" data-testid="lab-course-done">
+      <div className="topbar">
+        <button className="icon-btn filled" aria-label="Back to the course" onClick={() => back({ name: 'intonation', interval: iv })}><IconBack /></button>
+        <span className="t16 muted grow">Train · {c.title}</span>
+      </div>
+      <section className="band" aria-labelledby="crs-done-h">
+        <span className="eb good-text">Course complete · {dateWords(doneDay)}</span>
+        <h2 id="crs-done-h">{c.done}</h2>
+        <div className="row" style={{ gap: 10 }}><CourseChecks iv={iv} lab={lab} /><span className="t14 muted">all {RUNGS} steps</span></div>
+        <ul className="crs-cando">
+          {c.canDo.map((x) => <li key={x} className="t16">{x}</li>)}
+        </ul>
+      </section>
+      {music && (
+        <section className="card voice" data-testid="lab-use-it" aria-labelledby="crs-use-h">
+          <span className="eb">Use it in your music</span>
+          <h3 id="crs-use-h" className="h3">{where}, the {iv === 'fifth' ? 'open fifths' : 'major thirds'}</h3>
+          <span className="t16">
+            {iv === 'fifth'
+              ? `Your part and the ${music.spot.otherName.toLowerCase()} meet on open fifths here. Sing them slowly and listen for the still sound.`
+              : `Your part and the ${music.spot.otherName.toLowerCase()} make major thirds here. Sing them slowly, a little lower than the piano, and listen for the ring.`}
+          </span>
+        </section>
+      )}
+      <section className="card crs-row" aria-label="Quick check">
+        <span className="you-ic" aria-hidden="true"><IconClock /></span>
+        <span className="grow col" style={{ gap: 2 }} data-testid="lab-review">
+          <strong className="t16">{rv === 'due' ? 'Quick check today' : rv === 'kept' ? 'Quick check: it held ✓' : rv === 'slipped' ? 'Quick check: it slipped a little'
+            : t.review ? `Quick check ${inDays(today, t.review.due)} · ${dateWords(t.review.due)}` : 'Quick check in a week'}</strong>
+          <span className="t14 muted">{rv === 'slipped' ? 'Sing it by ear once more: step 4, until it locks again.' : 'One minute, three holds. If it has slipped, we suggest one step again.'}</span>
+        </span>
+        {(rv === 'due' || rv === 'slipped') && (
+          <button className="btn small" data-testid="lab-review-go" onClick={() => go(rv === 'due' ? { name: 'intonation', interval: iv, check: true } : { name: 'intonation', interval: iv, rung: 4 })}>
+            {rv === 'due' ? 'Start' : 'Step 4'}
+          </button>
+        )}
+      </section>
+      {otherOpen && (
+        <section className="card" aria-labelledby="crs-next-h">
+          <span className="t14 muted">Next course</span>
+          <h3 id="crs-next-h" className="h3">{COURSES[other].title}</h3>
+          <span className="t14 muted">{COURSES[other].line} {RUNGS} steps · about {COURSE_MINUTES} min.</span>
+          <button className="link between" data-testid="lab-next-course" onClick={toOther}>
+            <span>{courseStatus(lab[other]) === 'new' ? 'Start step 1: Listen' : `Continue: ${RUNG_NAMES[lab[other].rung - 1]}`}</span> <IconChevron size={18} />
+          </button>
+        </section>
+      )}
+      <div className="crs-foot">
+        {nx ? (
+          <>
+            <button className="btn primary block two" data-testid="today-next" onClick={() => goStep(nx, true)}>
+              <span>Next: {stepShort(nx)}</span><span className="sub">step {ses!.nextIndex + 1} of {ses!.plan.steps.length} · {nx.minutes} min</span>
+            </button>
+            {music && <button className="btn block" data-testid="lab-sing-spot" onClick={sing}>Sing {where} slowly</button>}
+            <button className="link" data-testid="finish-today" onClick={() => { finishToday(); go({ name: 'home' }); }}>Finish for today</button>
+          </>
+        ) : ses ? (
+          <>
+            <button className="btn primary block" data-testid="today-finish" onClick={() => { finishToday(); go({ name: 'home' }); }}>Finish for today</button>
+            {music && <button className="btn block" data-testid="lab-sing-spot" onClick={sing}>Sing {where} slowly</button>}
+          </>
+        ) : (
+          <>
+            {music
+              ? <button className="btn primary block" data-testid="lab-sing-spot" onClick={sing}><IconPlay size={18} /> Sing {where} slowly</button>
+              : otherOpen && <button className="btn primary block" data-testid="lab-next-course-go" onClick={toOther}>Start the {COURSES[other].title.toLowerCase()}</button>}
+            <button className="btn block" data-testid="lab-to-train" onClick={() => go({ name: 'train' })}>Back to Train</button>
+          </>
+        )}
+      </div>
+    </main>
   );
 }
 
@@ -287,31 +603,31 @@ function ListenRung({ iv, root, lab, record }: RungProps) {
   if (mode === 'check') return <ListenCheck iv={iv} root={root} lab={lab} record={record} play={play} playing={playing} />;
   const rootHz = midiToHz(root);
   return (
-    <main className="screen" data-testid="lab-listen">
-      <RungTop iv={iv} rung={1} title="What to listen for">
-        <span className="small muted">Two notes that are nearly in tune make a pulse, a “wah-wah-wah”. The closer they get, the slower it pulses. Pure means no pulse at all.</span>
+    <main className="screen crs-stepscreen" data-testid="lab-listen">
+      <RungTop iv={iv} rung={1}>
+        <GoalLines goal="Hear the pulse stop." how={<>Two notes that are nearly in tune make a pulse, a “wah-wah-wah”. The closer they get, the slower it pulses. Pure means no pulse at all.</>} />
       </RungTop>
       {EXAMPLES[iv].map((e) => {
         const on = playing === e.key;
         const hz = toneHz(root, deg, e.off);
         return (
-          <div key={e.key} className="card" style={{ gap: 8, padding: 12, borderColor: on ? 'var(--accent)' : undefined }}>
+          <div key={e.key} className="card" style={{ gap: 8, padding: 12, borderColor: on ? 'var(--voice)' : undefined }}>
             <div className="row">
               <button className="icon-btn filled" aria-label={`${on ? 'Stop' : 'Play'}: ${e.title}`} aria-pressed={on} data-testid={`lab-ex-${e.key}`}
                 onClick={() => play(on ? null : e.key, { do: rootHz, x: hz })}>
-                {on ? <IconPause /> : <IconPlay color="var(--accent)" />}
+                {on ? <IconPause /> : <IconPlay color="var(--voice)" />}
               </button>
               <div className="col grow" style={{ gap: 0 }}>
-                <strong>{e.title}</strong>
-                <span className="small muted">do + {DEG_NAME[deg]}{e.off ? ` ${e.off > 0 ? '+' : ''}${Math.round(e.off)}¢` : ''}</span>
+                <strong className="t16">{e.title}</strong>
+                <span className="t14 muted">do + {DEG_NAME[deg]} · {wobbleWord(e.off)}</span>
               </div>
             </div>
             <Wave beats={shownBeats(e.off, deg, ['do'])} height={44} colour={e.off === 0 ? 'var(--good)' : 'var(--voice)'} label={`${e.title}: ${wobbleWord(e.off)}`} />
-            <span className="small">{e.hear}</span>
+            <span className="t14">{e.hear}</span>
           </div>
         );
       })}
-      <div className="notice info small">Don't listen to the notes: listen to the space between them. Is it moving, or still?</div>
+      <div className="notice info t14">Don't listen to the notes: listen to the space between them. Is it moving, or still?</div>
       <button className="btn primary block" data-testid="lab-check" onClick={() => { void play(null, {}); setMode('check'); }}>I hear it: check me</button>
     </main>
   );
@@ -321,7 +637,6 @@ function ListenRung({ iv, root, lab, record }: RungProps) {
 function ListenCheck({ iv, root, lab, record, play, playing }: RungProps & {
   play: (key: string | null, tones: Record<string, number>, sec?: number) => Promise<void>; playing: string | null;
 }) {
-  const deg = INTERVAL_DEGREE[iv];
   const [round, setRound] = useState(() => newCheck(iv));
   const [heard, setHeard] = useState<Set<'A' | 'B'>>(new Set());
   const [answer, setAnswer] = useState<'A' | 'B' | null>(null);
@@ -338,24 +653,24 @@ function ListenCheck({ iv, root, lab, record, play, playing }: RungProps & {
     if (answer) return;
     setAnswer(a);
     void play(null, {});
-    if (record(iv, 1, a === round.pure ? 0 : 1)) setPassed(true);
+    if (record(iv, 1, a === round.pure ? 0 : 1).opened) setPassed(true);
   }
   const right = answer != null && answer === round.pure;
   return (
-    <main className="screen" data-testid="lab-quiz">
-      <RungTop iv={iv} rung={1} title="Which is calmer?">
-        <span className="small muted">One is pure, one isn't. Same notes, same sound: listen to {iv === 'third' ? 'the third' : 'the fifth'}.</span>
+    <main className="screen crs-stepscreen" data-testid="lab-quiz">
+      <RungTop iv={iv} rung={1}>
+        <GoalLines goal="Which is calmer?" how={<>One is pure, one isn't. Same notes, same sound: listen to {iv === 'third' ? 'the third' : 'the fifth'}.</>} />
       </RungTop>
-      <Rounds results={results.map((v) => (v === 0 ? 0 : 99))} tol={0} total={CHECK_ROUNDS} />
+      <Tries label="Right answers" results={results} ok={(v) => v === 0} total={CHECK_ROUNDS} more={moreToPass(1, results)} />
       <div className="row" style={{ gap: 12 }}>
         {(['A', 'B'] as const).map((w) => {
           const on = playing === `chord-${w}`;
           return (
             <button key={w} className="card grow" aria-pressed={on} data-testid={`lab-chord-${w}`}
-              style={{ alignItems: 'center', minHeight: 150, justifyContent: 'center', borderColor: answer && w === round.pure ? 'var(--good)' : on ? 'var(--accent)' : undefined }}
+              style={{ alignItems: 'center', minHeight: 150, justifyContent: 'center', borderColor: answer && w === round.pure ? 'var(--good)' : on ? 'var(--voice)' : undefined }}
               onClick={() => { setHeard((h) => new Set(h).add(w)); void play(on ? null : `chord-${w}`, chord(w), 3); }}>
               <span style={{ fontSize: 40, fontWeight: 800, lineHeight: 1 }}>{w}</span>
-              <span className="small muted">{answer ? (w === round.pure ? 'pure' : iv === 'third' ? 'piano' : 'off') : on ? 'playing…' : 'tap to hear'}</span>
+              <span className="t14 muted">{answer ? (w === round.pure ? 'pure' : iv === 'third' ? 'piano' : 'off') : on ? 'playing…' : 'tap to hear'}</span>
             </button>
           );
         })}
@@ -372,14 +687,14 @@ function ListenCheck({ iv, root, lab, record, play, playing }: RungProps & {
           {iv === 'third' ? 'The piano’s third pulses against do several times a second.' : 'The other fifth was 12 cents off and pulsed.'} Play them again and listen for it.
         </div>
       )}
-      {heard.size < 2 && !answer && <span className="tiny muted">Hear both first.</span>}
-      {passed && <PassedNote iv={iv} rung={1} />}
+      {heard.size < 2 && !answer && <span className="t14 muted">Hear both first.</span>}
       {answer && (
         <button className="btn primary block" data-testid="lab-next" onClick={() => { void play(null, {}); setRound(newCheck(iv)); setHeard(new Set()); setAnswer(null); }}>
           Next pair
         </button>
       )}
-      <span className="tiny muted">To pass: {CHECK_PASS} of the last {CHECK_ROUNDS} right.</span>
+      <span className="t14 muted">{COURSES[iv].steps[0].rule}.</span>
+      {passed && <StepDone iv={iv} rung={1} onKeep={() => setPassed(false)} />}
     </main>
   );
 }
@@ -414,7 +729,7 @@ function TuneRung({ iv, root, lab, record }: RungProps) {
     if (done != null) return;
     lockedAt.current = Date.now();
     setDone(off);
-    if (record(iv, 2, off)) setPassed(true);
+    if (record(iv, 2, off).opened) setPassed(true);
   }
   async function next() {
     if (Date.now() - lockedAt.current < 600) return; // (a double tap on "That's it")
@@ -423,33 +738,33 @@ function TuneRung({ iv, root, lab, record }: RungProps) {
     setOn(true);
     (await drone.get())?.set({ do: rootHz, x: toneHz(root, deg, r.start - r.shift) });
   }
-  const v = done != null ? verdict(deg, done, TOL_HAND) : null;
+  const results = lab[iv].logs[2] ?? [];
   return (
-    <main className="screen" data-testid="lab-tune">
-      <RungTop iv={iv} rung={2} title="Tune it by hand">
-        <span className="small muted">No singing yet. The app plays do and an out-of-tune {DEG_NAME[deg]}. Move {DEG_NAME[deg]} until the pulse stops.</span>
+    <main className="screen crs-stepscreen" data-testid="lab-tune">
+      <RungTop iv={iv} rung={2}>
+        <GoalLines goal={`Move ${DEG_NAME[deg]} until the pulse stops.`} how={<>No singing yet. The app plays do and an out-of-tune {DEG_NAME[deg]}; the picture shows how much it pulses.</>} />
       </RungTop>
-      <Rounds results={lab[iv].logs[2] ?? []} tol={TOL_HAND} />
+      <Tries label="Pure tunings" results={results} ok={(v) => Math.abs(v) <= TOL_HAND} total={ROUNDS} more={moreToPass(2, results)} />
       <div className="card" style={{ gap: 8 }}>
         <div className="row between">
-          <strong className="small">What you hear</strong>
-          <span className="mono small" style={{ color: Math.abs(off) <= TOL_HAND ? 'var(--good)' : 'var(--muted)' }} data-testid="lab-word">{on ? wobbleWord(off) : '–'}</span>
+          <span className="t14 muted">What you hear</span>
+          <span className="mono t14" style={{ color: Math.abs(off) <= TOL_HAND ? 'var(--good)' : 'var(--voice)' }} data-testid="lab-word">{on ? wobbleWord(off) : '–'}</span>
         </div>
         <Wave beats={on ? shownBeats(off, deg, ['do']) : null} label={on ? `Pulse: ${wobbleWord(off)}` : 'Not playing'} />
-        <span className="tiny muted">One second of sound. A slower pulse means closer.</span>
+        <span className="t14 muted">One second of sound. A slower pulse means closer.</span>
       </div>
       {!on ? (
         <button className="btn primary block" data-testid="lab-start" onClick={() => void start()}>Play do and {DEG_NAME[deg]}</button>
       ) : (
         <>
           <div className="field">
-            <span className="small" style={{ fontWeight: 600 }} aria-hidden="true">Move {DEG_NAME[deg]}</span>
+            <span className="t14" style={{ fontWeight: 600 }} aria-hidden="true">Move {DEG_NAME[deg]}</span>
             <div className="row">
-              <span className="small muted" aria-hidden="true">lower</span>
+              <span className="t14 muted" aria-hidden="true">lower</span>
               <input type="range" className="grow" min={-SLIDER} max={SLIDER} step={0.5} value={pos} disabled={done != null}
                 data-testid="lab-slider" aria-label={`Move ${DEG_NAME[deg]}: left is lower, right is higher`} aria-valuetext="no numbers: use your ears"
-                onChange={(e) => set(Number(e.target.value))} style={{ height: 44, accentColor: 'var(--accent)' }} />
-              <span className="small muted" aria-hidden="true">higher</span>
+                onChange={(e) => set(Number(e.target.value))} style={{ height: 44, accentColor: 'var(--voice)' }} />
+              <span className="t14 muted" aria-hidden="true">higher</span>
             </div>
           </div>
           <div className="row" style={{ gap: 10 }}>
@@ -458,18 +773,15 @@ function TuneRung({ iv, root, lab, record }: RungProps) {
           </div>
         </>
       )}
-      {v && done != null && (
-        <div className={v.good ? 'notice info col' : 'notice col'} style={{ gap: 6 }} role="status" data-testid="lab-verdict">
-          <strong>{v.title}</strong>
-          <Landed deg={deg} value={pureCents(deg) + done} tol={TOL_HAND} />
-          <span className="small">{v.text}</span>
-        </div>
-      )}
-      {passed && <PassedNote iv={iv} rung={2} />}
+      {done != null && <TryResult deg={deg} off={done} tol={TOL_HAND} title="Your tuning" />}
       {on && (done == null
         ? <button className="btn primary block" data-testid="lab-lock" onClick={lock}>That's it</button>
         : <button className="btn primary block" data-testid="lab-next" onClick={() => void next()}>Next round</button>)}
-      <span className="tiny muted">To pass: {PASS} of the last {ROUNDS} within {TOL_HAND}¢ of pure.</span>
+      <div className="row between wrap" style={{ gap: 4 }}>
+        <span className="t14 muted">{COURSES[iv].steps[1].rule}.</span>
+        <CentHelp />
+      </div>
+      {passed && <StepDone iv={iv} rung={2} onKeep={() => setPassed(false)} />}
     </main>
   );
 }
@@ -483,10 +795,13 @@ function newTuneRound() {
   return { shift, start: shift + Math.round((Math.random() < 0.5 ? -m : m) * 2) / 2 };
 }
 
-// ---------- 3–5 · singing ----------
+// ---------- 3–5 · singing, and the quick check ----------
 
-function SingRung({ iv, root, lab, record, rung }: RungProps & { rung: number }) {
-  const chordRung = rung === 5;
+/** The quick check: three holds by ear (no picture), a week after the course. */
+interface CheckMode { holds: number[]; kept: boolean | null }
+
+function SingRung({ iv, root, lab, record, rung, check }: RungProps & { rung: number; check?: CheckMode }) {
+  const chordRung = rung === 5 && !check;
   const [part, setPart] = useState<Degree>(INTERVAL_DEGREE[iv]);
   const [showWobble, setShowWobble] = useState(rung !== 4);
   const deg = chordRung ? part : INTERVAL_DEGREE[iv];
@@ -588,7 +903,7 @@ function SingRung({ iv, root, lab, record, rung }: RungProps & { rung: number })
     // A different note (more than a semitone away) is no try; in the chord, rounds with the wobble shown are practice.
     const counted = Math.abs(offBy) <= 60 && (!chordRung || !sw);
     setResult({ value: c, counted });
-    if (counted && rec(iv, rung, offBy)) setPassed(true);
+    if (counted && rec(iv, rung, offBy).opened) setPassed(true);
   }
 
   /** A new round. */
@@ -622,18 +937,25 @@ function SingRung({ iv, root, lab, record, rung }: RungProps & { rung: number })
     }, 2500);
   }
 
-  const v = result ? (Math.abs(result.value - target) > 60
-    ? { title: 'That was a different note', good: false, text: `Aim for ${DEG_NAME[deg]}: ${hintInterval(deg)}.` }
-    : verdict(deg, result.value - target, tol)) : null;
-  const title = rung === 3 ? 'Sing it, with the wobble' : rung === 4 ? 'Sing it blind' : 'In the chord';
+  // While a hold is under way: only the picture (or the ear) and the hold timer.
+  const holding = state === 'on' && !lockedUi && held >= 0.3;
+  const wrongNote = result != null && Math.abs(result.value - target) > 60;
+  const note = DEG_NAME[deg];
+  const goal = check ? `Sing ${note} by ear and hold it for ${HOLD_SEC} seconds, three times.`
+    : rung === 3 ? `Sing ${note} so the ${iv === 'third' ? 'chord' : 'fifth'} goes still, then hold it for ${HOLD_SEC} seconds.`
+      : rung === 4 ? `Sing ${note} by ear, then hold it for ${HOLD_SEC} seconds.`
+        : `Lock your note into the chord, then hold it for ${HOLD_SEC} seconds.`;
   const how = deg === 'do' ? 'Hold do steady; the others are tuned to it.'
-    : `Start a little ${deg === 'mi' ? 'above' : 'below'} ${DEG_NAME[deg]} on “nee”, straight tone, and slide slowly. Stop where it goes still, and hold.`;
+    : `Start a little ${deg === 'mi' ? 'above' : 'below'} ${note} on “nee”, straight tone, and slide ${deg === 'mi' ? 'down' : 'up'} slowly. Stop where ${wobbleOn ? 'the picture calms down' : 'it goes still'}, and hold.`;
+  const results = check ? check.holds : lab[iv].logs[rung] ?? [];
   return (
-    <main className="screen" data-testid={`lab-sing-${rung}`}>
-      <RungTop iv={iv} rung={rung} title={title}>
-        <span className="small muted">{rung === 4 ? 'The screen won’t help this time. ' : chordRung ? 'The app sings the other two notes, already pure. ' : ''}{how}</span>
+    <main className="screen crs-stepscreen" data-testid={check ? 'lab-check-screen' : `lab-sing-${rung}`}>
+      <RungTop iv={iv} rung={check ? 'check' : rung}>
+        <GoalLines goal={goal} how={<>{rung === 4 || check ? 'No picture this time: only your ears. ' : chordRung ? 'The app sings the other two notes, already pure. ' : ''}{how}</>} />
       </RungTop>
-      <Rounds results={lab[iv].logs[rung] ?? []} tol={tol} />
+      {check
+        ? <Tries label="Holds" results={check.holds} ok={(v) => Math.abs(v) <= tol} total={CHECK_HOLDS} more={check.kept != null ? checkLine(check.holds) : `${CHECK_HOLDS - check.holds.length} to go`} />
+        : <Tries label="Pure tries" results={results} ok={(v) => Math.abs(v) <= tol} total={ROUNDS} more={moreToPass(rung, results)} />}
       {chordRung && (
         <>
           <div className="seg" role="group" aria-label="You sing">
@@ -644,18 +966,18 @@ function SingRung({ iv, root, lab, record, rung }: RungProps & { rung: number })
             ))}
           </div>
           <label className="toggle-row">
-            <span className="small" style={{ fontWeight: 600 }}>Show the wobble{showWobble ? ' (practice: rounds count with it off)' : ''}</span>
+            <span className="t14" style={{ fontWeight: 600 }}>Show the picture{showWobble ? ' (practice: rounds count with it off)' : ''}</span>
             <input type="checkbox" checked={showWobble} data-testid="lab-wobble-toggle" onChange={(e) => { setShowWobble(e.target.checked); again(); }} />
           </label>
         </>
       )}
       <div className="row wrap" style={{ gap: 6 }}>
-        {others.map((o) => <span key={o} className="pill small">App: {DEG_NAME[o]}</span>)}
-        <span className="pill small" style={{ color: 'var(--voice)' }}>You: {DEG_NAME[deg]}</span>
+        <span className="pill">Drone: {others.map((o) => DEG_NAME[o]).join(' + ')}</span>
+        <span className="pill voice">You: {note}</span>
       </div>
       {state !== 'on' ? (
         <div className="card" style={{ alignItems: 'center', gap: 10 }}>
-          <span className="small muted" style={{ textAlign: 'center' }}>
+          <span className="t14 muted" style={{ textAlign: 'center' }}>
             {state === 'error' ? err : 'Headphones on: the app’s notes must not reach the microphone. Your voice is analysed on this phone only.'}
           </span>
           <button className="btn voice" data-testid="lab-mic" disabled={state === 'starting'} onClick={() => void start()}>
@@ -667,41 +989,53 @@ function SingRung({ iv, root, lab, record, rung }: RungProps & { rung: number })
           {wobbleOn ? (
             <>
               <div className="row between">
-                <strong className="small">The wobble</strong>
-                <span className="mono small" style={{ color: offNow != null && Math.abs(offNow) <= tol ? 'var(--good)' : 'var(--muted)' }} data-testid="lab-word">{wobbleWord(offNow)}</span>
+                <span className="t14 muted">Your voice</span>
+                <span className="mono t14" style={{ color: offNow != null && Math.abs(offNow) <= tol ? 'var(--good)' : 'var(--voice)' }} data-testid="lab-word">{wobbleWord(offNow)}</span>
               </div>
               <Wave beats={offNow == null ? null : shownBeats(offNow, deg, others)} label={`Your voice against the drone: ${wobbleWord(offNow)}`} />
-              <span className="tiny muted">Shows how much it pulses, never which way. Which way to move is for your ear.</span>
+              {!holding && <span className="t14 muted">Shows how much it pulses, never which way. Which way to move is for your ear.</span>}
             </>
           ) : (
             <div className="col" style={{ alignItems: 'center', gap: 6, padding: '12px 0' }}>
               <IconEar size={40} color="var(--muted)" />
-              <strong>Listen for the moment it stops moving</strong>
+              <strong className="t16">Listen for the moment it stops moving</strong>
             </div>
           )}
           <HoldRing held={held} done={lockedUi} />
         </div>
       )}
-      {v && result && (
-        <div ref={verdictRef} className={v.good ? 'notice info col' : 'notice col'} style={{ gap: 6, scrollMarginBottom: 16 }} role="status" data-testid="lab-verdict">
-          <strong>{lockedUi ? '' : 'Last round: '}{v.title}{!result.counted && Math.abs(result.value - target) <= 60 ? ' (practice round)' : ''}</strong>
-          {Math.abs(result.value - target) <= 60 && <Landed deg={deg} value={result.value} tol={tol} />}
-          <span className="small">{v.text}</span>
+      {result && !holding && check?.kept == null && (
+        <div ref={verdictRef} style={{ scrollMarginBottom: 16 }}>
+          {wrongNote ? (
+            <div className="notice col" role="status" data-testid="lab-verdict" style={{ gap: 4 }}>
+              <strong>That was a different note</strong>
+              <span className="t14">Aim for {note}: {hintInterval(deg)}. It doesn’t count as a try.</span>
+            </div>
+          ) : (
+            <TryResult deg={deg} off={result.value - target} tol={tol} title={lockedUi ? 'Your last try' : 'Last round'} practice={!result.counted}
+              note={lockedUi ? 'Sing again when you’re ready; the app is listening.' : undefined} />
+          )}
         </div>
       )}
-      {chordRung && state === 'on' && (
-        <div className="notice info small">
+      {check && check.kept != null && <CheckDone iv={iv} kept={check.kept} holds={check.holds} />}
+      {chordRung && state === 'on' && !holding && (
+        <div className="notice info t14">
           <strong>Listen for the ghost note.</strong> When all three are pure, you may hear a soft hum two octaves below do. Nobody sings it: your ears make it.
         </div>
       )}
-      {passed && <PassedNote iv={iv} rung={rung} />}
-      {state === 'on' && (
+      {state === 'on' && !holding && check?.kept == null && (
         <div className="row" style={{ gap: 10 }}>
-          {rung === 3 && <button className="btn grow" disabled={hinting || lockedUi} data-testid="lab-hint" onClick={() => void hint()}>{hinting ? 'Listen…' : 'Hear it once'}</button>}
-          {lockedUi && <button className="btn primary grow" data-testid="lab-next" onClick={() => again()}>Next round</button>}
+          {rung === 3 && !check && <button className="btn grow" disabled={hinting || lockedUi} data-testid="lab-hint" onClick={() => void hint()}><IconPlay size={16} color="currentColor" /> {hinting ? 'Listen…' : 'Hear it once'}</button>}
+          {lockedUi && <button className="btn grow" data-testid="lab-next" onClick={() => again()}>Next round</button>}
         </div>
       )}
-      <span className="tiny muted">To pass: {PASS} of the last {ROUNDS} within {tol}¢ of pure{chordRung ? ', with the wobble off' : ''}. Hold it {HOLD_SEC} s, straight tone (no vibrato).</span>
+      {!holding && (
+        <div className="row between wrap" style={{ gap: 4 }}>
+          <span className="t14 muted">{check ? `Kept when ${CHECK_KEEP} of ${CHECK_HOLDS} holds are close to pure.` : `${COURSES[iv].steps[rung - 1].rule}.`} Straight tone, no vibrato.</span>
+          <CentHelp />
+        </div>
+      )}
+      {passed && !check && <StepDone iv={iv} rung={rung} onKeep={() => setPassed(false)} />}
     </main>
   );
 }
@@ -720,14 +1054,58 @@ function HoldRing({ held, done }: { held: number; done: boolean }) {
     <div className="row" style={{ gap: 14 }}>
       <svg width={72} height={72} viewBox="0 0 72 72" role="img" aria-label={done ? 'Round taken' : `Held ${held.toFixed(1)} of ${HOLD_SEC} seconds`} data-testid="lab-hold">
         <circle cx={36} cy={36} r={30} fill="none" stroke="var(--line)" strokeWidth={7} />
-        <circle cx={36} cy={36} r={30} fill="none" stroke="var(--accent)" strokeWidth={7} strokeLinecap="round"
+        <circle cx={36} cy={36} r={30} fill="none" stroke="var(--voice)" strokeWidth={7} strokeLinecap="round"
           strokeDasharray={`${(C * f).toFixed(1)} ${C.toFixed(1)}`} transform="rotate(-90 36 36)" />
         <text x={36} y={41} textAnchor="middle" fontSize={15} fontWeight={600} fill="var(--text)" fontFamily="var(--mono)">{done ? '✓' : `${(HOLD_SEC * f).toFixed(1)}s`}</text>
       </svg>
       <div className="col grow" style={{ gap: 2 }}>
-        <strong className="small">{done ? 'Got it: see where you landed below' : `Hold it steady for ${HOLD_SEC} s`}</strong>
-        <span className="tiny muted">{done ? 'Still listening. Take a breath, then sing again for the next round.' : 'The app takes what you hold and shows where you landed.'}</span>
+        <strong className="t16">{done ? 'Got it: see where you landed below' : `Hold it steady for ${HOLD_SEC} s`}</strong>
+        <span className="t14 muted">{done ? 'Still listening. Take a breath, then sing again for the next round.' : 'The app takes what you hold and shows where you landed.'}</span>
       </div>
+    </div>
+  );
+}
+
+// ---------- the quick check ----------
+
+function QuickCheck({ iv, root, lab, onLab }: { iv: LabInterval; root: number; lab: LabProgress; onLab: (p: LabProgress) => void }) {
+  const [holds, setHolds] = useState<number[]>([]);
+  const [kept, setKept] = useState<boolean | null>(null);
+  const ref = useRef<number[]>([]);
+  const record = (_iv: LabInterval, _rung: number, v: number) => {
+    if (ref.current.length >= CHECK_HOLDS) return { passed: false, opened: false };
+    ref.current = [...ref.current, v];
+    setHolds(ref.current);
+    if (ref.current.length === CHECK_HOLDS) {
+      const r = logCheck(loadLab(), iv, ref.current);
+      saveLab(r.p);
+      onLab(r.p);
+      setKept(r.kept);
+      syncProgressSoon();
+    }
+    return { passed: false, opened: false };
+  };
+  return <SingRung iv={iv} root={root} lab={lab} record={record} rung={4} check={{ holds, kept }} />;
+}
+
+function CheckDone({ iv, kept, holds }: { iv: LabInterval; kept: boolean; holds: number[] }) {
+  const ses = todaySession({ lab: true });
+  const nx = ses?.next ?? null;
+  return (
+    <div className={`card crs-result${kept ? ' good' : ''}`} role="status" data-testid="lab-check-done">
+      <strong className="crs-feel">{kept ? 'It held ✓' : 'It slipped a little'}</strong>
+      <span className="t16">{kept
+        ? `${checkLine(holds)}: your ${iv === 'third' ? 'pure third' : 'pure fifth'} is still there.`
+        : `${checkLine(holds)}. One step again brings it back: sing it by ear, until it locks.`}</span>
+      {kept ? (
+        nx ? <button className="btn primary block two" data-testid="today-next" onClick={() => goStep(nx, true)}><span>Next: {stepShort(nx)}</span><span className="sub">step {ses!.nextIndex + 1} of {ses!.plan.steps.length} · {nx.minutes} min</span></button>
+          : <button className="btn primary block" data-testid="lab-to-train" onClick={() => go({ name: 'train' })}>Back to Train</button>
+      ) : (
+        <>
+          <button className="btn primary block" data-testid="lab-redo" onClick={() => go({ name: 'intonation', interval: iv, rung: 4 }, true)}>Sing it by ear, once more</button>
+          <button className="btn block" onClick={() => (nx ? goStep(nx, true) : go({ name: 'train' }))}>{nx ? 'Later: next step of today' : 'Later'}</button>
+        </>
+      )}
     </div>
   );
 }

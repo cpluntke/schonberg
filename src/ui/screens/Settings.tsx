@@ -18,6 +18,7 @@ import { AccountSync } from '../components/AccountSync';
 import { UsageStats } from '../components/UsageStats';
 import { weekGoalOf } from '../today';
 import { APPEARANCES, TEXT_SIZES, textSizeOf } from '../theme';
+import { ReminderSettings } from '../components/Reminders';
 
 export function Settings() {
   const [profile, update] = useProfile();
@@ -117,6 +118,7 @@ export function Settings() {
             <button key={n} aria-pressed={weekGoalOf(profile.weekGoal) === n} aria-label={`${n} day${n === 1 ? '' : 's'} a week`} onClick={() => update({ weekGoal: n })}>{n}</button>
           ))}
         </div>
+        <ReminderSettings />
         <button className="link start" data-testid="settings-progress" onClick={() => go({ name: 'progress' })}>See your progress ›</button>
       </section>
 
@@ -320,7 +322,7 @@ export function Settings() {
       </div>
 
       <section className="col small muted settings-about" style={{ gap: 4 }}>
-        <span>Schönberg Hero · your practice stays on this device. Only your choir's leaderboard, the progress you share with your section lead, a live “practising now” count by voice part (no name), with a choir account the progress kept with it (above), and, if switched on, the anonymous usage counts (daily, and every few minutes while in use; Privacy) reach the choir server.</span>
+        <span>Schönberg Hero · your practice stays on this device. Only your choir's leaderboard, the progress you share with your section lead, a live “practising now” count by voice part (no name), with a choir account the progress kept with it (above), with the daily reminder on what it needs to send it (no name), and, if switched on, the anonymous usage counts (daily, and every few minutes while in use; Privacy) reach the choir server.</span>
         <span>Built-in score: an original warm-up chorale. Scores from your choir's library show their edition and licence on their page.</span>
       </section>
 

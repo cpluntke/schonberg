@@ -19,8 +19,7 @@ import { LoggedOutCard, SyncNotice, openAccount } from '../components/AccountSyn
 import { pieceStatus, type PieceStatus } from '../plan';
 import { presenceShown, usePresence } from '../../progress/presence';
 import { LOGO_TILE } from '../components/ChoirLogo';
-import { useStaff } from './Admin';
-import { labEnabled } from './IntonationLab';
+import { courseRecommended } from './IntonationLab';
 import { labInProgramme, loadLab, RUNGS } from '../../game/intonation';
 
 export { pieceStatus, type PieceStatus };
@@ -38,8 +37,7 @@ export function Home() {
   const [profile] = useProfile();
   const version = useStoreVersion();
   const day = useDay();
-  const staff = useStaff();
-  const labOn = labEnabled(staff);
+  const labOn = courseRecommended();
   // Today: the plan (frozen once started), and whether it's done; planned once per change of the store
   // or the day, and stored after rendering (Home never writes while it draws).
   const today = React.useMemo(() => computeToday(labOn), [version, day, labOn]);
@@ -139,7 +137,7 @@ export function Home() {
           <div className="notice info" data-testid="all-ready">Everything in this cycle is concert-ready. Keep them fresh, or train your ear under Train.</div>
         ) : !betweenCycles ? (
           <div className="notice info" data-testid="no-pieces">{labInProgramme()
-            ? 'No scores in this cycle yet. Start with the intonation lab below.'
+            ? 'No scores in this cycle yet. Start with the intonation courses below.'
             : "No pieces in this cycle yet. Add some under Pieces or import your choir's MusicXML."}</div>
         ) : null}
 
@@ -222,7 +220,6 @@ export function Home() {
         )}
       </section>
 
-      {labOn && !labInProgramme() && <IntonationCard />}
 
       </div>
       </div>
@@ -296,7 +293,7 @@ function Notice() {
   );
 }
 
-/** The intonation lab: in the programme (all singers) or as a preview (admins, see labEnabled). */
+/** The intonation courses, when the choir recommends them (the lab is in its programme; every singer has them under Train). */
 function IntonationCard({ inProgramme = false }: { inProgramme?: boolean }) {
   const lab = loadLab();
   const step = (k: 'fifth' | 'third') => (lab[k].rung > RUNGS ? 'done ✓' : `step ${lab[k].rung} of ${RUNGS}`);
@@ -304,8 +301,8 @@ function IntonationCard({ inProgramme = false }: { inProgramme?: boolean }) {
     <button className="card" style={{ textAlign: 'left', color: 'inherit', borderColor: 'var(--voice-deep)' }} data-testid="home-intonation"
       onClick={() => go({ name: 'intonation' })}>
       <div className="row between">
-        <strong>Intonation lab</strong>
-        <span className="badge">{inProgramme ? 'In this cycle' : 'Preview · admins'}</span>
+        <strong>Intonation courses</strong>
+        <span className="badge">{inProgramme ? 'Your choir recommends' : 'Train'}</span>
       </div>
       <span className="small muted">Find the pure fifth and the pure major third by ear: listen, tune by hand, then sing.</span>
       <span className="tiny mono" style={{ color: 'var(--voice)' }}>Fifth: {step('fifth')} · Third: {step('third')}</span>

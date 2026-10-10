@@ -23,6 +23,7 @@ import { barsKey, getBars, type BarMap, type BarStat } from './bars';
 import { getWords, wordsKey, type WordsProgress } from './words';
 import { accountMadeHere, apiBase, endSession, loadSession, onSessionChange, sessionFor, type Session } from './choir';
 import { mergeSyncedPoints, pointsForSync, type CyclePoints } from './points';
+import { RUNGS, cleanTrack, loadLab, saveLab, type LabInterval, type LabProgress, type LabTrack } from '../game/intonation';
 
 /**
  * 2: levels have a slow and an in-tempo step (SectionC[6] = slow). A copy with v < 2 comes from an
@@ -92,7 +93,17 @@ export interface ProgressSnapshot {
   pts?: CyclePoints;
   /** Days practised (YYYY-MM-DD, the last few months): the streak carries over to a new phone. */
   days?: string[];
+  /** The intonation courses (the lab's two ladders); older apps ignore it. */
+  lab?: LabC;
 }
+
+/**
+ * One ladder: rung (1–6, 6 = done), the last rounds per rung (cents off pure, to 0.1), the day each
+ * rung was passed, the last round (ms), the quick check [due, checked?, kept 0/1] and the rung to redo.
+ */
+export interface LabTrackC { r: number; l?: Record<string, number[]>; p?: Record<string, string>; at?: number; rv?: [string, string?, number?]; rd?: number }
+export interface LabC { f?: LabTrackC; t?: LabTrackC }
+const LAB_KEYS: [LabInterval, 'f' | 't'][] = [['fifth', 'f'], ['third', 't']];
 
 const PROFILE_KEYS = [
   'name', 'voice', 'notation', 'strictness', 'tuning', 'latencyMs', 'beat', 'keepRecording', 'rangeLow', 'rangeHigh',
@@ -510,6 +521,8 @@ export function buildSnapshot(now = Date.now()): { data: ProgressSnapshot; hash:
   if (pts) data.pts = { k: pts.k.slice(0, 200), n: pts.n, since: pts.since };
   const days = practiceDays(120);
   if (days.length) data.days = days;
+  const lab = encodeLab(loadLab());
+  if (lab) data.lab = lab;
   // The envelope the server receives: {"baseRev":…,"data":{…,"at":…}}.
   const rest = utf8(JSON.stringify({ baseRev: 1e12, data: { ...data, at: now } }));
   const budget = TOTAL_BUDGET - rest;
@@ -545,6 +558,79 @@ export function buildSnapshot(now = Date.now()): { data: ProgressSnapshot; hash:
   const hash = contentHash(data);
   data.at = now;
   return { data, hash, bytes: utf8(JSON.stringify(data)) };
+}
+
+// ------------------------------------------------------------------ the intonation courses
+
+const fresh = (t: LabTrack) => t.rung <= 1 && !t.at && !Object.values(t.logs).some((l) => l.length);
+
+/** The two ladders in the compact format (undefined when neither was started). */
+export function encodeLab(p: LabProgress): LabC | undefined {
+  const out: LabC = {};
+  for (const [k, c] of LAB_KEYS) {
+    const t = p[k];
+    if (fresh(t)) continue;
+    const tc: LabTrackC = { r: t.rung };
+    const logs = Object.entries(t.logs).filter(([, v]) => v.length);
+    if (logs.length) tc.l = Object.fromEntries(logs.map(([r, v]) => [r, v.map((x) => Math.round(x * 10) / 10)]));
+    if (t.passed && Object.keys(t.passed).length) tc.p = Object.fromEntries(Object.entries(t.passed).map(([r, d]) => [r, d]));
+    if (t.at) tc.at = Math.floor(t.at);
+    if (t.review) tc.rv = t.review.checked ? [t.review.due, t.review.checked, t.review.kept ? 1 : 0] : [t.review.due];
+    if (t.redo) tc.rd = t.redo;
+    out[c] = tc;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** A synced copy's ladders (only the ones it has), malformed parts dropped. */
+export function decodeLab(v: unknown): Partial<LabProgress> | null {
+  if (!isObj(v)) return null;
+  const out: Partial<LabProgress> = {};
+  for (const [k, c] of LAB_KEYS) {
+    const tc = v[c];
+    if (!isObj(tc)) continue;
+    const rv = Array.isArray(tc.rv) ? tc.rv : null;
+    const t = cleanTrack({
+      rung: tc.r, logs: tc.l, passed: tc.p, at: typeof tc.at === 'number' ? capTime(tc.at) : undefined, redo: tc.rd,
+      review: rv ? { due: rv[0], checked: rv[1], kept: rv[2] === 1 } : undefined,
+    });
+    if (t) out[k] = t;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+/**
+ * Merge a synced copy's ladders into this phone's: the higher rung wins; each rung's rounds come from
+ * the copy that practised last; a rung's pass day is the earlier one; the quick check and a redo come
+ * from the copy that practised last (if it has a check), else from the other. Never lowers a rung.
+ */
+export function mergeLab(local: LabProgress, remote: Partial<LabProgress>): LabProgress {
+  const out = { ...local };
+  for (const [k] of LAB_KEYS) {
+    const r = remote[k];
+    if (!r) continue;
+    const l = local[k];
+    const newer = (r.at ?? 0) > (l.at ?? 0) ? r : l;
+    const older = newer === r ? l : r;
+    const rung = Math.max(l.rung, r.rung);
+    const logs: Record<number, number[]> = {};
+    for (const n of new Set([...Object.keys(l.logs), ...Object.keys(r.logs)].map(Number))) {
+      logs[n] = newer.logs[n] ?? older.logs[n] ?? [];
+    }
+    const passed: Record<number, string> = { ...older.passed };
+    for (const [n, d] of Object.entries(newer.passed ?? {})) if (!passed[Number(n)] || d < passed[Number(n)]) passed[Number(n)] = d;
+    const t: LabTrack = { rung, logs };
+    if (Object.keys(passed).length) t.passed = passed;
+    const at = Math.max(l.at ?? 0, r.at ?? 0);
+    if (at) t.at = at;
+    if (rung > RUNGS) {
+      const src = newer.review ? newer : older.review ? older : null;
+      if (src?.review) t.review = { ...src.review };
+      if (src?.redo) t.redo = src.redo;
+    }
+    out[k] = t;
+  }
+  return out;
 }
 
 export interface ApplyResult { pieces: number; profile: boolean; cycle: boolean }
@@ -611,6 +697,8 @@ export function applySnapshot(d: unknown, opts: { adoptSettings?: boolean } = {}
   }
   addSyncedDays(d.days);
   mergeSyncedPoints(d.pts);
+  const lab = decodeLab(d.lab);
+  if (lab) saveLab(mergeLab(loadLab(), lab));
   const profile = isObj(d.profile);
   if (opts.adoptSettings) {
     const here = loadProfile();

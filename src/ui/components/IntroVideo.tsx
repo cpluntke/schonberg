@@ -5,8 +5,7 @@ import { allPieces, getPiece, chosenPartId, singableSections } from '../library'
 import { loadCycle, loadProfile } from '../../progress/store';
 import { nextUpRoute } from '../plan';
 import { computeToday, startToday } from '../today';
-import { useStaff } from '../screens/Admin';
-import { labEnabled } from '../screens/IntonationLab';
+import { courseRecommended } from '../screens/IntonationLab';
 
 const BASE = import.meta.env.BASE_URL || './';
 export const INTRO_SRC = `${BASE}media/onboarding.mp4`;
@@ -91,7 +90,7 @@ export function firstRunRoute(): Route | null {
  */
 function TryItNow({ onClose }: { onClose: () => void }) {
   const profile = loadProfile();
-  const labOn = labEnabled(useStaff());
+  const labOn = courseRecommended();
   const setupDone = profile.onboarded && profile.latencyMs > 0;
   const today = computeToday(labOn);
   const firstStep = today.plan.steps[today.status.next >= 0 ? today.status.next : 0];

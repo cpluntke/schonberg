@@ -9,9 +9,12 @@ the cards are in `src/ui/components/Today.tsx`; Your progress is `src/ui/screens
 
 `buildPlan(ctx)`: **3–4 steps, about 10–15 minutes**, never two steps on the same passage.
 
-1. **Warm-up** first: the intonation lab's next rung (the fifth, then the third; once both ladders are
-   done a 2-minute tune-up), only when the lab is on for this singer (`labEnabled`: in the choir's
-   programme, or an admin's preview).
+1. **Warm-up** first, from the intonation courses (`game/courses.ts courseWarmUp`, docs/INTONATION.md),
+   only when the choir recommends them (the lab in its programme) or the singer has started a course,
+   so Today doesn't grow for everyone: a quick check that is due (1 min, a week after a course is done),
+   rung 4 once more after a check that slipped, the active course's next step (none once a step of it
+   was passed today: one step a day), and with the choir's recommendation the fifth, then the third,
+   then (both done) a 2-minute tune-up.
 2. **What matters most**: passages the singer said felt shaky at the last rehearsal ("You said it felt
    shaky"); passages to fix after a full run and reviews due (any piece); the first step of each
    rehearsal piece (`Cycle.focusPieceIds`) that isn't rehearsal-ready yet.
@@ -70,7 +73,7 @@ one listen for a passage never sung; whole minutes, 1–6. Lab rungs: 5, 5, 4, 5
   without a pass, so a struggling singer can still finish the day. The whole piece: a run in tempo that
   opened its level, or two real goes at the level (runs that counted but where too much slipped or the
   entries came late are logged as practice with `fullRun`; stopped, slower and paused runs don't
-  count). Words: a words run today. The lab: the rung passed, or a full go at it today (6 rounds of the
+  count). Words: a words run today. The quick check: taken today. The lab: the rung passed, or a full go at it today (6 rounds of the
   listening check, 4 of the others; the session strip counts rounds while the lab is open from the
   plan, as the lab keeps no dates). A **tune-up** (a rung already passed: both ladders done, or the
   rehearsal-day minute) ticks only on rounds sung today. Listening, slower practice runs and loops don't count.
@@ -80,7 +83,9 @@ one listen for a passage never sung; whole minutes, 1–6. Lab rungs: 5, 5, 4, 5
   same function for tomorrow 9:00 on today's progress, a preview), the week line and **Practise more
   (optional)**. The week line is honest about the calendar: "your best week so far" only when better
   than every earlier week, "matches your best week" on a tie, no "practise tomorrow" on a Sunday. The
-  reminder offer of the mockups is left out until reminders exist.
+  reminder offer: once, when the browser can show reminders and the daily reminder is off, "Want a
+  nudge tomorrow? · Remind me at 18:00 / No thanks" (`ReminderOffer`; the reminder itself:
+  You → Practice, docs/PRIVACY.md §4).
 
 ## Today's session
 
@@ -131,6 +136,7 @@ first run there is their first). A piece with nothing sung yet says "Not started
 
 `sh:today` (today's plan and session), `sh:rehearsals` (rehearsal answers), `sh:dayNotes` (notes sung
 right per day, added with the cycle points), `sh:labDay` (lab rounds today), `sh:reached` (when each
-piece reached each level), and the log entries' `cents`. Only the week goal travels with the choir
-account (`sync.ts` PROFILE_KEYS); the rest stays on the phone (a confirmed rehearsal counts on the
+piece reached each level), `sh:leapRuns` (the leap drill's last runs: "last time 4 of 8"), and the log
+entries' `cents`. Only the week goal (`sync.ts` PROFILE_KEYS) and the intonation courses (`lab`)
+travel with the choir account; the rest stays on the phone (a confirmed rehearsal counts on the
 phone it was confirmed on).

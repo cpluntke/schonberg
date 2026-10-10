@@ -30,8 +30,15 @@ export type Route =
   | { name: 'ranks' }
   | { name: 'expert' }
   | { name: 'tuner' }
-  /** The intonation lab: its ladder, or one interval's rung (1–5). */
-  | { name: 'intonation'; interval?: 'fifth' | 'third'; rung?: number }
+  /**
+   * The intonation courses: a course's page (no rung), one of its steps (rung 1–5), the course
+   * complete page (`done`) or its quick check a week later (`check`).
+   */
+  | { name: 'intonation'; interval?: 'fifth' | 'third'; rung?: number; done?: boolean; check?: boolean }
+  /** All courses (Train). */
+  | { name: 'courses' }
+  /** A held drone (do, or do and sol) at a pitch of your choice (Train's tools). */
+  | { name: 'drone' }
   | { name: 'diagnostics' }
   | { name: 'lyrics'; pieceId: string; partId: string }
   | { name: 'memorymap'; pieceId: string; partId: string }
@@ -96,10 +103,14 @@ export function parseHash(hash: string): Route {
     case 'ranks': return { name: 'ranks' };
     case 'expert': return { name: 'expert' };
     case 'tuner': return { name: 'tuner' };
+    case 'courses': return { name: 'courses' };
+    case 'drone': return { name: 'drone' };
     case 'intonation': {
       const iv = seg[1] === 'fifth' || seg[1] === 'third' ? seg[1] : null;
       const rung = Math.round(Number(seg[2]));
       if (iv && rung >= 1 && rung <= 5) return { name: 'intonation', interval: iv, rung };
+      if (iv && seg[2] === 'done') return { name: 'intonation', interval: iv, done: true };
+      if (iv && seg[2] === 'check') return { name: 'intonation', interval: iv, check: true };
       return iv ? { name: 'intonation', interval: iv } : { name: 'intonation' };
     }
     case 'diagnostics': return { name: 'diagnostics' };
@@ -132,7 +143,7 @@ export function href(r: Route): string {
     case 'lyrics':
     case 'memorymap': return `#/${r.name}/${e(r.pieceId)}/${e(r.partId)}`;
     case 'invite': return r.token ? `#/invite/${e(r.token)}` : '#/invite';
-    case 'intonation': return `#/intonation${r.interval ? `/${r.interval}${r.rung ? `/${r.rung}` : ''}` : ''}`;
+    case 'intonation': return `#/intonation${r.interval ? `/${r.interval}${r.check ? '/check' : r.done ? '/done' : r.rung ? `/${r.rung}` : ''}` : ''}`;
     default: return r.name === 'home' ? '#/' : `#/${r.name}`;
   }
 }

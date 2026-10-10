@@ -130,6 +130,16 @@ describe('the intonation lab\'s addresses', () => {
     expect(parseHash('#/intonation/third/9')).toEqual({ name: 'intonation', interval: 'third' });
     expect(parseHash('#/intonation/sixth/2')).toEqual({ name: 'intonation' });
   });
+
+  it('a course done, its quick check, all courses and the drone', () => {
+    for (const r of [{ name: 'intonation', interval: 'fifth', done: true }, { name: 'intonation', interval: 'third', check: true }, { name: 'courses' }, { name: 'drone' }] as const) {
+      expect(parseHash(href(r))).toEqual(r);
+    }
+    expect(href({ name: 'intonation', interval: 'fifth', done: true })).toBe('#/intonation/fifth/done');
+    // (Today's quick-check step carries rung 4 too: the address is the check's)
+    expect(href({ name: 'intonation', interval: 'fifth', rung: 4, check: true })).toBe('#/intonation/fifth/check');
+    expect(parseHash('#/intonation/done')).toEqual({ name: 'intonation' });
+  });
 });
 
 describe('where a new screen opens', () => {

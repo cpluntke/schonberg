@@ -52,7 +52,7 @@ export type LabInterval = 'fifth' | 'third';
 /** Where a step starts (structurally a ui/router Route). */
 export type PlanRoute =
   | { name: 'play'; pieceId: string; partId: string; sectionId: string; level: number; step?: Step; mode: '2d'; words?: boolean }
-  | { name: 'intonation'; interval: LabInterval; rung: number };
+  | { name: 'intonation'; interval: LabInterval; rung: number; check?: boolean };
 
 export interface TodayStep {
   /** Stable key: the same work gives the same id (kind, piece, part, passage, level, step). */
@@ -65,8 +65,11 @@ export interface TodayStep {
   /** For a lab step: the rung (1–5). */
   level: number;
   step: Step;
-  /** A lab step; `tuneUp`: a short go at a rung already passed (it ticks only on rounds sung today). */
-  lab?: { interval: LabInterval; rung: number; tuneUp?: boolean };
+  /**
+   * A lab step; `tuneUp`: a short go at a rung already passed (it ticks only on rounds sung today);
+   * `check`: the course's quick check a week after it was done (it ticks once taken today).
+   */
+  lab?: { interval: LabInterval; rung: number; tuneUp?: boolean; check?: boolean };
   minutes: number;
   /** "Dieu! qu'il la fait · bars 22–29". */
   title: string;
@@ -116,8 +119,11 @@ export interface PlanPiece {
 export interface PlanContext {
   now: number;
   pieces: PlanPiece[];
-  /** The intonation lab's next rung, or null when the lab isn't on for this singer. */
-  lab: { interval: LabInterval; rung: number; done: boolean } | null;
+  /**
+   * The intonation course's next step (ui/today.ts labNext), or null when it isn't in Today for this
+   * singer. `check`: the quick check is due; `redo`: rung 4 once more after a check that slipped.
+   */
+  lab: { interval: LabInterval; rung: number; done: boolean; check?: boolean; redo?: boolean } | null;
   /** The next rehearsal (days from the plan's day: 0 = today), with its weekday name ("Tuesday"). */
   rehearsal: { days: number; weekday: string; time?: string } | null;
   /** The last day practised before the plan's day ('YYYY-MM-DD'), null = never. */
@@ -132,10 +138,10 @@ export const WELCOME_BACK_DAYS = 7;
 export const MAX_STEPS = 4;
 export const PLAN_MIN = 10;
 export const PLAN_MAX = 15;
-/** Minutes of each lab rung (Listen, Tune it by hand, Sing it with the wobble, Sing it blind, In the chord). */
+/** Minutes of each lab rung (Listen, Tune it by hand, Sing it with the wobble, Sing it by ear, In the chord). */
 export const LAB_MINUTES = [5, 5, 4, 5, 6];
 const LAB_NAME: Record<LabInterval, string> = { fifth: 'the pure fifth', third: 'the pure third' };
-const LAB_RUNG_NAMES = ['Listen', 'Tune it by hand', 'Sing it, with the wobble', 'Sing it blind', 'In the chord'];
+const LAB_RUNG_NAMES = ['Listen', 'Tune it by hand', 'Sing it, with the wobble', 'Sing it by ear', 'In the chord'];
 const COUNT_IN_SEC = 8;
 const RESULTS_SEC = 20;
 
@@ -264,8 +270,16 @@ export function pieceCandidates(p: PlanPiece, now: number, rehearsalDays: number
 
 /** The lab's warm-up step (its next rung; once both ladders are done, a short tune-up in the chord). */
 export function labStep(lab: NonNullable<PlanContext['lab']>, short = false): TodayStep {
+  if (lab.check) {
+    return {
+      id: `lab:${lab.interval}:check`, kind: 'lab', level: 4, step: 'tempo', minutes: 1, why: 'warm-up',
+      lab: { interval: lab.interval, rung: 4, check: true },
+      title: `Quick check · ${LAB_NAME[lab.interval]}`, reason: 'One minute, three holds: does it still lock?',
+      route: { name: 'intonation', interval: lab.interval, rung: 4, check: true },
+    };
+  }
   const rung = Math.max(1, Math.min(5, lab.rung));
-  const minutes = short ? 1 : lab.done ? 2 : LAB_MINUTES[rung - 1];
+  const minutes = short ? 1 : lab.done && !lab.redo ? 2 : LAB_MINUTES[rung - 1];
   // (a rung already passed, or a short tune-up: it ticks on rounds sung today, never by itself)
   const tuneUp = short || lab.done || lab.rung > 5;
   return {
@@ -273,7 +287,7 @@ export function labStep(lab: NonNullable<PlanContext['lab']>, short = false): To
     lab: { interval: lab.interval, rung, ...(tuneUp ? { tuneUp: true } : {}) },
     title: short ? (lab.interval === 'third' ? 'Pure-third tune-up' : 'Pure-fifth tune-up') : `Warm-up · ${LAB_NAME[lab.interval]}`,
     reason: short ? (lab.interval === 'third' ? 'So your third rings in the chord' : 'So your fifth rings in the chord')
-      : lab.done ? `${LAB_RUNG_NAMES[rung - 1]} · keeps your ear ready` : `Step ${rung} of 5 · ${LAB_RUNG_NAMES[rung - 1]}`,
+      : lab.redo ? `${LAB_RUNG_NAMES[rung - 1]}, once more · it slipped a little` : lab.done ? `${LAB_RUNG_NAMES[rung - 1]} · keeps your ear ready` : `Step ${rung} of 5 · ${LAB_RUNG_NAMES[rung - 1]}`,
     route: { name: 'intonation', interval: lab.interval, rung },
   };
 }
@@ -448,6 +462,8 @@ export interface TickContext {
   /** The lab's current rung per interval (a rung below it is passed). */
   labRung?: Partial<Record<LabInterval, number>>;
   lab?: LabDay | null;
+  /** The day each interval's quick check was last taken. */
+  labChecked?: Partial<Record<LabInterval, string>>;
   /** When the words of a passage were last practised (ms), 0 = never. */
   wordsAt?: (pieceId: string, partId: string, sectionId: string) => number;
 }
@@ -466,6 +482,7 @@ export const TRIES_TO_TICK = 2;
  */
 export function stepDone(s: TodayStep, t: TickContext): boolean {
   if (s.kind === 'lab' && s.lab) {
+    if (s.lab.check) return t.labChecked?.[s.lab.interval] === t.day;
     if (!s.lab.tuneUp && (t.labRung?.[s.lab.interval] ?? 0) > s.lab.rung) return true;
     const n = t.lab && t.lab.day === t.day ? t.lab.rounds[`${s.lab.interval}:${s.lab.rung}`] ?? 0 : 0;
     return n >= labRoundsFor(s.lab.rung);

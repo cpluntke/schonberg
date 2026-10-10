@@ -29,6 +29,7 @@ export function UsageStats() {
           <span><strong>Practising now</strong> (unless switched off above): while the singing screen is open, a count per voice part, no names, kept only in the server's memory.</span>
           <span><strong>Sharing progress with your section lead</strong> (on when you join a choir; you can switch it off above): how each bar of the programme's pieces is going, the notes that keep going wrong (and how), your piece levels and your voice range. Your section lead and the admins see your voice range by name; bars, levels and notes only as totals for the whole section (from 3 singers sharing), though in a small section they may be able to work out yours.</span>
           <span><strong>A choir account</strong> (if you make one) keeps your progress on the choir server so it follows you to another phone.</span>
+          <span><strong>The daily reminder</strong> (if you switch it on): your browser's push address, the time, your time zone and the date you last practised (no name, no choir, no account), so the server can send it on days you haven't practised. Deleted when you switch it off, when your browser drops it, or after 60 days without the app.</span>
           <span>Recordings never leave this phone unless you share one yourself.</span>
         </div>
       </details>

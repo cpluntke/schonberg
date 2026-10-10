@@ -162,9 +162,10 @@ at the bottom of Diagnostics (and `#/superadmin`).
 
 - **Tab bar**: on phones only under the four tabs and the staff screens; every other screen is a
   sub-screen with its own back arrow. Wide screens keep the sidebar on sub-screens too. Practice
-  screens (Play, Results, the words, the lyrics quiz, the memory map), voice setup and the lab's steps
-  have neither.
-- **The lit tab** (`tabOf`): Your progress → Today; Ranks → Choir; Expert, the tuner, the lab → Train.
+  screens (Play, Results, the words, the lyrics quiz, the memory map), voice setup and a course's
+  steps and quick check have neither.
+- **The lit tab** (`tabOf`): Your progress → Today; Ranks → Choir; Expert, the tuner, the drone, the
+  courses → Train.
   A piece, Settings and Diagnostics light the tab they were opened from (remembered per browser tab in
   `sessionStorage['sh:fromTab']`); opened straight from a link: Pieces (a piece) or Today.
 - **Old addresses**: `#/library` is the Pieces tab; `#/ranks` and `#/settings` are still screens of
@@ -172,8 +173,11 @@ at the bottom of Diagnostics (and `#/superadmin`).
 - **Pieces** (`screens/Pieces.tsx`, `pieces.ts`): the programme's pieces (the singer's own imports
   apart), what's still to come (`Cycle.wanted`), your own imports, the rest on this phone, importing;
   "Choose the programme's pieces" toggles pieces in and out and deletes imports.
-- **Train** (`screens/Train.tsx`): for now what exists: the intonation lab as today's warm-up (when
-  `labEnabled`), the tuner ("Check a note"), the leap drill and the Zwölfton row (Expert mode).
+- **Train** (`screens/Train.tsx`): today's warm-up (the active course's next step), the tools (Check
+  a note = the tuner, the Drone `#/drone`), the intonation courses (the active one, one suggestion, All
+  courses `#/courses`; `game/courses.ts`, the course screens in `screens/IntonationLab.tsx`:
+  `#/intonation/<interval>[/<rung>|/done|/check]`), drills from your music (the leap drill, whose Results
+  are `screens/LeapResults.tsx`) and the Zwölfton row. docs/INTONATION.md.
 - **Choir** (`screens/Choir.tsx` ChoirScreen, `components/ChoirOverview.tsx`, `choirTab.ts`): the
   next rehearsal with its focus and one action (the first focus piece not yet rehearsal-ready, its next
   step), the programme, this week in your section (singers of your voice on the choir's board with

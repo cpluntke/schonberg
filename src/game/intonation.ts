@@ -6,10 +6,11 @@
 // (how much, never which way) instead of a tuning needle.
 //
 // Each interval is a ladder (docs/INTONATION.md): listen, tune by hand, sing with the pulse shown,
-// sing blind, sing it in a chord.
+// sing it by ear, sing it in a chord.
 
 import type { VoiceType } from '../music/types';
 import { loadCycle, rawGet, rawSet } from '../progress/store';
+import { addDays, dayOf } from '../progress/today';
 
 export type LabInterval = 'fifth' | 'third';
 /** A chord tone, as scale degrees of a major triad. */
@@ -44,7 +45,7 @@ export const pureCents = (d: Degree) => cents(RATIO[d][0] / RATIO[d][1]);
 export const pianoCents = (d: Degree) => ET_SEMIS[d] * 100;
 
 export const RUNGS = 5;
-export const RUNG_NAMES = ['Listen', 'Tune it by hand', 'Sing it, with the wobble', 'Sing it blind', 'In the chord'] as const;
+export const RUNG_NAMES = ['Listen', 'Tune it by hand', 'Sing it, with the wobble', 'Sing it by ear', 'In the chord'] as const;
 
 /** Rounds that count towards a rung (the last ROUNDS), and how many of them must be pure. */
 export const ROUNDS = 4;
@@ -196,28 +197,72 @@ export function median(xs: number[]): number {
   return s.length % 2 ? s[k] : (s[k - 1] + s[k]) / 2;
 }
 
-// ---- Progress (this phone only) ----
+// ---- Progress (this phone, and the choir account: sync.ts `lab`) ----
 
-export interface LabTrack { rung: number; logs: Record<number, number[]> }
+/**
+ * The quick check a week after a course is done (rungs 3–4 in one minute): `due` (a day), `checked`
+ * (the day it was taken) and whether it held (`kept`). A slip suggests rung 4 once more (`LabTrack.redo`).
+ */
+export interface LabReview { due: string; checked?: string; kept?: boolean }
+export interface LabTrack {
+  rung: number;
+  logs: Record<number, number[]>;
+  /** The day each rung was passed (YYYY-MM-DD). */
+  passed?: Record<number, string>;
+  /** The last round logged (ms). */
+  at?: number;
+  review?: LabReview;
+  /** After a slipped check: the rung to pass once more (4, "Sing it by ear"). */
+  redo?: number;
+}
 export type LabProgress = Record<LabInterval, LabTrack>;
+
+/** The quick check comes this many days after a course (or a redo) is done. */
+export const REVIEW_DAYS = 7;
+/** The quick check: this many holds, and how many must be close to pure. */
+export const CHECK_HOLDS = 3;
+export const CHECK_KEEP = 2;
 
 const KEY = 'sh:intonation';
 const fresh = (): LabProgress => ({ fifth: { rung: 1, logs: {} }, third: { rung: 1, logs: {} } });
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const isDay = (v: unknown): v is string => typeof v === 'string' && DAY_RE.test(v);
+
+/** One track from stored (or synced) JSON: anything malformed is dropped. */
+export function cleanTrack(t: unknown): LabTrack | null {
+  if (!t || typeof t !== 'object') return null;
+  const o = t as Record<string, unknown>;
+  if (typeof o.rung !== 'number' || !Number.isFinite(o.rung)) return null;
+  const logs: Record<number, number[]> = {};
+  if (o.logs && typeof o.logs === 'object') {
+    for (const [r, v] of Object.entries(o.logs as Record<string, unknown>)) {
+      const n = Number(r);
+      if (Array.isArray(v) && n >= 1 && n <= RUNGS) logs[n] = v.filter((x): x is number => typeof x === 'number' && Number.isFinite(x)).slice(-CHECK_ROUNDS);
+    }
+  }
+  const out: LabTrack = { rung: Math.max(1, Math.min(RUNGS + 1, Math.round(o.rung))), logs };
+  if (o.passed && typeof o.passed === 'object') {
+    const passed: Record<number, string> = {};
+    for (const [r, d] of Object.entries(o.passed as Record<string, unknown>)) if (Number(r) >= 1 && Number(r) <= RUNGS && isDay(d)) passed[Number(r)] = d;
+    if (Object.keys(passed).length) out.passed = passed;
+  }
+  if (typeof o.at === 'number' && Number.isFinite(o.at) && o.at > 0) out.at = o.at;
+  const rv = o.review as Record<string, unknown> | undefined;
+  if (rv && typeof rv === 'object' && isDay(rv.due)) {
+    out.review = { due: rv.due };
+    if (isDay(rv.checked)) { out.review.checked = rv.checked; out.review.kept = rv.kept === true; }
+  }
+  if (o.redo === 4 && out.rung > RUNGS) out.redo = 4;
+  return out;
+}
 
 export function loadLab(): LabProgress {
   try {
-    const raw = JSON.parse(rawGet(KEY) ?? 'null') as Partial<LabProgress> | null;
+    const raw = JSON.parse(rawGet(KEY) ?? 'null') as Partial<Record<LabInterval, unknown>> | null;
     const p = fresh();
     for (const k of ['fifth', 'third'] as const) {
-      const t = raw?.[k];
-      if (!t || typeof t.rung !== 'number' || !Number.isFinite(t.rung)) continue;
-      const logs: Record<number, number[]> = {};
-      if (t.logs && typeof t.logs === 'object') {
-        for (const [r, v] of Object.entries(t.logs)) {
-          if (Array.isArray(v)) logs[Number(r)] = v.filter((x): x is number => typeof x === 'number' && Number.isFinite(x));
-        }
-      }
-      p[k] = { rung: Math.max(1, Math.min(RUNGS + 1, Math.round(t.rung))), logs };
+      const t = cleanTrack(raw?.[k]);
+      if (t) p[k] = t;
     }
     return p;
   } catch { return fresh(); }
@@ -229,14 +274,40 @@ export function saveLab(p: LabProgress) { rawSet(KEY, JSON.stringify(p)); }
 /**
  * Log one round's result (how far from pure, cents; for the listening check 0 = right, 1 = wrong)
  * and open the next rung when this one is passed. Returns the updated progress and whether it passed.
+ * Passing a rung stamps its day; passing the last one books the quick check a week later; passing
+ * the rung to redo after a slipped check books a new one.
  */
-export function logRound(p: LabProgress, iv: LabInterval, rung: number, value: number): { p: LabProgress; passed: boolean } {
+export function logRound(p: LabProgress, iv: LabInterval, rung: number, value: number, now = Date.now()): { p: LabProgress; passed: boolean } {
   const t = p[iv];
   const keep = rung === 1 ? CHECK_ROUNDS : ROUNDS;
   const logs = { ...t.logs, [rung]: [...(t.logs[rung] ?? []), value].slice(-keep) };
   const passed = rungPassed(rung, logs[rung]);
-  const next: LabTrack = { logs, rung: passed && t.rung === rung ? rung + 1 : t.rung };
+  const opens = passed && t.rung === rung;
+  const day = dayOf(now);
+  const next: LabTrack = { ...t, logs, rung: opens ? rung + 1 : t.rung, at: now };
+  if (opens) next.passed = { ...t.passed, [rung]: day };
+  if (opens && rung === RUNGS) next.review = { due: addDays(day, REVIEW_DAYS) };
+  if (passed && t.redo === rung) {
+    delete next.redo;
+    next.review = { due: addDays(day, REVIEW_DAYS) };
+  }
   return { p: { ...p, [iv]: next }, passed };
+}
+
+/**
+ * The quick check's result (the cents off pure of its holds): kept when CHECK_KEEP of them were
+ * close to pure. A slip asks for rung 4 once more (its rounds start afresh).
+ */
+export function logCheck(p: LabProgress, iv: LabInterval, holds: number[], now = Date.now()): { p: LabProgress; kept: boolean } {
+  const t = p[iv];
+  const kept = holds.filter((v) => Math.abs(v) <= TOL_SING).length >= CHECK_KEEP;
+  const day = dayOf(now);
+  const next: LabTrack = { ...t, at: now, review: { due: t.review?.due ?? day, checked: day, kept } };
+  if (!kept) {
+    next.redo = 4;
+    next.logs = { ...t.logs, 4: [] };
+  } else delete next.redo;
+  return { p: { ...p, [iv]: next }, kept };
 }
 
 export function rungPassed(rung: number, results: number[]): boolean {
@@ -244,4 +315,14 @@ export function rungPassed(rung: number, results: number[]): boolean {
   const tol = rung === 2 ? TOL_HAND : TOL_SING;
   const last = results.slice(-ROUNDS);
   return last.filter((v) => Math.abs(v) <= tol).length >= PASS;
+}
+
+/** Rounds still needed to pass a rung if every one from now on is pure (0 once passed). */
+export function roundsToPass(rung: number, results: number[]): number {
+  let r = [...results];
+  for (let n = 0; n <= CHECK_ROUNDS; n++) {
+    if (rungPassed(rung, r)) return n;
+    r = [...r, 0].slice(-(rung === 1 ? CHECK_ROUNDS : ROUNDS));
+  }
+  return CHECK_ROUNDS;
 }

@@ -9,7 +9,7 @@ import { useToast } from './hooks';
 import { IconEar, IconMusic, IconPeople, IconShield, IconSun } from './icons';
 import { Home } from './screens/Home';
 import { Pieces } from './screens/Pieces';
-import { Train } from './screens/Train';
+import { AllCourses, DroneScreen, Train } from './screens/Train';
 import { PieceScreen } from './screens/Piece';
 import { PlayScreen } from './screens/Play';
 import { Results } from './screens/Results';
@@ -29,6 +29,7 @@ import { ChoirScreen } from './screens/Choir';
 import { AdminScreen, ADMIN_ROUTES, adminHome, useStaff } from './screens/Admin';
 import { InviteScreen } from './screens/Invite';
 import { startUsageStats } from './usage';
+import { startReminders } from '../progress/reminders';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { UpdatePrompt } from './components/UpdatePrompt';
 import { StorageFullNotice } from './components/StorageFullNotice';
@@ -54,11 +55,12 @@ export function App() {
   // hop between Results, the piece and the next run.
   useEffect(() => {
     const micScreens = ['play', 'setup', 'tuner', 'diagnostics', 'results', 'piece', 'intonation'];
-    // (the lab's ladder doesn't listen: only its steps do)
-    if (micScreens.includes(route.name) && !(route.name === 'intonation' && !route.rung)) return;
+    // (a course's page doesn't listen: only its steps and its quick check do)
+    const labMic = route.name === 'intonation' && (!!route.rung || !!route.check);
+    if (micScreens.includes(route.name) && !(route.name === 'intonation' && !labMic)) return;
     const t = window.setTimeout(() => releaseTracker(), 3 * 60_000);
     return () => clearTimeout(t);
-  }, [route.name, route.name === 'intonation' && !!route.rung]);
+  }, [route.name, route.name === 'intonation' && (!!route.rung || !!route.check)]);
   useEffect(() => {
     let hiddenAt = 0;
     const onVis = () => {
@@ -81,6 +83,8 @@ export function App() {
   }, [lib.ready, lib.version]);
   // Anonymous usage statistics (Settings → Send anonymous usage statistics): daily totals once a day, plus hourly counts every few minutes for the last 24 hours.
   useEffect(() => { startUsageStats(); }, []);
+  // The daily practice reminder (if on): the server hears the subscription again, and "practised today" after a run.
+  useEffect(() => startReminders(), []);
   // Progress kept with the choir account: on start and whenever the app comes back, if something
   // changed (at most once a minute). A new login also moves this phone's shared progress to the account.
   useEffect(() => {
@@ -150,7 +154,9 @@ export function App() {
       case 'ranks': body = <Ranks />; break;
       case 'expert': body = <Expert />; break;
       case 'tuner': body = <TunerScreen />; break;
-      case 'intonation': body = <IntonationLab key={`${route.interval ?? ''}${route.rung ?? ''}`} route={route} />; break;
+      case 'intonation': body = <IntonationLab key={`${route.interval ?? ''}${route.rung ?? ''}${route.done ? 'd' : ''}${route.check ? 'c' : ''}`} route={route} />; break;
+      case 'courses': body = <AllCourses />; break;
+      case 'drone': body = <DroneScreen />; break;
       case 'diagnostics': body = <Diagnostics />; break;
       case 'lyrics': body = <LyricsQuiz key={route.pieceId + route.partId} pieceId={route.pieceId} partId={route.partId} />; break;
       case 'memorymap': body = <MemoryMap key={route.pieceId + route.partId} pieceId={route.pieceId} partId={route.partId} />; break;
@@ -169,7 +175,7 @@ export function App() {
       {/* (keyboard: the menu comes after the page in the document; this jumps there first) */}
       {sidebar && <a href="#main-nav" className="skip-link" onClick={(e) => { e.preventDefault(); document.querySelector<HTMLElement>('#main-nav button')?.focus(); }}>Go to the menu</a>}
       {/* Today's session: the strip on top of the lab (Results and the pre-run card carry their own). */}
-      {route.name === 'intonation' && route.rung != null && lib.ready && <SessionStrip lab />}
+      {route.name === 'intonation' && (route.rung != null || route.check || route.done) && lib.ready && <SessionStrip lab />}
       <ErrorBoundary resetKey={JSON.stringify(route)}>{body}</ErrorBoundary>
       <DisplaySync />
       <UpdatePrompt hidden={route.name === 'play'} />
