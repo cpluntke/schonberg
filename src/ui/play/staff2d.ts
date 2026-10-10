@@ -1407,8 +1407,9 @@ export function lyricFontFor(sp: number) {
 
 // (Phones: a staff space of 14 px gives 15 px note names and 18 px words; laptops' full score keeps
 // its 10–11 px. Both grow with Settings → Display → Text size.)
-const lyricPx = (sp: number) => fpx(Math.max(11, Math.min(18, sp * 1.3)));
-const namePx = (sp: number) => fpx(Math.max(10, Math.min(17, sp * 1.1)));
+// (a phone-sized staff, 12 px spaces and up, never has names under 15 px or words under 16 px)
+const lyricPx = (sp: number) => fpx(Math.max(sp >= 12 ? 16 : 11, Math.min(18, sp * 1.3)));
+const namePx = (sp: number) => fpx(Math.max(sp >= 12 ? 15 : 10, Math.min(17, sp * 1.1)));
 
 /** Note names: a little smaller than the words, in their own row between the staff and the words. */
 export function nameFontFor(sp: number) {
@@ -1451,11 +1452,20 @@ export function nameMeasure(c: Ctx, font: string, notation: NotationMode): NameW
   };
 }
 
-/** Staff-space size: a portrait phone gets fewer but bigger systems (filling the height), so the
- *  sung line's height against the notes reads; landscape shows two systems. */
+/** A phone held upright (its canvas can be about square on a small phone under big text), or a tall view. */
+export const uprightView = (W: number, H: number) => (W < 600 ? H > W * 0.6 : H > W * 1.15);
+
+/** Staff-space size: a portrait phone gets two big systems (or two rows of the scrolling line), filling
+ *  the height, so the sung line's height against the notes reads and the note names are 15 px+
+ *  (a 390 px phone: 15 px spaces, a 60 px staff); landscape shows two smaller systems. */
 export function staffSpace(W: number, H: number, perSys: number): { sp: number; floor: number } {
-  const portrait = H > W * 1.15;
-  const sp = Math.max(6.5, Math.min(portrait ? 15 : 12, (H - 8) / ((portrait ? 3 : 2) * perSys), W / (portrait ? 33 : 44)));
+  if (uprightView(W, H)) {
+    // (two systems when they fit at a 12 px staff space; a small phone with big text: one, larger)
+    const two = (H - 8) / (2 * perSys);
+    const sp = Math.max(6.5, Math.min(16, W / 26, two >= 12 ? two : (H - 8) / perSys));
+    return { sp, floor: Math.max(6.5, Math.min(sp, W / 34)) };
+  }
+  const sp = Math.max(6.5, Math.min(12, (H - 8) / (2 * perSys), W / 44));
   return { sp, floor: Math.max(6.5, Math.min(sp, W / 44)) };
 }
 
@@ -1600,17 +1610,17 @@ const SMOOTH_SEC = 1.2;
 const SMOOTH_N = 16;
 
 /** The pinned start of a scrolling line: staff lines, clef and the key (and time) in force at `beat`. */
-export function drawPinned(c: Ctx, g: Pick<SysGeo, 'top' | 'mid'>, layout: Pick<StaffLayout, 'sp' | 'clef'>, first: StaffSystem, key: KeySig, s: Pick<DrawState, 'score' | 'notation'>, showTime: boolean, H: number) {
+export function drawPinned(c: Ctx, g: Pick<SysGeo, 'top' | 'mid'>, layout: Pick<StaffLayout, 'sp' | 'clef'>, first: StaffSystem, key: KeySig, s: Pick<DrawState, 'score' | 'notation'>, showTime: boolean, H: number, y0 = 0) {
   const sp = layout.sp;
   const w = first.prefixEnd;
   c.fillStyle = COLORS.bg;
-  c.fillRect(0, 0, w, H);
+  c.fillRect(0, y0, w, H - y0);
   // Soft edge where the music slides under the clef.
   const grad = c.createLinearGradient(w, 0, w + 1.6 * sp, 0);
   grad.addColorStop(0, COLORS.bg);
   grad.addColorStop(1, COLORS.bgClear);
   c.fillStyle = grad;
-  c.fillRect(w, 0, 1.6 * sp, H);
+  c.fillRect(w, y0, 1.6 * sp, H - y0);
   const pin: StaffSystem = {
     ...first, cont: false, measures: [], x1: w, key, cancelFifths: 0,
     timeSig: showTime ? (first.measures[0]?.sm.timeSig ?? null) : null,
@@ -1692,7 +1702,12 @@ function drawStaffScroll(c: Ctx, W: number, H: number, s: DrawState) {
   if (!systems.length) return;
   const beat = timeToBeat(s.score.tempos, s.pos);
   const { off, px, k } = scrollOffset(systems, beat, W, sp, { tempos: s.score.tempos, pos: s.pos });
-  const top = Math.round(Math.max(4, (H - L.band) / 2) + L.above * sp);
+  // A tall phone: the line goes on in a second row underneath, what comes after the right edge
+  // (both rows glide together), so the next bars are in view at a staff size that reads.
+  const rows = uprightView(W, H) && H - 8 >= 2 * L.band ? 2 : 1;
+  const gap = rows === 2 ? Math.min(0.3 * L.band, (H - 8 - 2 * L.band) / 3) : 0;
+  const block = rows * L.band + gap;
+  const top = Math.round(Math.max(4, (H - block) / 2) + L.above * sp);
 
   const notes = s.part.notes;
   const [ra, rb] = s.range ?? [0, -1];
@@ -1731,7 +1746,30 @@ function drawStaffScroll(c: Ctx, W: number, H: number, s: DrawState) {
     drawBubble(c, cur, s, L, px, off + W - 0.5 * sp);
   }
   c.restore();
-  drawPinned(c, { top, mid: top + 2 * sp }, layout, systems[0], keyAtBeat(s.score, beat), s, off < 1, H);
+  let split = H;
+  if (rows === 2) {
+    // Row 2: the line from row 1's right edge on, notes only (no voice, no playhead).
+    const off2 = off + W - pinned;
+    const top2 = top + L.band + gap;
+    split = Math.round(top2 - L.above * sp - gap / 2);
+    let key2: KeySig | null = null;
+    c.save();
+    c.translate(-off2, 0);
+    for (let j = 0; j < systems.length; j++) {
+      const sy = systems[j];
+      if (sy.x1 - off2 < pinned - 2 * sp || sy.prefixEnd - off2 > W + 2 * sp) continue;
+      if (!key2 && sy.x1 - off2 > pinned) key2 = sy.key;
+      drawSystem(c, { j, sys: sy, sd: sysDraw(L, j, s), top: top2, mid: top2 + 2 * sp }, layout, L, s, v);
+    }
+    c.restore();
+    if (key2) drawPinned(c, { top: top2, mid: top2 + 2 * sp }, layout, systems[0], key2, s, false, H, split);
+    else {
+      // (past the end of the music: nothing in row 2)
+      c.fillStyle = COLORS.bg;
+      c.fillRect(0, split, W, H - split);
+    }
+  }
+  drawPinned(c, { top, mid: top + 2 * sp }, layout, systems[0], keyAtBeat(s.score, beat), s, off < 1, split);
   void k;
 }
 

@@ -80,6 +80,20 @@ export function initials(s: string): string {
 }
 
 /** Wide screen (laptop, tablet in landscape): the play screen uses the width for the full score. */
+/** Does the media query `q` match (and re-render when that changes)? */
+export function useMedia(q: string): boolean {
+  const [on, setOn] = useState(() => typeof matchMedia === 'function' && matchMedia(q).matches);
+  useEffect(() => {
+    if (typeof matchMedia !== 'function') return;
+    const m = matchMedia(q);
+    const f = () => setOn(m.matches);
+    f();
+    m.addEventListener?.('change', f);
+    return () => m.removeEventListener?.('change', f);
+  }, [q]);
+  return on;
+}
+
 export function useWide(): boolean {
   const q = '(min-width: 900px)';
   const [wide, setWide] = useState(() => typeof matchMedia === 'function' && matchMedia(q).matches);

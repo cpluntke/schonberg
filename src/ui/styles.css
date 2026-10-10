@@ -277,19 +277,44 @@ input[type='range'] { accent-color: var(--accent); width: 100%; }
 .play-controls { padding: 10px 12px calc(14px + var(--safe-bottom)); display: flex; flex-direction: column; gap: 10px; }
 .mixer { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
 .mixer button {
-  min-height: 44px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); font-weight: 600; font-size: 0.875rem; padding: 2px 4px;
+  min-height: 44px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); font-weight: 600; font-size: min(0.875rem, 3.9vw); padding: 2px 4px;
 }
 .mixer button[aria-pressed='false'] { color: var(--muted); background: transparent; border-style: dashed; text-decoration: line-through; }
 .mixer button.me { border: 2px solid var(--voice); color: var(--voice); background: var(--voice-bg); }
 .mixer button { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-/* Restart · (Peek) · Finish · Pause: Pause never leaves the screen. */
+/* Restart · (Peek) · Stop · Pause: Pause never leaves the screen. While singing, Stop and Pause
+   share the row equally, plain (no orange while you sing). */
 .play-actions { gap: 8px; min-width: 0; min-height: 60px; }
 /* (Before a run there's no ▶ here: the card's Start is the one. The row keeps its height, so the score doesn't jump.) */
 .play-actions > .btn { flex: none; }
+.play-actions > .btn.run-btn { flex: 1 1 0; min-width: 0; height: 56px; font-size: 1.0625rem; font-weight: 700; border-radius: 14px; }
+.play-actions > .btn.restart { height: 56px; min-width: 56px; border-radius: 14px; }
+@media (max-width: 560px) {
+  .play-actions > .btn.restart .lbl { display: none; }
+  .play-actions > .btn.restart { padding: 0; }
+}
+@media (min-width: 900px) { .play-actions > .btn.run-btn { flex: 0 1 180px; } }
 @media (max-width: 440px) {
   .play-actions.compact .lbl { display: none; }
   .play-actions.compact > .btn { padding: 0 12px; }
 }
+/* A run over several passages: its bars as a thin strip, a segment per passage. */
+.run-strip { display: flex; align-items: center; gap: 10px; padding: 0 16px 4px; flex: none; min-height: 22px; }
+.run-strip .segs { flex: 1 1 auto; display: flex; gap: 3px; min-width: 0; }
+.run-strip .segs i { display: block; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; min-width: 3px; flex-basis: 0; }
+.run-strip .segs b { display: block; height: 100%; background: var(--voice); transition: width 0.3s ease; }
+.run-strip .n { font: 600 0.875rem var(--mono); color: var(--muted); white-space: nowrap; flex: none; }
+/* The score view on a phone: how close you are, in big words, above the music. */
+.readout-band { flex: none; height: 4.25rem; display: flex; align-items: center; padding: 4px 12px; min-width: 0; }
+.readout {
+  display: inline-flex; align-items: baseline; gap: 12px; max-width: 100%; padding: 8px 16px; border-radius: 16px;
+  border: 2px solid var(--voice); background: var(--voice-bg); white-space: nowrap; overflow: hidden;
+}
+.readout .n { font-size: 1.875rem; font-weight: 800; line-height: 1; color: var(--voice); }
+.readout .w { font-size: 1.1875rem; font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; }
+.readout.off { border-color: var(--accent-text); background: var(--accent-soft); }
+.readout.off .n { color: var(--accent-text); }
+.readout-idle { color: var(--muted); font-size: 0.9375rem; padding-left: 4px; }
 @media (max-width: 340px) {
   .play-actions .lbl { display: none; }
   .mixer button .you { display: none; }
@@ -363,6 +388,8 @@ input[type='range'] { accent-color: var(--accent); width: 100%; }
   .lyrics { font-size: 1rem; padding-top: 4px; min-height: 26px; }
   .big-play { width: 48px; height: 48px; }
   .play-actions { min-height: 48px; }
+  .play-actions > .btn.run-btn, .play-actions > .btn.restart { flex: none; width: 52px; height: 48px; padding: 0; }
+  .run-strip { padding-bottom: 2px; }
   .play-hud { padding-top: 2px; padding-bottom: 0; }
   .howto { display: none !important; }
   .overlay { align-items: flex-start; overflow-y: auto; }
@@ -723,7 +750,8 @@ html:has(.results-foot) { scroll-padding-bottom: 200px; }
   width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--line-strong); background: var(--surface); display: grid; place-items: center;
   font: 800 0.9375rem var(--font); font-style: normal; color: var(--muted);
 }
-.lvl.lg > .n > span { font: 600 0.875rem var(--font); color: var(--muted); text-align: center; line-height: 1.2; max-width: 100%; padding: 0 2px; overflow-wrap: break-word; }
+/* (at a larger text size the five labels stay whole: no bigger than fits a phone's fifth of the width) */
+.lvl.lg > .n > span { font: 600 min(0.875rem, 3.8vw) var(--font); color: var(--muted); text-align: center; line-height: 1.2; max-width: 100%; padding: 0 2px; overflow-wrap: break-word; }
 .lvl.lg > .n.half > i { background: linear-gradient(90deg, var(--voice) 50%, var(--surface) 50%); border-color: var(--voice); color: var(--text); }
 .lvl.lg > .n.full > i { background: var(--voice); border-color: var(--voice); color: var(--accent-ink); }
 .lvl.lg > .n.now > i { box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--accent); color: var(--text); }

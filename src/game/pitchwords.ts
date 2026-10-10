@@ -58,3 +58,15 @@ export function toleranceWords(tol: number): string {
             : part('a fifth', 20);
   return `${words} (${t} cents)`;
 }
+
+/**
+ * The big live readout over the sheet music (score view on a phone): the words and which way to
+ * go, "a touch flat" + "↑" (sing higher), "clearly sharp" + "↓", "spot on" + "". While singing the
+ * arrow is the correction; afterwards (Results, pitchTag) it describes the miss.
+ */
+export function pitchReadout(cents: number): { words: string; arrow: '↑' | '↓' | ''; say: string } {
+  const d = pitchDegree(cents);
+  if (d === 'spot on') return { words: 'spot on', arrow: '', say: 'spot on' };
+  const flat = cents < 0;
+  return { words: pitchWords(cents), arrow: flat ? '↑' : '↓', say: `${pitchWords(cents)}: sing ${d} ${flat ? 'higher' : 'lower'}` };
+}

@@ -239,7 +239,7 @@ export function Settings() {
           {profile.appearance === 'system' ? 'Light or dark as your phone is set (it can change in the evening).'
             : profile.appearance === 'light' ? 'Dark text on a light page: easier to read in daylight.' : 'Light text on a dark page (the default).'}
         </span>
-        <span className="small" id="settings-textsize-label">Text size</span>
+        <span className="small" id="settings-textsize-label" style={{ marginTop: 6 }}>Text size</span>
         <div className="seg" role="group" aria-labelledby="settings-textsize-label" data-testid="settings-textsize">
           {TEXT_SIZES.map((t) => (
             <button key={t.id} aria-pressed={textSizeOf(profile.textSize) === t.id} data-testid={`textsize-${t.id}`}
@@ -249,7 +249,7 @@ export function Settings() {
           ))}
         </div>
         <span className="small muted">All the app's text, the note names and words on the music included.</span>
-        <span className="small" id="settings-practice-display-label">While you practise</span>
+        <span className="small" id="settings-practice-display-label" style={{ marginTop: 6 }}>While you practise</span>
         <div className="seg" role="group" aria-labelledby="settings-practice-display-label" data-testid="settings-display">
           {([[undefined, 'Automatic'], ['score', 'Score'], ['highway', 'Highway']] as const).map(([d, label]) => (
             <button key={label} aria-pressed={profile.display === d} onClick={() => update({ display: d, displayChosen: d !== undefined, scoreDefaultNote: false })}>{label}</button>

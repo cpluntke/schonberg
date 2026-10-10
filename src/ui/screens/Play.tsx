@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { Route } from '../router';
 import { dropGuard, go, leaveTo, practiceParent, pushGuard, useBackGuard } from '../router';
 import { getPiece, noteRangeFor, singableSections } from '../library';
-import { useProfile, useWide } from '../hooks';
+import { useMedia, useProfile, useWide } from '../hooks';
 import {
   MAX_LEVEL, OFF_BOOK_DAYS, effectiveTolerance, entriesOnTime, fixesBefore, fullRunCounts, pieceReadiness, sectionRunCounts,
   speakerPractice, stepFor, stepLabel, stepSpec, type EntriesCheck, type Step,
@@ -41,7 +41,9 @@ import { setLastResult } from '../play/lastResult';
 import { useResume } from '../play/useResume';
 import { IconBack, IconChevronDown, IconEar, IconHome, IconPause, IconPlay, IconRestart, IconStop } from '../icons';
 import { passRule, taskSentence } from '../play/prerun';
-import { toleranceWords } from '../../game/pitchwords';
+import { pitchReadout, toleranceWords } from '../../game/pitchwords';
+import { barsDone, liveReading, runProgress } from '../play/readout';
+import { noteLabel } from '../../game/notation';
 import { lowerLabel, troubleNote } from '../path';
 import { getNoteStats } from '../../progress/notestats';
 import { barRangeLabel } from '../../music/sections';
@@ -118,7 +120,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
   const [phase, setPhase] = useState<'ready' | 'running' | 'paused' | 'micError'>('ready');
   const [micMsg, setMicMsg] = useState('');
   const [listened, setListened] = useState(false);
-  const [hud, setHud] = useState<{ score: number; combo: number; count: number; lyricIdx: number; skip: { target: number; entry: number; bar: string } | null }>({ score: 0, combo: 0, count: 0, lyricIdx: -1, skip: null });
+  const [hud, setHud] = useState<Hud>({ score: 0, combo: 0, count: 0, lyricIdx: -1, skip: null, done: 0, rd: null });
   const [gains, setGains] = useState<Record<string, number>>(() => {
     const g: Record<string, number> = {};
     for (const p of piece?.score.parts ?? []) {
@@ -198,6 +200,13 @@ function SingPlay({ route }: { route: PlayRoute }) {
   const others = useMemo(() => (piece && part ? hasOtherStaves(piece.score, part.id) : { voices: false, accompaniment: false }), [piece, part]);
   const fullScore = useMemo(() => wide && display === 'score' && !!piece && !!part && isFullScore(piece.score, part.id, staves),
     [wide, display, piece, part, staves]);
+  // The score view on a phone: the live reading in big words above the music (not in landscape,
+  // where the height is the music's); the canvas then draws only the voice dot, not its bubble.
+  const short = useMedia('(max-height: 520px)');
+  const readoutOn = route.mode === '2d' && display === 'score' && !fullScore && !listenOnly && !short;
+  // A run over more than one passage (the whole piece, a long stretch): a strip of its bars.
+  const progress = useMemo(() => (piece && section && route.mode === '2d' ? runProgress(piece.score, piece.sections, section.start, section.end) : null),
+    [piece, section, route.mode]);
   /** Tapping what Automatic would show keeps Automatic (nothing is pinned). */
   const pickStaves = (v: 'mine' | 'voices' | 'all') => updateProfile({ scoreStaves: v === autoStaves ? undefined : v });
   const singerIsHigh = profile.voice === 'S' || profile.voice === 'A';
@@ -525,6 +534,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
         staves,
         scroll: !scorePages,
         dimLyrics: doo,
+        readout: readoutOn,
         hide: offBook ? (i: number) => {
           // Cold start: nothing of your part before the entry either (it would give the pitch away).
           if (cold && range && i < range[0]) return 'none';
@@ -570,15 +580,28 @@ function SingPlay({ route }: { route: PlayRoute }) {
           const k = skipTarget(piece.score.measures, part, pos, section.end, (s.latencyMs / 1000 + 0.15) * rate);
           if (k) skip = { ...k, bar: piece.score.measures.find((m) => k.entry >= m.start - 1e-6 && k.entry < m.start + m.dur - 1e-6)?.number ?? '' };
         }
-        const next = { score: s?.live?.score ?? 0, combo: s?.live?.combo ?? 0, count, lyricIdx, skip };
+        const done = progress ? barsDone(piece.score, section.start, section.end, pos) : 0;
+        // The live readout: the note being sung (its name where the level shows names) and how close.
+        let rd: Hud['rd'] = null;
+        if (readoutOn && s && s.phase === 'playing') {
+          const r = liveReading({ samples: s.samples, pos, part, range, hide: st.hide });
+          if (r) {
+            const n = part.notes[r.index];
+            const w = pitchReadout(r.cents);
+            const name = showNames ? noteLabel(n.midi, notation, keyAtTimeIn(nameKeysOf(piece.score), n.start), n.spelling).text : '';
+            rd = { name, words: w.words, arrow: w.arrow, say: w.say, ok: Math.abs(r.cents) <= tolerance };
+          }
+        }
+        const next: Hud = { score: s?.live?.score ?? 0, combo: s?.live?.combo ?? 0, count, lyricIdx, skip, done, rd };
         setHud((h) => (h.score === next.score && h.combo === next.combo && h.count === next.count && h.lyricIdx === next.lyricIdx
-          && h.skip?.target === next.skip?.target && h.skip?.entry === next.skip?.entry ? h : next));
+          && h.skip?.target === next.skip?.target && h.skip?.entry === next.skip?.entry && h.done === next.done
+          && h.rd?.name === next.rd?.name && h.rd?.words === next.rd?.words && h.rd?.ok === next.rd?.ok ? h : next));
       }
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [piece, part, section, route.mode, notation, showNames, rate, tolerance, offBook, cold, display, staves, doo, scorePages, listenOnly]);
+  }, [piece, part, section, route.mode, notation, showNames, rate, tolerance, offBook, cold, display, staves, doo, scorePages, listenOnly, readoutOn, progress]);
 
   // Seen once a run starts with it on screen (switching display before Start shows the other one's).
   useEffect(() => {
@@ -665,6 +688,19 @@ function SingPlay({ route }: { route: PlayRoute }) {
           </div>
         )} />
 
+      {progress && <RunStrip progress={progress} done={hud.done} />}
+      {readoutOn && (
+        <div className="readout-band" data-testid="readout-band">
+          {running && hud.rd ? (
+            <div className={hud.rd.ok ? 'readout' : 'readout off'} data-testid="readout" title={hud.rd.say}>
+              {hud.rd.name && <span className="n">{hud.rd.name}</span>}
+              <span className="w">{hud.rd.words}{hud.rd.arrow && <span className="arr" aria-hidden="true"> {hud.rd.arrow}</span>}</span>
+            </div>
+          ) : (
+            <span className="readout-idle" data-testid="readout-idle">{running ? 'Listening…' : 'How close you are shows here as you sing.'}</span>
+          )}
+        </div>
+      )}
       <div className="play-canvas-wrap" ref={wrapRef}>
         <canvas ref={canvasRef} aria-label={display === 'score' ? undefined : route.mode === '3d' ? 'Arcade' : 'Note highway'} role="img" data-display={display} />
         <div className="sr-only" aria-live="polite" data-testid="countin-live">{hud.count > 0 && running ? String(hud.count) : ''}</div>
@@ -938,11 +974,13 @@ function SingPlay({ route }: { route: PlayRoute }) {
           })}
         </div>
         {/* With Peek too, Restart and Finish show only their icons on a phone (Pause always fits). */}
+        {/* While singing: Restart (an icon on a phone), then Stop and Pause, equal and plain (no
+            orange while you sing). Otherwise the round ▶ to carry on. */}
         <div className={`row play-actions${offBook && running && hiddenRef.current.size > 0 ? ' compact' : ''}`}>
-          <button className="btn small" aria-label="Restart" disabled={!running} onClick={() => { disposeSession(sessionRef.current); sessionRef.current = null; start(); }}>
-            <IconRestart size={16} /> <span className="lbl">Restart</span>
+          <button className="btn small restart" aria-label="Restart" disabled={!running} onClick={() => { disposeSession(sessionRef.current); sessionRef.current = null; start(); }}>
+            <IconRestart size={18} /> <span className="lbl">Restart</span>
           </button>
-          <div className="grow" />
+          {!running && <div className="grow" />}
           {offBook && running && hiddenRef.current.size > 0 && (
             <button className="btn small" data-testid="peek"
               onPointerDown={(e) => { e.preventDefault(); peekStart(); }} onPointerUp={peekEnd} onPointerLeave={peekEnd} onPointerCancel={peekEnd}
@@ -953,8 +991,8 @@ function SingPlay({ route }: { route: PlayRoute }) {
           )}
           {running ? (
             <>
-              {!listenOnly && <button className="btn small" aria-label="Finish" onClick={() => sessionRef.current?.finish()}><IconStop size={14} color="#EEF0FF" /> <span className="lbl">Finish</span></button>}
-              <button className="big-play" aria-label="Pause" onClick={() => { sessionRef.current?.pause(); setPhase('paused'); }}><IconPause /></button>
+              {!listenOnly && <button className="btn run-btn" aria-label="Stop" data-testid="stop" onClick={() => sessionRef.current?.finish()}><IconStop size={16} /> <span className="lbl">Stop</span></button>}
+              <button className="btn run-btn" aria-label="Pause" data-testid="pause" onClick={() => { sessionRef.current?.pause(); setPhase('paused'); }}><IconPause size={18} /> <span className="lbl">Pause</span></button>
             </>
           ) : (
             // (Ready: the card's Start button is the one to tap.)
@@ -980,6 +1018,36 @@ function SingPlay({ route }: { route: PlayRoute }) {
         </div>
       )}
     </main>
+  );
+}
+
+interface Hud {
+  score: number;
+  combo: number;
+  count: number;
+  lyricIdx: number;
+  skip: { target: number; entry: number; bar: string } | null;
+  /** Bars of the run sung so far (the progress strip). */
+  done: number;
+  /** The live readout: the note's name ('' where names are hidden), the words, the way to go, in tolerance. */
+  rd: { name: string; words: string; arrow: string; say: string; ok: boolean } | null;
+}
+
+/** The progress of a run over several passages: a segment per passage, filled bar by bar, and "12/64 bars". */
+function RunStrip({ progress, done }: { progress: { total: number; parts: number[] }; done: number }) {
+  let at = 0;
+  return (
+    <div className="run-strip" role="progressbar" aria-label="Bars sung" aria-valuemin={0} aria-valuemax={progress.total} aria-valuenow={done}
+      aria-valuetext={`${done} of ${progress.total} bars`} data-testid="run-strip">
+      <span className="segs" aria-hidden="true">
+        {progress.parts.map((n, i) => {
+          const f = Math.max(0, Math.min(1, (done - at) / n));
+          at += n;
+          return <i key={i} style={{ flexGrow: n }}><b style={{ width: `${f * 100}%` }} /></i>;
+        })}
+      </span>
+      <span className="n">{done}/{progress.total} bars</span>
+    </div>
   );
 }
 
