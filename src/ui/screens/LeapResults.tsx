@@ -27,8 +27,8 @@ export function LeapResults({ lr, piece }: { lr: LastResult; piece: PieceInfo })
   const total = Math.floor((part?.notes.length ?? 0) / 2);
   const out = leapOutcomes(lr.result.notes, total);
   const landed = out.filter((o) => o.landed).length;
-  // (counted runs only: a stopped run is practice)
-  const counts = !lr.notCounted;
+  // (a run stopped early isn't kept; the drill is always "practice" for the levels, that's fine here)
+  const counts = !/^stopped/.test(lr.notCounted ?? '');
   useEffect(() => {
     if (!counts || logged.has(lr)) return;
     logged.add(lr);

@@ -268,7 +268,10 @@ export function DroneScreen() {
   const [on, setOn] = useState(false);
   const ref = useRef<Drone | null>(null);
   const alive = useRef(true);
-  useEffect(() => () => { alive.current = false; ref.current?.dispose(); ref.current = null; }, []);
+  useEffect(() => {
+    alive.current = true;
+    return () => { alive.current = false; ref.current?.dispose(); ref.current = null; };
+  }, []);
   const tones = (r: number, f: boolean): Record<string, number> => (f ? { do: midiToHz(r), sol: midiToHz(r) * 1.5 } : { do: midiToHz(r) });
   // While it sounds, it follows the note and the fifth.
   useEffect(() => { if (on) ref.current?.set(tones(root, fifth)); }, [root, fifth, on]);

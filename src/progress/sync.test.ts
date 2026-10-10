@@ -12,6 +12,8 @@ import {
   throttle, TOTAL_BUDGET, uploadProgress, type ProgressSnapshot, SNAPSHOT_VERSION, encodeSection, decodeSection,
 } from './sync';
 import { saveSession, type Session } from './choir';
+import { decodeLab, encodeLab, mergeLab } from './sync';
+import { loadLab, saveLab, type LabProgress, type LabTrack } from '../game/intonation';
 
 const DAY = 86_400_000;
 const T = new Date(2026, 9, 1, 12).getTime();
@@ -879,5 +881,63 @@ describe('the steps (snapshot v2): slow travels with the copy; an older app’s 
     localStorage.clear(); _resetAllForTests();
     applySnapshot(JSON.parse(JSON.stringify(snap)));
     expect(getProgress('p', 'P1')!.sections.a).toMatchObject({ level: 1, slow: 2 });
+  });
+});
+
+describe('the intonation courses travel with the account (snapshot `lab`)', () => {
+  const track = (o: Partial<LabTrack>): LabTrack => ({ rung: 1, logs: {}, ...o });
+  const both = (f: Partial<LabTrack>, t: Partial<LabTrack> = {}): LabProgress => ({ fifth: track(f), third: track(t) });
+
+  it('encodes only started ladders, compactly, and decodes them back', () => {
+    expect(encodeLab(both({}))).toBeUndefined();
+    const p = both(
+      { rung: 6, logs: { 4: [1.234, -3], 5: [2] }, passed: { 1: '2026-09-30', 5: '2026-10-04' }, at: T, review: { due: '2026-10-11', checked: '2026-10-11', kept: false }, redo: 4 },
+      { rung: 3, logs: { 3: [3, 5, 15] }, passed: { 1: '2026-10-07' }, at: T + DAY },
+    );
+    const c = encodeLab(p)!;
+    expect(c.f).toEqual({ r: 6, l: { 4: [1.2, -3], 5: [2] }, p: { 1: '2026-09-30', 5: '2026-10-04' }, at: T, rv: ['2026-10-11', '2026-10-11', 0], rd: 4 });
+    expect(c.t).toEqual({ r: 3, l: { 3: [3, 5, 15] }, p: { 1: '2026-10-07' }, at: T + DAY });
+    expect(JSON.stringify(c).length).toBeLessThan(400);
+    const d = decodeLab(JSON.parse(JSON.stringify(c)))!;
+    expect(d.fifth).toEqual({ ...p.fifth, logs: { 4: [1.2, -3], 5: [2] } });
+    expect(d.third).toEqual(p.third);
+    expect(decodeLab(null)).toBeNull();
+    expect(decodeLab({ f: { r: 'x' }, t: 5 })).toBeNull();
+  });
+
+  it('merging: the higher rung wins, rounds from the copy practised last, the earlier pass day, the newer check', () => {
+    const here = both({ rung: 3, logs: { 2: [1, 1, 1], 3: [20] }, passed: { 1: '2026-10-02', 2: '2026-10-03' }, at: T + 2 * DAY });
+    const there = { fifth: track({ rung: 6, logs: { 3: [1, 2, 3], 5: [1, 1, 1] }, passed: { 1: '2026-10-01', 5: '2026-10-04' }, at: T + DAY, review: { due: '2026-10-11' } }) };
+    const m = mergeLab(here, there);
+    expect(m.fifth.rung).toBe(6);
+    expect(m.fifth.logs).toEqual({ 2: [1, 1, 1], 3: [20], 5: [1, 1, 1] });
+    expect(m.fifth.passed).toEqual({ 1: '2026-10-01', 2: '2026-10-03', 5: '2026-10-04' });
+    expect(m.fifth.review).toEqual({ due: '2026-10-11' });
+    expect(m.fifth.at).toBe(T + 2 * DAY);
+    expect(m.third).toEqual(here.third);
+    // Never lowers: an older copy at a lower rung changes nothing.
+    expect(mergeLab(m, { fifth: track({ rung: 2, at: T }) }).fifth.rung).toBe(6);
+    // A slipped check on the newer copy wins (with its redo and cleared rung 4).
+    const slipped = mergeLab(m, { fifth: track({ rung: 6, logs: { 4: [] }, at: T + 3 * DAY, review: { due: '2026-10-11', checked: '2026-10-11', kept: false }, redo: 4 }) });
+    expect(slipped.fifth.redo).toBe(4);
+    expect(slipped.fifth.logs[4]).toEqual([]);
+    expect(slipped.fifth.review?.kept).toBe(false);
+  });
+
+  it('a snapshot carries it; applying it merges into this phone; older copies without it change nothing', () => {
+    saveLab(both({ rung: 2, logs: { 1: [0, 0, 0, 0, 0, 0] }, passed: { 1: '2026-10-01' }, at: T }));
+    const { data } = buildSnapshot(T);
+    expect(data.lab?.f?.r).toBe(2);
+    expect(data.lab?.t).toBeUndefined();
+    localStorage.removeItem('sh:intonation');
+    applySnapshot({ ...data, lab: { t: { r: 4, at: T, p: { 3: '2026-10-05' } } } });
+    expect(loadLab().third.rung).toBe(4);
+    expect(loadLab().fifth.rung).toBe(1);
+    applySnapshot(data);
+    expect(loadLab().fifth.rung).toBe(2);
+    const { lab: _lab, ...old } = data;
+    applySnapshot(old);
+    expect(loadLab().fifth.rung).toBe(2);
+    expect(loadLab().third.rung).toBe(4);
   });
 });

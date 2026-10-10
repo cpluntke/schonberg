@@ -155,7 +155,8 @@ export function courseInToday(lab: LabProgress, recommended: boolean): boolean {
 
 /**
  * Today's warm-up from the courses (progress/today PlanContext.lab), or null: a quick check that is
- * due; rung 4 once more after a slip; the active course's next step; with the choir's recommendation
+ * due; rung 4 once more after a slip; the active course's next step (none when a step of it was
+ * passed today: one step a day); with the choir's recommendation
  * the fifth, then the third, then (both done) a short tune-up in the chord. A singer who only finished
  * a course on their own gets nothing more (Today doesn't grow by itself).
  */
@@ -167,7 +168,8 @@ export function courseWarmUp(lab: LabProgress, recommended: boolean, today: stri
   const redo = COURSE_IDS.find((k) => lab[k].redo);
   if (redo) return { interval: redo, rung: lab[redo].redo!, done: true, redo: true };
   const act = activeCourse(lab);
-  if (act) return { interval: act, rung: lab[act].rung, done: false };
+  // (one step a day: a step of it passed today, the next one is for tomorrow)
+  if (act) return Object.values(lab[act].passed ?? {}).includes(today) ? null : { interval: act, rung: lab[act].rung, done: false };
   if (!recommended) return null;
   const open = COURSE_IDS.find((k) => lab[k].rung <= RUNGS);
   return open ? { interval: open, rung: lab[open].rung, done: false } : { interval: 'third', rung: RUNGS, done: true };

@@ -12,6 +12,8 @@ describe('tabs', () => {
     expect(tabOf({ name: 'expert' })).toBe('train');
     expect(tabOf({ name: 'tuner' })).toBe('train');
     expect(tabOf({ name: 'intonation' })).toBe('train');
+    expect(tabOf({ name: 'courses' })).toBe('train');
+    expect(tabOf({ name: 'drone' })).toBe('train');
     // (whatever tab was shown before)
     expect(tabOf({ name: 'ranks' }, 'home')).toBe('choir');
   });
@@ -42,10 +44,10 @@ describe('tabs', () => {
   });
 
   it('wide screens: the sidebar on sub-screens too, never while practising or in setup', () => {
-    for (const h of ['#/', '#/pieces', '#/piece/x', '#/progress', '#/ranks', '#/settings', '#/expert', '#/tuner', '#/diagnostics', '#/intonation', '#/choiradmin']) {
+    for (const h of ['#/', '#/pieces', '#/piece/x', '#/progress', '#/ranks', '#/settings', '#/expert', '#/tuner', '#/diagnostics', '#/intonation', '#/intonation/fifth/done', '#/courses', '#/drone', '#/choiradmin']) {
       expect(showsSidebar(parseHash(h)), h).toBe(true);
     }
-    for (const h of ['#/play/p/S/s1?level=1', '#/results', '#/setup', '#/intonation/fifth/2', '#/lyrics/p/S', '#/memorymap/p/S']) {
+    for (const h of ['#/play/p/S/s1?level=1', '#/results', '#/setup', '#/intonation/fifth/2', '#/intonation/fifth/check', '#/lyrics/p/S', '#/memorymap/p/S']) {
       expect(showsSidebar(parseHash(h)), h).toBe(false);
     }
   });
