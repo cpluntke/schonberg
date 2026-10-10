@@ -102,17 +102,21 @@ export function App() {
   useEffect(() => {
     const t = window.setTimeout(() => {
       const h = document.querySelector('main h1') as HTMLElement | null;
+      // (not away from a dialog the singer has already opened, e.g. a passage's sheet)
+      const inDialog = !!document.activeElement?.closest?.('[role="dialog"]');
       if (h) {
         h.setAttribute('tabindex', '-1');
-        h.focus({ preventScroll: true });
+        if (!inDialog) h.focus({ preventScroll: true });
         document.title = `${h.textContent?.trim() || 'Schönberg Hero'} · Schönberg Hero`;
       }
     }, 60);
     return () => clearTimeout(t);
   }, [route, lib.ready]);
   // The piece page belongs to the tab it was opened from (Home or Library): that tab stays lit.
+  // (a piece opened straight from a link, the app's first screen: Home, its natural parent)
   const [fromTab, setFromTab] = React.useState<Route['name']>(() => {
-    try { return (sessionStorage.getItem('sh:fromTab') as Route['name'] | null) ?? 'library'; } catch { return 'library'; }
+    if (route.name === 'piece') return 'home';
+    try { return (sessionStorage.getItem('sh:fromTab') as Route['name'] | null) ?? 'home'; } catch { return 'home'; }
   });
   useEffect(() => {
     if (!TABS.some((t) => t.name === route.name)) return;

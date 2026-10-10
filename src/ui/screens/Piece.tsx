@@ -6,7 +6,7 @@ import { useProfile, useStoreVersion } from '../hooks';
 import { go, back, type Route } from '../router';
 import { getProgress, dueForReview, loadCycle } from '../../progress/store';
 import {
-  LEVELS, OFF_BOOK_DAYS, pieceReadiness, nextStep, levelLabel, passLabel, stepFor, stepLabel, stepSpec, stepWord, type Step, type NextStep,
+  LEVELS, OFF_BOOK_DAYS, pieceReadiness, nextStep, levelLabel, stepFor, stepLabel, stepSpec, stepWord, type Step, type NextStep,
 } from '../../progress/ladder';
 import { IconBack, IconChevron, IconChevronDown, IconCube, IconPlay } from '../icons';
 import { voiceName } from './Home';
@@ -24,6 +24,8 @@ import { joinLabels, meterNodes, nextLabel, nextReason, passageStatus, pathStatu
 import { nextRehearsal } from '../../progress/rehearsal';
 import { formatDate } from '../hooks';
 import { slowRate } from '../../progress/struggle';
+import { toleranceWords } from '../../game/pitchwords';
+import { passRule } from '../play/prerun';
 import type { Part, Section } from '../../music/types';
 import type { PieceInfo } from '../library';
 
@@ -52,7 +54,7 @@ const SHORT: Record<number, string> = { 1: 'Notes', 2: 'Words', 3: 'Alone', 4: '
 function stepsLine(level: number): string {
   const sl = stepSpec(level, 'slow');
   const tp = stepSpec(level, 'tempo');
-  const one = (x: typeof sl) => `${Math.round(x.rate * 100)}%, ±${x.tolerance} cents, pass: ${passLabel(x)}${x.headphones ? ', headphones on' : ''}`;
+  const one = (x: typeof sl) => `${Math.round(x.rate * 100)}%, a note may be ${toleranceWords(x.tolerance)} off, ${passRule(x).replace(/\.$/, '').toLowerCase()}${x.headphones ? ', headphones on' : ''}`;
   return `slow ${one(sl)} · in tempo ${one(tp)}`;
 }
 
@@ -78,6 +80,17 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
   const [sheetId, setSheetId] = useState<string | null>(null);
   const pendingRef = useRef<(() => void) | null>(null);
 
+  // A sheet's history entry left over from before a reload (the sheet is closed now): step down onto
+  // the piece's own entry, so back doesn't land on the same page again.
+  useEffect(() => {
+    try {
+      const st = history.state as { pieceSheet?: boolean } | null;
+      if (st?.pieceSheet) {
+        history.replaceState({ ...st, pieceSheet: undefined }, '', location.href);
+        if (history.length > 1) history.back();
+      }
+    } catch { /* ignore */ }
+  }, []);
   // The passage sheet is a history entry: back closes it (and a run started from it leaves it first,
   // so back from the run lands on the piece, not on a closed sheet).
   useEffect(() => {
@@ -131,7 +144,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
 
   // The piece's meter: its level in tempo, a half node once every passage has passed the working
   // level's slow step, the ring on the level being worked on.
-  const pieceNodes = meterNodes({ level: P, slow: path.half && path.working ? path.working.level : 0, now: path.working });
+  const pieceNodes = meterNodes({ level: path.filled, slow: path.half && path.working ? path.working.level : 0, now: path.working });
 
   // The goal line: what rehearsal- / concert-ready means, and the next rehearsal's focus.
   const cycle = loadCycle();
@@ -165,8 +178,8 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
         loop: {
           label: `Loop bar ${ms[t.measure].number} at ${Math.round(slowRate('slow') * 100)}%`,
           go: () => closeSheet(() => go({
-            name: 'play', pieceId: piece.id, partId: part!.id, sectionId: 'drill', level: cur.level, step: 'slow', mode: '2d',
-            from: ms[t.measure].start, to: ms[t.measure].start + ms[t.measure].dur, rate: slowRate('slow'),
+            name: 'play', pieceId: piece.id, partId: part!.id, sectionId: 'drill', level: cur.level, step: cur.step, mode: '2d',
+            from: ms[t.measure].start, to: ms[t.measure].start + ms[t.measure].dur, rate: slowRate('slow'), back: { sectionId: s.id, level: cur.level, step: cur.step },
           })),
         },
       } : {}),
@@ -208,7 +221,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
         <h2 className="h3">Your path</h2>
         <LevelMeter size="lg" nodes={pieceNodes} label="Your path" />
         <p className="here" data-testid="piece-level">
-          {path.working ? <>You're here: {path.here}</> : <>Memorised ✓ · {path.here}</>}
+          {!path.working ? <>Memorised ✓ · {path.here}</> : path.here.startsWith('From memory') ? path.here : <>You're here: {path.here}</>}
         </p>
         {goalBits.length > 0 && <p className="t14 muted" data-testid="goal-line">{goalBits.join(' ')}</p>}
         {multi && r.clean.length > 0 && (
@@ -216,22 +229,22 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
             <span aria-hidden="true">★ </span>Clean run{r.clean.length > 1 ? 's' : ''} at Level {r.clean.join(', ')}: every passage right in one go
           </span>
         )}
-        {multi && P === 4 && r.offBookDays > 0 && !r.toFix.length && (
+        {multi && P === 4 && r.offBookDays > 0 && !r.toFix.length && !path.here.startsWith('From memory') && (
           <span className="t14 muted">Whole piece from memory: day {r.offBookDays} of {OFF_BOOK_DAYS}. Sing it all at Level 5 again on another day.</span>
         )}
         {next && part && (
           <>
             <div className="divider" />
-            <NowBlock next={next} sections={sections} path={path} label={label} reason={reason}
+            <NowBlock next={next} sections={sections} path={path} label={label} reason={reason} pieceLevel={P}
               best={(id, l, st) => bestAtStep(piece.id, part.id, id, prog?.sections[id], l, st)}
               onPlay={() => play(next.sectionId, next.level, '2d', next.step)}
               onTempo={() => play(next.sectionId, next.level, '2d', 'tempo')}
               onWords={() => go({ name: 'play', pieceId: piece.id, partId: part.id, sectionId: next.sectionId, level: 0, mode: '2d', words: true })} />
           </>
         )}
-        {!next && sections.length > 0 && (
-          <span className="t14 muted">Every level done. Sing it all through once a week to keep it fresh.</span>
-        )}
+        {!next && sections.length > 0 && (path.waitDay
+          ? <span className="t14 muted" data-testid="come-back">Come back tomorrow for day 2: sing it {multi ? 'all ' : ''}from memory once more and it is memorised.</span>
+          : <span className="t14 muted">Every level done. Sing it all through once a week to keep it fresh.</span>)}
       </section>
       </div>
 
@@ -248,7 +261,8 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
             const fix = fixAt.get(s.id);
             const isDue = due.includes(s.id);
             const ly = lyricOf(s);
-            const status = fix ? `To fix · Level ${fix} in tempo` : isDue ? `Review due · ${st.text}` : st.text;
+            const memDay = (sp?.level ?? 0) === 4 ? sp?.offBookDays?.length ?? 0 : 0;
+            const status = fix ? `To fix · Level ${fix} in tempo` : isDue ? `Review due · ${st.text}` : memDay ? `From memory: day ${memDay} of ${OFF_BOOK_DAYS}` : st.text;
             const nodes = meterNodes({ level: sp?.level ?? 0, slow: sp?.slow, now: next && next.sectionId === s.id ? { level: next.level } : null });
             return (
               <button key={s.id} className="prow" data-testid="passage-row" onClick={() => openSheet(s.id)}
@@ -261,7 +275,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
                   <LevelMeter nodes={nodes} label={s.label} />
                   <span className="t14" data-testid={fix ? 'section-to-fix' : 'passage-status'}
                     style={{ color: st.done && !fix && !isDue ? 'var(--good)' : 'var(--muted)' }}>
-                    {status}{(sp?.level ?? 0) === 4 && sp?.offBookDays?.length ? ` · from memory: day ${sp.offBookDays.length} of ${OFF_BOOK_DAYS}` : ''}
+                    {status}
                   </span>
                 </div>
                 <span className="chev"><IconChevron size={18} /></span>
@@ -306,8 +320,8 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
 }
 
 /** "Now · Level 1 · Notes · slow": the step being worked on, its passages, and the one next step. */
-function NowBlock({ next, sections, path, label, reason, best, onPlay, onTempo, onWords }: {
-  next: NextStep; sections: Section[]; path: ReturnType<typeof pathStatus>; label: (id: string) => string; reason: string;
+function NowBlock({ next, sections, path, label, reason, pieceLevel, best, onPlay, onTempo, onWords }: {
+  next: NextStep; sections: Section[]; path: ReturnType<typeof pathStatus>; label: (id: string) => string; reason: string; pieceLevel: number;
   best: (id: string, level: number, step: Step) => number | null;
   onPlay: () => void; onTempo: () => void; onWords: () => void;
 }) {
@@ -318,7 +332,9 @@ function NowBlock({ next, sections, path, label, reason, best, onPlay, onTempo, 
         : `Now · ${stepLabel(next.level, next.step)}`;
   const intro = full
     ? 'The whole piece in one go, in tempo. Passages that slip are yours to fix on their own; then the level is the piece’s.'
-    : next.kind === 'fix' ? `It slipped in your run-through. Pass it in tempo on its own and the piece gets closer to ${levelLabel(next.level)}.`
+    : next.kind === 'fix' ? (next.level > pieceLevel
+      ? `It slipped in your run-through. Pass it in tempo on its own and the piece gets closer to ${levelLabel(next.level)}.`
+      : `It slipped in your run-through. Pass it in tempo on its own: the piece keeps ${levelLabel(pieceLevel)} either way.`)
       : next.kind === 'review' ? 'Keep it fresh: sing it once more at the level it has.'
         : 'One new thing at a time: first slow, then in tempo. Passing in tempo also ticks slow.';
   // The checklist: the passages at the step being worked on (the next one highlighted).
@@ -552,7 +568,7 @@ function MoreWays({ piece, part, sections, prog, r, P, label, play, showHelp, se
                   <div className="col" style={{ gap: 2 }}>
                     <strong>{levelLabel(l.level)}</strong>
                     <span className="t14 muted">{l.description}</span>
-                    <span className="tiny muted mono">
+                    <span className="t14 muted">
                       {l.guide ? 'your part plays' : 'others only'} · {l.showNames ? 'note names' : 'lyrics only'}{l.doo ? ' · on “doo”' : ''} · {stepsLine(l.level)}
                     </span>
                   </div>

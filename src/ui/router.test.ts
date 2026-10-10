@@ -104,6 +104,16 @@ describe('practice screens sit right above their piece', () => {
   });
 });
 
+describe('a loop carries the passage step it came from', () => {
+  it('round-trips back=<passage>:<level>:<step> on a drill, and drops it elsewhere', () => {
+    const loop = { name: 'play', pieceId: 'p1', partId: 'S', sectionId: 'drill', level: 4, mode: '2d', from: 10, to: 12, step: 'slow', rate: 0.5,
+      back: { sectionId: 's2-m8-15', level: 4, step: 'tempo' } } as const;
+    expect(parseHash(href(loop))).toEqual(loop);
+    expect(parseHash('#/play/p1/S/s1?level=2&back=s1:2:slow')).not.toHaveProperty('back');
+    expect(parseHash('#/play/p1/S/drill?level=2&from=1&to=2&back=s1:9:slow')).not.toHaveProperty('back');
+  });
+});
+
 describe('the intonation lab\'s addresses', () => {
   it('round-trips the ladder and a rung; nonsense falls back to the ladder', () => {
     for (const r of [{ name: 'intonation' }, { name: 'intonation', interval: 'third' }, { name: 'intonation', interval: 'fifth', rung: 4 }] as const) {

@@ -8,7 +8,7 @@ import { IconBack } from '../icons';
 
 /** Why `pieceId` (and its section) can't be opened here. */
 export function missingText(pieceId: string, what: 'piece' | 'section' = 'section'): string {
-  if (getPiece(pieceId)) return what === 'section' ? 'This section couldn\'t be found. The score may have changed since the link was made.' : 'This couldn\'t be found.';
+  if (getPiece(pieceId)) return what === 'section' ? 'This passage couldn\'t be found. The score may have changed since the link was made.' : 'This couldn\'t be found.';
   if (attemptLog().some((e) => e.pieceId === pieceId)) return 'This piece isn\'t on this device any more.';
   if (pieceId.startsWith('choir-')) return 'This choir piece isn\'t on this device. Your choir\'s pieces arrive here once you\'ve joined the choir and its programme includes them.';
   return 'This piece isn\'t on this device.';

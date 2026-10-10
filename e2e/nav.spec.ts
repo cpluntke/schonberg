@@ -30,9 +30,9 @@ test('Results: back lands on the piece, then Home; Again then back lands on the 
   const pieceUrl = page.url();
   await singFirstSection(page);
   await expect(page).toHaveURL(/#\/results$/);
-  // The next step is in view without scrolling, with Again and the piece next to it.
-  await expect(page.getByTestId('results-foot').locator('.btn.primary')).toBeInViewport();
-  await expect(page.getByTestId('results-foot').locator('.row .btn').first()).toBeInViewport();
+  // The next step is in view without scrolling, with these bars in tempo (a step-up) and the piece next to it.
+  await expect(page.getByTestId('next-step')).toBeInViewport();
+  await expect(page.getByTestId('now-in-tempo')).toBeInViewport();
   await expect(page.getByTestId('to-piece')).toBeInViewport();
   await expect(page.getByTestId('finish-today')).toBeInViewport();
   await page.goBack();
@@ -44,7 +44,7 @@ test('Results: back lands on the piece, then Home; Again then back lands on the 
 
   // Again from Results replaces it; back from that run (and its results) is the piece.
   await singFirstSection(page);
-  await page.getByTestId('results-foot').locator('.row .btn').first().click(); // Again / Now in tempo
+  await page.getByTestId('again').click(); // (slow passed already: Again)
   await expect(page.getByTestId('start')).toBeVisible();
   await page.goBack();
   await expect(page).toHaveURL(pieceUrl);

@@ -125,12 +125,40 @@ test('What to fix: loop the bar slowly, then the passage again; the zoom drills 
   await expect(page.getByTestId('hp-state')).toContainText('Headphones on'); // (remembered)
   await page.getByTestId('start').click();
   await expect(page.getByTestId('pass-banner')).toContainText('one note to fix', { timeout: 90_000 });
+  // Two misses in a row: the loop stays the first step (it is the slow practice); the help card says so.
+  await expect(page.getByTestId('loop-bar')).toBeVisible();
+  await expect(page.getByTestId('help-card')).toContainText('Tricky one');
+  await expect(page.getByTestId('help-again')).toBeVisible();
   await page.getByTestId('mistake-zoom-btn').click();
   await page.getByTestId('practise-slow-zoom').click();
   await expect(page).toHaveURL(/#\/play\/warmup-chorale\/[^/]+\/drill\?level=1&from=[\d.]+&to=[\d.]+&step=slow&rate=0\.5/);
   await expect(page.getByTestId('mistake-zoom')).toHaveCount(0);
   await expect(page.getByTestId('start')).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+// The passage sheet: Escape, the browser's back and a tap on the scrim close it, and back after that
+// is the page before the piece (the sheet leaves no history behind).
+test('the passage sheet closes with Escape, back and the scrim', async ({ page }) => {
+  await page.goto('/#/');
+  await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
+  await page.getByTestId('piece-row').first().click();
+  const sheet = page.getByTestId('passage-sheet');
+  await page.getByTestId('passage-row').first().click();
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByTestId('sheet-close')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(sheet).toHaveCount(0);
+  await page.getByTestId('passage-row').first().click();
+  await expect(sheet).toBeVisible();
+  await page.goBack();
+  await expect(sheet).toHaveCount(0);
+  await expect(page).toHaveURL(/#\/piece\//);
+  await page.getByTestId('passage-row').first().click();
+  await page.getByTestId('passage-sheet-scrim').click({ position: { x: 10, y: 10 } });
+  await expect(sheet).toHaveCount(0);
+  await page.goBack();
+  await expect(page).toHaveURL(/#\/$/);
 });
 
 // Level 1 counts only with headphones on (docs/LEVELS.md): the pre-run card asks, Start waits for
@@ -161,7 +189,8 @@ test('level 1 asks “Headphones on?”; without them a perfect run is practice'
     const k = Object.keys(localStorage).find((x) => x.startsWith('sh:progress:warmup-chorale:'));
     const p = k ? JSON.parse(localStorage.getItem(k)!) : null;
     // (Uncounted runs are logged under 'practice', which isn't a section.)
-    return p ? Object.entries(p.sections as Record<string, { level: number }>).filter(([id]) => id !== 'practice').reduce((a, [, x]) => Math.max(a, x.level), 0) : -1;
+    // (a run that doesn't count is practice: it's logged, but never kept as a passage)
+    return p ? Object.entries(p.sections as Record<string, { level: number }>).filter(([id]) => id !== 'practice').reduce((a, [, x]) => Math.max(a, x.level), 0) : 0;
   });
   expect(level).toBe(0);
   // "Sing it again with headphones on" answers Yes for the next run.
@@ -223,7 +252,7 @@ test('score view: switch display, sing level 1 from sheet music, reach results',
   expect(ink).toBeGreaterThan(2000);
 
   await expect(page.getByTestId('pass-banner')).toBeVisible({ timeout: 90_000 });
-  await expect(page.getByTestId('pass-banner')).toContainText(/Level 1 · slow ✓|✓/);
+  await expect(page.getByTestId('pass-banner')).toContainText('Level 1 · slow ✓');
 
   // Settings: the same choice, including going back to automatic.
   await page.goto('/#/settings');

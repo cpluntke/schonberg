@@ -1,7 +1,7 @@
 // A passage's levels (the UX review's B2): a bottom sheet over the piece, with the five levels, what
 // each adds, where the passage stands in each level's two steps (slow, in tempo) and a start for
 // each step; Listen; a slow loop of its trouble bar; and its current step as the one primary action.
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import type { Part, Section } from '../../music/types';
 import type { SectionProgress } from '../../progress/store';
 import { attemptLog, logStep } from '../../progress/store';
@@ -49,6 +49,7 @@ export function PassageSheet({ pieceId, partId, section, lyric, sp, onClose, act
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
     closeRef.current?.focus();
+    const raf = requestAnimationFrame(() => closeRef.current?.focus());
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { e.preventDefault(); onClose(); return; }
       // Keep keyboard focus inside the sheet.
@@ -65,6 +66,7 @@ export function PassageSheet({ pieceId, partId, section, lyric, sp, onClose, act
     document.body.style.overflow = 'hidden';
     window.addEventListener('keydown', onKey);
     return () => {
+      cancelAnimationFrame(raf);
       window.removeEventListener('keydown', onKey);
       document.body.style.overflow = overflow;
       prev?.focus?.();
@@ -77,6 +79,10 @@ export function PassageSheet({ pieceId, partId, section, lyric, sp, onClose, act
   const done = lvl >= 5;
   const primary = done ? { level: 5, step: 'tempo' as Step } : cur;
   const pct = (x: number | null) => (x == null ? '' : `best ${Math.round(x * 100)}%`);
+  // The best of the step you're on only (sung at that step: slow bests come from the log), once per sheet.
+  const curBest = useMemo(() => (done ? null : bestAtStep(pieceId, partId, section.id, sp, cur.level, cur.step)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pieceId, partId, section.id, cur.level, cur.step, done]);
 
   return (
     <div className="psheet-scrim" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }} data-testid="passage-sheet-scrim">
@@ -98,7 +104,7 @@ export function PassageSheet({ pieceId, partId, section, lyric, sp, onClose, act
             const stepBtn = (st: Step) => {
               const passed = passedStep(sp, l, st);
               const here = isNow && cur.step === st;
-              const best = here || passed ? bestAtStep(pieceId, partId, section.id, sp, l, st) : null;
+              const best = here ? curBest : null;
               const text = `${stepWord(st)}${passed ? ' ✓' : here ? ' · now' : ''}${here && best != null ? `, ${pct(best)}` : ''}`;
               return (
                 <button key={st} className={`stepbtn${passed ? ' done' : here ? ' cur' : ''}`} data-testid={`sheet-${l}-${st}`}

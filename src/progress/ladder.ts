@@ -191,11 +191,26 @@ export interface EntriesCheck {
  * is taken off every onset first (the part of the delay the line-up showed to be the device's, on a
  * phone without a measured delay). A run without entries passes.
  */
-export function entriesOnTime(
+/** One entry of a run (entryTimings): its note, how late it came in, and whether it was sung at all. */
+export interface EntryTiming {
+  /** Index of the entry note in the part. */
+  index: number;
+  /** Onset after the written start, minus `offsetMs` (ms); null when it never landed in tune. */
+  ms: number | null;
+  /** Not sung at all (no voice in the note, or `clearly` silent). */
+  missed: boolean;
+}
+
+/**
+ * The entries of a run, one by one (see entriesOnTime for which notes are entries and which are left
+ * out), and the bound their mean onset must stay under: LATE_MS, or 2 × LATE_MS when only one entry
+ * has an onset. Results names the entries from this list, so it says what the check judged.
+ */
+export function entryTimings(
   partNotes: readonly Pick<ScoreNote, 'start' | 'dur'>[],
   notes: readonly (Pick<NoteResult, 'index' | 'onsetMs'> & Partial<Pick<NoteResult, 'unsure' | 'clearly' | 'voicedRatio'>>)[],
   offsetMs = 0,
-): EntriesCheck {
+): { entries: EntryTiming[]; bound: number } {
   const sorted = [...notes].sort((a, b) => a.index - b.index);
   const entries = sorted.filter((n, k) => {
     const i = n.index;
@@ -207,10 +222,20 @@ export function entriesOnTime(
     return cur.start - (prev.start + prev.dur) >= ENTRY_REST_SEC - 1e-6;
   });
   const silent = (n: (typeof entries)[number]) => n.clearly === 'silent' || (n.onsetMs === null && (n.voicedRatio ?? 0) === 0);
-  const missed = entries.filter(silent).length;
-  const timed = entries.filter((n) => n.onsetMs !== null);
-  const meanMs = timed.length ? timed.reduce((a, n) => a + (n.onsetMs! - offsetMs), 0) / timed.length : null;
-  const bound = timed.length >= 2 ? LATE_MS : 2 * LATE_MS;
+  const list = entries.map((n): EntryTiming => ({ index: n.index, ms: n.onsetMs === null ? null : n.onsetMs - offsetMs, missed: silent(n) }));
+  const timed = list.filter((e) => e.ms !== null).length;
+  return { entries: list, bound: timed >= 2 ? LATE_MS : 2 * LATE_MS };
+}
+
+export function entriesOnTime(
+  partNotes: readonly Pick<ScoreNote, 'start' | 'dur'>[],
+  notes: readonly (Pick<NoteResult, 'index' | 'onsetMs'> & Partial<Pick<NoteResult, 'unsure' | 'clearly' | 'voicedRatio'>>)[],
+  offsetMs = 0,
+): EntriesCheck {
+  const { entries, bound } = entryTimings(partNotes, notes, offsetMs);
+  const missed = entries.filter((e) => e.missed).length;
+  const timed = entries.filter((e) => e.ms !== null);
+  const meanMs = timed.length ? timed.reduce((a, e) => a + e.ms!, 0) / timed.length : null;
   const ok = entries.length === 0 || (missed === 0 && (meanMs === null || meanMs <= bound));
   return { ok, entries: entries.length, missed, meanMs: meanMs == null ? null : Math.round(meanMs) };
 }

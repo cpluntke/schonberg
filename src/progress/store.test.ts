@@ -122,6 +122,14 @@ describe('profile & corrupted storage', () => {
 });
 
 describe('recordAttempt', () => {
+  it('a practice run (a loop, a drill) is logged but never kept as a passage', () => {
+    recordAttempt('p', 'S', 's0', 1, res(0.9), undefined, undefined, { step: 'slow' });
+    const r = recordAttempt('p', 'S', 'drill', 1, res(0.95), 12, undefined, { step: 'slow', practice: true });
+    expect(r).toMatchObject({ newLevel: 0, prevLevel: 0, newSlow: 0 });
+    expect(r.stepUp).toBeUndefined();
+    expect(getProgress('p', 'S')!.sections.drill).toBeUndefined();
+    expect(attemptLog().at(-1)).toMatchObject({ sectionId: 'drill', level: 1, step: 'slow' });
+  });
   it('pass / fail at thresholds: a slow pass ticks the step, a pass in tempo the level', () => {
     const S = { step: 'slow' as const };
     const T = { step: 'tempo' as const };
@@ -821,13 +829,13 @@ describe('schema 2: every level has a slow and an in-tempo step (migrateToSteps)
     full: { level: 1, best: { 1: 0.9 }, attempts: 2, lastPracticed: 3000, lastPassed: 3000, toFix: { 1: ['s2'], 3: ['s1'] }, toFixLocks: { 1: true, 3: true }, clean: [1] },
   });
 
-  it('migrateToSteps: old Level 1 passes become Level 1 slow; levels ≥ 2 and best results stay', () => {
+  it('migrateToSteps: old Level 1 passes become Level 1 slow; levels ≥ 2 and their bests stay; Level 1 bests (sung slow) go', () => {
     const m = migrateToSteps(v1() as never);
-    expect(m.sections.s0).toEqual({ level: 0, slow: 1, best: { 1: 0.92 }, attempts: 3, lastPassed: 1000, lastPracticed: 2000 });
-    expect(m.sections.s1).toEqual(v1().sections.s1);
-    expect(m.sections.s2).toEqual(v1().sections.s2);
+    expect(m.sections.s0).toEqual({ level: 0, slow: 1, best: {}, attempts: 3, lastPassed: 1000, lastPracticed: 2000 });
+    expect(m.sections.s1).toEqual({ ...v1().sections.s1, best: { 2: 0.85 } });
+    expect(m.sections.s2).toEqual({ ...v1().sections.s2, best: {} });
     expect(m.sections.s3).toEqual(v1().sections.s3);
-    expect(m.full).toEqual({ level: 0, best: { 1: 0.9 }, attempts: 2, lastPracticed: 3000, lastPassed: 3000, toFix: { 3: ['s1'] }, toFixLocks: { 3: true }, clean: [] });
+    expect(m.full).toEqual({ level: 0, best: {}, attempts: 2, lastPracticed: 3000, lastPassed: 3000, toFix: { 3: ['s1'] }, toFixLocks: { 3: true }, clean: [] });
     expect(currentStep(m.sections.s0)).toEqual({ level: 1, step: 'tempo' });
     // A full record above level 1 keeps its level; its level-1 list and star go.
     const f2 = migrateToSteps({ ...v1(), full: { level: 3, best: {}, attempts: 1, toFix: { 1: ['s2'] }, toFixLocks: { 1: true }, clean: [1, 3] } } as never).full!;

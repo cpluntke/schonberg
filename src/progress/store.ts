@@ -431,15 +431,22 @@ function ensureSchema(): void {
  * from an older app (sync.ts, snapshot v < 2). Idempotent on data that has no level 1 left.
  */
 export function migrateToSteps(p: PieceProgress): PieceProgress {
+  // Bests are kept for runs in tempo: the old Level 1 was sung at 70%, so its bests are slow ones (dropped).
+  const noL1 = <T extends { best?: Record<number, number>; bestScore?: Record<number, number> }>(x: T): T => {
+    const o = { ...x };
+    if (isObj(o.best) && 1 in o.best) { const { 1: _b, ...rest } = o.best; o.best = rest; }
+    if (isObj(o.bestScore) && 1 in o.bestScore) { const { 1: _s, ...rest } = o.bestScore; o.bestScore = rest; }
+    return o;
+  };
   const sections: Record<string, SectionProgress> = {};
   for (const [id, sp] of Object.entries(p.sections ?? {})) {
     if (isObj(sp) && sp.level === 1) {
-      sections[id] = { ...sp, level: 0, slow: Math.max(1, Number.isFinite(sp.slow) ? (sp.slow as number) : 0) };
-    } else sections[id] = sp;
+      sections[id] = noL1({ ...sp, level: 0, slow: Math.max(1, Number.isFinite(sp.slow) ? (sp.slow as number) : 0) });
+    } else sections[id] = isObj(sp) ? noL1(sp) : sp;
   }
   const out: PieceProgress = { ...p, sections };
   if (isObj(p.full)) {
-    const f: FullRunProgress = { ...p.full };
+    const f: FullRunProgress = noL1({ ...p.full });
     if (f.level === 1) f.level = 0;
     if (isObj(f.toFix) && 1 in f.toFix) {
       const { 1: _drop, ...rest } = f.toFix;
@@ -647,7 +654,7 @@ export function recordAttempt(
   result: AttemptResult,
   durationSec?: number,
   now: number = Date.now(),
-  extra: { step?: Step; timingFail?: boolean; entriesLate?: boolean } = {},
+  extra: { step?: Step; timingFail?: boolean; entriesLate?: boolean; practice?: boolean } = {},
 ): RecordResult {
   const prog: PieceProgress = getProgress(pieceId, partId) ?? {
     pieceId, partId, sections: {}, totalAttempts: 0, bestScore: 0,
@@ -695,8 +702,15 @@ export function recordAttempt(
     prog.totalAttempts = (prog.totalAttempts ?? 0) + 1;
     prog.bestScore = Math.max(prog.bestScore ?? 0, score);
   }
-  prog.sections[sectionId] = sp;
-  writeJSON(K.progress(pieceId, partId), prog, false);
+  // A practice run (a loop, a drill, a run that didn't count) is logged, but never kept as a passage
+  // (what the lines above changed on `prog` and `sp` is dropped).
+  if (extra.practice) {
+    const before = getProgress(pieceId, partId);
+    if (before) { before.totalAttempts = (before.totalAttempts ?? 0) + (lvl > 0 ? 1 : 0); writeJSON(K.progress(pieceId, partId), before, false); }
+  } else {
+    prog.sections[sectionId] = sp;
+    writeJSON(K.progress(pieceId, partId), prog, false);
+  }
 
   const entry: AttemptLog = { at: now, pieceId, partId, sectionId, level: lvl, ...(lvl > 0 ? { step } : {}), accuracy, score, passed };
   if (durationSec != null && Number.isFinite(durationSec)) entry.durationSec = durationSec;
@@ -706,6 +720,7 @@ export function recordAttempt(
   log.push(entry);
   writeJSON(K.log, log.length > LOG_CAP ? log.slice(log.length - LOG_CAP) : log, false);
   emit();
+  if (extra.practice) return { passed, step, newLevel: prevLevel, prevLevel, prevSlow, newSlow: prevSlow };
   return {
     passed, step, newLevel: sp.level, prevLevel, prevSlow, newSlow: slowAbove(sp), ...(stepUp ? { stepUp } : {}),
     ...(lvl === 5 ? { offBookDays: sp.offBookDays?.length ?? 0 } : {}),
