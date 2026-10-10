@@ -6,8 +6,8 @@
 //   screen is a sub-screen with its own back arrow: no tab bar on phones, the sidebar stays on wide
 //   screens (with the tab it belongs to lit). Practice screens (Play, Results, the words, the
 //   lyrics quiz, the memory map) and voice setup have neither.
-// - A sub-screen lights the tab it belongs to: Ranks → Choir; Expert, the tuner, the intonation lab
-//   → Train. Screens reached from several tabs light the tab they were opened from: a piece (Today,
+// - A sub-screen lights the tab it belongs to: Ranks → Choir; Expert, the tuner, the drone, the
+//   courses (the intonation lab) → Train. Screens reached from several tabs light the tab they were opened from: a piece (Today,
 //   Pieces or Choir; opened straight from a link: Pieces), Settings, Diagnostics and Your progress
 //   (from the avatar's "You" sheet, on every tab; opened from a link: Today). That tab is stamped on
 //   the screen's history entry, so back and forward across several tabs keep it.
@@ -29,6 +29,8 @@ const PARENT: Partial<Record<Route['name'], TabName>> = {
   expert: 'train',
   tuner: 'train',
   intonation: 'train',
+  courses: 'train',
+  drone: 'train',
 };
 
 /** Screens reached from several tabs: they light the tab they were opened from, else this one. */
@@ -81,8 +83,8 @@ export function showsTabBar(route: Pick<Route, 'name'>): boolean {
 /** Wide screens: the sidebar on the tab roots, the staff screens and every sub-screen (not while practising or in setup). */
 export function showsSidebar(route: Route): boolean {
   if (showsTabBar(route) || route.name in FROM) return true;
-  // (the lab's steps listen and sing: like a practice screen; its ladder is a sub-screen)
-  if (route.name === 'intonation') return !route.rung;
+  // (a course's steps and its quick check listen and sing: like a practice screen; its page is a sub-screen)
+  if (route.name === 'intonation') return !route.rung && !route.check;
   return route.name in PARENT;
 }
 
