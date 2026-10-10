@@ -67,8 +67,8 @@ export function LeapResults({ lr, piece }: { lr: LastResult; piece: PieceInfo })
   return (
     <main className="screen practice has-foot results" data-testid="leap-results">
       <PracticeBar up={up} heading title="Your tricky leaps" sub={`${total} leaps from your pieces`} />
-      <section className={`card crs-leaps${landed === total ? ' good' : ''}`} role="status" data-testid="drill-verdict">
-        <h2 className="crs-leaps-h">{landed} of {total} leaps landed{better > 0 ? ' ↑' : ''}</h2>
+      <section className={`card crs-leaps${landed === total || better > 0 ? ' good' : ''}`} role="status" data-testid="drill-verdict">
+        <h2 className="crs-leaps-h">{landed} of {total} leaps landed{better > 0 ? '\u00a0↑' : ''}</h2>
         <span className="t16 muted" data-testid="leaps-last">
           {before ? `Last time (${whenWord(before.at)}) ${before.landed} of ${before.total}` : 'Your first go: next time you’ll see how it compares.'}
         </span>
@@ -90,7 +90,9 @@ export function LeapResults({ lr, piece }: { lr: LastResult; piece: PieceInfo })
           <span className="eb">Hardest today</span>
           <strong className="h3">{leapWords(semis(hard.i))}{hardLeap ? ` · ${shortTitle(getPiece(hardLeap.pieceId)?.title ?? '')} bar ${bar?.number ?? hardLeap.measure + 1}` : ''}</strong>
           <span className="t16">
-            {hard.cents == null ? 'The top note wasn’t heard clearly.' : `The top note landed ${pitchPhrase(hard.cents)}.`} Hear it first, then sing it slowly with your part playing.
+            {hard.note === 'start'
+              ? (hard.cents == null ? 'The note it leaps from wasn’t heard clearly.' : `The note it leaps from was ${pitchPhrase(hard.cents)}.`)
+              : hard.cents == null ? 'The note it lands on wasn’t heard clearly.' : `The note it lands on was ${pitchPhrase(hard.cents)}.`} Hear it first, then sing it slowly with your part playing.
           </span>
         </section>
       )}

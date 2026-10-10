@@ -49,7 +49,10 @@ export function IntonationLab({ route }: { route: LabRoute }) {
     const opened = after.rung > before.rung;
     if (opened || (before.redo && !after.redo)) syncProgressSoon();
     // The course is done: its page says so (C6).
-    if (opened && rung === RUNGS) window.setTimeout(() => go({ name: 'intonation', interval: iv, done: true }, true), 900);
+    if (opened && rung === RUNGS) {
+      const here = location.hash;
+      window.setTimeout(() => { if (location.hash === here) go({ name: 'intonation', interval: iv, done: true }, true); }, 900);
+    }
     return { passed: r.passed, opened: opened || (!!before.redo && !after.redo) };
   };
 
@@ -404,7 +407,12 @@ function StepDoneSheet({ iv, rung, onKeep }: { iv: LabInterval; rung: number; on
   const nx = ses?.next ?? null;
   const n = ses?.plan.steps.length ?? 0;
   const sheetRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => { sheetRef.current?.querySelector<HTMLElement>('button')?.focus(); }, []);
+  useEffect(() => {
+    sheetRef.current?.querySelector<HTMLElement>('button')?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onKeep(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const next = rung < RUNGS ? rung + 1 : null;
   const sub = `${c.title} · ${c.steps[rung - 1].rule.replace(/^To pass: /, '')}`;
   return (

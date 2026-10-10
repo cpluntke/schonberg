@@ -1040,6 +1040,8 @@ input[type='range'] { height: 44px; margin: 0; }
 .crs-result { gap: 8px; }
 .crs-result.good { border-color: #24583a; }
 .crs-feel { font-size: 22px; line-height: 1.25; }
+.crs-stepscreen .pill { font-size: 14px; }
+.crs-page .btn .sub, .crs-sheet .btn .sub, .crs-foot .btn .sub, .crs-stepscreen .btn .sub { font-size: 14px; }
 
 /* Step done (C4): a quiet card in the bottom sheet. */
 .crs-sheet { gap: 14px; }
@@ -1064,11 +1066,11 @@ input[type='range'] { height: 44px; margin: 0; }
 
 /* The leap drill's results (C5). */
 .crs-leaps { gap: 6px; }
-.crs-leaps.good, .crs-leaps { background: var(--good-bg); border-color: #24583a; }
+.crs-leaps.good { background: var(--good-bg); border-color: #24583a; }
 .crs-leaps-h { font-size: 28px; line-height: 1.15; }
 .crs-leapchips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
 .crs-leapchips li {
-  display: flex; flex-direction: column; gap: 2px; padding: 8px 14px; border-radius: 14px; border: 1px solid var(--line);
+  display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 14px; border: 1px solid var(--line);
   background: var(--surface); min-height: 44px;
 }
 .crs-leapchips li.miss { border-color: #6b2a35; background: #2a1520; }

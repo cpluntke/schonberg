@@ -10,7 +10,9 @@ export interface LeapOutcome {
   /** The leap's index in the drill (one per bar). */
   i: number;
   landed: boolean;
-  /** The landing note's cents off (null: not heard). */
+  /** The note that missed (the landing note when both did, or when the leap landed). */
+  note: 'start' | 'landing';
+  /** That note's cents off (null: not heard). */
   cents: number | null;
 }
 
@@ -23,7 +25,8 @@ export function leapOutcomes(notes: Pick<NoteResult, 'index' | 'grade' | 'unsure
   return Array.from({ length: leaps }, (_, i) => {
     const a = by.get(2 * i), b = by.get(2 * i + 1);
     const ok = (n: typeof a) => !!n && noteVerdict(n) !== 'wrong';
-    return { i, landed: ok(a) && ok(b), cents: b?.cents ?? null };
+    const startMissed = !ok(a) && ok(b);
+    return { i, landed: ok(a) && ok(b), note: startMissed ? 'start' : 'landing', cents: (startMissed ? a?.cents : b?.cents) ?? null };
   });
 }
 

@@ -12,7 +12,9 @@ describe('the leap drill: leap by leap', () => {
     const out = leapOutcomes(notes as never, 4);
     expect(out.map((o) => o.landed)).toEqual([true, false, false, false]);
     expect(hardestLeap(out)).toMatchObject({ i: 3, cents: null }); // (not heard at all: the landing note is missing)
-    expect(hardestLeap(out.slice(0, 3))).toMatchObject({ i: 2, cents: 60 });
+    expect(hardestLeap(out.slice(0, 3))).toMatchObject({ i: 2, cents: 60, note: 'landing' });
+    // The note it leaps from missed: that's the one named.
+    expect(leapOutcomes([n(0, 'miss', -70), n(1, 'good', 0)] as never, 1)[0]).toEqual({ i: 0, landed: false, note: 'start', cents: -70 });
     expect(hardestLeap(out.slice(0, 1))).toBeNull();
   });
 
