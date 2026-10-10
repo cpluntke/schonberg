@@ -51,7 +51,7 @@ export function ChoirLogoEditor({ code, auth, info, onChanged }: { code: string;
     setBusy(true);
     try {
       onChanged(await setChoirLogo(code, auth, picture));
-      toast(picture ? 'Logo saved: singers see it on Home' : 'Logo removed');
+      toast(picture ? 'Logo saved: singers see it on Today and the Choir tab' : 'Logo removed');
     } catch (e) {
       toast((e as Error).message);
     } finally {
@@ -67,7 +67,7 @@ export function ChoirLogoEditor({ code, auth, info, onChanged }: { code: string;
           {src ? <img src={src} alt={`${info?.name ?? 'Choir'} logo`} style={{ width: '100%', height: '100%', objectFit: 'contain' }} data-testid="logo-preview" />
             : <span className="tiny muted">none</span>}
         </div>
-        <span className="small muted grow">Shown on Home for everyone in the choir, on a light tile. A square picture works best (PNG, JPEG or WebP; the app makes it small); a wide banner gets very small.</span>
+        <span className="small muted grow">Shown on Today and the Choir tab for everyone in the choir, on a light tile. A square picture works best (PNG, JPEG or WebP; the app makes it small); a wide banner gets very small.</span>
       </div>
       <div className="row wrap" style={{ gap: 8 }}>
         <button className="btn small" disabled={busy} onClick={() => input.current?.click()} data-testid="logo-choose">

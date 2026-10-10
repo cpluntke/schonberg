@@ -149,7 +149,7 @@ export function Setup() {
                 );
               })}
             </div>
-            <span className="tiny muted">Your own scores can be imported later in the Library.</span>
+            <span className="tiny muted">Your own scores can be imported later under Pieces.</span>
           </div>
           <button className="btn primary block" style={{ marginTop: 'auto' }} disabled={needsName}
             onClick={() => { update({ name: name.trim() }); setStep(2); }}>Continue</button>

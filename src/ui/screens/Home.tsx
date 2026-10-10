@@ -1,7 +1,7 @@
 import React from 'react';
 import { allPieces, getPiece, singableSections, type PieceInfo } from '../library';
 import { useProfile, useStoreVersion, formatDate, daysUntil, initials } from '../hooks';
-import { go } from '../router';
+import { go, openAt } from '../router';
 import { getProgress, loadCycle, practiceDays, sameWork } from '../../progress/store';
 import { levelLabel, levelSpec, stepWord } from '../../progress/ladder';
 import { nextRehearsal } from '../../progress/rehearsal';
@@ -170,7 +170,7 @@ export function Home() {
           <span>{fromChoir
             ? 'The concert is over. Your choir will publish the next programme here; until then, keep your pieces fresh.'
             : 'The concert is over. Set the dates of your next rehearsal and concert to plan the next cycle.'}</span>
-          {!fromChoir && <button className="btn small" style={{ alignSelf: 'flex-start' }} onClick={() => go({ name: 'settings' })}>Set new dates</button>}
+          {!fromChoir && <button className="btn small" style={{ alignSelf: 'flex-start' }} onClick={() => openAt({ name: 'settings' }, 'settings-cycle')}>Set new dates</button>}
         </div>
       )}
 
@@ -212,7 +212,7 @@ export function Home() {
           </button>
         ))}
         {!betweenCycles && (
-          <button className="link start" onClick={() => go({ name: 'settings' })} data-testid="edit-dates">
+          <button className="link start" onClick={() => openAt({ name: 'settings' }, 'settings-cycle')} data-testid="edit-dates">
             {!nr && !cycle.concertDate ? 'Set rehearsal and concert dates' : 'Edit dates and rehearsal pieces'}
           </button>
         )}

@@ -156,7 +156,7 @@ export function SectionInsights({ view }: { view: SectionInsightsView }) {
   const ids = useMemo(() => orderedPieceIds(Object.keys(view.pieces)), [view]);
   const partRange = useMemo(() => sectionPartRange(view.voice, loadCycle().pieceIds), [view.voice]);
   if (!view.sharing) {
-    return <div className="notice">Nobody in this section shares their progress yet. Singers turn it on in Settings → Your choir.</div>;
+    return <div className="notice">Nobody in this section shares their progress yet. Singers turn it on on the Choir tab (or in Settings → Privacy).</div>;
   }
   const small = Object.values(view.pieces).some((p) => p.hidden);
   return (

@@ -1,7 +1,7 @@
 // Your progress (the UX review's A6): this week, the last five weeks, each programme piece on its
 // level ladder, and "Getting better" when the data shows it. Reached from Today's week card and Settings.
 import React from 'react';
-import { back, go } from '../router';
+import { back, go, openAt } from '../router';
 import { useStoreVersion, daysUntil } from '../hooks';
 import { IconBack } from '../icons';
 import { attemptLog, loadCycle, loadProfile, logStep } from '../../progress/store';
@@ -170,7 +170,7 @@ export function ProgressScreen() {
         </section>
       )}
       </div>
-      <button className="btn ghost block" onClick={() => go({ name: 'settings' })} data-testid="progress-settings">Week goal: {goal} days a week · change</button>
+      <button className="btn ghost block" onClick={() => openAt({ name: 'settings' }, 'settings-practice')} data-testid="progress-settings">Week goal: {goal} days a week · change</button>
       <span className="t14 muted center">{weekText(week.count, goal)} this week.</span>
     </main>
   );

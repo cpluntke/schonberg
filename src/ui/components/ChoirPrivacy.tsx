@@ -28,7 +28,7 @@ export function ChoirPrivacy() {
       </label>
       <label className="toggle-row">
         <span>Count me in “Practising now”
-          <span className="tiny muted" style={{ display: 'block' }}>While you sing, others see one more singer of your voice part on Home: a count only, never your name.</span>
+          <span className="tiny muted" style={{ display: 'block' }}>While you sing, others see one more singer of your voice part on Today and the Choir tab: a count only, never your name.</span>
         </span>
         <input type="checkbox" checked={!profile.presenceHidden} disabled={busy} data-testid="privacy-presence"
           onChange={(e) => update({ presenceHidden: !e.target.checked })} />

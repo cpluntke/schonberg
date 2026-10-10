@@ -1,7 +1,7 @@
 // Today on Home (the UX review's A1–A8): the plan card, the week, Today done, the rehearsal check-in,
 // the calm status line, and the session strip on the screens inside today's session.
 import React, { useEffect, useState } from 'react';
-import { go } from '../router';
+import { go, openAt } from '../router';
 import { getPiece } from '../library';
 import { daysUntil } from '../hooks';
 import { IconPlay } from '../icons';
@@ -190,7 +190,7 @@ export function StatusLine({ cycle = loadCycle(), rehearsalDay }: { cycle?: Cycl
     return (
       <div className="row status-line" style={{ gap: 4, flexWrap: 'wrap' }} data-testid="status-line">
         <span className="t14 muted">No rehearsal or concert dates yet.</span>
-        <button className="link inline" onClick={() => go({ name: 'settings' })}>Set dates</button>
+        <button className="link inline" onClick={() => openAt({ name: 'settings' }, 'settings-cycle')}>Set dates</button>
       </div>
     );
   }

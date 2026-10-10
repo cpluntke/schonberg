@@ -297,7 +297,7 @@ export function Settings() {
 
       <section className="col small muted settings-about" style={{ gap: 4 }}>
         <span>Schönberg Hero · your practice stays on this device. Only your choir's leaderboard, the progress you share with your section lead, a live “practising now” count by voice part (no name), with a choir account the progress kept with it (above), and, if switched on, the anonymous usage counts (daily, and every few minutes while in use; Privacy) reach the choir server.</span>
-        <span>Built-in score: an original warm-up chorale. Scores from your choir's library show their edition and licence in the Library.</span>
+        <span>Built-in score: an original warm-up chorale. Scores from your choir's library show their edition and licence on their page.</span>
       </section>
 
       {/* A super-admin login on this phone (the login itself: #/superadmin, or Diagnostics). Singers never see this. */}

@@ -67,11 +67,11 @@ export function ChoirInsights() {
   }, [token, code]);
   const ids = useMemo(() => (view ? orderedPieceIds([...new Set(VOICE_ORDER.flatMap((v) => Object.keys(view.sections[v]?.pieces ?? {})))]) : []), [view]);
   const programme = loadCycle().pieceIds;
-  if (!apiBase() || !code) return <><div className="notice">Join your choir first (Settings → Your choir).</div></>;
+  if (!apiBase() || !code) return <><div className="notice">Join your choir first (the Choir tab).</div></>;
   if (!token) {
     return (
       <>
-        <div className="notice">Only choir admins see every section. Log in as an admin under Settings → Your choir.</div>
+        <div className="notice">Only choir admins see every section. Log in as an admin on the Choir tab (Membership).</div>
       </>
     );
   }
