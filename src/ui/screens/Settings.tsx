@@ -13,6 +13,7 @@ import { noteLabel } from '../../game/notation';
 import { IntroVideoButton } from '../components/IntroVideo';
 import { AccountSync } from '../components/AccountSync';
 import { UsageStats } from '../components/UsageStats';
+import { weekGoalOf } from '../today';
 
 export function Settings() {
   const [profile, update] = useProfile();
@@ -65,6 +66,17 @@ export function Settings() {
       {/* Wide screens: two columns of cards (how you practise and your cycle; your voice, account and data). */}
       <div className="lay settings-cols">
       <div className="lay settings-col">
+      <section className="col" style={{ gap: 8 }} data-testid="settings-week-goal">
+        <h2 className="eyebrow" id="settings-goal-label">Your week</h2>
+        <span className="t14">Days a week you mean to practise (a rehearsal you were at counts too)</span>
+        <div className="seg" role="group" aria-labelledby="settings-goal-label">
+          {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+            <button key={n} aria-pressed={weekGoalOf(profile.weekGoal) === n} aria-label={`${n} day${n === 1 ? '' : 's'} a week`} onClick={() => update({ weekGoal: n })}>{n}</button>
+          ))}
+        </div>
+        <button className="link start" data-testid="settings-progress" onClick={() => go({ name: 'progress' })}>See your progress ›</button>
+      </section>
+
       <section className="col" style={{ gap: 8 }}>
         <h2 className="eyebrow">Note names</h2>
         <div className="choice-grid">

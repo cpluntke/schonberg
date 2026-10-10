@@ -2,17 +2,22 @@ import React from 'react';
 import { allPieces, getPiece, type PieceInfo } from '../library';
 import { useProfile, useStoreVersion, formatDate, daysUntil, initials } from '../hooks';
 import { go } from '../router';
-import { loadCycle, streakDays, sameWork } from '../../progress/store';
-import { levelLabel, levelSpec, stepLabel } from '../../progress/ladder';
+import { getProgress, loadCycle, practiceDays, sameWork } from '../../progress/store';
+import { levelLabel, levelSpec } from '../../progress/ladder';
 import { nextRehearsal } from '../../progress/rehearsal';
 import { rowOfTheDay } from '../../game/twelvetone';
-import { IconFlame, IconPlay, IconMic, IconStar } from '../icons';
-import { cyclePoints, practisedToday } from '../../progress/points';
+import { IconMic } from '../icons';
 import { IntroVideoButton } from '../components/IntroVideo';
+import { singableSections } from '../library';
+import { meterNodes, pathStatus } from '../path';
+import { LevelMeter } from '../components/LevelMeter';
+import { PlanCard, RehearsalCheck, StatusLine, TodayDone, WeekCard } from '../components/Today';
+import { dateWords, endSession, lastRehearsal, todayState } from '../today';
+import { dayOf } from '../../progress/today';
 import { apiBase, cachedChoir, choirCycleNext, choirCycleNow, choirLogo, loadSession, sharingNeedsOk, startSharing } from '../../progress/choir';
 import { shareMyProgress } from '../play/shareProgress';
 import { LoggedOutCard, SyncNotice, openAccount } from '../components/AccountSync';
-import { pieceStatus, todaysPlan, type PieceStatus } from '../plan';
+import { pieceStatus, type PieceStatus } from '../plan';
 import { presenceShown, usePresence } from '../../progress/presence';
 import { LOGO_TILE } from '../components/ChoirLogo';
 import { useStaff } from './Admin';
@@ -34,32 +39,35 @@ export function greeting(now = new Date()): string {
 export function Home() {
   const [profile] = useProfile();
   useStoreVersion();
+  const staff = useStaff();
+  const labOn = labEnabled(staff);
+  // Back on Home: today's session pauses (the strip shows again once a step is started from here).
+  React.useEffect(() => { endSession(); }, []);
   const cycle = loadCycle();
   const cyclePieces = cycle.pieceIds.map((id) => getPiece(id)).filter(Boolean) as PieceInfo[];
   const statuses = cyclePieces.map((p) => pieceStatus(p, profile.voice));
-  const streak = streakDays();
-  const today = practisedToday();
-  const points = cyclePoints();
   const choir = profile.choirCode ? cachedChoir() : null;
   const logo = choir ? choirLogo() : null;
   const betweenCycles = !!choir && choir.code === profile.choirCode && Array.isArray(choir.cycles) && !choirCycleNow(choir);
   const nextCycle = betweenCycles ? choirCycleNext(choir) : null;
-  const focusIds = new Set(cycle.focusPieceIds ?? []);
-  const plan = todaysPlan(statuses, cycle);
-  const focus = plan[0] ?? null;
   const row = rowOfTheDay(new Date());
-  const staff = useStaff();
   const nr = nextRehearsal(cycle);
-  const toRehearsal = nr ? nr.days : null;
   const toConcert = daysUntil(cycle.concertDate);
-  const focusStatuses = statuses.filter((s) => focusIds.has(s.piece.id));
   const focusMissing = (cycle.wanted ?? []).filter((w) => w.focus && !statuses.some((s) => sameWork(s.piece.title, w.title)));
-  const target = cycleTarget(statuses, toRehearsal, toConcert, focusStatuses.length ? focusStatuses : null);
-  const avg = statuses.length ? statuses.reduce((a, s) => a + s.pct, 0) / statuses.length : 0;
-  const noDates = !nr && !cycle.concertDate;
   // The concert is over: what comes next (the choir's next programme, or the singer's own dates).
   const fromChoir = !!profile.choirCode || !!cycle.preset?.startsWith('choir:');
   const concertOver = toConcert != null && toConcert < 0;
+  // Today: the plan (frozen once started), and whether it's done.
+  const today = todayState(labOn);
+  const { plan, status } = today;
+  const done = profile.onboarded && plan.steps.length > 0 && (status.complete || !!today.finished);
+  const everPractised = practiceDays(1).length > 0;
+  const first = profile.name ? profile.name.split(' ')[0] : '';
+  const hello = done ? 'Gut gemacht' : plan.mode === 'welcome' ? 'Welcome back' : greeting();
+  const rehearsalTime = plan.mode === 'rehearsal' && cycle.rehearsalWeekday != null ? (cycle.rehearsalTime ?? '19:30') : undefined;
+  const afterRehearsal = !!lastRehearsal(dayOf(new Date()), cycle);
+  const nextLabel = nr ? (nr.days === 0 ? 'tonight' : dateWords(nr.at)
+    + (cycle.rehearsalWeekday != null ? ` ${cycle.rehearsalTime ?? '19:30'}` : '')) : undefined;
 
   return (
     <main className="screen wide home">
@@ -77,8 +85,8 @@ export function Home() {
 
       <div className="row" style={{ gap: 12, alignItems: 'center' }}>
         <div className="col grow" style={{ gap: 4, minWidth: 0 }}>
-          <h1 className="hero">{greeting()}{profile.name ? `, ${profile.name.split(' ')[0]}` : ''}</h1>
-          <span className="small muted">{voiceName(profile.voice)}{logo && choir?.name ? ` · ${choir.name}` : ''}</span>
+          <h1 className="hero" data-testid="greeting">{hello}{first ? `, ${first}` : ''}</h1>
+          <span className="t14 muted">{voiceName(profile.voice)}{logo && choir?.name ? ` · ${choir.name}` : ''}</span>
         </div>
         {logo && (
           <img src={logo} alt={`${choir?.name ?? 'Choir'} logo`} data-testid="choir-logo" className="home-logo"
@@ -91,55 +99,68 @@ export function Home() {
       <div className="lay home-cols">
       <div className="lay home-main">
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 10 }} data-testid="stats">
-        <div className="card flat" style={{ gap: 2, padding: '12px 14px', minWidth: 0 }} data-testid="streak-tile">
-          <div className="row" style={{ gap: 6 }}>
-            <IconFlame size={26} color={streak > 0 && !today ? '#8A6A5C' : '#FF7A45'} />
-            <span className="mono" style={{ fontSize: 30, fontWeight: 700, lineHeight: 1 }} data-testid="streak-days">{streak}</span>
+      {!profile.onboarded && (
+        <div className="card first-open" style={{ borderColor: 'var(--voice-deep)' }} data-testid="first-open">
+          <strong className="first-line">Learn your part and sing it in tune before the next rehearsal.</strong>
+          <span className="t14 muted">The app listens while you sing your own voice part and shows you the one note to fix. 10–15 minutes a day is enough.</span>
+          <div className="row">
+            <IconMic color="#4CC9F0" />
+            <div className="grow col" style={{ gap: 2 }}>
+              <strong>Set up your voice (2 min)</strong>
+              <span className="t14 muted">Mic check, your range, headphone delay and your preferred note names.</span>
+            </div>
           </div>
-          <span className="small" style={{ fontWeight: 700 }}>day streak</span>
-          <span className="tiny muted">{today ? 'Practised today ✓' : streak > 0 ? 'Sing today to keep it going' : 'Sing today to start one'}</span>
+          <IntroVideoButton className="btn block" />
+          <button className="btn primary block" data-testid="home-setup" onClick={() => go({ name: 'setup' })}>Start setup</button>
+          {apiBase() && !loadSession() && ( // (logged in already: nothing to get back)
+            <button className="linklike small muted" style={{ alignSelf: 'center', minHeight: 44 }} data-testid="home-account"
+              onClick={() => openAccount('login')}>New phone? Log in to your choir account to get your progress back</button>
+          )}
         </div>
-        <div className="card flat" style={{ gap: 2, padding: '12px 14px', minWidth: 0 }} data-testid="points-tile">
-          <div className="row" style={{ gap: 6 }}>
-            <IconStar size={24} color="#4CC9F0" />
-            <span className="mono" style={{ fontSize: 30, fontWeight: 700, lineHeight: 1 }} data-testid="cycle-points">{points.n.toLocaleString()}</span>
-          </div>
-          <span className="small" style={{ fontWeight: 700 }}>notes right this cycle</span>
-          {points.name && <span className="tiny muted">{points.name}</span>}
-        </div>
-      </div>
+      )}
 
-      <PractisingNow />
+      {plan.mode === 'welcome' && !done && (
+        <p className="t16 muted" style={{ margin: 0 }} data-testid="welcome-line">Good to have you here. Everything you learnt is still there: let's ease back in with five minutes.</p>
+      )}
+      {!betweenCycles && !concertOver && plan.mode !== 'welcome' && <StatusLine cycle={cycle} rehearsalDay={plan.mode === 'rehearsal'} />}
+      {!betweenCycles && focusMissing.length > 0 && nr && nr.days >= 0 && (
+        <span className="t14 muted" data-testid="rehearsal-focus">
+          The next rehearsal also works on{' '}
+          {focusMissing.map((w, i) => (
+            <span key={w.title}>{i ? ', ' : ''}<button className="linklike" onClick={() => go({ name: 'library' })}>{w.title}</button></span>
+          ))}{' '}(import your score first).
+        </span>
+      )}
+
+      {profile.onboarded && plan.mode !== 'welcome' && <RehearsalCheck labOn={labOn} />}
+
+      {done ? <TodayDone plan={plan} labOn={labOn} />
+        : plan.steps.length > 0 ? (
+          <PlanCard plan={plan} status={status} labOn={labOn} secondary={!profile.onboarded} rehearsalTime={rehearsalTime} />
+        ) : statuses.length && !betweenCycles ? (
+          <div className="notice info" data-testid="all-ready">Everything in this cycle is concert-ready. Try the arcade mode or today's Zwölfton row.</div>
+        ) : !betweenCycles ? (
+          <div className="notice info" data-testid="no-pieces">{labInProgramme()
+            ? 'No scores in this cycle yet. Start with the intonation lab below.'
+            : "No pieces in this cycle yet. Add some from the Library or import your choir's MusicXML."}</div>
+        ) : null}
+
+      {plan.mode === 'rehearsal' && !done && <TonightsFocus statuses={statuses} />}
+      {plan.mode === 'welcome' && !done && <LeftOff statuses={statuses} />}
+      {everPractised && !done && (
+        <WeekCard mode={plan.mode === 'rehearsal' ? 'rehearsal' : plan.mode === 'welcome' ? 'welcome' : afterRehearsal ? 'after' : 'normal'} nextRehearsalLabel={nextLabel} />
+      )}
 
       <Notice />
       <SyncNotice />
       <LoggedOutCard />
       {sharingNeedsOk() && (
         <div className="card" data-testid="share-ask" style={{ gap: 8 }}>
-          <span className="small">Your choir now shares everyone's practice with the section leads: which bars are hard for the section (as totals) and your voice range. Yours isn't shared yet.</span>
+          <span className="t14">Your choir now shares everyone's practice with the section leads: which bars are hard for the section (as totals) and your voice range. Yours isn't shared yet.</span>
           <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-            <button className="btn primary small" onClick={() => { startSharing(); void shareMyProgress(true); }}>Start sharing</button>
+            <button className="btn small" onClick={() => { startSharing(); void shareMyProgress(true); }}>Start sharing</button>
             <button className="btn small ghost" onClick={() => go({ name: 'choir' })}>What's shared</button>
           </div>
-        </div>
-      )}
-
-      {!profile.onboarded && (
-        <div className="card" style={{ borderColor: 'var(--voice-deep)' }}>
-          <div className="row">
-            <IconMic color="#4CC9F0" />
-            <div className="grow col" style={{ gap: 2 }}>
-              <strong>Set up your voice (2 min)</strong>
-              <span className="small muted">Mic check, your range, headphone delay and your preferred note names.</span>
-            </div>
-          </div>
-          <IntroVideoButton className="btn block" />
-          <button className="btn primary block" data-testid="home-setup" onClick={() => go({ name: 'setup' })}>Start setup</button>
-          {apiBase() && !loadSession() && ( // (logged in already: nothing to get back)
-            <button className="linklike small muted" style={{ alignSelf: 'center', minHeight: 40 }} data-testid="home-account"
-              onClick={() => openAccount('login')}>New phone? Log in to your choir account to get your progress back</button>
-          )}
         </div>
       )}
 
@@ -150,70 +171,16 @@ export function Home() {
             : <><strong>{choir?.name ?? 'Your choir'}: the last cycle is over.</strong> The next programme comes when your choir starts a new cycle.</>}
         </div>
       )}
+      {!betweenCycles && concertOver && (
+        <div className="notice info small col" style={{ gap: 8 }} data-testid="concert-over">
+          <span>{fromChoir
+            ? 'The concert is over. Your choir will publish the next programme here; until then, keep your pieces fresh.'
+            : 'The concert is over. Set the dates of your next rehearsal and concert to plan the next cycle.'}</span>
+          {!fromChoir && <button className="btn small" style={{ alignSelf: 'flex-start' }} onClick={() => go({ name: 'settings' })}>Set new dates</button>}
+        </div>
+      )}
 
-      {/* (between the choir's cycles the notice above stands for the cycle: no dates to set; the
-          singer's own pieces still get today's practice) */}
-      {(!betweenCycles || !!focus?.next) && <section className="card" data-testid="cycle-card">
-        {!betweenCycles && <>
-          <div className="row between">
-            <div className="eyebrow">{cycle.name || 'This cycle'}</div>
-            <button className="btn ghost small" onClick={() => go({ name: 'settings' })}>{noDates ? 'Set dates' : 'Edit dates'}</button>
-          </div>
-          <div className="row" style={{ gap: 16 }}>
-            <Countdown label="Rehearsal" days={toRehearsal} date={nr?.label} raw />
-            <Countdown label="Concert" days={toConcert} date={cycle.concertDate} />
-            <div className="col" style={{ gap: 2, marginLeft: 'auto', alignItems: 'flex-end' }}>
-              <span className="mono" style={{ fontSize: 26, fontWeight: 600 }}>{Math.round(avg * 100)}%</span>
-              <span className="tiny muted">cycle readiness</span>
-            </div>
-          </div>
-        </>}
-        {!betweenCycles && focusStatuses.length + focusMissing.length > 0 && nr && nr.days >= 0 && (
-          <div className="small" data-testid="rehearsal-focus">
-            <span className="muted">{nr.days === 0 ? 'Tonight' : `Next rehearsal (${nr.label})`}:</span>{' '}
-            {focusStatuses.map((s, i) => (
-              <span key={s.piece.id}>{i ? ', ' : ''}<button className="linklike" onClick={() => go({ name: 'piece', pieceId: s.piece.id })}>{s.piece.title}</button>
-                <span className="muted"> {Math.round(s.pct * 100)}%</span></span>
-            ))}
-            {focusMissing.map((w, i) => (
-              <span key={w.title}>{i || focusStatuses.length ? ', ' : ''}<button className="linklike" onClick={() => go({ name: 'library' })}>{w.title}</button>
-                <span className="muted"> (import first)</span></span>
-            ))}
-          </div>
-        )}
-        {!betweenCycles && concertOver && (
-          <div className="notice info small col" style={{ gap: 8 }} data-testid="concert-over">
-            <span>{fromChoir
-              ? 'The concert is over. Your choir will publish the next programme here; until then, keep your pieces fresh.'
-              : 'The concert is over. Set the dates of your next rehearsal and concert to plan the next cycle.'}</span>
-            {!fromChoir && <button className="btn small" style={{ alignSelf: 'flex-start' }} onClick={() => go({ name: 'settings' })}>Set new dates</button>}
-          </div>
-        )}
-        {!betweenCycles && target && <div className="small" style={{ color: 'var(--accent-text)' }}>{target}</div>}
-        {focus && focus.next ? (
-          <>
-            <NextUp status={focus} secondary={!profile.onboarded} />
-            {plan.length > 1 && (
-              <div className="col" style={{ gap: 0 }}>
-                <span className="tiny muted">Also today</span>
-                {plan.slice(1).map((st) => (
-                  <button key={st.piece.id} className="list-row" style={{ padding: '8px 0' }}
-                    onClick={() => go({ name: 'play', pieceId: st.piece.id, partId: st.partId, sectionId: st.next!.sectionId, level: st.next!.level, step: st.next!.step, mode: '2d' })}>
-                    <IconPlay size={14} color="#FF7A45" />
-                    <span className="grow small ellipsis"><strong>{st.piece.title}</strong> · {st.next!.reason}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </>
-        ) : statuses.length ? (
-          <div className="notice info">Everything in this cycle is concert-ready. Try the arcade mode or today's Zwölfton row.</div>
-        ) : (
-          <div className="notice info">{labInProgramme()
-            ? 'No scores in this cycle yet. Start with the intonation lab below.'
-            : "No pieces in this cycle yet. Add some from the Library or import your choir's MusicXML."}</div>
-        )}
-      </section>}
+      <PractisingNow />
 
       {labInProgramme() && <IntonationCard inProgramme />}
       </div>
@@ -229,7 +196,7 @@ export function Home() {
             <div className="mono-tile">{initials(s.piece.composer || s.piece.title)}</div>
             <div className="grow col" style={{ gap: 2 }}>
               <span className="ellipsis" style={{ fontWeight: 600, fontSize: 15 }}>{s.piece.title}</span>
-              <span className="small muted ellipsis">
+              <span className="t14 muted ellipsis">
                 {[s.piece.composer, s.partName].filter(Boolean).join(' · ')}
                 {s.next?.kind === 'fix' ? ` · ${s.toFix.reduce((n, f) => n + f.sectionIds.length, 0)} to fix` : s.fullDue ? ' · full run due for review' : s.due.length ? ` · ${s.due.length} due for review` : ''}
               </span>
@@ -245,14 +212,19 @@ export function Home() {
             <div className="mono-tile" style={{ color: 'var(--muted)', border: '1px dashed var(--line)', background: 'transparent' }}>+</div>
             <div className="grow col" style={{ gap: 2 }}>
               <span className="ellipsis" style={{ fontWeight: 600, fontSize: 15 }}>{w.title}</span>
-              <span className="small muted ellipsis">{[w.composer, w.note ?? 'import your choir’s score'].filter(Boolean).join(' · ')}</span>
+              <span className="t14 muted ellipsis">{[w.composer, w.note ?? 'import your choir’s score'].filter(Boolean).join(' · ')}</span>
             </div>
             <span className="badge muted">Import</span>
           </button>
         ))}
+        {!betweenCycles && (
+          <button className="link start" onClick={() => go({ name: 'settings' })} data-testid="edit-dates">
+            {!nr && !cycle.concertDate ? 'Set rehearsal and concert dates' : 'Edit dates and rehearsal pieces'}
+          </button>
+        )}
       </section>
 
-      {labEnabled(staff) && !labInProgramme() && <IntonationCard />}
+      {labOn && !labInProgramme() && <IntonationCard />}
 
       <button className="card expert" style={{ textAlign: 'left', color: 'inherit' }} onClick={() => go({ name: 'expert' })}>
         <div className="row between">
@@ -269,6 +241,61 @@ export function Home() {
       </div>
       </div>
     </main>
+  );
+}
+
+/** Rehearsal day: where tonight's pieces stand. */
+function TonightsFocus({ statuses }: { statuses: PieceStatus[] }) {
+  const ids = new Set(loadCycle().focusPieceIds ?? []);
+  const focus = statuses.filter((s) => ids.has(s.piece.id));
+  if (!focus.length) return null;
+  return (
+    <section className="card" data-testid="tonights-focus">
+      <h2 className="h3">Tonight's focus</h2>
+      <div className="checklist">
+        {focus.map((s) => {
+          const ps = pathStatus(singableSections(s.piece, s.partId), getProgress(s.piece.id, s.partId));
+          return (
+            <div key={s.piece.id} className="li" style={{ alignItems: 'flex-start' }}>
+              <div className="grow col" style={{ gap: 2 }}>
+                <strong className="t16">{s.piece.title}</strong>
+                {s.rehearsalReady
+                  ? <span className="t14 good-text">Level {Math.min(5, s.pieceLevel)} reached ✓</span>
+                  : <span className="t14 muted">Working on {ps.here}</span>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+/** Welcome back: the pieces where they left off. */
+function LeftOff({ statuses }: { statuses: PieceStatus[] }) {
+  const rows = statuses.slice(0, 4);
+  if (!rows.length) return null;
+  return (
+    <section className="card" data-testid="left-off">
+      <h2 className="h3">Where you left off</h2>
+      <div className="checklist">
+        {rows.map((s) => {
+          const ps = pathStatus(singableSections(s.piece, s.partId), getProgress(s.piece.id, s.partId));
+          const nodes = meterNodes({ level: ps.pieceLevel, slow: ps.half && ps.working ? ps.working.level : 0, now: ps.working });
+          return (
+            <div key={s.piece.id} className="li">
+              <div className="grow col" style={{ gap: 2 }}>
+                <strong className="t16">{s.piece.title}</strong>
+                {s.pieceLevel > 0
+                  ? <span className="t14 good-text">Level {s.pieceLevel} reached ✓</span>
+                  : <span className="t14 muted">Working on {ps.here}</span>}
+              </div>
+              <LevelMeter nodes={nodes} label={s.piece.title} />
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -311,63 +338,7 @@ export function pieceLabel(s: PieceStatus): string {
   return s.pct > 0 ? 'in progress' : 'not started';
 }
 
-/** `secondary`: before the voice setup, setup is the one primary action and practising comes second. */
-function NextUp({ status, secondary }: { status: PieceStatus; secondary?: boolean }) {
-  const n = status.next!;
-  const spec = levelSpec(n.level);
-  // An experienced singer can skip the sections: offer the full run at the next piece level.
-  const skip = status.multi && n.kind === 'section' && status.pieceLevel < 5 ? status.pieceLevel + 1 : 0;
-  return (
-    <div className="col" style={{ gap: 10 }}>
-      <div className="col" style={{ gap: 2 }}>
-        <span className="small muted">Next up</span>
-        <span style={{ fontSize: 20, fontWeight: 800 }}>{status.piece.title}</span>
-        <span className="small muted">{n.reason}{spec && !n.reason.includes(spec.name) ? ` (${stepLabel(n.level, n.step)})` : ''}</span>
-      </div>
-      <button className={`btn block${secondary ? '' : ' primary'}`} onClick={() => go({ name: 'play', pieceId: status.piece.id, partId: status.partId, sectionId: n.sectionId, level: n.level, step: n.step, mode: '2d' })}>
-        <IconPlay size={18} {...(secondary ? { color: '#FF7A45' } : {})} /> {n.sectionId === 'all' ? 'Sing it all now' : n.kind === 'fix' ? 'Fix it now' : 'Practise now'}
-      </button>
-      {skip > 0 && (
-        <button className="btn ghost small" data-testid="skip-to-full" onClick={() => go({ name: 'play', pieceId: status.piece.id, partId: status.partId, sectionId: 'all', level: skip, step: 'tempo', mode: '2d' })}>
-          Know it already? Sing the whole piece at Level {skip}
-        </button>
-      )}
-    </div>
-  );
-}
-
 export { sameWork };
-
-function Countdown({ label, days, date, raw }: { label: string; days: number | null; date?: string; raw?: boolean }) {
-  return (
-    <div className="col" style={{ gap: 2 }}>
-      <span className="mono" style={{ fontSize: 22, fontWeight: 600 }}>
-        {days == null ? '–' : days < 0 ? 'past' : days === 0 ? 'today' : `${days}d`}
-      </span>
-      <span className="tiny muted">{label}{date ? ` · ${raw ? date : formatDate(date)}` : ' · not set'}</span>
-    </div>
-  );
-}
-
-function cycleTarget(statuses: PieceStatus[], toRehearsal: number | null, toConcert: number | null, focus: PieceStatus[] | null): string | null {
-  const goals = [
-    { label: 'Rehearsal', level: 3, days: toRehearsal, name: levelLabel(3), set: focus ?? statuses },
-    { label: 'Concert', level: 4, days: toConcert, name: levelLabel(4), set: statuses },
-  ];
-  for (const g of goals) {
-    if (g.days == null || g.days < 0) continue;
-    // The piece level counts: a piece is ready once it has been sung through at the level.
-    const missing = g.set.filter((st) => st.pieceLevel < g.level).length;
-    if (!missing) continue;
-    const when = g.days === 0 ? 'today' : g.days === 1 ? 'tomorrow' : `in ${g.days} days`;
-    const what = g.label === 'Rehearsal' && focus
-      ? `${missing === g.set.length && missing > 1 ? 'the' : missing} rehearsal piece${missing > 1 ? 's' : ''}`
-      : `${missing} piece${missing > 1 ? 's' : ''}`;
-    const perDay = g.days > 1 && missing > 1 ? Math.ceil(missing / g.days) : 0;
-    return `${g.label} ${when}: ${what} not yet sung through at ${g.name}${perDay && perDay < missing ? `, about ${perDay} a day` : ''}.`;
-  }
-  return null;
-}
 
 export function voiceName(v: string): string {
   return ({ S: 'Soprano', A: 'Alto', T: 'Tenor', B: 'Bass' } as Record<string, string>)[v] ?? 'Singer';

@@ -766,3 +766,92 @@ details.more > .more-body { display: flex; flex-direction: column; gap: 0; paddi
   .piece-screen .lay.piece-main > details.more { margin-top: 0; }
   .piece-head h1 { font-size: 30px; }
 }
+
+/* ===================================================================== the daily loop
+   Today on Home (the plan, the week, Today done, the rehearsal check-in), the session strip and Your
+   progress (the UX review's A1–A8). 14 px+ text, 44 px+ targets, orange only for the one primary. */
+.center { text-align: center; }
+.nowrap { white-space: nowrap; }
+.link.between { justify-content: space-between; width: 100%; padding: 0; }
+button.plain { background: none; border: none; padding: 0; color: inherit; text-align: left; font: inherit; cursor: pointer; }
+.first-open .first-line { font-size: 20px; line-height: 1.25; font-weight: 800; }
+.status-line .behind { color: var(--accent-text); }
+.home .t14.good-text { font-weight: 600; }
+
+.steps-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.steps-list > li { position: relative; border-top: 1px solid var(--line); }
+.steps-list > li:first-child { border-top: none; }
+.steps-list .step-row {
+  display: flex; align-items: flex-start; gap: 12px; width: 100%; min-height: 56px; padding: 12px 0; background: none; border: none;
+  color: inherit; text-align: left; font: inherit;
+}
+button.step-row { cursor: pointer; }
+.steps-list .step-row > .check { margin-top: 1px; }
+.steps-list .step-text { gap: 2px; }
+.steps-list .step-text > strong { font-size: 16px; line-height: 1.3; }
+.steps-list .mins { font-size: 14px; color: var(--muted); white-space: nowrap; padding-top: 2px; }
+.steps-list > li.done .step-text > strong { color: var(--muted); }
+.steps-list > li.shaky::before { content: ''; position: absolute; left: -16px; top: 12px; bottom: 12px; width: 3px; border-radius: 2px; background: var(--voice); }
+.plan-card { gap: 10px; }
+.plan-card h2 { font-size: 22px; line-height: 1.2; }
+.plan-card .start-today { min-height: 56px; font-size: 17px; margin-top: 4px; }
+
+.week-card { gap: 10px; }
+.wk { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; text-align: center; }
+.wk > div { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.wk .check { width: 30px; height: 30px; border-radius: 15px; }
+.wk .check.reh { border-style: dashed; color: var(--muted); }
+.wk .check.now.reh { border-style: solid; color: var(--accent-text); }
+.wk .wk-today { color: var(--accent-text); font-weight: 700; }
+
+.done-band { background: var(--good-bg); border-color: #24583a; gap: 8px; }
+.done-band h2 { font-size: 28px; line-height: 1.15; }
+.done-band .divider { background: #24583a; margin: 4px 0; }
+
+.checkin { gap: 10px; }
+.checkin .li { display: flex; align-items: center; gap: 12px; min-height: 48px; border-top: 1px solid var(--line); }
+.checkin .li:first-child { border-top: none; }
+.checkin .chip.attended { align-self: flex-start; }
+.checkin > .btn { align-self: flex-start; min-width: 96px; }
+
+/* The session strip: "Today · step 2 of 4" with a tick per step and the minutes left. */
+.session {
+  display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 16px; background: var(--bg-2);
+  border-bottom: 1px solid var(--line); font: 600 14px var(--font); flex: none;
+}
+.session .ticks { display: inline-flex; gap: 5px; }
+.session .ticks i { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid #3a4170; display: block; }
+.session .ticks i.done { background: var(--good); border-color: var(--good); }
+.session .ticks i.now { border: 2px solid var(--accent); }
+.session .link.inline { margin: 0; min-height: 44px; font-size: 14px; }
+.screen > .session { margin: -16px -16px -18px; }
+.screen > .session + .practice-bar { margin-top: 0; }
+.precard > .session.compact { margin: -16px -16px 0; border-radius: 22px 22px 0 0; padding: 0 16px; }
+@media (min-width: 700px) { .screen > .session { margin-left: -24px; margin-right: -24px; } }
+@media (min-width: 900px) and (min-height: 480px) {
+  .screen.practice > .session { max-width: none; width: auto; margin: -16px calc(-1 * var(--gutter)) -18px; padding-left: var(--gutter); padding-right: var(--gutter); }
+}
+
+/* Your progress. */
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.tile { border: 1px solid var(--line); border-radius: 14px; padding: 10px 6px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 2px; min-width: 0; }
+.tile > strong { font-size: 24px; line-height: 1.2; }
+.wkrows { display: flex; flex-direction: column; }
+.wkrow { display: grid; grid-template-columns: 58px minmax(0, 1fr) 46px 34px; align-items: center; gap: 8px; min-height: 44px; border-top: 1px solid var(--line); }
+.wkrow.head { border-top: none; min-height: 32px; }
+.wkrow.cur > span:first-child, .wkrow.cur .num { font-weight: 800; }
+.wkrow .num { text-align: right; }
+.wkrow .cells { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; max-width: 230px; }
+.wkrow .cells i { aspect-ratio: 1; border-radius: 6px; background: var(--surface-2); display: grid; place-items: center; font-style: normal; font-size: 13px; font-weight: 800; color: var(--accent-ink); max-height: 30px; }
+.wkrow .cells i.on { background: var(--good); }
+.wkrow .cells i.future { background: transparent; border: 1px dashed var(--line); }
+.legend { gap: 6px; flex-wrap: wrap; }
+.legend .lvl { margin-left: 8px; }
+.legend .lvl:first-child { margin-left: 0; }
+.better-bar { height: 12px; border-radius: 6px; background: transparent; overflow: hidden; }
+.better-bar > span { display: block; height: 100%; border-radius: 6px; background: #4a5180; }
+.better-bar > span.now { background: var(--voice); }
+.progress-cols { display: flex; flex-direction: column; gap: 18px; }
+@media (min-width: 900px) and (min-height: 480px) {
+  .progress-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+}

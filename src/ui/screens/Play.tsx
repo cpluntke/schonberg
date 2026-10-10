@@ -50,6 +50,8 @@ import type { AttemptResult } from '../../game/types';
 import type { NotationMode } from '../../game/notation';
 import { NotFound } from '../components/NotFound';
 import { PracticeBar } from '../components/PracticeBar';
+import { SessionStrip } from '../components/Today';
+import { noteReached } from '../../progress/today';
 import { skipTarget } from '../play/skip';
 import { recordNotes } from '../../progress/notestats';
 
@@ -371,6 +373,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
     const reached = full ? full.reached : (rec as ReturnType<typeof recordAttempt>).reached;
     const ladder = full ? full.counted : sectionLadder;
     const pieceAfter = pieceReadiness(secs, getProgress(piece.id, part.id)).pieceLevel;
+    noteReached(piece.id, part.id, pieceBefore, pieceAfter);
     if (ladder) {
       snapshotReadiness(piece.id, part.id, pieceReadiness(secs, getProgress(piece.id, part.id)).pct);
     }
@@ -684,6 +687,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
           // The pre-run card, low on the screen so the first bars stay in view above it (scrolls on short phones).
           <div className="overlay prerun">
             <div className="card precard" data-testid="prerun">
+              <SessionStrip pieceId={piece.id} compact />
               <span className="eb now" data-testid="step-label">{listenOnly ? 'Listen' : levelInfo?.label}</span>
               {cold ? (
                 <p className="task">

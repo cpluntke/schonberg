@@ -170,7 +170,8 @@ function playStep(p: PlanPiece, o: {
   const listen = o.kind === 'passage' && level === 1 && o.step === 'slow' && neverSung(p, o.sectionId);
   const sec = secOf(p, o.sectionId);
   const minutes = o.words ? estimateMinutes(sec, 0.8, 2) : estimateMinutes(sec, rate, o.tries, listen);
-  const title = o.title ?? (o.sectionId === 'all' ? `${p.title} · sing it all once` : `${p.title} · ${lower(labelOf(p, o.sectionId))}`);
+  const name = p.title.length > 24 ? p.short : p.title;
+  const title = o.title ?? (o.sectionId === 'all' ? `${name} · sing it all once` : `${name} · ${lower(labelOf(p, o.sectionId))}`);
   return {
     id: `${o.kind}:${p.pieceId}:${p.partId}:${o.sectionId}:${level}:${o.step}`,
     kind: o.kind, pieceId: p.pieceId, partId: p.partId, sectionId: o.sectionId, level, step: o.step, minutes, title, reason: o.reason, why: o.why,
@@ -242,7 +243,7 @@ export function pieceCandidates(p: PlanPiece, now: number, rehearsalDays: number
     const extra = t ?? last ?? fresh ?? '';
     if (level === 2 && step === 'slow' && p.words?.(s.id) === false) {
       out.push(playStep(p, { kind: 'words', sectionId: s.id, level, step, why: 'progress', tries: 2, words: true,
-        title: `${p.title} · ${lower(s.label)} · the words`, reason: 'Say the words in rhythm, before you sing them' }));
+        title: `${p.title.length > 24 ? p.short : p.title} · ${lower(s.label)} · the words`, reason: 'Say the words in rhythm, before you sing them' }));
       continue;
     }
     out.push(playStep(p, { kind: 'passage', sectionId: s.id, level, step, why: 'progress', tries: 3,
@@ -267,7 +268,7 @@ export function labStep(lab: NonNullable<PlanContext['lab']>, short = false): To
     lab: { interval: lab.interval, rung },
     title: short ? (lab.interval === 'third' ? 'Pure-third tune-up' : 'Pure-fifth tune-up') : `Warm-up · ${LAB_NAME[lab.interval]}`,
     reason: short ? (lab.interval === 'third' ? 'So your third rings in the chord' : 'So your fifth rings in the chord')
-      : lab.done ? `${LAB_RUNG_NAMES[rung - 1]} · keeps your ear ready` : `Step ${rung} of 5 · ${LAB_RUNG_NAMES[rung - 1].toLowerCase()} · gets your ear ready`,
+      : lab.done ? `${LAB_RUNG_NAMES[rung - 1]} · keeps your ear ready` : `Step ${rung} of 5 · ${LAB_RUNG_NAMES[rung - 1]}`,
     route: { name: 'intonation', interval: lab.interval, rung },
   };
 }
@@ -372,16 +373,18 @@ function rehearsalPlan(ctx: PlanContext, day: string): TodayPlan {
       steps.push({ ...s, minutes: Math.min(3, s.minutes) });
       continue;
     }
-    // The passage being worked on (the lowest): once, in tempo when its notes are known.
-    const c = pieceCandidates(p, ctx.now, 0).find((x) => x.kind === 'passage' || x.kind === 'fix' || x.kind === 'review');
-    if (!c || !c.sectionId) continue;
-    const sp = p.prog?.sections[c.sectionId];
-    const known = (sp?.level ?? 0) >= 1 || (sp?.slow ?? 0) >= 1;
-    const lv = (sp?.level ?? 0) >= 1 ? Math.min(MAX_LEVEL, sp!.level) : 1;
-    const s = playStep(p, { kind: 'passage', sectionId: c.sectionId, level: lv, step: known ? 'tempo' : 'slow', why: 'focus', tries: 1,
-      title: `${p.short} · ${lower(labelOf(p, c.sectionId))} once${known ? ', in tempo' : ''}`,
-      reason: p.focus ? 'Tonight’s focus' : 'Keeps it in your ear for tonight' });
-    steps.push(s);
+    // The passages being worked on (the lowest first): once each, in tempo when the notes are known;
+    // a second one while the warm-up is still short.
+    const cands = pieceCandidates(p, ctx.now, 0).filter((x) => (x.kind === 'passage' || x.kind === 'fix' || x.kind === 'review') && x.sectionId !== 'all');
+    for (const c of cands.slice(0, 2)) {
+      if (steps.length >= 3 || (c !== cands[0] && sum(steps) >= 4)) break;
+      const sp = p.prog?.sections[c.sectionId!];
+      const known = (sp?.level ?? 0) >= 1 || (sp?.slow ?? 0) >= 1;
+      const lv = (sp?.level ?? 0) >= 1 ? Math.min(MAX_LEVEL, sp!.level) : 1;
+      steps.push(playStep(p, { kind: 'passage', sectionId: c.sectionId!, level: lv, step: known ? 'tempo' : 'slow', why: 'focus', tries: 1,
+        title: `${p.short} · ${lower(labelOf(p, c.sectionId!))} once${known ? ', in tempo' : ''}`,
+        reason: p.focus ? 'Tonight’s focus' : 'Keeps it in your ear for tonight' }));
+    }
   }
   if (ctx.lab) steps.push(labStep(ctx.lab, true));
   // (about five minutes: trim the longest first)

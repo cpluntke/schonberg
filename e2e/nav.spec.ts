@@ -62,10 +62,10 @@ test('Results: back lands on the piece, then Home; Again then back lands on the 
   expect(errors).toEqual([]);
 });
 
-test('Practise now on Home: back from Play goes to the piece, then Home; ⌂ on Results goes Home', async ({ page }) => {
+test('Start today\u2019s practice on Home: back from Play goes to the piece, then Home; ⌂ on Results goes Home', async ({ page }) => {
   test.setTimeout(120_000);
   await home(page);
-  await page.getByRole('button', { name: /^(Practise now|Sing it all now|Fix it now)$/ }).first().click();
+  await page.getByTestId('start-today').click();
   await expect(page.getByTestId('start')).toBeVisible();
   await page.goBack();
   await expect(page).toHaveURL(/#\/piece\//);

@@ -30,6 +30,8 @@ import { lateEntries, notesShare, shareWords, type EntryTiming } from '../play/p
 import { pitchWords } from '../../game/pitchwords';
 import { nextRehearsal } from '../../progress/rehearsal';
 import { daysUntil } from '../hooks';
+import { SessionStrip, useWeek, weekText } from '../components/Today';
+import { finishToday, goStep, stepShort, todaySession } from '../today';
 import type { Section } from '../../music/types';
 
 /** Start a run from Results: it takes Results' place in history (router: practice screens replace each other). */
@@ -312,11 +314,42 @@ export function Results() {
   // Second choice: after a miss of a passage the next passage (or the same one again); after a slow
   // pass the same bars in tempo; else the same run again (or an easier step).
   const diagnosed = primary.testid === 'loop-bar' || primary.testid === 'loop-entry';
-  const again: FootStep | null = diagnosed
+  let again: FootStep | null = diagnosed
     ? (nextSec && next ? { label: 'Next passage', testid: 'next-passage', onClick: () => play(nextSec.id, Math.min(5, (prog?.sections[nextSec.id]?.level ?? 0) + 1), '2d', stepFor(prog?.sections[nextSec.id], Math.min(5, (prog?.sections[nextSec.id]?.level ?? 0) + 1))) } : againStep)
     : stepUp ? { label: 'Now in tempo', testid: 'now-in-tempo', onClick: () => play(lr.sectionId, lr.level, '2d', 'tempo') }
       : easierStep ?? (primary.repeats ? null : againStep);
   const passed = lr.ladder && lr.passed;
+
+  // Today's session (started from Home's plan): once this step is done the footer moves on to the
+  // next step of today; after a miss, "Skip to next step" sits next to the help. Outside a session
+  // nothing changes.
+  const ses = todaySession({ pieceId: piece.id });
+  let sessionFinish = false;
+  if (ses) {
+    const curDone = ses.status.done[ses.index];
+    const n = ses.plan.steps.length;
+    const skip: FootStep | null = ses.next
+      ? { label: 'Skip to next step', testid: 'skip-step', onClick: () => goStep(ses.next!, true) }
+      : null;
+    if (curDone) {
+      const demoted: FootStep | null = primary.repeats || primary.testid === 'next-step' || primary.testid === 'arcade-run' ? null
+        : { label: primary.label, testid: primary.testid, onClick: primary.onClick };
+      primary = ses.next
+        ? {
+          label: <><IconPlay size={18} /> Next: {stepShort(ses.next)}</>, testid: 'today-next',
+          why: `step ${ses.nextIndex + 1} of ${n} · ${ses.next.minutes} min`, onClick: () => goStep(ses.next!, true),
+        }
+        : {
+          label: 'Finish for today', testid: 'today-finish', why: 'Every step of today is done.',
+          onClick: () => { finishToday(); leaveTo({ name: 'home' }); },
+        };
+      again = demoted ?? again;
+      sessionFinish = !!ses.next;
+    } else {
+      again = skip ?? again;
+      sessionFinish = true;
+    }
+  }
 
   // ---- The main block: what happened, in one place (a milestone, a pass, or what to fix).
   const sp = section ? prog?.sections[section.id] : undefined;
@@ -378,6 +411,7 @@ export function Results() {
 
   return (
     <main className="screen practice has-foot results">
+      <SessionStrip pieceId={piece.id} />
       <PracticeBar up={up} heading title={piece.title}
         sub={[part?.name, section ? lowerLabel(section.label) : (lr.sectionId === 'all' ? 'sing it all' : lr.sectionId === 'cold' ? 'cold start' : lr.sectionId === 'entries' ? 'entry drill' : whatSung), spec ? stepLabel(lr.level, step) : ''].filter(Boolean).join(' · ')} />
 
@@ -527,11 +561,7 @@ export function Results() {
 
       {(lr.points || lr.streak) && (
         <div className="row wrap" style={{ gap: 8 }} data-testid="run-stats">
-          {lr.streak && lr.streak.days > 0 && (
-            <span className="pill" data-testid="run-streak">
-              <IconFlame size={16} color="#FF7A45" /> {lr.streak.days}-day streak{lr.streak.extended ? (lr.streak.days > 1 ? ' · today counts!' : ' · started today!') : ''}
-            </span>
-          )}
+          <WeekPill />
           {lr.points && (
             <span className="pill" data-testid="run-points">
               <IconStar size={16} color="#4CC9F0" /> {lr.points.gained > 0 ? `+${lr.points.gained.toLocaleString()} notes right · ` : ''}{lr.points.total.toLocaleString()} {lr.points.gained > 0 ? 'this cycle' : 'notes right this cycle'}
@@ -570,7 +600,7 @@ export function Results() {
       </div>
       </div>
 
-      <ResultsFoot primary={primary} again={again} toPiece={primary.onClick === toPiece ? null : toPiece} finish={passed && !lr.notCounted} />
+      <ResultsFoot primary={primary} again={again} toPiece={primary.onClick === toPiece ? null : toPiece} finish={ses ? sessionFinish : passed && !lr.notCounted} session={!!ses} />
     </main>
   );
 }
@@ -752,7 +782,7 @@ function startedDays(pieceId: string, partId: string): number | null {
 }
 
 /** The sticky footer of Results: one primary step (and why, under it), a second choice and the piece, and on a pass "Finish for today". */
-function ResultsFoot({ primary, again, toPiece, finish }: { primary: FootStep; again: FootStep | null; toPiece: (() => void) | null; finish?: boolean }) {
+function ResultsFoot({ primary, again, toPiece, finish, session }: { primary: FootStep; again: FootStep | null; toPiece: (() => void) | null; finish?: boolean; session?: boolean }) {
   return (
     <div className="results-foot" data-testid="results-foot">
       <button className="btn primary block two" data-testid={primary.testid} onClick={primary.onClick}>
@@ -765,7 +795,7 @@ function ResultsFoot({ primary, again, toPiece, finish }: { primary: FootStep; a
           {toPiece && <button className="btn small" data-testid="to-piece" onClick={toPiece}>Back to the piece</button>}
         </div>
       )}
-      {finish && <button className="link" data-testid="finish-today" onClick={() => leaveTo({ name: 'home' })}>Finish for today</button>}
+      {finish && <button className="link" data-testid="finish-today" onClick={() => { if (session) finishToday(); leaveTo({ name: 'home' }); }}>Finish for today</button>}
     </div>
   );
 }
@@ -985,4 +1015,10 @@ function AccountTip() {
       </div>
     </div>
   );
+}
+
+/** The week, not a streak to lose: "3 days · goal 4 this week". */
+function WeekPill() {
+  const w = useWeek();
+  return <span className="pill" data-testid="run-week">{weekText(w.count, w.goal)} this week</span>;
 }

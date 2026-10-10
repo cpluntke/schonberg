@@ -125,10 +125,13 @@ describe('rehearsal day and the day after', () => {
     const plan = buildPlan(ctx({ now: TUE, pieces: [abendlied(), dieu(), schaffe()], rehearsal: { days: 0, weekday: 'Tuesday', time: '19:30' }, lab: { interval: 'third', rung: 4, done: false } }));
     expect(plan.mode).toBe('rehearsal');
     expect(plan.minutes).toBeLessThanOrEqual(6);
-    expect(plan.steps.map((s) => s.pieceId ?? 'lab')).toEqual(['abend', 'dieu', 'lab']);
+    expect(plan.steps.map((s) => s.pieceId ?? 'lab')).toEqual(['abend', 'dieu', 'dieu', 'lab']);
     expect(plan.steps[0]).toMatchObject({ kind: 'sing-it-all', reason: 'Keeps it fresh for tonight' });
     expect(plan.steps[1].reason).toBe('Tonight’s focus');
-    expect(plan.steps[2]).toMatchObject({ kind: 'lab', minutes: 1 });
+    // a passage whose notes are known slowly: once, in tempo
+    expect(plan.steps[2]).toMatchObject({ step: 'tempo', level: 1 });
+    expect(plan.steps[2].title).toMatch(/once, in tempo$/);
+    expect(plan.steps[3]).toMatchObject({ kind: 'lab', minutes: 1 });
   });
 
   it('the day after: what felt shaky comes first ("You said it felt shaky")', () => {

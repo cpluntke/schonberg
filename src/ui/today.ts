@@ -259,3 +259,13 @@ export function stepShort(s: TodayStep): string {
   const what = s.sectionId === 'all' ? 'sing it all' : s.title.split(' · ').slice(1).join(' · ');
   return [t, what].filter(Boolean).join(' · ');
 }
+
+/** "Sat 10 Oct", "12 Dec", "Tuesday": a date in words (weekday, day, month), without commas. */
+export function dateWords(t: number | string | Date, o: Intl.DateTimeFormatOptions = { weekday: 'short', day: 'numeric', month: 'short' }): string {
+  const d = typeof t === 'string' ? new Date(`${t}T12:00:00`) : new Date(t);
+  const part = (k: 'weekday' | 'day' | 'month') => {
+    if (!o[k]) return '';
+    try { return new Intl.DateTimeFormat('en-US', { [k]: o[k] }).format(d); } catch { return ''; }
+  };
+  return [part('weekday'), part('day'), part('month')].filter(Boolean).join(' ');
+}

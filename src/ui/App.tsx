@@ -17,6 +17,8 @@ import { Ranks } from './screens/Ranks';
 import { Expert } from './screens/Expert';
 import { TunerScreen } from './screens/TunerScreen';
 import { IntonationLab } from './screens/IntonationLab';
+import { ProgressScreen } from './screens/Progress';
+import { SessionStrip } from './components/Today';
 import './generated';
 import { Diagnostics } from './screens/Diagnostics';
 import { LyricsQuiz } from './screens/LyricsQuiz';
@@ -119,9 +121,9 @@ export function App() {
   }, [route.name]);
   // Settings' own pages (the choir, the tuner, diagnostics) keep the sidebar on wide screens (no tab bar on phones).
   const settingsPage = ['choir', 'tuner', 'diagnostics'].includes(route.name);
-  const tab = route.name === 'piece' ? fromTab : settingsPage ? 'settings' : route.name;
+  const tab = route.name === 'piece' ? fromTab : settingsPage ? 'settings' : route.name === 'progress' ? 'home' : route.name;
   const isAdmin = ADMIN_ROUTES.includes(route.name);
-  const showNav = ['home', 'library', 'ranks', 'settings', 'piece', 'expert'].includes(route.name) || isAdmin;
+  const showNav = ['home', 'library', 'ranks', 'settings', 'piece', 'expert', 'progress'].includes(route.name) || isAdmin;
   const sidebar = showNav || settingsPage;
 
   let body: React.ReactNode;
@@ -136,6 +138,7 @@ export function App() {
       case 'results': body = <Results />; break;
       case 'setup': body = <Setup />; break;
       case 'settings': body = <Settings />; break;
+      case 'progress': body = <ProgressScreen />; break;
       case 'ranks': body = <Ranks />; break;
       case 'expert': body = <Expert />; break;
       case 'tuner': body = <TunerScreen />; break;
@@ -157,6 +160,8 @@ export function App() {
     <div className={route.name === 'play' ? 'app app-play' : sidebar ? 'app has-nav' : 'app'}>
       {/* (keyboard: the menu comes after the page in the document; this jumps there first) */}
       {sidebar && <a href="#main-nav" className="skip-link" onClick={(e) => { e.preventDefault(); document.querySelector<HTMLElement>('#main-nav button')?.focus(); }}>Go to the menu</a>}
+      {/* Today's session: the strip on top of the lab (Results and the pre-run card carry their own). */}
+      {route.name === 'intonation' && route.rung != null && lib.ready && <SessionStrip lab />}
       <ErrorBoundary resetKey={JSON.stringify(route)}>{body}</ErrorBoundary>
       <UpdatePrompt hidden={route.name === 'play'} />
       <StorageFullNotice hidden={route.name === 'play'} />
