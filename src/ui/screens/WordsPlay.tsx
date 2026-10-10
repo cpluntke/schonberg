@@ -9,6 +9,7 @@ import { setLastResult } from '../play/lastResult';
 import { useResume } from '../play/useResume';
 import { lyricLine, simulateMode } from './Play';
 import { wordInitial } from '../play/highway2d';
+import { COLORS, STAFF_GRADE, fpx } from '../play/palette';
 import { IconBack, IconHome, IconPause, IconPlay, IconRestart, IconStop } from '../icons';
 import { STAGE_NAMES, scoreWords, syllableOnsets, syllableOnsetsWithLevels, syllablesOf, type Syllable, type WordsResult, type WordsStage } from '../../game/textrhythm';
 import { getWords, recordWords } from '../../progress/words';
@@ -19,7 +20,8 @@ import { SessionStrip } from '../components/Today';
 
 type PlayRoute = Extract<Route, { name: 'play' }>;
 
-const GRADE_COLOR = { perfect: '#4CC9F0', good: '#4CC9F0', ok: '#1D4F63', miss: '#FF5D73' } as const;
+/** A syllable's colour by grade (read from the theme: palette.ts). */
+const gradeColor = (g: 'perfect' | 'good' | 'ok' | 'miss') => (g === 'ok' ? COLORS.voiceDeep : STAFF_GRADE[g]);
 
 /** Syllable text as shown at a stage: full, the first letter of each word, or nothing. */
 export function stageText(s: { text: string; wordStart: boolean }, stage: WordsStage): string {
@@ -209,7 +211,7 @@ export function WordsPlay({ route }: { route: PlayRoute }) {
             <div className="card words-card">
               <SessionStrip pieceId={piece.id} compact />
               <span className="eyebrow">Words in rhythm</span>
-              <strong style={{ fontSize: 18 }}>{section.label}</strong>
+              <strong style={{ fontSize: '1.125rem' }}>{section.label}</strong>
               {syl.length === 0 ? (
                 <span className="small muted">Your part has no words here.</span>
               ) : (
@@ -238,7 +240,7 @@ export function WordsPlay({ route }: { route: PlayRoute }) {
         {phase === 'micError' && (
           <div className="overlay">
             <div className="card" role="alert">
-              <strong style={{ fontSize: 18 }}>No microphone</strong>
+              <strong style={{ fontSize: '1.125rem' }}>No microphone</strong>
               <span className="small muted">{micMsg}</span>
               <button className="btn block" onClick={() => setPhase('ready')}>Try again</button>
             </div>
@@ -254,7 +256,7 @@ export function WordsPlay({ route }: { route: PlayRoute }) {
           <div className="grow" />
           {running ? (
             <>
-              <button className="btn small" onClick={() => sessionRef.current?.finish()}><IconStop size={14} color="#EEF0FF" /> Finish</button>
+              <button className="btn small" onClick={() => sessionRef.current?.finish()}><IconStop size={14} /> Finish</button>
               <button className="big-play" aria-label="Pause" onClick={() => { sessionRef.current?.pause(); setPhase('paused'); }}><IconPause /></button>
             </>
           ) : (
@@ -266,7 +268,7 @@ export function WordsPlay({ route }: { route: PlayRoute }) {
       {phase === 'paused' && (
         <div className="overlay sheet" data-testid="pause-sheet">
           <div className="card" role="dialog" aria-label="Paused">
-            <strong style={{ fontSize: 18 }}>Paused</strong>
+            <strong style={{ fontSize: '1.125rem' }}>Paused</strong>
             {resumeMsg && <span className="small" role="status">{resumeMsg}</span>}
             <button className="btn primary block" autoFocus disabled={resuming} onClick={() => { pushGuard(); void resume(); }}><IconPlay size={18} /> {resuming ? 'Resuming…' : 'Resume'}</button>
             <button className="btn block" onClick={() => { sessionRef.current?.dispose(); sessionRef.current = null; start(); }}><IconRestart size={18} /> Restart passage</button>
@@ -292,16 +294,16 @@ function drawWordsLane(c: CanvasRenderingContext2D, W: number, H: number, s: {
   const x = (t: number) => nowX + (t - s.pos) * pps;
   const tMin = s.pos - nowX / pps;
   const tMax = s.pos + (W - nowX) / pps;
-  c.fillStyle = '#0F1226';
+  c.fillStyle = COLORS.bg;
   c.fillRect(0, 0, W, H);
   // Bar lines.
-  c.font = '600 10px "JetBrains Mono", monospace';
+  c.font = `600 ${fpx(11)}px "JetBrains Mono", monospace`;
   c.textBaseline = 'top';
   for (const m of s.measures) {
     if (m.start < tMin || m.start > tMax) continue;
-    c.fillStyle = '#262B4D';
+    c.fillStyle = COLORS.measure;
     c.fillRect(Math.round(x(m.start)), 14, 1, H - 14);
-    c.fillStyle = '#A8B0D6';
+    c.fillStyle = COLORS.label;
     c.fillText(m.number, x(m.start) + 3, 2);
   }
   // Syllables.
@@ -315,7 +317,7 @@ function drawWordsLane(c: CanvasRenderingContext2D, W: number, H: number, s: {
     const g = past ? gradeOf.get(sy.index) : undefined;
     const bx = x(sy.start);
     const bw = Math.max(18, (end - sy.start) * pps - 4);
-    c.fillStyle = g ? GRADE_COLOR[g] : sy.start <= s.pos && s.pos < end ? '#FF7A45' : '#2A1A16';
+    c.fillStyle = g ? gradeColor(g) : sy.start <= s.pos && s.pos < end ? COLORS.target : COLORS.targetSoft;
     c.globalAlpha = g === 'miss' ? 0.6 : 1;
     c.beginPath();
     c.roundRect?.(bx, laneY - 22, bw, 44, 10);
@@ -323,22 +325,22 @@ function drawWordsLane(c: CanvasRenderingContext2D, W: number, H: number, s: {
     c.fill();
     c.globalAlpha = 1;
     if (!g && !(sy.start <= s.pos && s.pos < end)) {
-      c.strokeStyle = '#FF7A45';
+      c.strokeStyle = COLORS.target;
       c.lineWidth = 2;
       c.stroke();
     }
     // Past syllables always show their text (feedback); upcoming ones as the stage allows.
     const txt = past ? sy.text : stageText(sy, s.stage);
     if (txt) {
-      c.font = `800 ${txt.length > 6 ? 13 : 16}px "Bricolage Grotesque", sans-serif`;
+      c.font = `800 ${fpx(txt.length > 6 ? 13 : 16)}px "Bricolage Grotesque", sans-serif`;
       c.textBaseline = 'middle';
-      c.fillStyle = g || sy.start <= s.pos ? '#0B0D1A' : '#FFB08F';
+      c.fillStyle = g || sy.start <= s.pos ? COLORS.onFill : COLORS.targetText;
       c.fillText(txt, bx + 6, laneY + 1, bw - 8);
     }
   }
   // Your loudness and the syllables the app heard.
   const baseY = H - 18;
-  c.strokeStyle = '#4CC9F0';
+  c.strokeStyle = COLORS.voice;
   c.lineWidth = 2;
   c.beginPath();
   let started = false;
@@ -349,11 +351,11 @@ function drawWordsLane(c: CanvasRenderingContext2D, W: number, H: number, s: {
     if (!started) { c.moveTo(x(p.time), yy); started = true; } else c.lineTo(x(p.time), yy);
   }
   c.stroke();
-  c.fillStyle = '#EEF0FF';
+  c.fillStyle = COLORS.text;
   for (const t of s.onsets) {
     if (t < tMin || t > s.pos) continue;
     c.fillRect(Math.round(x(t)) - 1, baseY - H * 0.32, 2, 8);
   }
-  c.fillStyle = 'rgba(238,240,255,0.85)';
+  c.fillStyle = COLORS.playhead;
   c.fillRect(Math.round(nowX) - 1, 14, 2, H - 14);
 }

@@ -146,12 +146,12 @@ export function Ranks() {
       </div>
 
       <div className="card ranks-battle">
-        <div className="row between"><h2 style={{ fontSize: 15 }}>Section battle</h2><span className="tiny muted">avg. readiness (current app)</span></div>
+        <div className="row between"><h2 style={{ fontSize: '0.9375rem' }}>Section battle</h2><span className="tiny muted">avg. readiness (current app)</span></div>
         {sections.map((s) => (
           <div key={s.vt} className="row">
             <span style={{ width: 22, fontWeight: 800 }}>{s.vt}</span>
             <div className="bar grow" style={{ height: 14, borderRadius: 7 }}>
-              <span style={{ width: `${(s.avg / maxAvg) * 100}%`, background: s.vt === profile.voice ? 'var(--accent)' : '#4A5288', borderRadius: 7 }} />
+              <span style={{ width: `${(s.avg / maxAvg) * 100}%`, background: s.vt === profile.voice ? 'var(--accent)' : 'var(--line-hover)', borderRadius: 7 }} />
             </div>
             <span className="mono small" style={{ width: 70, textAlign: 'right' }}>{s.n ? `${Math.round(s.avg * 100)}% · ${s.n}` : '–'}</span>
           </div>
@@ -179,7 +179,7 @@ export function Ranks() {
               ...(isMe ? { background: 'var(--voice-bg)', border: '1px solid var(--voice)' } : { borderBottom: '1px solid var(--surface-2)' }),
             }}>
               <span className="mono muted" style={{ width: 22 }}>{i + 1}</span>
-              <span style={{ width: 36, height: 36, borderRadius: 18, background: 'var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13 }}>{initials(e.name)}</span>
+              <span style={{ width: 36, height: 36, borderRadius: 18, background: 'var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.875rem' }}>{initials(e.name)}</span>
               <div className="grow col" style={{ gap: 0 }}>
                 <span style={{ fontWeight: 600 }}>{isMe ? (profile.name ? `${e.name} (you)` : 'You') : e.name}</span>
                 <span className="tiny muted">{[({ S: 'Soprano', A: 'Alto', T: 'Tenor', B: 'Bass' } as Record<string, string>)[e.voice], e.streak > 0 ? `${e.streak}-day streak` : '', e.clean ? `★ clean run at level ${e.clean}` : '', old ? 'older app: readiness not comparable' : ''].filter(Boolean).join(' · ')}</span>
@@ -192,7 +192,7 @@ export function Ranks() {
                   for (const id of e.pieceId === ALL_PIECES ? programme : [e.pieceId]) for (const n of names) removeLocalEntry(choir, n, id);
                   setRefresh((x) => x + 1);
                 }}>
-                  <span aria-hidden="true" style={{ fontSize: 18, color: 'var(--muted)' }}>×</span>
+                  <span aria-hidden="true" style={{ fontSize: '1.125rem', color: 'var(--muted)' }}>×</span>
                 </button>
               )}
             </div>
@@ -204,9 +204,9 @@ export function Ranks() {
 
       {pieces.length > 0 && (
         <div className="card ranks-overview">
-          <div className="row between"><h2 style={{ fontSize: 15 }}>Choir overview</h2><span className="tiny muted">avg. readiness per section of the choir</span></div>
+          <div className="row between"><h2 style={{ fontSize: '0.9375rem' }}>Choir overview</h2><span className="tiny muted">avg. readiness per section of the choir</span></div>
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 13 }}>
+            <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '0.875rem' }}>
               <thead>
                 <tr>
                   <th scope="col" style={{ textAlign: 'left', padding: '4px 6px' }}>Piece</th>
@@ -223,7 +223,7 @@ export function Ranks() {
                       {(['S', 'A', 'T', 'B'] as const).map((vt) => {
                         const v = es.filter((e) => e.voice === vt && (e === mine || e.v === READINESS_VERSION));
                         const avg = v.length ? v.reduce((a, e) => a + e.readiness, 0) / v.length : null;
-                        const bg = avg == null ? 'transparent' : avg >= 0.75 ? '#1D4F63' : avg >= 0.4 ? '#2A2F55' : '#4A2418';
+                        const bg = avg == null ? 'transparent' : avg >= 0.75 ? 'var(--voice-bg)' : avg >= 0.4 ? 'var(--surface-2)' : 'var(--accent-soft)';
                         return <td key={vt} className="mono" style={{ textAlign: 'center', padding: '6px', background: bg }}>{avg == null ? '–' : `${Math.round(avg * 100)}%`}</td>;
                       })}
                     </tr>

@@ -110,8 +110,8 @@ export function Tuner({ notation, onReading, autoStart = false }: {
         <>
           <div className="row" style={{ alignItems: 'baseline', gap: 10 }}>
             <span className="tuner-note" data-testid="tuner-note">{lab}</span>
-            {notation !== 'letter' && <span style={{ fontSize: 24, fontWeight: 600, color: 'var(--muted)' }}>{letter}</span>}
-            {notation === 'letter' && nearest != null && <span style={{ fontSize: 28, fontWeight: 600, color: 'var(--muted)' }}>{Math.floor(nearest / 12) - 1}</span>}
+            {notation !== 'letter' && <span style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--muted)' }}>{letter}</span>}
+            {notation === 'letter' && nearest != null && <span style={{ fontSize: '1.75rem', fontWeight: 600, color: 'var(--muted)' }}>{Math.floor(nearest / 12) - 1}</span>}
           </div>
           <span className="mono small" style={{ color: 'var(--voice)' }}>{reading.hz ? `${reading.hz.toFixed(1)} Hz` : 'sing a comfortable “ah”'}</span>
           <div className="meter" aria-label={`${cents} cents`}>

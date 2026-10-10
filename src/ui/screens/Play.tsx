@@ -660,7 +660,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
         onBack={() => leaveFor(up)} onHome={() => leaveFor({ name: 'home' })}
         extra={!listenOnly && (
           <div className="col" style={{ alignItems: 'flex-end', gap: 0, paddingRight: 2 }}>
-            <span className="mono" style={{ fontWeight: 600, fontSize: route.mode === '3d' ? 22 : 17 }} data-testid="score">{hud.score.toLocaleString()}</span>
+            <span className="mono" style={{ fontWeight: 600, fontSize: route.mode === '3d' ? '1.375rem' : '1.0625rem' }} data-testid="score">{hud.score.toLocaleString()}</span>
             <span className="mono tiny" style={{ color: 'var(--accent)', whiteSpace: 'nowrap' }}>{hud.combo > 1 ? `combo ${hud.combo}` : ' '}</span>
           </div>
         )} />
@@ -670,9 +670,9 @@ function SingPlay({ route }: { route: PlayRoute }) {
         <div className="sr-only" aria-live="polite" data-testid="countin-live">{hud.count > 0 && running ? String(hud.count) : ''}</div>
         {hud.count > 0 && running && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-            <span style={{ fontSize: 96, fontWeight: 800, color: 'var(--accent)', textShadow: '0 0 24px #FF7A45' }}>{hud.count}</span>
+            <span style={{ fontSize: '6rem', fontWeight: 800, color: 'var(--accent)', textShadow: '0 0 24px var(--accent)' }}>{hud.count}</span>
             {sessionRef.current?.resumed && (
-              <span className="small" data-testid="resume-hint" style={{ background: 'rgba(11,13,26,0.85)', borderRadius: 8, padding: '4px 10px' }}>Carry on singing from the line</span>
+              <span className="small" data-testid="resume-hint" style={{ background: 'var(--scrim)', borderRadius: 8, padding: '4px 10px' }}>Carry on singing from the line</span>
             )}
           </div>
         )}
@@ -816,7 +816,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
               )}
               {!listenOnly && showHowto && (
                 <details className="col t14 howto" style={{ gap: 4, background: 'var(--bg-2)', borderRadius: 10, padding: '0 12px' }} data-testid="howto">
-                  <summary className="link start" style={{ fontSize: 15 }}>First time? How to read the screen</summary>
+                  <summary className="link start" style={{ fontSize: '0.9375rem' }}>First time? How to read the screen</summary>
                   <div className="col" style={{ gap: 4, paddingBottom: 10 }}>
                   {display === 'score' ? (
                     <>
@@ -824,7 +824,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
                         ? <span>The full score: your part is the staff with the <span style={{ color: 'var(--voice)' }}>blue</span> band, the other voices are drawn plainly. The white line moves through the bars: sing the note it's on in your staff (it glows <span style={{ color: 'var(--accent)' }}>orange</span>).</span>
                         : <span>Your part as sheet music. The white line moves through the bar: sing the note it's on (it glows <span style={{ color: 'var(--accent)' }}>orange</span>).</span>}
                       <span><span style={{ color: 'var(--voice)' }}>━</span> Your voice draws a blue line at its exact height on the staff: just under the note means flat, just over means sharp (light orange when out of tune).</span>
-                      <span>Notes turn <span style={{ color: 'var(--voice)' }}>blue</span> when sung well, <span style={{ color: '#F2D15C' }}>yellow</span> when close, <span style={{ color: '#FF5D73' }}>red</span> when missed. The bubble says how close you are: spot on, a touch, a little or clearly flat or sharp. Prefer moving bars? Choose Highway under Display &amp; tempo.</span>
+                      <span>Notes turn <span style={{ color: 'var(--voice)' }}>blue</span> when sung well, <span style={{ color: 'var(--warn)' }}>yellow</span> when close, <span style={{ color: 'var(--bad)' }}>red</span> when missed. The bubble says how close you are: spot on, a touch, a little or clearly flat or sharp. Prefer moving bars? Choose Highway under Display &amp; tempo.</span>
                     </>
                   ) : (
                     <>
@@ -907,7 +907,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
         {phase === 'micError' && (
           <div className="overlay">
             <div className="card" role="alert">
-              <strong style={{ fontSize: 18 }}>No microphone</strong>
+              <strong style={{ fontSize: '1.125rem' }}>No microphone</strong>
               <span className="small muted">{micMsg}</span>
               <button className="btn primary block" onClick={listenInstead}>Listen to this passage instead</button>
               <button className="btn block" onClick={() => setPhase('ready')}>Try again</button>
@@ -965,7 +965,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
       {phase === 'paused' && (
         <div className="overlay sheet" data-testid="pause-sheet">
           <div className="card" role="dialog" aria-label="Paused">
-            <strong style={{ fontSize: 18 }}>Paused</strong>
+            <strong style={{ fontSize: '1.125rem' }}>Paused</strong>
             {isFullRun && <span className="small muted">A run of the whole piece counts only in one go: carry on to practise, or restart to sing it through for the level.</span>}
             {resumeMsg && <span className="small" role="status">{resumeMsg}</span>}
             <button className="btn primary block" autoFocus disabled={resuming} onClick={() => { pushGuard(); void resume(); }}><IconPlay size={18} /> {resuming ? 'Resuming…' : 'Resume'}</button>

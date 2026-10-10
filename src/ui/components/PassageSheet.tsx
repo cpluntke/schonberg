@@ -90,7 +90,7 @@ export function PassageSheet({ pieceId, partId, section, lyric, sp, onClose, act
         <span className="grab" aria-hidden="true" />
         <div className="row" style={{ alignItems: 'flex-start' }}>
           <div className="grow col" style={{ gap: 2 }}>
-            <h2 style={{ fontSize: 20 }}>{section.label}</h2>
+            <h2 style={{ fontSize: '1.25rem' }}>{section.label}</h2>
             {lyric && <span className="lyr">“{lyric}…”</span>}
           </div>
           <button ref={closeRef} className="icon-btn filled" aria-label="Close" onClick={onClose} data-testid="sheet-close"><IconClose /></button>
@@ -129,7 +129,7 @@ export function PassageSheet({ pieceId, partId, section, lyric, sp, onClose, act
                       {actions.words && <button className="link start" data-testid="sheet-words" onClick={actions.words}>Optional first: say it in rhythm</button>}
                       {lvl >= 2 && (
                         <button className="link start" data-testid="sheet-arcade" aria-label={`Arcade mode for ${section.label}`}
-                          onClick={() => actions.sing(Math.max(2, Math.min(4, lvl)), 'tempo', '3d')}><IconCube size={16} color="#B3A6FF" /> Arcade (just for fun)</button>
+                          onClick={() => actions.sing(Math.max(2, Math.min(4, lvl)), 'tempo', '3d')}><IconCube size={16} color="var(--expert)" /> Arcade (just for fun)</button>
                       )}
                     </div>
                   )}

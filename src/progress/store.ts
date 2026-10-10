@@ -97,6 +97,10 @@ export interface Profile {
   sync?: boolean;
   /** Days a week the singer means to practise (Today's week card; default 4). Rehearsals count. */
   weekGoal?: number;
+  /** Settings → Display: the colours (unset = dark, the app's look; 'system' follows the phone). See ui/theme.ts. */
+  appearance?: 'dark' | 'light' | 'system';
+  /** Settings → Display: text size, applied app-wide (unset = standard). See ui/theme.ts. */
+  textSize?: 'standard' | 'large' | 'larger';
 }
 
 /** The practice display (the singer's choice, else sheet music at every level). */

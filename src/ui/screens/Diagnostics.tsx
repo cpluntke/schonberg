@@ -174,7 +174,7 @@ export function Diagnostics() {
       </div>
 
       <button className="btn primary block" onClick={copy}>Copy diagnostics report</button>
-      <textarea readOnly value={reportText} aria-label="Diagnostics report" style={{ minHeight: 200, fontFamily: 'var(--mono)', fontSize: 11, background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--line)', borderRadius: 10, padding: 10 }} />
+      <textarea readOnly value={reportText} aria-label="Diagnostics report" style={{ minHeight: 200, fontFamily: 'var(--mono)', fontSize: '0.8125rem', background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--line)', borderRadius: 10, padding: 10 }} />
       {/* For whoever runs the choir server: the super-admin login, out of the singers' way (no longer in Settings). */}
       {apiBase() && !loadSuperSession() && (
         <button className="linklike small muted" style={{ alignSelf: 'center', minHeight: 44 }} data-testid="settings-super-link" onClick={() => go({ name: 'superadmin' })}>

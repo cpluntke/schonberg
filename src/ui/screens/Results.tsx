@@ -58,11 +58,11 @@ function gradeLetter(acc: number, wrongAtEveryNote = false): string {
 
 function insightIcon(i: Insight) {
   switch (i.kind) {
-    case 'flat-long-notes': case 'flat-overall': return <IconDown size={20} color="#FF7A45" />;
-    case 'sharp-long-notes': case 'sharp-overall': return <IconUp size={20} color="#FF7A45" />;
-    case 'late-entries': case 'early-entries': case 'behind-beat': case 'consonant-on-beat': return <IconClock size={20} color="#FF7A45" />;
-    case 'great': return <IconStar size={20} color="#4CC9F0" />;
-    default: return <IconLoop size={20} color="#FF7A45" />;
+    case 'flat-long-notes': case 'flat-overall': return <IconDown size={20} color="var(--accent)" />;
+    case 'sharp-long-notes': case 'sharp-overall': return <IconUp size={20} color="var(--accent)" />;
+    case 'late-entries': case 'early-entries': case 'behind-beat': case 'consonant-on-beat': return <IconClock size={20} color="var(--accent)" />;
+    case 'great': return <IconStar size={20} color="var(--voice)" />;
+    default: return <IconLoop size={20} color="var(--accent)" />;
   }
 }
 
@@ -294,7 +294,7 @@ export function Results() {
     };
   } else if (stuck) {
     primary = listenHelp
-      ? { label: <><IconEar size={18} color="#0B0D1A" /> Listen again, then sing it</>, why: 'A few misses in a row: hear how it goes first.', testid: 'stuck-listen', onClick: listenAgain }
+      ? { label: <><IconEar size={18} /> Listen again, then sing it</>, why: 'A few misses in a row: hear how it goes first.', testid: 'stuck-listen', onClick: listenAgain }
       : { label: <><IconPlay size={18} /> {slowLabel}</>, why: toSlowStep ? 'A few misses in a row: the slow step first (it counts), then in tempo.' : 'Slower runs don’t count, but they make the next try easier.', testid: 'stuck-slow', onClick: singSlowly };
   } else if (nextFix) {
     primary = {
@@ -326,7 +326,7 @@ export function Results() {
     };
   } else {
     primary = {
-      label: <><IconCube size={18} color="#0B0D1A" /> {lr.full?.passed && lr.full.newLevel >= 5 ? 'Memorised!' : 'All done for today!'} Arcade run of the whole piece</>,
+      label: <><IconCube size={18} /> {lr.full?.passed && lr.full.newLevel >= 5 ? 'Memorised!' : 'All done for today!'} Arcade run of the whole piece</>,
       why: 'Just for fun: arcade runs don’t count for a level.', testid: 'arcade-run', onClick: () => play('all', 4, '3d'),
     };
   }
@@ -502,7 +502,7 @@ export function Results() {
 
       {lr.full && lr.full.sections.length > 0 && (
         <div className="col" style={{ gap: 6 }} data-testid="full-sections">
-          <h2 style={{ fontSize: 16 }}>Passage by passage</h2>
+          <h2 style={{ fontSize: '1rem' }}>Passage by passage</h2>
           {lr.full.sections.map((x) => {
             const fix = lr.full!.counted && lr.full!.toFix.includes(x.id);
             return (
@@ -536,7 +536,7 @@ export function Results() {
           <div className="grade-tile small-tile" aria-label={`Grade ${letter}${lr.notCounted ? ' (practice)' : ''}`} data-testid="grade"
             style={lr.notCounted ? { background: 'var(--surface-2)', color: 'var(--muted)' } : undefined}>{letter}</div>
           <div className="col grow" style={{ gap: 2 }}>
-            <span className="mono" style={{ fontSize: 22, fontWeight: 600 }} data-testid="result-score">{r.score.toLocaleString()}</span>
+            <span className="mono" style={{ fontSize: '1.375rem', fontWeight: 600 }} data-testid="result-score">{r.score.toLocaleString()}</span>
             <span className="t14" style={{ color: 'var(--voice)' }}>{Math.round(r.accuracy * 100)}% accuracy{isPB ? ' · new personal best!' : ''}</span>
           </div>
           <span className="t14 muted">Details</span>
@@ -555,21 +555,21 @@ export function Results() {
       {measureIdx.length > 0 && (
         <div className="col" style={{ gap: 8 }}>
           <div className="row between">
-            <h2 style={{ fontSize: 16 }}>Bar by bar</h2>
+            <h2 style={{ fontSize: '1rem' }}>Bar by bar</h2>
             <span className="t14 muted">tap a bar to loop it</span>
           </div>
           <div className="heat">
             {measureIdx.map((m) => {
               const v = r.perMeasure[m];
               // Level 1: a bar with a wrong note needs work, whatever its average.
-              const bg = wrongBars.has(m) ? '#FF7A45' : v >= 0.85 ? '#4CC9F0' : v >= 0.6 ? '#1D4F63' : '#FF7A45';
-              return <button key={m} aria-label={`${cellName(m)}: ${Math.round(v * 100)}%`} title={`${cellName(m)} · ${Math.round(v * 100)}%`} style={{ background: bg, color: bg === '#1D4F63' ? '#EEF0FF' : '#0B0D1A', fontSize: 11, fontWeight: 700, fontFamily: 'var(--mono)' }} onClick={() => playLoop(m - 1, m + 1)}>{cellText(m)}</button>;
+              const bg = wrongBars.has(m) ? 'var(--accent)' : v >= 0.85 ? 'var(--voice)' : v >= 0.6 ? 'var(--voice-deep)' : 'var(--accent)';
+              return <button key={m} aria-label={`${cellName(m)}: ${Math.round(v * 100)}%`} title={`${cellName(m)} · ${Math.round(v * 100)}%`} style={{ background: bg, color: bg === 'var(--voice-deep)' ? 'var(--text)' : 'var(--accent-ink)', fontSize: '0.8125rem', fontWeight: 700, fontFamily: 'var(--mono)' }} onClick={() => playLoop(m - 1, m + 1)}>{cellText(m)}</button>;
             })}
           </div>
           <div className="row t14 muted" style={{ gap: 14 }}>
-            <span className="row" style={{ gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: '#4CC9F0' }} />solid</span>
-            <span className="row" style={{ gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: '#1D4F63' }} />ok</span>
-            <span className="row" style={{ gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: '#FF7A45' }} />needs work</span>
+            <span className="row" style={{ gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--voice)' }} />solid</span>
+            <span className="row" style={{ gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--voice-deep)' }} />ok</span>
+            <span className="row" style={{ gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--accent)' }} />needs work</span>
             <span className="grow" style={{ textAlign: 'right' }}>{barRangeLabel(piece.score, measureIdx[0], measureIdx[measureIdx.length - 1], true)}</span>
           </div>
         </div>
@@ -580,7 +580,7 @@ export function Results() {
           <WeekPill />
           {lr.points && (
             <span className="pill" data-testid="run-points">
-              <IconStar size={16} color="#4CC9F0" /> {lr.points.gained > 0 ? `+${lr.points.gained.toLocaleString()} notes right · ` : ''}{lr.points.total.toLocaleString()} {lr.points.gained > 0 ? 'this cycle' : 'notes right this cycle'}
+              <IconStar size={16} color="var(--voice)" /> {lr.points.gained > 0 ? `+${lr.points.gained.toLocaleString()} notes right · ` : ''}{lr.points.total.toLocaleString()} {lr.points.gained > 0 ? 'this cycle' : 'notes right this cycle'}
             </span>
           )}
         </div>
@@ -588,13 +588,13 @@ export function Results() {
 
       {insights.length > 0 && (
         <div className="col" style={{ gap: 8 }}>
-          <h2 style={{ fontSize: 16 }}>Coach notes</h2>
+          <h2 style={{ fontSize: '1rem' }}>Coach notes</h2>
           {insights.map((i, k) => (
             <div key={k} className="card" style={{ padding: '12px 14px', gap: 8 }}>
               <div className="row" style={{ alignItems: 'flex-start' }}>
                 <span style={{ flex: 'none', marginTop: 2 }}>{insightIcon(i)}</span>
                 <div className="col" style={{ gap: 2 }}>
-                  <strong style={{ fontSize: 15 }}>{i.title}</strong>
+                  <strong style={{ fontSize: '0.9375rem' }}>{i.title}</strong>
                   <span className="t14 muted">{i.detail}</span>
                 </div>
               </div>
@@ -719,7 +719,7 @@ function PathProgress({ sections, prog, label }: { sections: Section[]; prog: Pi
   return (
     <div className="card" data-testid="path-progress" style={{ gap: 8 }}>
       <span className="eb">Your path{W ? ` · ${levelLabel(W.level)}` : ''}</span>
-      <h2 style={{ fontSize: 20 }}>{headline}</h2>
+      <h2 style={{ fontSize: '1.25rem' }}>{headline}</h2>
       <div className="checklist">
         {groups.map((g) => {
           const st = passageStatus(g.sp);
@@ -786,7 +786,7 @@ function MilestoneBand({ piece, m, sections, prog, lr, notesRight, passName }: {
         </span>
       </section>
       <div className="card" data-testid="next-goal">
-        <h2 style={{ fontSize: 20 }}><span className="muted" style={{ fontWeight: 700 }}>Next goal:</span> {nextGoal.h}</h2>
+        <h2 style={{ fontSize: '1.25rem' }}><span className="muted" style={{ fontWeight: 700 }}>Next goal:</span> {nextGoal.h}</h2>
         <p className="t14 muted" style={{ margin: 0 }}>{nextGoal.p}</p>
       </div>
     </>
@@ -969,7 +969,7 @@ function WordsResults({ lr, words }: { lr: NonNullable<ReturnType<typeof getLast
   const nextStage = words.counted && words.stage < 2 && res.accuracy >= WORDS_PASS ? ((words.stage + 1) as WordsStage) : null;
   // The words screen opens at the next step that isn't passed yet.
   const again = () => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, level: 0, mode: '2d', words: true });
-  const color = { perfect: 'var(--voice)', good: 'var(--voice)', ok: '#E8B86A', miss: '#FF7A45' } as const;
+  const color = { perfect: 'var(--voice)', good: 'var(--voice)', ok: 'var(--warn)', miss: 'var(--accent)' } as const;
   const up = upOf(piece.id);
   const foot = sessionFoot(piece.id, {
     label: <><IconPlay size={18} /> {nextStage != null ? `Next: ${STAGE_NAMES[nextStage]}` : 'Again'}</>, onClick: again, testid: 'words-again',
@@ -1002,7 +1002,7 @@ function WordsResults({ lr, words }: { lr: NonNullable<ReturnType<typeof getLast
       {part && (
         <div className="card" data-testid="words-text">
           <span className="tiny muted">Blue: in time · amber: a little off · orange: missing or off the beat</span>
-          <p style={{ margin: 0, fontSize: 18, lineHeight: 1.5 }}>
+          <p style={{ margin: 0, fontSize: '1.125rem', lineHeight: 1.5 }}>
             {res.syllables.map((x, k) => {
               const n = part.notes[x.index];
               const sep = k > 0 && n.syllabic !== 'middle' && n.syllabic !== 'end' ? ' ' : '';
@@ -1015,8 +1015,8 @@ function WordsResults({ lr, words }: { lr: NonNullable<ReturnType<typeof getLast
         <div className="heat">
           {measureIdx.map((m) => {
             const v = res.perMeasure[m];
-            const bg = v >= 0.85 ? '#4CC9F0' : v >= 0.6 ? '#1D4F63' : '#FF7A45';
-            return <span key={m} aria-label={`${cellName(m)}: ${Math.round(v * 100)}%`} style={{ background: bg, height: 30, borderRadius: 3, color: bg === '#1D4F63' ? '#EEF0FF' : '#0B0D1A', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--mono)' }}>{cellText(m)}</span>;
+            const bg = v >= 0.85 ? 'var(--voice)' : v >= 0.6 ? 'var(--voice-deep)' : 'var(--accent)';
+            return <span key={m} aria-label={`${cellName(m)}: ${Math.round(v * 100)}%`} style={{ background: bg, height: 30, borderRadius: 3, color: bg === 'var(--voice-deep)' ? 'var(--text)' : 'var(--accent-ink)', fontSize: '0.8125rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--mono)' }}>{cellText(m)}</span>;
           })}
         </div>
       )}

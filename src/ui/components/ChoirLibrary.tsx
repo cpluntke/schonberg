@@ -77,7 +77,7 @@ export function LibraryPanel({ code, auth, info, draft, cycle, embedded = false,
               <div key={p.id} className="col" data-testid="library-piece" data-piece={p.id}
                 style={{ gap: 4, padding: '12px 0', borderTop: '1px solid var(--surface-2)' }}>
                 <div className="row" style={{ gap: 8, alignItems: 'flex-start' }}>
-                  <strong className="grow" style={{ fontSize: 15 }}>{p.title}</strong>
+                  <strong className="grow" style={{ fontSize: '0.9375rem' }}>{p.title}</strong>
                   {p.level && <span className="badge muted">{LEVEL[p.level] ?? p.level}</span>}
                 </div>
                 <span className="small muted">{p.composer}</span>
@@ -162,7 +162,7 @@ function LabEntry({ code, auth, draft, cycle, stamp, onAdded }: {
   return (
     <div className="col" data-testid="library-lab" style={{ gap: 4, padding: '12px 0', borderTop: '1px solid var(--surface-2)' }}>
       <div className="row" style={{ gap: 8, alignItems: 'flex-start' }}>
-        <strong className="grow" style={{ fontSize: 15 }}>{LAB_TITLE}</strong>
+        <strong className="grow" style={{ fontSize: '0.9375rem' }}>{LAB_TITLE}</strong>
         <span className="badge muted">Exercise</span>
       </div>
       <span className="small">Find the pure fifth and the pure major third by ear: listen, tune by hand, sing with and without help, then in a chord. No score needed.</span>

@@ -3,7 +3,8 @@
 // over it ("↓ clearly flat", "not sung"). Static, drawn with the score view's engraver (staff2d.ts).
 import type { NotationMode } from '../../game/notation';
 import type { Part, Score } from '../../music/types';
-import { COLORS, type DrawState } from './highway2d';
+import type { DrawState } from './highway2d';
+import { COLORS, fpx } from './palette';
 import {
   INK, buildSysDraw, drawStaffFrame, drawStaffNotes, layoutStaff, lyricFontFor, nameFontFor, nameMeasure, sungStep, textRows,
   type Cached, type StaffLayout, type SysDraw, type SysGeo, type Vis,
@@ -71,7 +72,7 @@ export interface MistakeOpts {
 
 const LEFT = 6;
 const RIGHT = 10;
-const tagPx = (sp: number) => Math.round(Math.max(11, Math.min(14, sp * 1.05)));
+const tagPx = (sp: number) => fpx(Math.max(12, Math.min(15, sp * 1.05)));
 
 /** Lay out bars m0..m1 of `part` on one line with the marks. */
 export function layoutMistakes(c: Ctx, score: Score, part: Part, m0: number, m1: number, marks: MistakeMark[], o: MistakeOpts): MistakeView {
@@ -179,19 +180,19 @@ export function layoutMistakes(c: Ctx, score: Score, part: Part, m0: number, m1:
   };
 }
 
-const MISS = COLORS.miss;
-const SUNG = INK.outTune;
-
 /** Draw a laid-out snippet (canvas already scaled to CSS px). */
 export function drawMistakes(c: Ctx, V: MistakeView) {
   const { sp, geo, L, state, vis } = V;
+  // (read each time: the colours follow Settings → Display)
+  const MISS = COLORS.miss;
+  const SUNG = INK.outTune;
   const { top, mid } = geo;
   c.fillStyle = COLORS.bg;
   c.fillRect(0, 0, V.W, V.H);
   // Bars with a wrong note: a faint red band behind the staff.
   for (const [m, x0, x1] of V.bars) {
     if (!V.wrongBars.has(m)) continue;
-    c.fillStyle = 'rgba(255,93,115,0.11)';
+    c.fillStyle = INK.wrongBar;
     rounded(c, x0 + 1, top - 1.1 * sp, x1 - x0 - 2, 6.2 * sp, 0.6 * sp);
     c.fill();
   }
@@ -234,7 +235,7 @@ export function drawMistakes(c: Ctx, V: MistakeView) {
       c.font = L.lyricFont;
       c.textAlign = 'center';
       c.textBaseline = 'alphabetic';
-      c.fillStyle = '#FFB3BE';
+      c.fillStyle = INK.wrongHead;
       c.fillText(ly, p.lyricX, top + (4 + L.lyricOff) * sp);
       c.textAlign = 'left';
     }
@@ -260,13 +261,13 @@ export function drawMistakes(c: Ctx, V: MistakeView) {
       c.setLineDash([]);
       c.globalAlpha = 1;
     }
-    c.fillStyle = '#3B1520';
+    c.fillStyle = INK.tagBg;
     rounded(c, p.tagX, yt, p.tagW, V.tagH, V.tagH / 2);
     c.fill();
     c.strokeStyle = MISS;
     c.lineWidth = 1.25;
     c.stroke();
-    c.fillStyle = '#FFD3DA';
+    c.fillStyle = INK.tagText;
     c.fillText(p.tag, cx, (yt + yb) / 2 + 0.5);
   }
   c.textAlign = 'left';

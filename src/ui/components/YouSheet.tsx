@@ -3,6 +3,7 @@
 // Settings; each row opens Settings on that part (openAt), or its own screen. Staff rows only for
 // staff logins. Settings itself stays a screen ("All settings").
 import React, { useEffect, useRef, useState } from 'react';
+import { APPEARANCES, TEXT_SIZES, textSizeOf } from '../theme';
 import { go, openAt, type Route } from '../router';
 import { useProfile, useStoreVersion } from '../hooks';
 import { avatarInitials } from '../nav';
@@ -129,7 +130,7 @@ export function YouSheet({ onClose }: { onClose: (then?: () => void) => void }) 
       sub: [choirName || 'No choir yet', apiBase() ? (session ? 'signed in' : 'account') : '', choirName ? 'change choir' : 'join'].filter(Boolean).join(' · '),
       open: settingsAt('settings-choir'),
     },
-    { id: 'display', icon: <IconText />, title: 'Display', sub: 'Score or highway · how the music moves', open: settingsAt('settings-display-block') },
+    { id: 'display', icon: <IconText />, title: 'Display', sub: `${APPEARANCES.find((a) => a.id === (profile.appearance ?? 'dark'))?.label} · ${TEXT_SIZES.find((t) => t.id === textSizeOf(profile.textSize))?.label.toLowerCase()} text · ${profile.display === 'highway' ? 'highway' : 'score'}`, open: settingsAt('settings-display-block') },
     { id: 'privacy', icon: <IconLock />, title: 'Privacy', sub: profile.choirCode ? 'What your choir sees of your practice' : 'Anonymous usage statistics', open: settingsAt('settings-privacy') },
     { id: 'help', icon: <IconHelp />, title: 'Help & intro video', sub: 'Watch the 2½-min intro · problem report', open: settingsAt('settings-help') },
     { id: 'data', icon: <IconData />, title: 'Your data', sub: 'Save a copy · restore it', open: settingsAt('settings-data') },

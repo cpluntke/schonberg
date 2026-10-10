@@ -6,6 +6,7 @@ import type { LiveScorer } from '../../game/scoring';
 import { keyHint, movesWithKey, noteLabel, type NotationMode } from '../../game/notation';
 import { keyAtTimeIn } from '../../music/keymarks';
 import { nameKeysOf } from '../../progress/keymarks';
+import { COLORS, fpx } from './palette';
 
 export interface DrawState {
   score: Score;
@@ -39,6 +40,9 @@ export interface DrawState {
   scroll?: boolean;
   /** The words are only for orientation (level 1 is sung on "doo"): draw them dimmed. */
   dimLyrics?: boolean;
+  /** Score view on a phone: the screen shows the live reading in big words (Play's readout), so
+   *  the canvas draws only the voice dot, not its small bubble. */
+  readout?: boolean;
 }
 
 /** First letter of the word a syllable starts ("" for a syllable inside a word). */
@@ -48,21 +52,7 @@ export function wordInitial(n: { lyric?: string; syllabic?: string }): string {
   return m ? m[0] : '';
 }
 
-export const COLORS = {
-  bg: '#0F1226',
-  row: '#1A1F3D',
-  rowKey: '#141833',
-  label: '#A8B0D6',
-  target: '#FF7A45',
-  targetSoft: '#2A1A16',
-  targetText: '#FFB08F',
-  voice: '#4CC9F0',
-  voiceDeep: '#1D4F63',
-  miss: '#FF5D73',
-  ghost: '#4A5288',
-  text: '#EEF0FF',
-  measure: '#262B4D',
-};
+export { COLORS } from './palette';
 
 const MAJOR = [0, 2, 4, 5, 7, 9, 11];
 /** Is `midi` in the scale of `key` (major, or natural/harmonic minor)? */
@@ -132,7 +122,7 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
   }
 
   // Bar lines + numbers.
-  c.font = '600 10px "JetBrains Mono", monospace';
+  c.font = `600 ${fpx(11)}px "JetBrains Mono", monospace`;
   c.textBaseline = 'top';
   for (const ms of s.score.measures) {
     if (ms.start < tMin - 0.01 || ms.start > tMax) continue;
@@ -161,12 +151,12 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
     c.setLineDash([]);
     c.globalAlpha = 1;
     if (hint) {
-      c.font = '700 12px system-ui, sans-serif';
+      c.font = `700 ${fpx(12)}px system-ui, sans-serif`;
       c.textBaseline = 'top';
       const tw = c.measureText(hint).width;
       const hx = Math.max(gutter + 2, kx + 4);
-      c.fillStyle = '#0B0D1A';
-      roundRect(c, hx - 3, 16, tw + 8, 17, 5);
+      c.fillStyle = COLORS.bubble;
+      roundRect(c, hx - 3, 16, tw + 8, fpx(12) + 5, 5);
       c.fill();
       c.fillStyle = COLORS.targetText;
       c.fillText(hint, hx + 1, 18);
@@ -188,7 +178,7 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
       if (d.text === lastText && Math.abs(x(d.time) - lastX) < 4) continue;
       const dx = Math.max(gutter + 2, x(d.time));
       if (dx - lastX < 30 && d.text === lastText) continue;
-      c.font = d.kind === 'dynamic' ? 'italic 800 15px Georgia, serif' : 'italic 500 12px Georgia, serif';
+      c.font = d.kind === 'dynamic' ? `italic 800 ${fpx(15)}px Georgia, serif` : `italic 500 ${fpx(12)}px Georgia, serif`;
       c.textBaseline = 'alphabetic';
       c.fillStyle = COLORS.targetText;
       c.globalAlpha = 0.85;
@@ -237,7 +227,7 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
         c.globalAlpha = isNow ? 1 : 0.8;
         c.fillRect(nx, H - 44, Math.max(2, nw), 2); // rhythm: where the note sits, not its pitch
         if (ch) {
-          c.font = '800 15px "Bricolage Grotesque", sans-serif';
+          c.font = `800 ${fpx(15)}px "Bricolage Grotesque", sans-serif`;
           c.textBaseline = 'alphabetic';
           c.fillText(ch, nx, H - 50);
         }
@@ -290,7 +280,7 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
     if (s.showNames && !past && nks.length > 1 && movesWithKey(s.notation)) {
       const nk = keyAtTimeIn(nks, n.start);
       if (nk.fifths !== s.key.fifths) {
-        c.font = '700 11px "JetBrains Mono", monospace';
+        c.font = `700 ${fpx(12)}px "JetBrains Mono", monospace`;
         c.textBaseline = 'alphabetic';
         c.fillStyle = COLORS.targetText;
         c.fillText(noteLabel(n.midi, s.notation, nk, n.spelling).text, nx + 2, ny - 3);
@@ -299,11 +289,11 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
     if (n.lyric) {
       c.save();
       if (s.dimLyrics) c.globalAlpha *= 0.45;
-      c.font = `800 ${bh >= 22 ? 12 : 10}px "Bricolage Grotesque", sans-serif`;
+      c.font = `800 ${fpx(bh >= 22 ? 12 : 10)}px "Bricolage Grotesque", sans-serif`;
       c.textBaseline = 'middle';
       const tw = c.measureText(n.lyric).width;
       if (tw + 6 <= nw && bh >= 14) {
-        c.fillStyle = past || isNow ? '#0B0D1A' : COLORS.targetText;
+        c.fillStyle = past || isNow ? COLORS.onFill : COLORS.targetText;
         c.fillText(n.lyric, nx + (nw - tw) / 2, ny + bh / 2 + 1);
       } else {
         c.fillStyle = COLORS.targetText;
@@ -351,7 +341,7 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
         const k = Math.ceil(ahead / beat - 1e-6);
         // Off book the countdown mustn't give the pitch away.
         const ey = s.hide && s.hide(i) !== 'show' ? top + 40 : y(Math.max(lo, Math.min(hi, n.midi)));
-        c.font = '800 22px "Bricolage Grotesque", sans-serif';
+        c.font = `800 ${fpx(22)}px "Bricolage Grotesque", sans-serif`;
         c.textBaseline = 'middle';
         c.fillStyle = COLORS.target;
         c.globalAlpha = 0.9;
@@ -364,14 +354,14 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
   }
 
   // Now line.
-  c.fillStyle = 'rgba(238,240,255,0.85)';
+  c.fillStyle = COLORS.playhead;
   c.fillRect(Math.round(nowX) - 1, top - 6, 2, H - top + 6);
 
   // Live voice dot + cents bubble.
   const last = s.samples[s.samples.length - 1];
   if (last && last.midi != null && s.pos - last.time < 0.2) {
     const py = y(Math.max(lo - 0.4, Math.min(hi + 0.4, last.midi)));
-    c.fillStyle = 'rgba(76,201,240,0.25)';
+    c.fillStyle = COLORS.voiceHalo;
     c.beginPath();
     c.arc(nowX, py, 11, 0, Math.PI * 2);
     c.fill();
@@ -404,14 +394,15 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
       let cents = (shown - target) * 100;
       if (Math.abs(cents) > 600) cents = ((cents % 1200) + 1800) % 1200 - 600; // show octave-folded
       const txt = pitchShort(cents);
-      c.font = '600 12px "JetBrains Mono", monospace';
+      c.font = `600 ${fpx(12)}px "JetBrains Mono", monospace`;
       c.textBaseline = 'middle';
       const tw = c.measureText(txt).width;
       const bx = nowX + 14;
       const by = Math.max(top + 10, Math.min(H - 14, py - 22));
       const ok = Math.abs(cents) <= s.tolerance;
-      c.fillStyle = '#0B0D1A';
-      roundRect(c, bx, by - 11, tw + 14, 22, 7);
+      const bh2 = fpx(12) + 10;
+      c.fillStyle = COLORS.bubble;
+      roundRect(c, bx, by - bh2 / 2, tw + 14, bh2, 7);
       c.fill();
       c.strokeStyle = ok ? COLORS.voice : COLORS.target;
       c.lineWidth = 1;
@@ -432,8 +423,8 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
       const lab = noteLabel(m, s.notation, s.key, isCur ? notes[current].spelling : undefined);
       const diatonic = inKey(m, s.key) || s.notation === 'pc';
       if (!diatonic && rowH < 16 && !isCur) continue;
-      c.font = `${isCur ? 800 : diatonic ? 600 : 400} ${rowH < 14 ? 10 : 12}px "JetBrains Mono", monospace`;
-      c.fillStyle = isCur ? COLORS.target : diatonic ? COLORS.label : '#6B739C';
+      c.font = `${isCur ? 800 : diatonic ? 600 : 400} ${fpx(rowH < 14 ? 10 : 12)}px "JetBrains Mono", monospace`;
+      c.fillStyle = isCur ? COLORS.target : diatonic ? COLORS.label : COLORS.labelDim;
       const tw = c.measureText(lab.text).width;
       const lx = (gutter - tw) / 2;
       c.fillText(lab.text, lx, y(m) + 1);

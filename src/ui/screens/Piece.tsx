@@ -442,8 +442,8 @@ function MoreWays({ piece, part, sections, prog, r, P, label, play, showHelp, se
                   <button key={l} className={cls} data-testid={`full-${l}`} style={{ position: 'relative' }}
                     aria-label={`Sing it all at ${stepLabel(l, 'tempo')}${l <= P ? ' (passed)' : ''}${star ? ' (clean run)' : ''}${fixes.length ? ` (${fixes.length} passage${fixes.length > 1 ? 's' : ''} to fix)` : ''}`}
                     onClick={() => play('all', l, '2d', 'tempo')}>
-                    {l} <span style={{ fontWeight: 600, fontSize: 11 }}>{SHORT[l]}</span>
-                    {star && <span aria-hidden="true" data-testid={`star-${l}`} style={{ position: 'absolute', top: 1, right: 4, fontSize: 12, color: '#FFD166' }}>★</span>}
+                    {l} <span style={{ fontWeight: 600, fontSize: '0.8125rem' }}>{SHORT[l]}</span>
+                    {star && <span aria-hidden="true" data-testid={`star-${l}`} style={{ position: 'absolute', top: 1, right: 4, fontSize: '0.8125rem', color: 'var(--star)' }}>★</span>}
                   </button>
                 );
               })}
@@ -464,7 +464,7 @@ function MoreWays({ piece, part, sections, prog, r, P, label, play, showHelp, se
               </div>
             ))}
             <div className="row wrap" style={{ gap: 6 }}>
-              <button className="btn small ghost" onClick={() => play('all', Math.max(2, Math.min(4, P || 3)), '3d')}><IconCube size={16} color="#B3A6FF" /> Arcade run</button>
+              <button className="btn small ghost" onClick={() => play('all', Math.max(2, Math.min(4, P || 3)), '3d')}><IconCube size={16} color="var(--expert)" /> Arcade run</button>
               <span className="t14 muted" style={{ alignSelf: 'center' }}>just for fun: doesn't count for a level</span>
             </div>
           </div>

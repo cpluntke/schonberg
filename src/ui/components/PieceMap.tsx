@@ -2,12 +2,13 @@ import React from 'react';
 import type { Part, Score, Section } from '../../music/types';
 import type { InsightKind } from '../../game/types';
 import { mastery, troubleSpots, type BarMap, type Mastery } from '../../progress/bars';
+import { mix } from '../theme';
 
 export const MASTERY_COLOR: Record<Mastery, string> = {
-  solid: '#4CC9F0',
-  ok: '#1D4F63',
-  weak: '#FF7A45',
-  none: '#262B45',
+  solid: 'var(--voice)',
+  ok: 'var(--voice-deep)',
+  weak: 'var(--accent)',
+  none: 'var(--line)',
 };
 const LABEL: Record<Mastery, string> = { solid: 'solid', ok: 'ok', weak: 'needs work', none: 'not sung yet' };
 
@@ -92,14 +93,14 @@ export function PieceMap({ score, part, sections, bars, onLoop }: {
                   aria-label={`Bar ${label(m)}: ${empty ? 'rest' : LABEL[k]}${g.length ? ` (${[...new Set(g.map((x) => x[1]))].join(', ')})` : ''}. Loop this bar`}
                   style={{
                     position: 'relative', minHeight: 44, padding: '3px 2px 2px', border: 'none', borderRadius: 6,
-                    background: empty ? 'transparent' : MASTERY_COLOR[k] + (k === 'none' ? '' : '33'),
-                    outline: empty ? '1px dashed #2A2F4A' : `1px solid ${MASTERY_COLOR[k]}`, outlineOffset: -1,
+                    background: empty ? 'transparent' : k === 'none' ? MASTERY_COLOR[k] : mix(MASTERY_COLOR[k], 20),
+                    outline: empty ? '1px dashed var(--line)' : `1px solid ${MASTERY_COLOR[k]}`, outlineOffset: -1,
                     display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 1,
                   }}>
-                  <span className="mono" style={{ fontSize: 9, color: '#9AA3C7', textAlign: 'left', lineHeight: 1 }}>{label(m)}</span>
-                  <Contour part={part} score={score} m={m} color={k === 'none' ? '#8088B0' : k === 'ok' ? '#7FB8CC' : MASTERY_COLOR[k]} />
+                  <span className="mono" style={{ fontSize: '0.8125rem', color: 'var(--muted)', textAlign: 'left', lineHeight: 1 }}>{label(m)}</span>
+                  <Contour part={part} score={score} m={m} color={k === 'none' ? 'var(--muted)' : k === 'ok' ? 'var(--voice)' : MASTERY_COLOR[k]} />
                   {g.length > 0 && (
-                    <span style={{ position: 'absolute', top: 1, right: 3, fontSize: 10, fontWeight: 800, color: '#FFB08A' }}>{[...new Set(g.map((x) => x[0]))].slice(0, 2).join('')}</span>
+                    <span style={{ position: 'absolute', top: 1, right: 3, fontSize: '0.8125rem', fontWeight: 800, color: 'var(--accent-text)' }}>{[...new Set(g.map((x) => x[0]))].slice(0, 2).join('')}</span>
                   )}
                 </button>
               );

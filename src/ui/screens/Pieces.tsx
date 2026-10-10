@@ -230,7 +230,7 @@ function ChoosePieces({ pieces, onDone }: { pieces: PieceInfo[]; onDone: () => v
               </button>
               <button className="grow col" style={{ gap: 2, background: 'none', border: 'none', textAlign: 'left', padding: 0, color: 'inherit', minHeight: 44 }}
                 onClick={() => go({ name: 'piece', pieceId: p.id })}>
-                <span className="ellipsis" style={{ fontWeight: 600, fontSize: 16 }}>{p.title}</span>
+                <span className="ellipsis" style={{ fontWeight: 600, fontSize: '1rem' }}>{p.title}</span>
                 <span className="t14 muted ellipsis">
                   {p.composer || 'Unknown composer'} · {p.score.parts.filter((x) => x.notes.length).length} parts · {p.score.measures.length} bars
                 </span>

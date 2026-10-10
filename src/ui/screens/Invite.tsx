@@ -66,7 +66,7 @@ export function InviteScreen({ token: fromUrl }: { token?: string }) {
         {top}
         <div className="card" data-testid="invite-done">
           <span className="eyebrow">{done.choirName}</span>
-          <strong style={{ fontSize: 20 }}>Welcome, {done.account.name}</strong>
+          <strong style={{ fontSize: '1.25rem' }}>Welcome, {done.account.name}</strong>
           <span>You're {admin ? 'an admin of' : `the section lead for the ${voicesText(done.account.voices)} in`} {done.choirName}, and logged in on this phone.</span>
           <span className="small muted">On another phone or computer, log in under Settings › Your choir with the choir code <strong className="mono">{done.code}</strong>, your name and your password.</span>
         </div>
@@ -122,7 +122,7 @@ export function InviteScreen({ token: fromUrl }: { token?: string }) {
         }
       }}>
         <span className="eyebrow">{info.choirName}</span>
-        <strong style={{ fontSize: 20 }} data-testid="invite-what">{what}</strong>
+        <strong style={{ fontSize: '1.25rem' }} data-testid="invite-what">{what}</strong>
         {!reset && <span className="small muted">{roleText(inv.role, inv.voices)}{inv.role === 'admin' ? ': the programme, the scores, and who leads which section.' : ': you see which bars your section finds hard (from singers who share their progress).'}</span>}
         <span className="tiny muted">Invited by {inv.by || 'your choir'} · the link works until {new Date(inv.expiresAt).toLocaleDateString()}</span>
         {!reset && (

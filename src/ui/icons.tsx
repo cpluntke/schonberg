@@ -25,13 +25,13 @@ export const IconCube = (p: P) => <S {...p}><path d="M12 2l9 5v10l-9 5-9-5V7z" /
 export const IconEar = (p: P) => <S {...p}><path d="M6 9a6 6 0 1 1 12 0c0 4-4 5-4 9a3 3 0 0 1-6 0" /><path d="M10 9a2 2 0 1 1 4 0" /></S>;
 export const IconShare = (p: P) => <S {...p}><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" /></S>;
 export const IconRestart = (p: P) => <S {...p}><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /></S>;
-export const IconPlay = ({ size = 22, color = '#0B0D1A' }: P) => (
+export const IconPlay = ({ size = 22, color = 'currentColor' }: P) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill={color} aria-hidden="true"><path d="M7 4l13 8-13 8z" /></svg>
 );
-export const IconPause = ({ size = 22, color = '#0B0D1A' }: P) => (
+export const IconPause = ({ size = 22, color = 'currentColor' }: P) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill={color} aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>
 );
-export const IconStop = ({ size = 22, color = '#0B0D1A' }: P) => (
+export const IconStop = ({ size = 22, color = 'currentColor' }: P) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill={color} aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
 );
 export const IconList = (p: P) => <S {...p}><path d="M4 6h16M4 12h16M4 18h16" /></S>;

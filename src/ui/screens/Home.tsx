@@ -75,7 +75,7 @@ export function Home() {
       <div className="lay home-top">
       <div className="row between home-head">
         <div className="row home-brand" style={{ gap: 8 }}>
-          <span style={{ fontWeight: 800, fontSize: 20, letterSpacing: '-0.02em' }}>Schönberg</span>
+          <span style={{ fontWeight: 800, fontSize: '1.25rem', letterSpacing: '-0.02em' }}>Schönberg</span>
           <span className="badge">Hero</span>
         </div>
         <YouButton />
@@ -102,7 +102,7 @@ export function Home() {
           <strong className="first-line">Learn your part and sing it in tune before the next rehearsal.</strong>
           <span className="t14 muted">The app listens while you sing your own voice part and shows you the one note to fix. 10–15 minutes a day is enough.</span>
           <div className="row">
-            <IconMic color="#4CC9F0" />
+            <IconMic color="var(--voice)" />
             <div className="grow col" style={{ gap: 2 }}>
               <strong>Set up your voice (2 min)</strong>
               <span className="t14 muted">Mic check, your range, headphone delay and your preferred note names.</span>
@@ -193,7 +193,7 @@ export function Home() {
           <button key={s.piece.id} className="list-row" data-testid="piece-row" onClick={() => go({ name: 'piece', pieceId: s.piece.id })}>
             <div className="mono-tile">{initials(s.piece.composer || s.piece.title)}</div>
             <div className="grow col" style={{ gap: 2 }}>
-              <span className="ellipsis" style={{ fontWeight: 600, fontSize: 15 }}>{s.piece.title}</span>
+              <span className="ellipsis" style={{ fontWeight: 600, fontSize: '0.9375rem' }}>{s.piece.title}</span>
               <span className="t14 muted ellipsis">
                 {[s.piece.composer, s.partName].filter(Boolean).join(' · ')}
                 {s.next?.kind === 'fix' ? ` · ${s.toFix.reduce((n, f) => n + f.sectionIds.length, 0)} to fix` : s.fullDue ? ' · full run due for review' : s.due.length ? ` · ${s.due.length} due for review` : ''}
@@ -209,7 +209,7 @@ export function Home() {
           <button key={w.title} className="list-row" onClick={() => go({ name: 'pieces' })} data-testid="wanted-row">
             <div className="mono-tile" style={{ color: 'var(--muted)', border: '1px dashed var(--line)', background: 'transparent' }}>+</div>
             <div className="grow col" style={{ gap: 2 }}>
-              <span className="ellipsis" style={{ fontWeight: 600, fontSize: 15 }}>{w.title}</span>
+              <span className="ellipsis" style={{ fontWeight: 600, fontSize: '0.9375rem' }}>{w.title}</span>
               <span className="t14 muted ellipsis">{[w.composer, w.note ?? 'import your choir’s score'].filter(Boolean).join(' · ')}</span>
             </div>
             <span className="badge muted">Import</span>

@@ -933,7 +933,7 @@ export function SuperAdmin() {
       {created ? (
         <div className="card" data-testid="choir-created">
           <span className="eyebrow">Choir created</span>
-          <strong style={{ fontSize: 20 }}>{created.name}</strong>
+          <strong style={{ fontSize: '1.25rem' }}>{created.name}</strong>
           <span className="small">Members join with the code <strong className="mono">{created.code}</strong>.</span>
           <InviteLinkBox token={created.token} title="Now send this link to the choir's admin"
             hint="With it they choose their name and password, then invite the section leads. It works once, for 7 days." />
