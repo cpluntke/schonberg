@@ -7,7 +7,7 @@ import type { NotationMode } from '../../game/notation';
 import type { Part } from '../../music/types';
 import type { PieceInfo } from '../library';
 import type { Route } from '../router';
-import { LEVELS } from '../../progress/ladder';
+import { stepSpec, type Step } from '../../progress/ladder';
 import { loadProfile } from '../../progress/store';
 import { slowRate } from '../../progress/struggle';
 import { barRangeLabel } from '../../music/sections';
@@ -30,8 +30,9 @@ interface Props {
   notes: NoteResult[];
   /** Tolerance the run was scored with (cents). */
   tol: number;
-  /** Level of the run: the practice runs are at it. */
+  /** Level and step of the run: the practice runs are at it. */
   level: number;
+  step?: Step;
   /** The run's span (score seconds): context bars stay inside it. */
   from: number;
   to: number;
@@ -160,11 +161,12 @@ function Legend() {
   );
 }
 
-export function MistakeScore({ piece, part, notes, tol, level, from, to, play }: Props) {
+export function MistakeScore({ piece, part, notes, tol, level, step: runStep, from, to, play }: Props) {
   const score = piece.score;
   const fonts = useFontsLoaded();
   const lvl = Math.max(1, level);
-  const spec = LEVELS[lvl - 1];
+  const step: Step = runStep ?? (lvl === 1 ? 'slow' : 'tempo');
+  const spec = stepSpec(lvl, step);
   const notation = loadProfile().notation as NotationMode;
   // Note names as the run showed them (levels 1–3).
   const names = !!spec?.showNames;
@@ -183,15 +185,15 @@ export function MistakeScore({ piece, part, notes, tol, level, from, to, play }:
   const pending = useRef<Extract<Route, { name: 'play' }> | null>(null);
 
   // Practice: the snippet's bars as a drill at the run's level, slowly by default.
-  const levelRate = spec?.rate ?? 1;
-  const slow = Math.min(slowRate(lvl), levelRate);
+  const levelRate = spec.rate;
+  const slow = Math.min(slowRate(step), levelRate);
   const pct = (r: number) => `${Math.round(r * 100)}%`;
   const route = (s: Spot, rate: number): Extract<Route, { name: 'play' }> => {
     const ms = score.measures;
     const a = ms[s.m0];
     const b = ms[s.m1];
     return {
-      name: 'play', pieceId: piece.id, partId: part.id, sectionId: 'drill', level: lvl, mode: '2d',
+      name: 'play', pieceId: piece.id, partId: part.id, sectionId: 'drill', level: lvl, step, mode: '2d',
       from: a?.start ?? from, to: b ? b.start + b.dur : to,
       ...(rate < levelRate - 1e-6 ? { rate } : {}),
     };
@@ -245,7 +247,7 @@ export function MistakeScore({ piece, part, notes, tol, level, from, to, play }:
       </button>
       {slow < levelRate - 1e-6 && (
         <button className="btn small" style={{ flex: '1 1 auto' }} data-testid={`practise-full${where === 'zoom' ? '-zoom' : ''}`}
-          aria-label={`Practise ${barsText(s)} at ${levelRate < 1 ? `the level's tempo (${pct(levelRate)})` : 'full tempo'}`}
+          aria-label={`Practise ${barsText(s)} at ${levelRate < 1 ? `the step's tempo (${pct(levelRate)})` : 'full tempo'}`}
           onClick={() => (where === 'zoom' ? close(route(s, levelRate)) : play(route(s, levelRate)))}>
           {levelRate < 1 ? `${pct(levelRate)} tempo` : 'Full tempo'}
         </button>

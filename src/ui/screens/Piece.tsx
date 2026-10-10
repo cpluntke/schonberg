@@ -5,13 +5,13 @@ import { entryNotes } from '../../game/drills';
 import { useProfile, useStoreVersion } from '../hooks';
 import { go, back } from '../router';
 import { getProgress, dueForReview } from '../../progress/store';
-import { LEVELS, OFF_BOOK_DAYS, pieceReadiness, nextStep, sectionStatus, levelSpec, passLabel } from '../../progress/ladder';
+import { LEVELS, OFF_BOOK_DAYS, pieceReadiness, nextStep, sectionStatus, levelSpec, passLabel, stepFor, stepLabel, stepSpec, type Step } from '../../progress/ladder';
 import { IconBack, IconDown, IconEar, IconCube, IconPlay } from '../icons';
 import { voiceName } from './Home';
 import { PieceMap } from '../components/PieceMap';
 import { getBars } from '../../progress/bars';
 import { startColdStart } from '../play/cold';
-import { getWords } from '../../progress/words';
+import { getWords, wordsDoneFor } from '../../progress/words';
 import { STAGE_NAMES } from '../../game/textrhythm';
 import { NotFound } from '../components/NotFound';
 import { KeyMarksCard } from '../components/KeyMarks';
@@ -35,7 +35,15 @@ function entryCount(part: Parameters<typeof entryNotes>[0]): number {
   return Math.min(10, idx.includes(0) || !part.notes.length ? idx.length : idx.length + 1);
 }
 
-const SHORT: Record<number, string> = { 1: 'Learn', 2: 'In time', 3: 'Alone', 4: 'Concert', 5: 'By heart' };
+const SHORT: Record<number, string> = { 1: 'Notes', 2: 'Words', 3: 'Alone', 4: 'Concert', 5: 'By heart' };
+
+/** "slow 70% · in tempo: 80%, entries on time" style line for the levels help. */
+function stepsLine(level: number): string {
+  const sl = stepSpec(level, 'slow');
+  const tp = stepSpec(level, 'tempo');
+  const one = (x: typeof sl) => `${Math.round(x.rate * 100)}%, ±${x.tolerance}¢, pass: ${passLabel(x)}${x.headphones ? ', headphones on' : ''}`;
+  return `slow ${one(sl)} · in tempo ${one(tp)}`;
+}
 
 export function PieceScreen({ pieceId }: { pieceId: string }) {
   const [profile] = useProfile();
@@ -52,12 +60,13 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
   const sections = part ? singableSections(piece, part.id) : [];
   const prog = part ? getProgress(piece.id, part.id) : undefined;
   const r = pieceReadiness(sections, prog);
-  const next = nextStep(sections, prog);
+  const next = nextStep(sections, prog, Date.now(), part ? wordsDoneFor(piece.id, part.id, part, sections) : undefined);
   const due = part ? dueForReview(piece.id, part.id, sections) : [];
 
   const pick = (id: string) => { setPartId(id); rememberPart(piece.id, id); };
-  const play = (sectionId: string, level: number, mode: '2d' | '3d' = '2d') =>
-    go({ name: 'play', pieceId: piece.id, partId: part!.id, sectionId, level, mode });
+  // (no step: the passage's current step for that level, see Play)
+  const play = (sectionId: string, level: number, mode: '2d' | '3d' = '2d', step?: Step) =>
+    go({ name: 'play', pieceId: piece.id, partId: part!.id, sectionId, level, mode, ...(step && mode === '2d' ? { step } : {}) });
   const label = (id: string) => sections.find((s) => s.id === id)?.label ?? id;
   // Sections that slipped in a full run, by section: the lowest level they must pass at.
   const fixAt = new Map<string, number>();
@@ -67,7 +76,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
   // A full run opened a level above the piece's: the piece was sung through, the fixes are what's left.
   const open = multi ? r.toFix.find((f) => f.level > P) : undefined;
   const openText = open
-    ? `Level ${open.level} open: fix ${open.sectionIds.length} section${open.sectionIds.length > 1 ? 's' : ''} to ${open.level === 5 ? 'finish it from memory' : 'reach it'}`
+    ? `Level ${open.level} open: fix ${open.sectionIds.length} passage${open.sectionIds.length > 1 ? 's' : ''} to ${open.level === 5 ? 'finish it from memory' : 'reach it'}`
     : '';
 
   return (
@@ -103,11 +112,11 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
       <div className="col" style={{ gap: 8 }}>
         <div className="row between">
           <span className="eyebrow">Your part</span>
-          {/* The section list is far down (after the readiness, the full run and the map). */}
+          {/* The passage list is far down (after the readiness, the full run and the map). */}
           {sections.length > 0 && (
             <button className="linklike jump-link" data-testid="jump-sections"
               onClick={() => document.getElementById('piece-sections')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
-              Jump to sections <IconDown size={16} />
+              Jump to passages <IconDown size={16} />
             </button>
           )}
         </div>
@@ -127,7 +136,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
             <span className="eyebrow">Readiness</span>
             <span style={{ fontWeight: 800, fontSize: 18 }} data-testid="piece-level">
               {r.memorised ? 'Memorised' : r.concertReady ? 'Concert-ready' : r.rehearsalReady ? 'Rehearsal-ready'
-                : P > 0 ? `Piece level ${P}: ${levelSpec(P).name}` : open ? openText : multi ? 'Not sung through yet' : `${sections.length} section to learn`}
+                : P > 0 ? `Piece level ${P}: ${levelSpec(P).name}` : open ? openText : multi ? 'Not sung through yet' : `${sections.length} passage to learn`}
             </span>
           </div>
           <span className="mono" style={{ fontSize: 28, fontWeight: 600 }}>{Math.round(r.pct * 100)}%</span>
@@ -135,12 +144,12 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
         <div className="bar"><span style={{ width: `${r.pct * 100}%` }} /></div>
         {multi && r.clean.length > 0 && (
           <span className="small" data-testid="clean-stars" style={{ color: 'var(--voice)' }}>
-            <span aria-hidden="true">★ </span>Clean run{r.clean.length > 1 ? 's' : ''} at level {r.clean.join(', ')}: every section right in one go
+            <span aria-hidden="true">★ </span>Clean run{r.clean.length > 1 ? 's' : ''} at Level {r.clean.join(', ')}: every passage right in one go
           </span>
         )}
         {multi && r.unconfirmed > 0 && !r.toFix.length && (
           <div className="notice info small" data-testid="confirm-note">
-            <strong>Level {r.unconfirmed} in every section.</strong> Confirm it with a full run-through: the piece's level comes from singing it all through.
+            <strong>Level {r.unconfirmed} in every passage.</strong> Confirm it with a full run-through, in tempo: the piece's level comes from singing it all through.
           </div>
         )}
         {open && P > 0 && (
@@ -149,7 +158,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
         {multi && r.toward && !r.unconfirmed && !open && (
           <div className="col" style={{ gap: 4 }} data-testid="toward-next">
             <span className="small muted">
-              Toward piece level {r.toward.level}: {r.toward.done} of {r.toward.total} sections at level {r.toward.level}
+              Toward piece level {r.toward.level}: {r.toward.done} of {r.toward.total} passages at Level {r.toward.level} in tempo
               {r.offBookDays > 0 ? ` · whole piece from memory: day ${r.offBookDays} of ${OFF_BOOK_DAYS}` : ''}
             </span>
             <div className="bar" style={{ height: 5 }}><span style={{ width: `${(r.toward.done / r.toward.total) * 100}%`, background: 'var(--voice-deep)' }} /></div>
@@ -157,12 +166,18 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
         )}
         <span className="small muted">
           {multi
-            ? <>The piece's level: sing the whole piece through at a level, then fix any section that slipped on its own. Rehearsal-ready = 3, concert-ready = 4, memorised = 5 (off book) on two different days.</>
-            : <>Rehearsal-ready = level 3 (Independent). Concert-ready = level 4. Memorised = level 5 (off book) on two different days.</>}
+            ? <>Every level has two steps: slow, then in tempo. The piece's level: sing the whole piece through at a level in tempo, then fix any passage that slipped on its own. Rehearsal-ready = 3, concert-ready = 4, memorised = 5 (by heart) on two different days.</>
+            : <>Every level has two steps: slow, then in tempo. Rehearsal-ready = Level 3 (Alone) in tempo. Concert-ready = Level 4. Memorised = Level 5 (by heart) on two different days.</>}
         </span>
         {next && (
-          <button className="btn primary block" data-testid="piece-next" onClick={() => play(next.sectionId, next.level)}>
-            <IconPlay size={18} /> {next.sectionId === 'all' ? 'Sing it all' : next.kind === 'fix' ? `Fix ${label(next.sectionId)}` : label(next.sectionId)}: level {next.level}
+          <button className="btn primary block" data-testid="piece-next" onClick={() => play(next.sectionId, next.level, '2d', next.step)}>
+            <IconPlay size={18} /> {next.sectionId === 'all' ? 'Sing it all' : next.kind === 'fix' ? `Fix ${label(next.sectionId)}` : label(next.sectionId)}: {stepLabel(next.level, next.step)}
+          </button>
+        )}
+        {next?.wordsFirst && part && (
+          <button className="btn ghost small" data-testid="words-first"
+            onClick={() => go({ name: 'play', pieceId: piece.id, partId: part.id, sectionId: next.sectionId, level: 0, mode: '2d', words: true })}>
+            Say it in rhythm first
           </button>
         )}
         {next && !(next.kind === 'full' && r.unconfirmed > 0) && <span className="tiny muted" style={{ marginTop: -6 }}>{next.reason}</span>}
@@ -173,9 +188,9 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
           <div className="col" style={{ gap: 8 }}>
             {multi && (
               <span className="small muted" data-testid="levels-help-piece">
-                <strong>The whole piece:</strong> sing it all through at a level, in one go. Sections that slip are to fix on
+                <strong>The whole piece:</strong> sing it all through at a level, in tempo, in one go. Passages that slip are to fix on
                 their own: once each passes, the piece reaches the level, with no need to sing it all again. More than half
-                slipped, or the run more than 10 points under the level's mark: that run is practice. Every section right first time: a clean-run ★.
+                slipped, or the run more than 10 points under the level's mark: that run is practice. Every passage right first time: a clean-run ★.
               </span>
             )}
             {LEVELS.map((l) => (
@@ -185,7 +200,7 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
                   <strong>{l.name}</strong>
                   <span className="small muted">{l.description}</span>
                   <span className="tiny muted mono">
-                    {Math.round(l.rate * 100)}% tempo · {l.guide ? 'your part plays' : 'others only'} · {l.showNames ? 'note names' : 'lyrics only'}{l.doo ? ' · on “doo”' : ''} · ±{l.tolerance}¢ · pass: {passLabel(l)}{l.headphones ? ', headphones on' : ''}
+                    {l.guide ? 'your part plays' : 'others only'} · {l.showNames ? 'note names' : 'lyrics only'}{l.doo ? ' · on “doo”' : ''} · {stepsLine(l.level)}
                   </span>
                 </div>
               </div>
@@ -199,9 +214,9 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
           <div className="col" style={{ gap: 2 }}>
             <strong>Sing it all</strong>
             <span className="small muted">
-              The whole piece in one go, every section scored. Sections that slip are to fix on their own: once
-              they pass, the piece reaches the level. Every section right first time earns a clean-run ★.
-              Know it already? Go straight to any level: you don't have to do the sections first.
+              The whole piece in one go, in tempo, every passage scored. Passages that slip are to fix on their own: once
+              they pass, the piece reaches the level. Every passage right first time earns a clean-run ★.
+              Know it already? Go straight to any level: you don't have to do the passages first.
             </span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 5 }}>
@@ -213,8 +228,8 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
               const cls = l <= P ? 'lvl-btn done' : l === (r.unconfirmed || P + 1) && !fixes.length ? 'lvl-btn next' : 'lvl-btn';
               return (
                 <button key={l} className={cls} data-testid={`full-${l}`} style={{ position: 'relative' }}
-                  aria-label={`Sing it all at level ${l} ${L.name}${l <= P ? ' (passed)' : ''}${star ? ' (clean run)' : ''}${fixes.length ? ` (${fixes.length} section${fixes.length > 1 ? 's' : ''} to fix)` : ''}`}
-                  onClick={() => play('all', l)}>
+                  aria-label={`Sing it all at ${stepLabel(l, 'tempo')}${l <= P ? ' (passed)' : ''}${star ? ' (clean run)' : ''}${fixes.length ? ` (${fixes.length} passage${fixes.length > 1 ? 's' : ''} to fix)` : ''}`}
+                  onClick={() => play('all', l, '2d', 'tempo')}>
                   {l} <span style={{ fontWeight: 600, fontSize: 11 }}>{SHORT[l]}</span>
                   {star && <span aria-hidden="true" data-testid={`star-${l}`} style={{ position: 'absolute', top: 1, right: 4, fontSize: 12, color: '#FFD166' }}>★</span>}
                 </button>
@@ -224,20 +239,20 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
           {r.toFix.map((f) => (
             <div key={f.level} className="col" style={{ gap: 6 }} data-testid="to-fix">
               <span className="small" style={{ color: 'var(--accent-text)' }}>
-                <strong>To fix at level {f.level}</strong> ({levelSpec(f.level).everyNote ? 'not every note was right in your full run' : `${f.sectionIds.length > 1 ? 'they' : 'it'} slipped in your full run`}).{' '}
+                <strong>To fix at Level {f.level}</strong> ({f.sectionIds.length > 1 ? 'they' : 'it'} slipped in your full run).{' '}
                 {f.level > P
-                  ? <>Pass {f.sectionIds.length > 1 ? 'each' : 'it'} on its own and {f.level === 5 ? 'the whole piece counts as sung from memory today (memorised = on two different days)' : `the piece reaches level ${f.level}`}. No need to sing it all again:</>
-                  : <>Practise {f.sectionIds.length > 1 ? 'each' : 'it'} at level {f.level} on its own:</>}
+                  ? <>Pass {f.sectionIds.length > 1 ? 'each' : 'it'} in tempo on its own and {f.level === 5 ? 'the whole piece counts as sung from memory today (memorised = on two different days)' : `the piece reaches Level ${f.level}`}. No need to sing it all again:</>
+                  : <>Practise {f.sectionIds.length > 1 ? 'each' : 'it'} at Level {f.level} in tempo on its own:</>}
               </span>
               <div className="row wrap" style={{ gap: 6 }}>
                 {f.sectionIds.map((id) => (
-                  <button key={id} className="btn small" onClick={() => play(id, f.level)}><IconPlay size={14} color="currentColor" /> {label(id)}</button>
+                  <button key={id} className="btn small" onClick={() => play(id, f.level, '2d', 'tempo')}><IconPlay size={14} color="currentColor" /> {label(id)}</button>
                 ))}
               </div>
             </div>
           ))}
           {P === 4 && r.offBookDays > 0 && !r.toFix.length && (
-            <span className="tiny muted">Whole piece from memory: day {r.offBookDays} of {OFF_BOOK_DAYS}. Sing it all at level 5 again on another day.</span>
+            <span className="tiny muted">Whole piece from memory: day {r.offBookDays} of {OFF_BOOK_DAYS}. Sing it all at Level 5 again on another day.</span>
           )}
           <div className="row wrap" style={{ gap: 6 }}>
             <button className="btn small ghost" onClick={() => play('all', Math.max(2, Math.min(4, P || 3)), '3d')}><IconCube size={16} color="#B3A6FF" /> Arcade run</button>
@@ -264,14 +279,17 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
       </div>
 
       <div className="lay piece-main">
-      <section className="ladder" aria-label="Sections" id="piece-sections" style={{ scrollMarginTop: 12 }}>
-        <h2 style={{ marginBottom: 0 }}>Sections</h2>
+      <section className="ladder" aria-label="Passages" id="piece-sections" style={{ scrollMarginTop: 12 }}>
+        <h2 style={{ marginBottom: 0 }}>Passages</h2>
         {multi && <span className="tiny muted" style={{ marginBottom: 4 }}>Practice steps: take the piece apart, then put it together in a full run.</span>}
         {sections.map((s) => {
           const sp = prog?.sections[s.id];
           const lvl = sp?.level ?? 0;
+          const slow = (sp?.slow ?? 0) > lvl ? sp!.slow! : 0;
           const status = sectionStatus(sp);
           const isDue = due.includes(s.id);
+          // "Level 2 · Level 3 · slow ✓": in tempo, and a slow step above it (never "Level 0").
+          const done = [lvl > 0 ? `Level ${lvl}${sp?.best?.[lvl] != null ? ` · best ${Math.round(sp.best[lvl] * 100)}%` : ''}` : '', slow ? `Level ${slow} · slow ✓` : ''].filter(Boolean).join(' · ');
           return (
             <div key={s.id} className="ladder-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
               <div className="row">
@@ -280,23 +298,25 @@ export function PieceScreen({ pieceId }: { pieceId: string }) {
                   {snippet(part!, s.start, s.end) && <span className="small ellipsis" style={{ color: 'var(--accent-text)', fontStyle: 'italic' }}>“{snippet(part!, s.start, s.end)}…”</span>}
                   <span className="tiny muted">
                     {fixAt.has(s.id) ? <strong style={{ color: 'var(--accent-text)' }} data-testid="section-to-fix">To fix at level {fixAt.get(s.id)} · </strong> : null}
-                    {isDue ? 'Due for review' : status === 'new' ? (fixAt.has(s.id) ? 'not passed on its own yet' : 'Not started') : `Level ${lvl}${sp?.best?.[lvl] != null ? ` · best ${Math.round(sp.best[lvl] * 100)}%` : ''}`}
+                    {isDue ? 'Due for review' : status === 'new' ? (fixAt.has(s.id) ? 'not passed on its own yet' : 'Not started') : done || 'Started'}
                     {lvl === 4 && sp?.offBookDays?.length ? ` · from memory: day ${sp.offBookDays.length} of ${OFF_BOOK_DAYS}` : ''}
                   </span>
                 </div>
                 <button className="icon-btn" aria-label={`Listen to ${s.label}`} title="Listen" onClick={() => play(s.id, 0)}><IconEar size={20} /></button>
-                <button className="icon-btn" aria-label={`Arcade mode for ${s.label}${lvl < 2 ? ' (unlocks at level 2)' : ''}`}
+                <button className="icon-btn" aria-label={`Arcade mode for ${s.label}${lvl < 2 ? ' (unlocks at Level 2)' : ''}`}
                   disabled={lvl < 2} onClick={() => play(s.id, Math.max(2, Math.min(4, lvl)), '3d')}
-                  title={lvl < 2 ? 'Arcade unlocks at level 2' : 'Arcade mode'}>
+                  title={lvl < 2 ? 'Arcade unlocks at Level 2' : 'Arcade mode'}>
                   <IconCube size={20} color={lvl >= 2 ? '#B3A6FF' : undefined} />
                 </button>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 5 }}>
                 {LEVELS.map((L) => {
                   const l = L.level;
-                  const cls = l <= lvl ? 'lvl-btn done' : l === lvl + 1 ? 'lvl-btn next' : 'lvl-btn';
+                  // Each level starts at its step for this passage (in tempo once passed, or once its slow step is).
+                  const st = stepFor(sp, l);
+                  const cls = l <= lvl ? 'lvl-btn done' : l === lvl + 1 ? `lvl-btn next${l <= slow ? ' half' : ''}` : l <= slow ? 'lvl-btn half' : 'lvl-btn';
                   return (
-                    <button key={l} className={cls} aria-label={`${s.label}, level ${l} ${L.name}${l <= lvl ? ' (passed)' : ''}`} onClick={() => play(s.id, l)}>
+                    <button key={l} className={cls} aria-label={`${s.label}, ${stepLabel(l, st)}${l <= lvl ? ' (passed)' : l <= slow ? ' (slow passed)' : ''}`} onClick={() => play(s.id, l, '2d', st)}>
                       {l} <span style={{ fontWeight: 600, fontSize: 11 }}>{SHORT[l]}</span>
                     </button>
                   );

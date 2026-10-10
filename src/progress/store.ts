@@ -4,12 +4,16 @@
 import { get as idbGet, set as idbSet, del as idbDel, keys as idbKeys } from 'idb-keyval';
 import type { Score, Section, VoiceType } from '../music/types';
 import type { AttemptResult, TuningMode } from '../game/types';
-import { MAX_LEVEL, OFF_BOOK_DAYS, attemptPasses, isDue, levelSpec, runOpensLevel, sectionChecks, sectionHeld, type Strictness } from './ladder';
+import { MAX_LEVEL, OFF_BOOK_DAYS, attemptPasses, isDue, runOpensLevel, sectionChecks, sectionHeld, type Step, type Strictness } from './ladder';
 
 /** Structurally identical to game/notation.ts NotationMode. */
 export type NotationMode = 'letter' | 'fixed' | 'movable' | 'jianpu' | 'pc';
 
-export const SCHEMA_VERSION = 1;
+/**
+ * 2: every level has a slow and an in-tempo step (docs/LEVELS.md). Data saved under 1 is migrated
+ * once (migrateToSteps): the old level 1 (70%, on "doo") is the new Level 1 slow.
+ */
+export const SCHEMA_VERSION = 2;
 export const PREFIX = 'sh:';
 const K = {
   schema: 'sh:schema',
@@ -39,8 +43,8 @@ export interface Profile {
   /** Delay suggested by the last run (ms), waiting for a second run to agree before it's learned. */
   latencyHint?: number;
   /**
-   * The answer to "Headphones on?" before a level-1 run (undefined = never asked). Level 1 counts
-   * only with headphones (ladder.speakerPractice). It belongs to this phone, like the delay: not
+   * The answer to "Headphones on?" before a Level 1 slow run (undefined = never asked). That step
+   * counts only with headphones (ladder.speakerPractice). It belongs to this phone, like the delay: not
    * part of the saved copy (sync.ts PROFILE_KEYS).
    */
   headphones?: boolean;
@@ -124,16 +128,22 @@ function migrateScoreDefault(p: Partial<Profile>, log: () => AttemptLog[]): void
 }
 
 export interface SectionProgress {
-  /** Highest level passed (0 = none). */
+  /** Highest level passed in tempo (0 = none). */
   level: number;
-  /** level → best accuracy (0..1). */
+  /**
+   * Highest level whose slow step was passed. Only meaningful when above `level` (passing in tempo
+   * ticks slow too): stored only then.
+   */
+  slow?: number;
+  /** level → best accuracy (0..1) in tempo (from before the steps: level 1's at 70%). */
   best: Record<number, number>;
-  /** level → best points score. */
+  /** level → best points score (in tempo). */
   bestScore?: Record<number, number>;
   attempts: number;
   lastPracticed?: number;
+  /** Last passed in tempo (reviews). */
   lastPassed?: number;
-  /** Local dates (YYYY-MM-DD) of off-book (level 5) passes; level 5 needs two different days. */
+  /** Local dates (YYYY-MM-DD) of off-book (level 5 in tempo) passes; level 5 needs two different days. */
   offBookDays?: string[];
 }
 
@@ -193,10 +203,17 @@ export interface AttemptLog {
   partId: string;
   sectionId: string;
   level: number;
+  /** The step sung (absent in entries saved before the steps: see logStep). */
+  step?: Step;
   accuracy: number;
   score: number;
   passed: boolean;
   durationSec?: number;
+}
+
+/** The step of a logged attempt: entries saved before the steps were level 1 at 70% (slow), the rest in tempo. */
+export function logStep(e: Pick<AttemptLog, 'level' | 'step'>): Step {
+  return e.step ?? (e.level === 1 ? 'slow' : 'tempo');
 }
 
 /** A programme piece the app can't ship (e.g. still in copyright): shown as an "import your score" slot. */
@@ -393,8 +410,57 @@ function ensureSchema(): void {
   schemaChecked = true;
   const v = Number(rawGet(K.schema));
   if (v !== SCHEMA_VERSION) {
-    // Future migrations go here (v < SCHEMA_VERSION). Unknown/newer: keep data, stamp version.
+    // Only data stamped 1 (every install has had the stamp from the start). No stamp = nothing saved
+    // yet, or the stamp couldn't be saved (storage full): never migrated, so a Level 1 reached in
+    // tempo can't be taken for the old (slow) one.
+    if (v === 1) migrateStoredToSteps();
+    // Unknown/newer: keep data, stamp version.
     rawSet(K.schema, String(SCHEMA_VERSION));
+  }
+}
+
+/**
+ * Schema 1 → 2 (docs/LEVELS.md, "Progress saved before the steps"): the old level 1 (70%, on "doo")
+ * is the new Level 1 slow. A section at level 1 → level 0 with slow 1; a full-run record at level 1
+ * → level 0. Level-1 fix lists and clean-run stars were earned slowly: dropped. Levels ≥ 2 and best
+ * results stay as they are. Pure; also applied to a schema-1 backup (importBackup) and to a copy
+ * from an older app (sync.ts, snapshot v < 2). Idempotent on data that has no level 1 left.
+ */
+export function migrateToSteps(p: PieceProgress): PieceProgress {
+  const sections: Record<string, SectionProgress> = {};
+  for (const [id, sp] of Object.entries(p.sections ?? {})) {
+    if (isObj(sp) && sp.level === 1) {
+      sections[id] = { ...sp, level: 0, slow: Math.max(1, Number.isFinite(sp.slow) ? (sp.slow as number) : 0) };
+    } else sections[id] = sp;
+  }
+  const out: PieceProgress = { ...p, sections };
+  if (isObj(p.full)) {
+    const f: FullRunProgress = { ...p.full };
+    if (f.level === 1) f.level = 0;
+    if (isObj(f.toFix) && 1 in f.toFix) {
+      const { 1: _drop, ...rest } = f.toFix;
+      if (Object.keys(rest).length) f.toFix = rest; else delete f.toFix;
+    }
+    if (isObj(f.toFixLocks) && 1 in f.toFixLocks) {
+      const { 1: _drop, ...rest } = f.toFixLocks;
+      if (Object.keys(rest).length) f.toFixLocks = rest; else delete f.toFixLocks;
+    }
+    if (Array.isArray(f.clean)) f.clean = f.clean.filter((l) => l !== 1);
+    out.full = f;
+  }
+  return out;
+}
+
+function migrateStoredToSteps(): void {
+  for (const k of allKeys()) {
+    if (!k.startsWith('sh:progress:')) continue;
+    const raw = rawGet(k);
+    if (raw == null) continue;
+    try {
+      const v = JSON.parse(raw);
+      if (!isObj(v) || !isObj(v.sections)) continue;
+      rawSet(k, JSON.stringify(migrateToSteps(v as unknown as PieceProgress)));
+    } catch { /* corrupt: readJSON resets it */ }
   }
 }
 
@@ -462,8 +528,16 @@ export function resetProgress(pieceId: string, partId: string): void {
 
 export interface RecordResult {
   passed: boolean;
+  /** The step sung. */
+  step: Step;
+  /** In-tempo level before and after (a level-up: newLevel > prevLevel). */
   newLevel: number;
   prevLevel: number;
+  /** Slow steps passed above the in-tempo level, before and after (0 = none). */
+  prevSlow: number;
+  newSlow: number;
+  /** A slow pass that raised `slow` (a step-up: now try that level in tempo). */
+  stepUp?: boolean;
   /** Level 5: different days passed off book so far (memorised at OFF_BOOK_DAYS). */
   offBookDays?: number;
   /** This pass cleared the section from the full run's to-fix list at these levels (with how many are left). */
@@ -527,7 +601,14 @@ export function reachLevel(full: FullRunProgress, lvl: number, now: number): Pie
   return { level: lvl, prevLevel, newLevel: full.level, ...(lvl === 5 ? { offBookDays: full.offBookDays?.length ?? 0 } : {}) };
 }
 
-/** Fold a section pass at `lvl` into its progress (level, best, review time, off-book days). */
+/** A section's slow steps above its in-tempo level (0 = none). */
+const slowAbove = (sp: SectionProgress): number => ((sp.slow ?? 0) > (sp.level ?? 0) ? sp.slow ?? 0 : 0);
+
+/**
+ * Fold a section pass in tempo at `lvl` into its progress (level, best, review time, off-book days).
+ * It ticks the slow step too (kept only while above the level: level 5 on a first day leaves level 4
+ * with slow 5).
+ */
 function passSection(sp: SectionProgress, lvl: number, accuracy: number, now: number): void {
   const prevLevel = sp.level ?? 0;
   sp.best = { ...(sp.best ?? {}) };
@@ -540,14 +621,19 @@ function passSection(sp: SectionProgress, lvl: number, accuracy: number, now: nu
     if (sp.offBookDays.length < OFF_BOOK_DAYS) reach = 4;
   }
   sp.level = Math.max(prevLevel, reach);
+  const slow = Math.max(sp.slow ?? 0, lvl);
+  if (slow > sp.level) sp.slow = slow; else delete sp.slow;
   // Passing at (or above) the current level counts as a review.
   if (lvl >= prevLevel) sp.lastPassed = now;
 }
 
 /**
- * Record one attempt. Level 0 (listen) only updates lastPracticed (and the log).
- * Any level 1..5 may be attempted (skip-ahead allowed); passing sets level = max(current, level).
- * Level 5 (off book) is only reached after passes on OFF_BOOK_DAYS different days.
+ * Record one attempt at a step (`extra.step`, default in tempo). Level 0 (listen) only updates
+ * lastPracticed (and the log). Any level 1..5 and either step may be attempted (skip-ahead allowed):
+ * a pass in tempo sets level = max(current, level) and ticks slow; a pass at slow above the in-tempo
+ * level sets slow = max(slow, level) and nothing else (no review, no fix, no piece level). Level 5 (off
+ * book) in tempo is only reached after passes on OFF_BOOK_DAYS different days. `timingFail` (late
+ * with a measured delay) and `entriesLate` (Level 1 in tempo, ladder.entriesOnTime) fail the run.
  */
 export function recordAttempt(
   pieceId: string,
@@ -557,7 +643,7 @@ export function recordAttempt(
   result: AttemptResult,
   durationSec?: number,
   now: number = Date.now(),
-  extra: { timingFail?: boolean } = {},
+  extra: { step?: Step; timingFail?: boolean; entriesLate?: boolean } = {},
 ): RecordResult {
   const prog: PieceProgress = getProgress(pieceId, partId) ?? {
     pieceId, partId, sections: {}, totalAttempts: 0, bestScore: 0,
@@ -565,24 +651,31 @@ export function recordAttempt(
   const sp: SectionProgress = prog.sections[sectionId] ?? { level: 0, best: {}, attempts: 0 };
   sp.best ??= {};
   const prevLevel = sp.level ?? 0;
+  const prevSlow = slowAbove(sp);
+  const step: Step = extra.step === 'slow' ? 'slow' : 'tempo';
   const lvl = Math.max(0, Math.min(MAX_LEVEL, Math.round(level)));
   const accuracy = Number.isFinite(result.accuracy) ? result.accuracy : 0;
   const score = Number.isFinite(result.score) ? result.score : 0;
 
   let passed = false;
+  let stepUp = false;
   let fixed: { level: number; remaining: number }[] = [];
   let reached: PieceReach | undefined;
   if (lvl === 0) {
     sp.lastPracticed = now;
   } else {
-    // The level's mark (level 1: every note right, see ladder.attemptPasses).
-    passed = attemptPasses(lvl, { accuracy, notes: result.notes ?? [] }) && !extra.timingFail;
+    // The step's mark (Level 1 slow: every note right, see ladder.attemptPasses).
+    passed = attemptPasses(lvl, step, { accuracy, notes: result.notes ?? [] }) && !extra.timingFail && !extra.entriesLate;
     sp.attempts = (sp.attempts ?? 0) + 1;
-    sp.best[lvl] = Math.max(sp.best[lvl] ?? 0, accuracy);
-    sp.bestScore = { ...(sp.bestScore ?? {}) };
-    sp.bestScore[lvl] = Math.max(sp.bestScore[lvl] ?? 0, score);
+    if (step === 'tempo') {
+      sp.best[lvl] = Math.max(sp.best[lvl] ?? 0, accuracy);
+      sp.bestScore = { ...(sp.bestScore ?? {}) };
+      sp.bestScore[lvl] = Math.max(sp.bestScore[lvl] ?? 0, score);
+    }
     sp.lastPracticed = now;
-    if (passed) {
+    if (passed && step === 'slow') {
+      if (lvl > prevLevel && lvl > (sp.slow ?? 0)) { sp.slow = lvl; stepUp = true; }
+    } else if (passed) {
       passSection(sp, lvl, accuracy, now);
       // Passing a section on its own clears it from the full run's to-fix list (at this level and
       // below). The last one to fix at a level: the piece reaches that level.
@@ -601,14 +694,14 @@ export function recordAttempt(
   prog.sections[sectionId] = sp;
   writeJSON(K.progress(pieceId, partId), prog, false);
 
-  const entry: AttemptLog = { at: now, pieceId, partId, sectionId, level: lvl, accuracy, score, passed };
+  const entry: AttemptLog = { at: now, pieceId, partId, sectionId, level: lvl, ...(lvl > 0 ? { step } : {}), accuracy, score, passed };
   if (durationSec != null && Number.isFinite(durationSec)) entry.durationSec = durationSec;
   const log = attemptLog();
   log.push(entry);
   writeJSON(K.log, log.length > LOG_CAP ? log.slice(log.length - LOG_CAP) : log, false);
   emit();
   return {
-    passed, newLevel: sp.level, prevLevel,
+    passed, step, newLevel: sp.level, prevLevel, prevSlow, newSlow: slowAbove(sp), ...(stepUp ? { stepUp } : {}),
     ...(lvl === 5 ? { offBookDays: sp.offBookDays?.length ?? 0 } : {}),
     ...(fixed.length ? { fixed } : {}),
     ...(reached ? { reached } : {}),
@@ -624,7 +717,7 @@ export interface FullRunSection {
 }
 
 export interface FullRunRecord {
-  /** The run counted: in one go, at the level's tempo (and, level 1, with headphones on). */
+  /** The run counted: in tempo, in one go, at full tempo. */
   counted: boolean;
   /** Overall accuracy reached the pass mark (and the timing was fine). */
   overallPassed: boolean;
@@ -654,8 +747,9 @@ export interface FullRunRecord {
 /**
  * Record a run-through of the whole piece at `level` (docs/LEVELS.md).
  *
- * A counted run (`counted`: in one go, at the level's tempo, level 1 with headphones, level 5 with
- * everything hidden) opens level N when at most half of the sections slipped and the run came within
+ * Only runs in tempo count (`opts.step`, default in tempo: a slow run of the whole piece is
+ * practice). A counted run (`counted`: in one go, at full tempo, level 5 with everything hidden) opens
+ * level N when at most half of the sections slipped and the run came within
  * 10 points of the pass mark (ladder.runOpensLevel), and the timing was fine. Then the sections that held are credited as section passes, the ones that
  * slipped become the fix list at N (replacing any earlier list at N), and the piece reaches N as
  * soon as each of them passes N on its own (recordAttempt). Nothing slipped and the run passed
@@ -670,9 +764,12 @@ export function recordFullRun(
   result: AttemptResult,
   sections: Section[],
   noteStart: (index: number) => number | undefined,
-  opts: { counted: boolean; timingFail?: boolean; durationSec?: number; now?: number },
+  opts: { counted: boolean; step?: Step; timingFail?: boolean; entriesLate?: boolean; durationSec?: number; now?: number },
 ): FullRunRecord {
   const now = opts.now ?? Date.now();
+  const step: Step = opts.step === 'slow' ? 'slow' : 'tempo';
+  // Slow runs of the whole piece never count; late entries (Level 1 in tempo) fail it like late timing.
+  opts = { ...opts, counted: opts.counted && step === 'tempo', timingFail: !!opts.timingFail || !!opts.entriesLate };
   const prog: PieceProgress = getProgress(pieceId, partId) ?? {
     pieceId, partId, sections: {}, totalAttempts: 0, bestScore: 0,
   };
@@ -690,8 +787,7 @@ export function recordFullRun(
       id: s.id, accuracy: checks[s.id].accuracy, passed: sectionHeld(lvl, checks[s.id]),
       ...(checks[s.id].wrong.length ? { wrong: checks[s.id].wrong } : {}),
     }));
-  // Level 1: every note of the whole run right (each section's wrong notes make it "to fix").
-  const overallPassed = attemptPasses(lvl, { accuracy, notes: result.notes ?? [] }) && !opts.timingFail;
+  const overallPassed = attemptPasses(lvl, 'tempo', { accuracy, notes: result.notes ?? [] }) && !opts.timingFail;
   const slipped = runSections.filter((rs) => !rs.passed).map((rs) => rs.id);
   const tooMuch = opts.counted && !opts.timingFail && runSections.length > 0
     && !runOpensLevel({ level: lvl, sections: runSections.length, slipped: slipped.length, accuracy });
@@ -741,7 +837,7 @@ export function recordFullRun(
   writeJSON(K.progress(pieceId, partId), prog, false);
 
   // Only runs that opened their level are logged as full runs ('all'); the rest is practice.
-  const entry: AttemptLog = { at: now, pieceId, partId, sectionId: opened ? 'all' : 'practice', level: lvl, accuracy, score, passed };
+  const entry: AttemptLog = { at: now, pieceId, partId, sectionId: opened ? 'all' : 'practice', level: lvl, step, accuracy, score, passed };
   if (opts.durationSec != null && Number.isFinite(opts.durationSec)) entry.durationSec = opts.durationSec;
   const log = attemptLog();
   log.push(entry);
@@ -783,7 +879,8 @@ export function upgradeFullRuns(pieceId: string, partId: string, sections: Secti
   const full = prog?.full;
   if (!prog || !full) return false;
   let changed = false;
-  const log = attemptLog().filter((e) => e.pieceId === pieceId && e.partId === partId);
+  // Only runs in tempo (entries from before the steps at level 1 were slow: never a grant now).
+  const log = attemptLog().filter((e) => e.pieceId === pieceId && e.partId === partId && logStep(e) === 'tempo');
   const lastRun = (n: number) => { const runs = log.filter((e) => e.sectionId === 'all' && e.level === n); return runs[runs.length - 1]; };
   if (!Array.isArray(full.clean)) {
     const stars = new Set<number>();
@@ -833,9 +930,11 @@ export function upgradeFullRuns(pieceId: string, partId: string, sections: Secti
   return changed;
 }
 
+/** Best result at a level in tempo (none is kept for slow runs: null). */
 export function personalBest(
-  pieceId: string, partId: string, sectionId: string, level: number,
+  pieceId: string, partId: string, sectionId: string, level: number, step: Step = 'tempo',
 ): { accuracy: number; score: number } | null {
+  if (step === 'slow') return null;
   const prog = getProgress(pieceId, partId);
   // The whole piece: counted full runs (the old 'all' record mixed in practice runs).
   const sp = sectionId === 'all' ? prog?.full : prog?.sections[sectionId];
@@ -1037,6 +1136,8 @@ export function importBackup(json: string): void {
   const entries = Object.entries(b.data).filter(([k, v]) => k.startsWith(PREFIX) && typeof v === 'string');
   for (const k of allKeys()) if (k.startsWith(PREFIX)) rawRemove(k);
   for (const [k, v] of entries) rawSet(k, v as string);
+  // The backup's own schema decides what to migrate (ensureSchema): its data's stamp, else the file's.
+  if (!entries.some(([k]) => k === K.schema)) rawSet(K.schema, String(Number.isFinite(Number(b.schema)) ? Number(b.schema) : 1));
   schemaChecked = false;
   ensureSchema();
   emit();

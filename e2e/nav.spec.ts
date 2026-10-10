@@ -10,7 +10,7 @@ async function home(page: Page) {
 }
 
 async function singFirstSection(page: Page) {
-  await page.getByLabel('Sections').getByRole('button', { name: /level 1/ }).first().click();
+  await page.getByLabel('Passages').getByRole('button', { name: /Level 1/ }).first().click();
   const hp = page.getByTestId('hp-yes');
   if (await hp.isVisible()) await hp.click();
   await page.getByTestId('start').click();
@@ -23,7 +23,7 @@ test('Results: back lands on the piece, then Home; Again then back lands on the 
   page.on('pageerror', (e) => errors.push(String(e)));
   await home(page);
   await page.getByTestId('piece-row').first().click();
-  await expect(page.getByRole('heading', { name: 'Sections' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Passages' })).toBeVisible();
   // The piece page keeps the tab it was opened from lit.
   await expect(page.getByRole('navigation').getByRole('button', { name: 'Home' })).toHaveAttribute('aria-current', 'true');
   const pieceUrl = page.url();
@@ -46,7 +46,7 @@ test('Results: back lands on the piece, then Home; Again then back lands on the 
   await expect(page.getByTestId('start')).toBeVisible();
   await page.goBack();
   await expect(page).toHaveURL(pieceUrl);
-  await expect(page.getByRole('heading', { name: 'Sections' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Passages' })).toBeVisible();
 
   // ← on Results and "☰ Piece" also go to the piece; no extra history (back again is Home).
   await singFirstSection(page);
@@ -81,7 +81,7 @@ test('mid-run, ← and back pause and open the sheet; leaving from it lands on t
   await home(page);
   await page.getByTestId('piece-row').first().click();
   const pieceUrl = page.url();
-  await page.getByLabel('Sections').getByRole('button', { name: /level 1/ }).first().click();
+  await page.getByLabel('Passages').getByRole('button', { name: /Level 1/ }).first().click();
   await page.getByTestId('hp-yes').click();
   // One Start button on the ready screen.
   await expect(page.getByRole('button', { name: /Start|Sing it now/ })).toHaveCount(1);

@@ -2,12 +2,22 @@ import type { AttemptResult } from '../../game/types';
 import type { WordsResult, WordsStage } from '../../game/textrhythm';
 import type { FullRunRecord, PieceReach } from '../../progress/store';
 import type { InputQuality } from '../../audio/inputQuality';
+import type { EntriesCheck } from '../../progress/ladder';
 
 export interface LastResult {
   pieceId: string;
   partId: string;
   sectionId: string;
   level: number;
+  /** The level's step (absent in results saved before the steps: Level 1 was slow, the rest in tempo). */
+  step?: 'slow' | 'tempo';
+  /** A section run: slow steps passed above its in-tempo level before and after (store.RecordResult). */
+  prevSlow?: number;
+  newSlow?: number;
+  /** A slow pass that raised the passage's slow step: now try that level in tempo. */
+  stepUp?: boolean;
+  /** Level 1 in tempo: whether the entries were sung and on time (ladder.entriesOnTime). */
+  entries?: EntriesCheck;
   mode: '2d' | '3d';
   from: number;
   to: number;
@@ -17,7 +27,7 @@ export interface LastResult {
   newLevel: number;
   /** True when the attempt counted toward the section ladder. */
   ladder: boolean;
-  /** Judged note by note (level 1: every note right); absent in results saved by older versions. */
+  /** Judged note by note (Level 1 slow: every note right); absent in results saved by older versions. */
   everyNote?: boolean;
   /** Tolerance (cents) the run was scored with (the level's, after the strictness factor). */
   tolerance?: number;
@@ -29,9 +39,9 @@ export interface LastResult {
   points?: { gained: number; total: number };
   /** The practice streak after this run, and whether this run started today's day of it. */
   streak?: { days: number; extended: boolean };
-  /** Sung slower than the level's tempo ("practise slowly"): the tempo, as a factor. Practice only. */
+  /** Sung slower than the step's tempo ("practise slowly"): the tempo, as a factor. Practice only. */
   slow?: number;
-  /** Level 1 sung without headphones (the singer's answer): practice, see ladder.speakerPractice. */
+  /** Level 1 slow sung without headphones (the singer's answer): practice, see ladder.speakerPractice. */
   speaker?: boolean;
   /** Headphone/mic delay learned from this run (ms), if any. */
   latencyAdjusted?: number;

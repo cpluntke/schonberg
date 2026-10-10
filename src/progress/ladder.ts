@@ -1,28 +1,30 @@
 // The mastery ladder (docs/design-critique.md, "The progression").
 // Pure functions only: no storage access here.
-import type { Section } from '../music/types';
+import type { ScoreNote, Section } from '../music/types';
 import type { PieceProgress, SectionProgress } from './store';
 import type { AttemptResult, NoteResult } from '../game/types';
 import { GRADE_VALUE } from '../game/scoring';
+import { ENTRY_REST_SEC, LATE_MS } from '../game/analysis';
 
 export type LevelNumber = 1 | 2 | 3 | 4 | 5;
 export type Strictness = 'forgiving' | 'standard' | 'strict';
+/**
+ * Every level has two steps (docs/LEVELS.md): SLOW (70%) then IN TEMPO (100%). Passing in tempo
+ * completes the level (and ticks slow); a singer may always try in tempo straight away.
+ */
+export type Step = 'slow' | 'tempo';
+export const STEPS: readonly Step[] = ['slow', 'tempo'];
+/** Tempo of every level's slow step. */
+export const SLOW_RATE = 0.7;
 
-export interface LevelSpec {
-  level: LevelNumber;
-  name: string;
+/** What one step of a level asks for. */
+export interface StepRules {
   /** Tempo factor. */
   rate: number;
-  /** Your own part audible as a guide. */
-  guide: boolean;
-  /** Note names shown on the bars (otherwise lyrics only). */
-  showNames: boolean;
-  /** Starting-pitch cue during the count-in. */
-  cue: 'note' | 'chord';
   /** Cents half-width (before the strictness factor). */
   tolerance: number;
   /**
-   * Accuracy needed to pass (0..1). At an every-note level it is only a backstop (a run can't pass on
+   * Accuracy needed to pass (0..1). At an every-note step it is only a backstop (a run can't pass on
    * forgiven notes alone): there, every note must be right (`everyNote`).
    */
   pass: number;
@@ -31,47 +33,117 @@ export interface LevelSpec {
    * unless clearly wrong, see noteVerdict). Replaces the percentage, and short sections get no slack.
    */
   everyNote: boolean;
-  /** Sung on "doo" instead of the words (the words are shown dimmed, for orientation). */
-  doo: boolean;
   /**
    * Counts only with headphones on (the singer says so before the run): through the phone speaker
    * the guide bleeds into the mic and the tracker can't hear every note reliably, which an
-   * every-note level can't allow. Without them the run is practice (see speakerPractice).
+   * every-note step can't allow. Without them the run is practice (see speakerPractice).
    */
   headphones: boolean;
-  description: string;
+  /** The entries (first note, notes after a rest) must be sung and on time on average (entriesOnTime). */
+  entries: boolean;
 }
+
+/** One level: what it adds, and its two steps. */
+export interface LevelSpec {
+  level: LevelNumber;
+  /** Notes, Words, Alone, Concert, By heart. */
+  name: string;
+  /** Your own part audible as a guide. */
+  guide: boolean;
+  /** Note names shown on the bars (otherwise lyrics only). */
+  showNames: boolean;
+  /** Starting-pitch cue during the count-in. */
+  cue: 'note' | 'chord';
+  /** Sung on "doo" instead of the words (the words are shown dimmed, for orientation). */
+  doo: boolean;
+  description: string;
+  slow: StepRules;
+  tempo: StepRules;
+}
+
+/** One step of one level: the level's parts and the step's rules. */
+export interface StepSpec extends Omit<LevelSpec, 'slow' | 'tempo'>, StepRules {
+  step: Step;
+  /** "Level 2 · Words · slow" */
+  label: string;
+}
+
+const both = (tolerance: number, pass: number): Pick<LevelSpec, 'slow' | 'tempo'> => ({
+  slow: { rate: SLOW_RATE, tolerance, pass, everyNote: false, headphones: false, entries: false },
+  tempo: { rate: 1, tolerance, pass, everyNote: false, headphones: false, entries: false },
+});
 
 export const LEVELS: LevelSpec[] = [
   {
-    level: 1, name: 'Note-learning', rate: 0.7, guide: true, showNames: true, cue: 'note', tolerance: 50, pass: 0.75, everyNote: true, doo: true, headphones: true,
-    description: 'Slow tempo (70%), sung on “doo”, with your part playing and note names shown. Learn the notes: every note must be right. Counts with headphones on.',
+    level: 1, name: 'Notes', guide: true, showNames: true, cue: 'note', doo: true,
+    slow: { rate: SLOW_RATE, tolerance: 50, pass: 0.75, everyNote: true, headphones: true, entries: false },
+    tempo: { rate: 1, tolerance: 50, pass: 0.8, everyNote: false, headphones: false, entries: true },
+    description: 'Learn the notes on “doo”, with your part playing, note names shown and your starting note. Slow: every note right, with headphones on. In tempo: 80%, coming in on time.',
   },
   {
-    level: 2, name: 'In time', rate: 1.0, guide: true, showNames: true, cue: 'note', tolerance: 35, pass: 0.8, everyNote: false, doo: false, headphones: false,
-    description: 'Full tempo, now with the words, your part still playing. Lock in rhythm and entries.',
+    level: 2, name: 'Words', guide: true, showNames: true, cue: 'note', doo: false, ...both(35, 0.8),
+    description: 'Now with the words, your part still playing.',
   },
   {
-    level: 3, name: 'Independent', rate: 1.0, guide: false, showNames: true, cue: 'note', tolerance: 30, pass: 0.8, everyNote: false, doo: false, headphones: false,
+    level: 3, name: 'Alone', guide: false, showNames: true, cue: 'note', doo: false, ...both(30, 0.8),
     description: 'Your part is muted: sing against the other voices only. Rehearsal-ready.',
   },
   {
-    level: 4, name: 'Concert-ready', rate: 1.0, guide: false, showNames: false, cue: 'chord', tolerance: 25, pass: 0.85, everyNote: false, doo: false, headphones: false,
-    description: 'No guide, no note names (lyrics only), starting chord only. Concert-ready.',
+    level: 4, name: 'Concert', guide: false, showNames: false, cue: 'chord', doo: false, ...both(25, 0.85),
+    description: 'No note names (lyrics only), starting chord only. Concert-ready.',
   },
   {
-    level: 5, name: 'Off book', rate: 1.0, guide: false, showNames: false, cue: 'chord', tolerance: 25, pass: 0.85, everyNote: false, doo: false, headphones: false,
-    description: 'From memory: your notes and words fade out as you learn them, while the other voices play. Passed off book on two different days = memorised.',
+    level: 5, name: 'By heart', guide: false, showNames: false, cue: 'chord', doo: false, ...both(25, 0.85),
+    description: 'From memory: your notes and words fade out as you learn them, while the other voices play. In tempo on two different days = memorised.',
   },
 ];
 
-/** "every note" or "80%": what a level needs to pass, for the level cards and the pre-run card. */
-export function passLabel(spec: Pick<LevelSpec, 'pass' | 'everyNote'>): string {
-  return spec.everyNote ? 'every note right' : `${Math.round(spec.pass * 100)}%`;
+/** "slow" / "in tempo". */
+export const stepWord = (step: Step): string => (step === 'slow' ? 'slow' : 'in tempo');
+
+/** "Level 2 · Words" */
+export function levelLabel(level: number): string {
+  const l = levelSpec(level);
+  return `Level ${l.level} · ${l.name}`;
+}
+
+/** "Level 2 · Words · slow" / "Level 2 · Words · in tempo". */
+export function stepLabel(level: number, step: Step): string {
+  return `${levelLabel(level)} · ${stepWord(step)}`;
+}
+
+/** Spec for one step of level 1..5 (values outside are clamped). */
+export function stepSpec(level: number, step: Step): StepSpec {
+  const { slow, tempo, ...l } = levelSpec(level);
+  const s = step === 'slow' ? 'slow' : 'tempo';
+  return { ...l, ...(s === 'slow' ? slow : tempo), step: s, label: stepLabel(l.level, s) };
 }
 
 /**
- * At an every-note level (level 1): was this note right? 'right' = graded "good" or better.
+ * The step to sing a level at by default: in tempo once the level (or its slow step) was passed,
+ * else slow (the app suggests slow first when a level is new; in tempo is always allowed).
+ */
+export function stepFor(sp: Pick<SectionProgress, 'level' | 'slow'> | undefined, level: number): Step {
+  return (sp?.level ?? 0) >= level || (sp?.slow ?? 0) >= level ? 'tempo' : 'slow';
+}
+
+/**
+ * A section's current step: the next level (its in-tempo level + 1, at most 5), slow until that
+ * level's slow step was passed, then in tempo.
+ */
+export function currentStep(sp: Pick<SectionProgress, 'level' | 'slow'> | undefined): { level: LevelNumber; step: Step } {
+  const target = Math.min(MAX_LEVEL, Math.max(0, sp?.level ?? 0) + 1) as LevelNumber;
+  return { level: target, step: stepFor(sp, target) };
+}
+
+/** "every note right", "80%" or "80%, entries on time": what a step needs to pass, for the cards. */
+export function passLabel(spec: Pick<StepRules, 'pass' | 'everyNote'> & Partial<Pick<StepRules, 'entries'>>): string {
+  if (spec.everyNote) return 'every note right';
+  return `${Math.round(spec.pass * 100)}%${spec.entries ? ', entries on time' : ''}`;
+}
+
+/**
+ * At an every-note step (level 1 slow): was this note right? 'right' = graded "good" or better.
  * 'forgiven' = below "good", but the scorer can't judge the note reliably (NoteResult.unsure: a very
  * short note, or a pitch outside the tracker's range) and didn't clearly hear it wrong
  * (NoteResult.clearly: no voice at all, or a definite pitch clearly off). Else 'wrong'.
@@ -87,14 +159,53 @@ export function wrongNotes(result: Pick<AttemptResult, 'notes'>): NoteResult[] {
 }
 
 /**
- * Whether one attempt (a section, or a whole run overall) reaches the level's mark, before any
- * timing check: the pass mark, and at an every-note level no wrong note.
+ * Whether one attempt (a section, or a whole run overall) reaches the step's mark, before any
+ * timing or entries check: the pass mark, and at an every-note step no wrong note.
  */
-export function attemptPasses(level: number, result: Pick<AttemptResult, 'accuracy' | 'notes'>): boolean {
-  const spec = levelSpec(level);
+export function attemptPasses(level: number, step: Step, result: Pick<AttemptResult, 'accuracy' | 'notes'>): boolean {
+  const spec = stepSpec(level, step);
   const accuracy = Number.isFinite(result.accuracy) ? result.accuracy : 0;
   if (accuracy < spec.pass) return false;
   return !spec.everyNote || result.notes.every((n) => noteVerdict(n) !== 'wrong');
+}
+
+/** The entries of a run, and whether they came in on time (entriesOnTime). */
+export interface EntriesCheck {
+  ok: boolean;
+  /** Entry notes in the run. */
+  entries: number;
+  /** Entries not sung at all (no onset). */
+  missed: number;
+  /** Mean onset of the sung entries (ms after the written start, minus `offsetMs`); null when none was sung. */
+  meanMs: number | null;
+}
+
+/**
+ * Level 1 in tempo: the entries must each be sung and, on average, on time. Entries as analysis.ts
+ * defines them: the first note (of the part, or of the run) and every note after a rest of at least
+ * ENTRY_REST_SEC. Each needs an onset (`onsetMs !== null`), and their mean onset must be at most
+ * LATE_MS. `offsetMs` is taken off every onset first (the part of the delay the line-up showed to be
+ * the device's, on a phone without a measured delay). A run without entries passes.
+ */
+export function entriesOnTime(
+  partNotes: readonly Pick<ScoreNote, 'start' | 'dur'>[],
+  notes: readonly Pick<NoteResult, 'index' | 'onsetMs'>[],
+  offsetMs = 0,
+): EntriesCheck {
+  const sorted = [...notes].sort((a, b) => a.index - b.index);
+  const entries = sorted.filter((n, k) => {
+    const i = n.index;
+    if (k === 0 || i === 0) return true;
+    const prev = partNotes[i - 1];
+    const cur = partNotes[i];
+    if (!prev || !cur) return false;
+    return cur.start - (prev.start + prev.dur) >= ENTRY_REST_SEC - 1e-6;
+  });
+  const sung = entries.filter((n) => n.onsetMs !== null);
+  const missed = entries.length - sung.length;
+  const meanMs = sung.length ? sung.reduce((a, n) => a + (n.onsetMs! - offsetMs), 0) / sung.length : null;
+  const ok = entries.length === 0 || (missed === 0 && meanMs !== null && meanMs <= LATE_MS);
+  return { ok, entries: entries.length, missed, meanMs: meanMs == null ? null : Math.round(meanMs) };
 }
 
 /** The highest level. Concert-ready (4) is the top of readiness; off book (5) is memorisation on top. */
@@ -102,20 +213,20 @@ export const MAX_LEVEL = 5;
 /** Off-book passes needed on different days before a section counts as memorised. */
 export const OFF_BOOK_DAYS = 2;
 
-/** Level 0 pseudo-level: listen once, all parts, unscored. */
+/** Listening (route level 0): once, all parts, unscored. Not a level. */
 export const LISTEN = {
   level: 0 as const,
   name: 'Listen',
   rate: 1.0,
   guide: true,
   showNames: true,
-  description: 'Hear the section once with all parts. Not scored.',
+  description: 'Hear the passage once with all parts. Not scored.',
 };
 
 export const REVIEW_AFTER_DAYS = 7;
 const DAY_MS = 86_400_000;
 
-/** Spec for level 1..5 (values outside are clamped). */
+/** The level-wide parts of level 1..5 (values outside are clamped); stepSpec for a step's rules. */
 export function levelSpec(level: number): LevelSpec {
   const i = Math.min(MAX_LEVEL, Math.max(1, Math.round(level || 1))) - 1;
   return LEVELS[i];
@@ -125,9 +236,9 @@ export function strictnessFactor(s: Strictness): number {
   return s === 'forgiving' ? 1.3 : s === 'strict' ? 0.8 : 1;
 }
 
-/** Tolerance in cents for a level after the profile strictness factor. */
-export function effectiveTolerance(level: number, strictness: Strictness): number {
-  return Math.round(levelSpec(level).tolerance * strictnessFactor(strictness));
+/** Tolerance in cents for a step after the profile strictness factor. */
+export function effectiveTolerance(level: number, step: Step, strictness: Strictness): number {
+  return Math.round(stepSpec(level, step).tolerance * strictnessFactor(strictness));
 }
 
 function levelOf(prog: PieceProgress | undefined, sectionId: string): number {
@@ -211,7 +322,7 @@ export const OPEN_MARGIN = 0.1;
  */
 export function runOpensLevel(o: { level: number; sections: number; slipped: number; accuracy: number }): boolean {
   const acc = Number.isFinite(o.accuracy) ? o.accuracy : 0;
-  return o.sections > 0 && o.slipped * 2 <= o.sections && acc >= levelSpec(o.level).pass - OPEN_MARGIN - 1e-9;
+  return o.sections > 0 && o.slipped * 2 <= o.sections && acc >= stepSpec(o.level, 'tempo').pass - OPEN_MARGIN - 1e-9;
 }
 
 /**
@@ -313,15 +424,16 @@ export const MIN_SECTION_SCORE = 0.5;
 /**
  * Each section's result within one run of the whole piece: its accuracy (shown), the value the pass
  * mark is checked against, and its wrong notes (noteVerdict; counted at every level, decisive only at
- * an every-note level). Short sections (fewer than SHORT_SECTION_NOTES judged notes) get one note of
+ * an every-note step). Short sections (fewer than SHORT_SECTION_NOTES judged notes) get one note of
  * slack: their weakest note counts as sung well, so a single "ok" can't fail a level. Not at an
- * every-note level (`level` 1): there every note counts.
+ * every-note step (level 1 slow): there every note counts. Full runs count in tempo only (the default).
  */
 export function sectionChecks(
   sections: Section[],
   noteStart: (index: number) => number | undefined,
   result: Pick<AttemptResult, 'notes'>,
   level?: number,
+  step: Step = 'tempo',
 ): Record<string, { accuracy: number; checked: number; notes: number; wrong: number[] }> {
   const vals = new Map<string, number[]>();
   const wrong = new Map<string, number[]>();
@@ -333,7 +445,7 @@ export function sectionChecks(
     vals.set(sec.id, [...(vals.get(sec.id) ?? []), GRADE_VALUE[n.grade]]);
     if (noteVerdict(n) === 'wrong') wrong.set(sec.id, [...(wrong.get(sec.id) ?? []), n.index]);
   }
-  const everyNote = level != null && levelSpec(level).everyNote;
+  const everyNote = level != null && stepSpec(level, step).everyNote;
   const out: Record<string, { accuracy: number; checked: number; notes: number; wrong: number[] }> = {};
   for (const [id, v] of vals) {
     const sum = v.reduce((a, b) => a + b, 0);
@@ -349,9 +461,9 @@ export function sectionChecks(
   return out;
 }
 
-/** A section held within a full run at `level` (see sectionChecks). */
-export function sectionHeld(level: number, check: { checked: number; wrong: number[] }): boolean {
-  const spec = levelSpec(level);
+/** A section held within a full run at `level` (in tempo unless `step` says otherwise; see sectionChecks). */
+export function sectionHeld(level: number, check: { checked: number; wrong: number[] }, step: Step = 'tempo'): boolean {
+  const spec = stepSpec(level, step);
   return check.checked >= spec.pass - 1e-9 && (!spec.everyNote || check.wrong.length === 0);
 }
 
@@ -367,17 +479,30 @@ export interface NextStep {
   /** A section id, or 'all' for a full run-through. */
   sectionId: string;
   level: number;
+  /** The step to sing it at (fixes, reviews and full runs are always in tempo). */
+  step: Step;
   reason: string;
   /** fix = a section that slipped in the full run that opened a level; full = a run-through of the whole piece. */
   kind: 'fix' | 'review' | 'full' | 'section';
+  /**
+   * Level 2 slow, and the passage's words in rhythm (src/progress/words.ts) aren't passed yet: the UI
+   * can offer "Say it in rhythm first".
+   */
+  wordsFirst?: boolean;
 }
+
+/**
+ * Whether a passage's words in rhythm were passed (words.ts): true, false, or null when the passage
+ * has no words (or it isn't known).
+ */
+export type WordsDone = (sectionId: string) => boolean | null;
 
 function todayKey(now: number): string {
   const d = new Date(now);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export function nextStep(sections: Section[], prog: PieceProgress | undefined, now: number = Date.now()): NextStep | null {
+export function nextStep(sections: Section[], prog: PieceProgress | undefined, now: number = Date.now(), words?: WordsDone): NextStep | null {
   if (sections.length === 0) return null;
   const multi = sections.length > 1;
   const P = pieceLevel(sections, prog);
@@ -390,14 +515,15 @@ export function nextStep(sections: Section[], prog: PieceProgress | undefined, n
     const more = fix.sectionIds.length - 1;
     // Off book: the days the piece will have been sung from memory once this list is done.
     const days = new Set([...(prog?.full?.offBookDays ?? []), today]).size;
+    const what = `Fix ${label(fix.sectionIds[0])}`;
     const goal = fix.level <= P
-      ? `: ${levelSpec(fix.level).everyNote ? 'not every note was right' : 'it slipped'} in your full run.`
+      ? `${what} at Level ${fix.level} in tempo: it slipped in your full run.`
       : fix.level === 5 && days < OFF_BOOK_DAYS
-        ? ` to finish the whole piece from memory: day ${days} of ${OFF_BOOK_DAYS}.`
-        : ` to reach level ${fix.level}.`;
+        ? `${what} at Level 5 in tempo to finish the whole piece from memory: day ${days} of ${OFF_BOOK_DAYS}.`
+        : `${what} in tempo to reach ${levelLabel(fix.level)}.`;
     return {
-      sectionId: fix.sectionIds[0], level: fix.level, kind: 'fix',
-      reason: `Fix ${label(fix.sectionIds[0])} at level ${fix.level}${goal}${more ? ` ${more} more to fix after this one.` : ''}`,
+      sectionId: fix.sectionIds[0], level: fix.level, step: 'tempo', kind: 'fix',
+      reason: `${goal}${more ? ` ${more} more to fix after this one.` : ''}`,
     };
   }
   // 2. Review the whole piece once a week.
@@ -405,7 +531,7 @@ export function nextStep(sections: Section[], prog: PieceProgress | undefined, n
     const f = prog!.full!;
     const days = Math.floor((now - (f.lastPassed ?? f.lastPracticed ?? now)) / DAY_MS);
     const l = Math.min(MAX_LEVEL, P);
-    return { sectionId: 'all', level: l, kind: 'review', reason: `Review: sing the whole piece at level ${l} (${levelSpec(l).name}). Last full run ${days} days ago.` };
+    return { sectionId: 'all', level: l, step: 'tempo', kind: 'review', reason: `Review: sing the whole piece at ${levelLabel(l)}. Last full run ${days} days ago.` };
   }
   // 3. Review: the most overdue section.
   let due: { s: Section; last: number } | null = null;
@@ -420,8 +546,8 @@ export function nextStep(sections: Section[], prog: PieceProgress | undefined, n
     const l = levelOf(prog, due.s.id);
     const days = Math.floor((now - due.last) / DAY_MS);
     return {
-      sectionId: due.s.id, level: l, kind: 'review',
-      reason: `Review ${due.s.label}: last passed ${days} days ago. Keep it at ${levelSpec(l).name}.`,
+      sectionId: due.s.id, level: l, step: 'tempo', kind: 'review',
+      reason: `Review ${due.s.label}: last passed ${days} days ago. Keep it at ${levelLabel(l)}.`,
     };
   }
   // 4. Memorising: the whole piece passed from memory on one day, so sing it all from memory again
@@ -429,26 +555,26 @@ export function nextStep(sections: Section[], prog: PieceProgress | undefined, n
   const fullDays = prog?.full?.offBookDays ?? [];
   if (multi && P === 4 && fullDays.length > 0 && !fullDays.includes(today)) {
     return {
-      sectionId: 'all', level: 5, kind: 'full',
+      sectionId: 'all', level: 5, step: 'tempo', kind: 'full',
       reason: `Sing the whole piece from memory again: day ${Math.min(OFF_BOOK_DAYS, fullDays.length + 1)} of ${OFF_BOOK_DAYS}.`,
     };
   }
-  // 5. Every section is above the piece level: confirm it with a full run. (Off book needs a
-  // second day: a piece already sung from memory today waits until tomorrow.)
+  // 5. Every section is above the piece level (in tempo): confirm it with a full run. (Off book
+  // needs a second day: a piece already sung from memory today waits until tomorrow.)
   if (multi) {
     const minSec = Math.min(...sections.map((s) => Math.min(MAX_LEVEL, levelOf(prog, s.id))));
     if (minSec > P && !(minSec === 5 && P === 4 && prog?.full?.offBookDays?.includes(today))) {
       const days = prog?.full?.offBookDays?.length ?? 0;
       const reason = minSec === 5
-        ? (P === 4 && days > 0 ? `Sing the whole piece from memory again: day ${days + 1} of ${OFF_BOOK_DAYS}.` : 'Every section is memorised: now sing the whole piece from memory.')
+        ? (P === 4 && days > 0 ? `Sing the whole piece from memory again: day ${days + 1} of ${OFF_BOOK_DAYS}.` : 'Every passage is memorised: now sing the whole piece from memory.')
         : P === 0
-          ? `Level ${minSec} in every section: confirm it with a full run-through.`
-          : `Every section is at level ${minSec}: sing the whole piece at ${levelSpec(minSec).name} to make it the piece's level.`;
-      return { sectionId: 'all', level: minSec, kind: 'full', reason };
+          ? `Level ${minSec} in every passage: confirm it with a full run-through.`
+          : `Every passage is at Level ${minSec}: sing the whole piece at ${levelLabel(minSec)} to make it the piece's level.`;
+      return { sectionId: 'all', level: minSec, step: 'tempo', kind: 'full', reason };
     }
   }
-  // 6. Earliest section with the lowest level. (A section already sung from memory today waits
-  // until tomorrow.)
+  // 6. Earliest section with the lowest level, at its current step. (A section already sung from
+  // memory today waits until tomorrow.)
   let best: Section | null = null;
   let bestLevel = 5;
   for (const s of [...sections].sort((a, b) => a.index - b.index)) {
@@ -457,14 +583,18 @@ export function nextStep(sections: Section[], prog: PieceProgress | undefined, n
     if (l < bestLevel) { best = s; bestLevel = l; }
   }
   if (!best || bestLevel >= MAX_LEVEL) return null;
-  const target = Math.min(MAX_LEVEL, bestLevel + 1);
-  const spec = levelSpec(target);
-  const reason = bestLevel === 0
-    ? `Start ${best.label}: learn the notes on “doo” at ${Math.round(spec.rate * 100)}% tempo.`
-    : target === 5
-      ? `Everything is concert-ready. Now learn ${best.label} by heart.`
-      : `${best.label} is your weakest section. Take it to ${spec.name}.`;
-  return { sectionId: best.id, level: target, kind: 'section', reason };
+  const sp = prog?.sections[best.id];
+  const { level: target, step } = currentStep(sp);
+  const left = sections.filter((s) => levelOf(prog, s.id) < target).length;
+  const started = sections.some((s) => (prog?.sections[s.id]?.attempts ?? 0) > 0 || levelOf(prog, s.id) > 0);
+  const tail = target === 5 && step === 'slow' ? ' Everything is concert-ready: now learn it by heart.'
+    : step === 'tempo' ? ' Slow is done: now in tempo.'
+      : multi && left === 1 ? ` Last passage at Level ${target}.`
+        : target === 1 && !started ? ' Learn the notes on “doo”.'
+          : '';
+  const out: NextStep = { sectionId: best.id, level: target, step, kind: 'section', reason: `${best.label}: ${stepLabel(target, step)}.${tail}` };
+  if (target === 2 && step === 'slow' && words?.(best.id) === false) out.wordsFirst = true;
+  return out;
 }
 
 function daysUntil(date: string | undefined, now: number): number | null {
@@ -482,8 +612,9 @@ function plural(n: number, w: string): string { return `${n} ${w}${n === 1 ? '' 
 
 /**
  * Recommended target given the cycle dates, e.g.
- * "Rehearsal in 3 days: get 4 more sections to Independent".
- * Returns null when there is no upcoming date or the target is already met.
+ * "Rehearsal in 3 days: get 4 more passages to Level 3 · Alone (about 2 a day), then sing it all through at that level".
+ * Counts the passages not yet at the target level in tempo. Returns null when there is no upcoming
+ * date or the target is already met.
  */
 export function targetForDate(
   sections: Section[],
@@ -500,58 +631,61 @@ export function targetForDate(
   for (const g of goals) {
     if (g.days == null || g.days < 0 || P >= g.level) continue;
     const when = g.days === 0 ? 'today' : g.days === 1 ? 'tomorrow' : `in ${g.days} days`;
-    const name = levelSpec(g.level).name;
+    const name = levelLabel(g.level);
+    // (levelOf is the in-tempo level: a passage whose slow step alone is done still needs its run in tempo)
     const missing = sections.filter((s) => levelOf(prog, s.id) < g.level).length;
     if (missing === 0 || sections.length === 1) {
-      return `${g.label} ${when}: sing the whole piece through at ${name} (level ${g.level})`;
+      return `${g.label} ${when}: sing the whole piece through at ${name}`;
     }
+    // Practice days before the date: today up to the day before (none left on the day itself).
     const perDay = g.days > 1 ? Math.ceil(missing / g.days) : missing;
-    const pace = g.days > 1 && perDay < missing ? ` (about ${perDay} a day)` : '';
-    return `${g.label} ${when}: get ${plural(missing, 'more section')} to ${name}${pace}, then sing it all through at that level`;
+    const pace = perDay < missing ? ` (about ${perDay} a day)` : '';
+    return `${g.label} ${when}: get ${plural(missing, 'more passage')} to ${name}${pace}, then sing it all through at that level`;
   }
   return null;
 }
 
 /**
- * A level that counts only with headphones (level 1), sung without them (`headphones`: the singer's
- * answer before the run, undefined = not answered): practice, it never changes a level.
+ * A step that counts only with headphones (level 1 slow), sung without them (`headphones`: the
+ * singer's answer before the run, undefined = not answered): practice, it never changes a level.
  */
-export function speakerPractice(level: number, headphones: boolean | undefined): boolean {
-  return level >= 1 && levelSpec(level).headphones && headphones !== true;
+export function speakerPractice(level: number, step: Step, headphones: boolean | undefined): boolean {
+  return level >= 1 && stepSpec(level, step).headphones && headphones !== true;
 }
 
 /**
- * Whether a run of one section counts for its level: not stopped early, at the level's full tempo,
- * with a trustworthy timing, (off book) with everything hidden and no peeking, and (level 1) with
- * headphones on. Says why not.
+ * Whether a run of one section counts for its step: not stopped early, at the step's tempo (or
+ * faster), with a trustworthy timing, (off book) with everything hidden and no peeking, and (level 1
+ * slow) with headphones on. Says why not.
  */
 export function sectionRunCounts(o: {
-  level: number; rate: number; partial: boolean; timingUnsure: boolean; offBookPractice: boolean; headphones?: boolean;
+  level: number; step: Step; rate: number; partial: boolean; timingUnsure: boolean; offBookPractice: boolean; headphones?: boolean;
 }): { counted: boolean; why?: 'stopped' | 'tempo' | 'timing' | 'offbook' | 'speaker' } {
   if (o.partial) return { counted: false, why: 'stopped' };
-  if (o.rate < levelSpec(o.level).rate - 1e-6) return { counted: false, why: 'tempo' };
+  if (o.rate < stepSpec(o.level, o.step).rate - 1e-6) return { counted: false, why: 'tempo' };
   if (o.timingUnsure) return { counted: false, why: 'timing' };
   if (o.offBookPractice) return { counted: false, why: 'offbook' };
-  if (speakerPractice(o.level, o.headphones)) return { counted: false, why: 'speaker' };
+  if (speakerPractice(o.level, o.step, o.headphones)) return { counted: false, why: 'speaker' };
   return { counted: true };
 }
 
 /**
- * Whether a run of the whole piece counts for the piece level: in one go (not stopped early, not
- * paused and resumed), at the level's full tempo, with a trustworthy timing, (off book) with
- * everything hidden and no peeking, and (level 1) with headphones on. Says why not, for the results
- * screen.
+ * Whether a run of the whole piece counts for the piece level: in tempo (a slow run of the whole
+ * piece is practice), in one go (not stopped early, not paused and resumed), at full tempo, with a
+ * trustworthy timing, and (off book) with everything hidden and no peeking. Says why not, for the
+ * results screen.
  */
 export function fullRunCounts(o: {
-  level: number; rate: number; partial: boolean; resumed: boolean; timingUnsure: boolean; offBookPractice: boolean; arcade?: boolean; headphones?: boolean;
-}): { counted: boolean; why?: 'arcade' | 'stopped' | 'paused' | 'tempo' | 'timing' | 'offbook' | 'speaker' } {
+  level: number; step: Step; rate: number; partial: boolean; resumed: boolean; timingUnsure: boolean; offBookPractice: boolean; arcade?: boolean; headphones?: boolean;
+}): { counted: boolean; why?: 'arcade' | 'slow' | 'stopped' | 'paused' | 'tempo' | 'timing' | 'offbook' | 'speaker' } {
   // The arcade is a reward mode: its runs of the whole piece are for fun, never a level test.
   if (o.arcade) return { counted: false, why: 'arcade' };
+  if (o.step === 'slow') return { counted: false, why: 'slow' };
   if (o.partial) return { counted: false, why: 'stopped' };
   if (o.resumed) return { counted: false, why: 'paused' };
-  if (o.rate < levelSpec(o.level).rate - 1e-6) return { counted: false, why: 'tempo' };
+  if (o.rate < stepSpec(o.level, 'tempo').rate - 1e-6) return { counted: false, why: 'tempo' };
   if (o.timingUnsure) return { counted: false, why: 'timing' };
   if (o.offBookPractice) return { counted: false, why: 'offbook' };
-  if (speakerPractice(o.level, o.headphones)) return { counted: false, why: 'speaker' };
+  if (speakerPractice(o.level, 'tempo', o.headphones)) return { counted: false, why: 'speaker' };
   return { counted: true };
 }

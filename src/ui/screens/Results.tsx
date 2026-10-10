@@ -6,7 +6,10 @@ import { toast } from '../hooks';
 import { getLastResult, lastRunPiece } from '../play/lastResult';
 import { getPiece, singableSections } from '../library';
 import { go, leaveTo, practiceParent, type Route } from '../router';
-import { LEVELS, OFF_BOOK_DAYS, effectiveTolerance, fixesBefore, nextStep, noteVerdict, wrongNotes } from '../../progress/ladder';
+import {
+  OFF_BOOK_DAYS, effectiveTolerance, fixesBefore, levelLabel, levelSpec, nextStep, noteVerdict, stepLabel, stepSpec, stepWord, wrongNotes, type Step,
+} from '../../progress/ladder';
+import { wordsDoneFor } from '../../progress/words';
 import { inputAdvice, type InputAdvice } from '../../audio/inputQuality';
 import { getProgress, loadProfile, saveProfile } from '../../progress/store';
 import { barRangeLabel } from '../../music/sections';
@@ -30,7 +33,7 @@ function upOf(pieceId: string): Route {
 }
 
 /** One step in the sticky footer: the button and the line under it saying why. */
-interface Step { label: React.ReactNode; why?: React.ReactNode; onClick: () => void; testid?: string }
+interface FootStep { label: React.ReactNode; why?: React.ReactNode; onClick: () => void; testid?: string }
 
 /**
  * The letter from accuracy. At an every-note level (level 1) a run with a wrong note shows at most a
@@ -80,10 +83,12 @@ export function Results() {
   const r = lr.result;
   const part = piece.score.parts.find((p) => p.id === lr.partId);
   const section = piece.sections.find((s) => s.id === lr.sectionId);
-  const spec = LEVELS[lr.level - 1];
+  // (results saved before the steps: Level 1 was slow, the rest in tempo)
+  const step: Step = lr.step ?? (lr.level === 1 ? 'slow' : 'tempo');
+  const spec = lr.level >= 1 ? stepSpec(lr.level, step) : undefined;
   const sections = singableSections(piece, lr.partId);
   const prog = getProgress(piece.id, lr.partId);
-  const next = nextStep(sections, prog);
+  const next = nextStep(sections, prog, Date.now(), wordsDoneFor(piece.id, lr.partId, part, sections));
   // Practice runs (stopped, slower, paused…) don't set personal bests.
   const isPB = !lr.notCounted && lr.prevBest != null && r.score > lr.prevBest;
   const label = (id: string) => sections.find((s) => s.id === id)?.label ?? id;
@@ -91,6 +96,9 @@ export function Results() {
   // The run opened its level with sections to fix: fixing them is the next step (no second run).
   const nextFix = lr.full?.opened && !lr.full.passed ? fixesBefore(sections, prog, lr.level)[0] : undefined;
   const leveledUp = lr.ladder && lr.newLevel > lr.prevLevel;
+  const stepUp = lr.ladder && !!lr.stepUp && !leveledUp;
+  const passName = section?.label ?? 'This passage';
+  const entriesLate = !!lr.entries && !lr.entries.ok;
 
   const sungCents = r.notes.map((n) => n.cents).filter((c): c is number => c != null && Math.abs(c) < 100).sort((a, b) => a - b);
   const avgCents = sungCents.length ? Math.round(sungCents[Math.floor(sungCents.length / 2)]) : null;
@@ -108,13 +116,13 @@ export function Results() {
     goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: 'drill', level, mode: '2d', from, to });
   };
 
-  // Level 1: every note must be right. The notes that weren't, by bar, with a loop to drill them.
-  // Judged note by note (level 1). A result saved by an older version has no verdicts (it passed or
-  // failed on the 75% mark): show it as it was judged then.
+  // Level 1 slow: every note must be right. The notes that weren't, by bar, with a loop to drill them.
+  // Judged note by note. A result saved by an older version has no verdicts (it passed or failed on
+  // the 75% mark): show it as it was judged then.
   const everyNote = !!spec?.everyNote && !!lr.everyNote;
   const wrong = everyNote ? wrongNotes(r) : [];
   const wrongBars = new Set(wrong.map((n) => part?.notes[n.index]?.measure));
-  const tol = lr.tolerance ?? effectiveTolerance(lr.level, loadProfile().strictness);
+  const tol = lr.tolerance ?? effectiveTolerance(lr.level, step, loadProfile().strictness);
   const letter = gradeLetter(r.accuracy, wrong.length > 0);
 
   // A run that failed (or didn't count) on timing isn't an "excellent run".
@@ -129,29 +137,38 @@ export function Results() {
   const micNotes = everyNote ? r.notes.filter((n) => n.unsure === 'mic' && noteVerdict(n) === 'forgiven') : [];
   const micBars = [...new Set(micNotes.map((n) => part?.notes[n.index]?.measure).filter((m): m is number => m != null))].sort((a, b) => a - b);
 
-  // Missed it: listening to the section again, or singing it slowly first, usually helps. After
-  // misses in a row that's what comes first; the full-tempo try stays one tap away. (Not for a run
-  // whose notes were right but late, or one through the phone's speaker: neither helps there.)
+  // Missed it: listening to the passage again, or singing it slower first, usually helps. After
+  // misses in a row that's what comes first; the try at the step's tempo stays one tap away. (Not for
+  // a run whose notes were right but late, or one through the phone's speaker: neither helps there.)
   const same = { name: 'play' as const, pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, mode: '2d' as const,
     ...(lr.sectionId === 'drill' ? { from: lr.from, to: lr.to } : {}) };
-  const listenAgain = () => goPlay({ ...same, level: 0, after: lr.level });
-  const singSlowly = () => goPlay({ ...same, level: lr.level, rate: slowRate(lr.level) });
-  const timingOnly = lr.timingFail != null && r.accuracy >= (spec?.pass ?? 0.8);
+  const ladderSec = !!section;
+  const listenAgain = () => goPlay({ ...same, level: 0, after: lr.level, step });
+  // In tempo on a passage: its slow step (which counts). At slow (or elsewhere): slower practice.
+  const toSlowStep = step === 'tempo' && ladderSec;
+  const singSlowly = () => goPlay(toSlowStep ? { ...same, level: lr.level, step: 'slow' } : { ...same, level: lr.level, step, rate: slowRate(step) });
+  const timingOnly = (lr.timingFail != null || entriesLate) && r.accuracy >= (spec?.pass ?? 0.8);
   // (nor when the microphone was the trouble: its advice comes first)
   const offerHelp = lr.ladder && !lr.passed && !lr.full && !speakerRun && !timingOnly && lr.mode === '2d' && advice.length === 0 && micNotes.length === 0;
-  const stuck = offerHelp && failsInARow(piece.id, lr.partId, lr.sectionId, lr.level) >= STUCK_AFTER;
-  const slowLabel = `${lr.level === 1 ? 'Sing it slower' : 'Practise slowly'} (${Math.round(slowRate(lr.level) * 100)}%)`;
+  const stuck = offerHelp && failsInARow(piece.id, lr.partId, lr.sectionId, lr.level, step) >= STUCK_AFTER;
+  const slowLabel = toSlowStep ? `Sing it slow (${Math.round(stepSpec(lr.level, 'slow').rate * 100)}%)`
+    : `${step === 'slow' ? 'Sing it slower' : 'Practise slowly'} (${Math.round(slowRate(step) * 100)}%)`;
+  /** Listening first is the help on Level 1 slow (the notes are new); elsewhere, singing slower. */
+  const listenHelp = step === 'slow' && lr.level === 1;
 
   // The sticky footer: one next step (with why), then "Again" (or an easier level) and the piece.
   const up = upOf(piece.id);
   const toPiece = () => leaveTo(up);
   const expertDrill = up.name === 'expert';
-  const nextLabel = (n: NonNullable<typeof next>) => `Next: ${n.sectionId === 'all' ? 'the whole piece' : n.kind === 'fix' ? `fix ${label(n.sectionId)}` : label(n.sectionId)}, level ${n.level}`;
+  const nextLabel = (n: NonNullable<typeof next>) => `Next: ${n.sectionId === 'all' ? 'the whole piece' : n.kind === 'fix' ? `fix ${label(n.sectionId)}` : label(n.sectionId)}, ${stepLabel(n.level, n.step)}`;
   const fixesLeft = nextFix ? fixesBefore(sections, prog, lr.level).length : 0;
-  const play = (sectionId: string, level: number, mode: '2d' | '3d' = '2d') => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId, level, mode });
-  let primary: Step & { repeats?: boolean };
+  const play = (sectionId: string, level: number, mode: '2d' | '3d' = '2d', st?: Step) =>
+    goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId, level, mode, ...(st && mode === '2d' ? { step: st } : {}) });
+  let primary: FootStep & { repeats?: boolean };
   if (lr.slow != null && lr.sectionId !== 'cold') {
-    primary = { label: <><IconPlay size={18} /> Now at full tempo</>, why: 'That was slow practice: now sing it at the level’s tempo.', testid: 'full-tempo', onClick: () => goPlay({ ...same, level: lr.level, mode: lr.mode }) };
+    primary = { label: <><IconPlay size={18} /> Now at {Math.round((spec?.rate ?? 1) * 100)}%</>, why: `That was slower practice: now sing it at ${step === 'slow' ? 'the slow step’s tempo' : 'full tempo'}.`, testid: 'full-tempo', onClick: () => goPlay({ ...same, level: lr.level, step, mode: lr.mode }) };
+  } else if (lr.full && step === 'slow' && lr.mode === '2d') {
+    primary = { label: <><IconPlay size={18} /> Now in tempo</>, why: 'Only a run of the whole piece in tempo counts for the piece.', testid: 'now-in-tempo', onClick: () => play('all', lr.level, '2d', 'tempo') };
   } else if (lr.sectionId === 'cold') {
     primary = { label: <><IconPlay size={18} /> Another cold start</>, why: 'A new bar at random: find your way in from memory.', testid: 'cold-again', onClick: () => { startColdStart(piece, lr.partId, lr.from, true); } };
   } else if (!lr.ladder && !lr.notCounted) {
@@ -160,54 +177,64 @@ export function Results() {
       : { label: 'Back to the piece', why: 'Drills are practice: they don’t change your levels.', testid: 'back-to-piece', onClick: toPiece };
   } else if (speakerRun) {
     primary = {
-      label: <><IconPlay size={18} /> Sing it again with headphones on</>, why: 'Level 1 counts with headphones on.', testid: 'again-headphones', repeats: true,
+      label: <><IconPlay size={18} /> Sing it again with headphones on</>, why: 'Level 1 slow counts with headphones on.', testid: 'again-headphones', repeats: true,
       onClick: () => {
         saveProfile({ ...loadProfile(), headphones: true }); // what the button says
-        play(lr.sectionId, lr.level, lr.mode);
+        play(lr.sectionId, lr.level, lr.mode, step);
       },
     };
   } else if (stuck) {
-    primary = lr.level === 1
+    primary = listenHelp
       ? { label: <><IconEar size={18} color="#0B0D1A" /> Listen again, then sing it</>, why: 'A few misses in a row: hear how it goes first.', testid: 'stuck-listen', onClick: listenAgain }
-      : { label: <><IconPlay size={18} /> {slowLabel}</>, why: 'Slow runs don’t count, but they make the full-tempo run easier.', testid: 'stuck-slow', onClick: singSlowly };
+      : { label: <><IconPlay size={18} /> {slowLabel}</>, why: toSlowStep ? 'A few misses in a row: the slow step first (it counts), then in tempo.' : 'Slower runs don’t count, but they make the next try easier.', testid: 'stuck-slow', onClick: singSlowly };
+  } else if (stepUp) {
+    primary = {
+      label: <><IconPlay size={18} /> Now in tempo</>, testid: 'now-in-tempo', onClick: () => play(lr.sectionId, lr.level, '2d', 'tempo'),
+      why: `Slow is done: passing ${stepLabel(lr.level, 'tempo')} completes the level.`,
+    };
   } else if (nextFix) {
     primary = {
-      label: <><IconPlay size={18} /> Fix {label(nextFix)} at level {lr.level}</>, testid: 'fix-first', onClick: () => play(nextFix, lr.level),
-      why: `${fixesLeft > 1 ? `${fixesLeft} sections to fix` : 'One section to fix'} on ${fixesLeft > 1 ? 'their' : 'its'} own: no need to sing it all again.`,
+      label: <><IconPlay size={18} /> Fix {label(nextFix)} at Level {lr.level}</>, testid: 'fix-first', onClick: () => play(nextFix, lr.level, '2d', 'tempo'),
+      why: `${fixesLeft > 1 ? `${fixesLeft} passages to fix` : 'One passage to fix'} on ${fixesLeft > 1 ? 'their' : 'its'} own, in tempo: no need to sing it all again.`,
     };
   } else if (lr.full?.tooMuch && next) {
-    // Too much slipped for the run to count: the sections first.
-    primary = { label: <><IconPlay size={18} /> {nextLabel(next)}</>, why: 'Too much slipped for the run to count: the sections first.', testid: 'practise-sections', onClick: () => play(next.sectionId, next.level) };
+    // Too much slipped for the run to count: the passages first.
+    primary = { label: <><IconPlay size={18} /> {nextLabel(next)}</>, why: 'Too much slipped for the run to count: the passages first.', testid: 'practise-sections', onClick: () => play(next.sectionId, next.level, '2d', next.step) };
   } else if (!lr.passed && lr.ladder) {
     primary = {
-      label: <><IconPlay size={18} /> Try again</>, testid: 'try-again', repeats: true, onClick: () => play(lr.sectionId, lr.level, lr.mode),
-      why: timingOnly ? 'The notes were right: now come in with the beat.'
-        : everyNote ? 'At level 1 every note must be right.'
-          : `Level ${lr.level} needs ${Math.round((spec?.pass ?? 0.8) * 100)}%.`,
+      label: <><IconPlay size={18} /> Try again</>, testid: 'try-again', repeats: true, onClick: () => play(lr.sectionId, lr.level, lr.mode, step),
+      why: entriesLate && timingOnly ? 'The notes were right: now come in on time at every entry.'
+        : timingOnly ? 'The notes were right: now come in with the beat.'
+          : everyNote ? 'At Level 1 slow every note must be right.'
+            : `${spec?.label ?? `Level ${lr.level}`} needs ${Math.round((spec?.pass ?? 0.8) * 100)}%.`,
     };
   } else if (next) {
-    primary = { label: <><IconPlay size={18} /> {nextLabel(next)}</>, why: next.reason, testid: 'next-step', onClick: () => play(next.sectionId, next.level) };
+    primary = { label: <><IconPlay size={18} /> {nextLabel(next)}</>, why: next.reason, testid: 'next-step', onClick: () => play(next.sectionId, next.level, '2d', next.step) };
   } else {
     primary = {
       label: <><IconCube size={18} color="#0B0D1A" /> {lr.full?.passed && lr.full.newLevel >= 5 ? 'Memorised!' : 'All done for today!'} Arcade run of the whole piece</>,
       why: 'Just for fun: arcade runs don’t count for a level.', testid: 'arcade-run', onClick: () => play('all', 4, '3d'),
     };
   }
-  // Second row: an easier level after a miss (as before), else the same run again.
-  const again: Step | null = !lr.passed && lr.ladder && lr.level > 1 && !nextFix
-    ? { label: `Easier: level ${lr.level - 1}`, testid: 'easier', onClick: () => play(lr.sectionId, lr.level - 1) }
+  // Second row: an easier step after a miss (in tempo: the same level slow; slow, or the whole piece:
+  // the level below in tempo), else the same run again.
+  const easier: { level: number; step: Step } | null = !lr.passed && lr.ladder && !nextFix
+    ? (step === 'tempo' && !lr.full ? { level: lr.level, step: 'slow' } : lr.level > 1 ? { level: lr.level - 1, step: 'tempo' } : null)
+    : null;
+  const again: FootStep | null = easier
+    ? { label: `Easier: ${easier.level === lr.level ? stepWord(easier.step) : `Level ${easier.level} in tempo`}`, testid: 'easier', onClick: () => play(lr.sectionId, easier.level, '2d', easier.step) }
     : primary.repeats ? null
       : {
         label: <><IconRestart size={16} /> {lr.slow != null ? 'Again, slowly' : 'Again'}</>,
         // (after a full run that opened its level: allowed any time, a new run replaces the fix list)
         testid: lr.sectionId === 'all' && nextFix ? 'sing-all-again' : 'again',
-        onClick: () => goPlay({ ...same, level: lr.level, mode: lr.mode, ...(lr.sectionId === 'cold' ? { from: lr.from, to: lr.to } : {}), ...(lr.slow != null ? { rate: lr.slow } : {}) }),
+        onClick: () => goPlay({ ...same, level: lr.level, mode: lr.mode, ...(lr.mode === '2d' ? { step } : {}), ...(lr.sectionId === 'cold' ? { from: lr.from, to: lr.to } : {}), ...(lr.slow != null ? { rate: lr.slow } : {}) }),
       };
 
   return (
     <main className="screen practice has-foot results">
       <PracticeBar up={up} heading title={piece.title}
-        sub={[part?.name, section?.label ?? (lr.sectionId === 'all' ? 'Whole piece' : lr.sectionId === 'cold' ? 'Cold start' : lr.sectionId === 'entries' ? 'Entry drill' : 'Drill'), spec ? `L${lr.level} ${spec.name}` : ''].filter(Boolean).join(' · ')} />
+        sub={[part?.name, section?.label ?? (lr.sectionId === 'all' ? 'Whole piece' : lr.sectionId === 'cold' ? 'Cold start' : lr.sectionId === 'entries' ? 'Entry drill' : 'Drill'), spec ? `L${lr.level} ${spec.name} · ${stepWord(step)}` : ''].filter(Boolean).join(' · ')} />
 
       {/* Wide screens: how it went (the verdict, the score, the sections) beside what to fix (the wrong
           notes, bar by bar); the extras under how it went. */}
@@ -226,34 +253,42 @@ export function Results() {
       )}
       {speakerRun && (
         <div className="notice info" role="status" data-testid="pass-banner">
-          <strong>Practice:</strong> level 1 counts with headphones on, because through the speaker the app can’t hear every note reliably.
+          <strong>Practice:</strong> Level 1 slow counts with headphones on, because through the speaker the app can’t hear every note reliably.
           {wrong.length > 0 ? ` ${wrong.length === 1 ? 'One note wasn’t' : `${wrong.length} notes weren’t`} right: see below.` : ''}
         </div>
       )}
       {lr.notCounted && !speakerRun && (
         <div className="notice info" role="status" data-testid="pass-banner">
           <strong>Practice run:</strong> {lr.notCounted}{lr.timingUnsure != null ? '.'
-            : lr.full ? <>, so it doesn't count toward the piece's level.{lr.level === 5 && /peeked|showing/.test(lr.notCounted) ? ' When you feel ready, choose “Test: all hidden” and sing it without peeking.' : ' Sing it all in one go at the level’s tempo for it to count.'}</>
-            : lr.level === 5 && !/stopped early/.test(lr.notCounted) ? <>, so it doesn't count toward memorising the section yet. When you feel ready, choose “Test: all hidden” and sing it without peeking.</>
-              : <>, so it doesn't count toward the level. Sing the whole section at the level's tempo to level up.</>}
+            : lr.full ? <>, so it doesn't count toward the piece's level.{lr.level === 5 && /peeked|showing/.test(lr.notCounted) ? ' When you feel ready, choose “Test: all hidden” and sing it without peeking.' : ' Sing it all in one go, in tempo, for it to count.'}</>
+            : lr.level === 5 && !/stopped early/.test(lr.notCounted) ? <>, so it doesn't count toward memorising the passage yet. When you feel ready, choose “Test: all hidden” and sing it without peeking.</>
+              : <>, so it doesn't count toward the level. Sing the whole passage at the step's tempo for it to count.</>}
           {lr.timingUnsure != null && <> <button className="linklike" onClick={() => go({ name: 'setup' })}>Open Voice setup</button></>}
         </div>
       )}
       {lr.ladder && lr.full && <FullRunBanner lr={lr} full={lr.full} label={label} />}
       {lr.ladder && !lr.full && (
         <div className={lr.passed ? 'notice info' : 'notice'} role="status" data-testid="pass-banner">
-          {lr.passed && lr.level === 5 && lr.newLevel < 5
-            ? <><strong>Sung from memory!</strong> That's day {lr.offBookDays ?? 1} of {OFF_BOOK_DAYS}: do it again on another day and the section counts as memorised.{leveledUp ? ` (And it's concert-ready now.)` : ''}</>
+          {lr.passed && lr.level === 5 && step === 'tempo' && lr.newLevel < 5
+            ? <><strong>Sung from memory!</strong> That's day {lr.offBookDays ?? 1} of {OFF_BOOK_DAYS}: do it again on another day and the passage counts as memorised.{leveledUp ? ` (And it's concert-ready now.)` : ''}</>
             : leveledUp
-            ? <><strong>{section?.label ?? 'Section'}: level {lr.newLevel} reached ({LEVELS[lr.newLevel - 1]?.name})!</strong> {lr.newLevel >= 5 ? 'This section is memorised.' : lr.newLevel >= 4 ? 'This section is concert-ready.' : lr.newLevel >= 3 ? 'This section is rehearsal-ready.' : ''}</>
+            ? <><strong>{passName}: {levelLabel(lr.newLevel)} reached!</strong> {lr.newLevel >= 5 ? 'This passage is memorised.' : lr.newLevel >= 4 ? 'This passage is concert-ready.' : lr.newLevel >= 3 ? 'This passage is rehearsal-ready.' : ''}</>
+            : stepUp
+            ? <><strong>{passName}: {stepLabel(lr.level, 'slow')} <span aria-label="done">✓</span></strong> Now sing it in tempo: that completes Level {lr.level}.</>
             : lr.passed
-              ? <><strong>Passed.</strong> You keep level {lr.newLevel}.</>
+              ? (step === 'slow' && lr.level > lr.newLevel
+                ? <><strong>Passed slow.</strong> Now try it in tempo: that completes Level {lr.level}.</>
+                : <><strong>Passed.</strong>{lr.newLevel > 0 ? ` You keep Level ${lr.newLevel}.` : ''}</>)
+              : entriesLate && r.accuracy >= (spec?.pass ?? 0.8)
+                ? <><strong>Not yet: come in on time.</strong> The notes were right ({Math.round(r.accuracy * 100)}%), but {lr.entries!.missed
+                  ? `${lr.entries!.missed === 1 ? 'one entry wasn’t' : `${lr.entries!.missed} of ${lr.entries!.entries} entries weren’t`} sung`
+                  : `your entries came in about ${lr.entries!.meanMs} ms late on average`}. In tempo every entry counts: breathe in tempo during the rest and come in with the beat.</>
               : lr.timingFail != null && r.accuracy >= (spec?.pass ?? 0.8)
                 ? lr.suggestDelayCheck
                   ? <><strong>Not yet:</strong> the notes were right ({Math.round(r.accuracy * 100)}%), but your voice reached the app about {lr.timingFail} ms after the beat. Either your headphones changed since the delay check (redo it in Voice setup, it takes 10 seconds) or you're singing behind the music: breathe early and sing with it, not after it.</>
                   : <><strong>Not yet:</strong> the notes were right ({Math.round(r.accuracy * 100)}%), but you came in about {lr.timingFail} ms behind the beat. Breathe early and sing with the music, not after it.</>
                 : everyNote && wrong.length
-                  ? <><strong>Not yet: {wrong.length === 1 ? 'one note wasn’t' : `${wrong.length} notes weren’t`} right.</strong> At level 1 every note counts. Loop {wrong.length === 1 ? 'its bar' : 'those bars'} slowly (below), then try again.</>
+                  ? <><strong>Not yet: {wrong.length === 1 ? 'one note wasn’t' : `${wrong.length} notes weren’t`} right.</strong> At Level 1 slow every note counts. Loop {wrong.length === 1 ? 'its bar' : 'those bars'} slowly (below), then try again.</>
                   : everyNote && micNotes.length
                     ? <><strong>Not yet:</strong> {Math.round(r.accuracy * 100)}%: microphone trouble kept the app from hearing {micNotes.length === 1 ? 'one note' : `${micNotes.length} notes`} clearly, so the run can’t count. Fix the microphone (below) and try again.</>
                     : everyNote
@@ -270,7 +305,7 @@ export function Results() {
         <div className="notice info" role="status" data-testid="fixed-banner">
           {fixedNote.remaining === 0
             ? <ReachedNote reach={lr.reached} level={fixedNote.level} />
-            : <><strong>Fixed</strong> for level {fixedNote.level}. {fixedNote.remaining} more section{fixedNote.remaining > 1 ? 's' : ''} to fix and the piece reaches level {fixedNote.level}.</>}
+            : <><strong>Fixed</strong> for Level {fixedNote.level}. {fixedNote.remaining} more passage{fixedNote.remaining > 1 ? 's' : ''} to fix and the piece reaches Level {fixedNote.level}.</>}
         </div>
       )}
       {lr.full && lr.reached && (
@@ -300,7 +335,7 @@ export function Results() {
 
       {lr.full && lr.full.sections.length > 0 && (
         <div className="col" style={{ gap: 6 }} data-testid="full-sections">
-          <h2 style={{ fontSize: 16 }}>Section by section</h2>
+          <h2 style={{ fontSize: 16 }}>Passage by passage</h2>
           {lr.full.sections.map((x) => {
             const fix = lr.full!.counted && lr.full!.toFix.includes(x.id);
             return (
@@ -321,9 +356,9 @@ export function Results() {
           })}
           <span className="tiny muted">
             {everyNote
-              ? 'At level 1 every note of every section must be right. Very short notes the app can’t judge reliably are let off unless clearly wrong.'
-              : `Each section needs ${Math.round((spec?.pass ?? 0.8) * 100)}% within the run, like the run as a whole (short sections get one weak note of slack).`}
-            {' '}A run opens the level when at most half of the sections slip and it reaches {Math.round((spec?.pass ?? 0.8) * 100) - 10}% overall; then the ones that slipped are yours to fix on their own.
+              ? 'Every note of every passage must be right. Very short notes the app can’t judge reliably are let off unless clearly wrong.'
+              : `Each passage needs ${Math.round((spec?.pass ?? 0.8) * 100)}% within the run, like the run as a whole (short passages get one weak note of slack).`}
+            {' '}A run opens the level when at most half of the passages slip and it reaches {Math.round((spec?.pass ?? 0.8) * 100) - 10}% overall; then the ones that slipped are yours to fix on their own, in tempo.
           </span>
         </div>
       )}
@@ -331,7 +366,7 @@ export function Results() {
       </div>
 
       <div className="lay res-b">
-      {wrong.length > 0 && part && <MistakeScore piece={piece} part={part} notes={wrong} tol={tol} level={lr.level} from={lr.from} to={lr.to} play={goPlay} />}
+      {wrong.length > 0 && part && <MistakeScore piece={piece} part={part} notes={wrong} tol={tol} level={lr.level} step={step} from={lr.from} to={lr.to} play={goPlay} />}
 
       {measureIdx.length > 0 && (
         <div className="col" style={{ gap: 8 }}>
@@ -398,16 +433,18 @@ export function Results() {
 
       {offerHelp && (
         <div className="card flat" data-testid="help-card" style={{ gap: 8 }}>
-          <strong style={{ fontSize: 15 }}>{stuck ? 'Tricky one: take it in smaller steps' : lr.level === 1 ? 'Not there yet? Listen to it again' : 'Need a hand with it?'}</strong>
+          <strong style={{ fontSize: 15 }}>{stuck ? 'Tricky one: take it in smaller steps' : listenHelp ? 'Not there yet? Listen to it again' : 'Need a hand with it?'}</strong>
           <span className="small muted">
-            {lr.level === 1
+            {listenHelp
               ? 'Hear how it goes once more, then sing it. Or sing it slower: it won’t count, but the notes settle.'
-              : 'Listen to the section, or sing it slowly first: slow runs don’t count, but they make the full-tempo run easier.'}
+              : toSlowStep
+                ? 'Listen to the passage, or sing it slow first: the slow step counts too, and it makes the run in tempo easier.'
+                : 'Listen to the passage, or sing it slower first: slower runs don’t count, but they make the next try easier.'}
           </span>
           <div className="row wrap" style={{ gap: 6 }}>
-            {!(stuck && lr.level === 1) && <button className="btn small" data-testid="help-listen" onClick={listenAgain}><IconEar size={16} /> {lr.level === 1 ? 'Listen again' : 'Listen'}</button>}
-            {!(stuck && lr.level > 1) && <button className="btn small" data-testid="help-slow" onClick={singSlowly}>{slowLabel}</button>}
-            {stuck && <button className="btn small" data-testid="help-again" onClick={() => goPlay({ ...same, level: lr.level, mode: lr.mode })}><IconPlay size={16} color="currentColor" /> Try again at full tempo</button>}
+            {!(stuck && listenHelp) && <button className="btn small" data-testid="help-listen" onClick={listenAgain}><IconEar size={16} /> {listenHelp ? 'Listen again' : 'Listen'}</button>}
+            {!(stuck && !listenHelp) && <button className="btn small" data-testid="help-slow" onClick={singSlowly}>{slowLabel}</button>}
+            {stuck && <button className="btn small" data-testid="help-again" onClick={() => goPlay({ ...same, level: lr.level, step, mode: lr.mode })}><IconPlay size={16} color="currentColor" /> Try it again{step === 'tempo' ? ' in tempo' : ''}</button>}
           </div>
         </div>
       )}
@@ -426,7 +463,7 @@ export function Results() {
 }
 
 /** The sticky footer of Results: one primary step and why, then up to two secondary buttons. */
-function ResultsFoot({ primary, again, toPiece }: { primary: Step; again: Step | null; toPiece: (() => void) | null }) {
+function ResultsFoot({ primary, again, toPiece }: { primary: FootStep; again: FootStep | null; toPiece: (() => void) | null }) {
   return (
     <div className="results-foot" data-testid="results-foot">
       <button className="btn primary block" data-testid={primary.testid} onClick={primary.onClick}>{primary.label}</button>
@@ -456,27 +493,29 @@ type LR = NonNullable<ReturnType<typeof getLastResult>>;
 
 /** The whole piece reached a level: by the last fix of the run that opened it (or, `inRun`, by sections that held in this run). */
 function ReachedNote({ reach, level, inRun }: { reach?: LR['reached']; level: number; inRun?: boolean }) {
-  const how = inRun ? `The sections left to fix at level ${level} held in this run` : 'Nothing left to fix';
-  if (!reach) return <><strong>Fixed!</strong> Nothing left to fix at level {level}.</>;
+  const how = inRun ? `The passages left to fix at Level ${level} held in this run` : 'Nothing left to fix';
+  if (!reach) return <><strong>Fixed!</strong> Nothing left to fix at Level {level}.</>;
   if (reach.level === 5 && reach.newLevel < 5) {
     return <><strong>Fixed!</strong> {how}: the whole piece is sung from memory, day {reach.offBookDays ?? 1} of {OFF_BOOK_DAYS}. Sing it all off book again on another day and it counts as memorised.</>;
   }
   return reach.newLevel > reach.prevLevel
-    ? <><strong>Fixed! Piece level {reach.newLevel} reached: {LEVELS[reach.newLevel - 1]?.name}.</strong> {how}, so the level is yours: no need to sing it all again. {READY[reach.newLevel] ?? ''}</>
-    : <><strong>Fixed!</strong> {how} at level {level}. The piece keeps level {reach.newLevel}.</>;
+    ? <><strong>Fixed! Piece level {reach.newLevel} reached: {levelSpec(reach.newLevel).name}.</strong> {how}, so the level is yours: no need to sing it all again. {READY[reach.newLevel] ?? ''}</>
+    : <><strong>Fixed!</strong> {how} at Level {level}. The piece keeps Level {reach.newLevel}.</>;
 }
 
 /** The verdict on a counted run of the whole piece: the piece level, what to fix, or too much slipped. */
 function FullRunBanner({ lr, full, label }: { lr: LR; full: NonNullable<LR['full']>; label: (id: string) => string }) {
-  const spec = LEVELS[lr.level - 1];
-  const everyNote = !!spec?.everyNote && !!lr.everyNote;
-  const need = Math.round((spec?.pass ?? 0.8) * 100);
+  // (only runs in tempo count for the piece)
+  const spec = stepSpec(lr.level, 'tempo');
+  const everyNote = !!spec.everyNote && !!lr.everyNote;
+  const need = Math.round(spec.pass * 100);
+  const entriesLate = !!lr.entries && !lr.entries.ok;
   const acc = Math.round(lr.result.accuracy * 100);
   const up = full.newLevel > full.prevLevel;
   const fixes = full.toFix.map(label);
   const list = fixes.length <= 3 ? fixes.join(', ') : `${fixes.slice(0, 3).join(', ')} and ${fixes.length - 3} more`;
   const slipped = full.sections.filter((x) => !x.passed).length;
-  const star = full.clean ? <> <strong data-testid="clean-run">Clean run! Every section right in one go{'\u00a0'}<span aria-hidden="true">★</span></strong></> : null;
+  const star = full.clean ? <> <strong data-testid="clean-run">Clean run! Every passage right in one go{'\u00a0'}<span aria-hidden="true">★</span></strong></> : null;
   // Opened above the piece level: fixing the slips reaches it. At or below it: the piece keeps its level.
   const reaches = lr.level > full.prevLevel;
   return (
@@ -484,17 +523,19 @@ function FullRunBanner({ lr, full, label }: { lr: LR; full: NonNullable<LR['full
       {full.passed && lr.level === 5 && full.newLevel < 5
         ? <><strong>The whole piece from memory!</strong> That's day {full.offBookDays ?? 1} of {OFF_BOOK_DAYS}: do it again on another day and the piece counts as memorised.{up ? ' (And it’s concert-ready now.)' : ''}{star}</>
         : full.passed && up
-          ? <><strong>Piece level {full.newLevel} reached: {LEVELS[full.newLevel - 1]?.name}!</strong>{star} {READY[full.newLevel] ?? ''}</>
+          ? <><strong>Piece level {full.newLevel} reached: {levelSpec(full.newLevel).name}!</strong>{star} {READY[full.newLevel] ?? ''}</>
           : full.passed
-            ? <><strong>Passed.</strong> The piece keeps level {full.newLevel}.{star}</>
+            ? <><strong>Passed.</strong> The piece keeps Level {full.newLevel}.{star}</>
             : full.tooMuch
-              ? <><strong>Too much slipped for this run to count</strong> ({slipped} of {full.sections.length} sections{everyNote ? ' had a note that wasn’t right' : ` were below ${need}%`}, {acc}% overall). A run opens the level when at most half of the sections slip and it reaches {need - 10}% overall. Practise the sections, then sing it all again.</>
+              ? <><strong>Too much slipped for this run to count</strong> ({slipped} of {full.sections.length} passages{everyNote ? ' had a note that wasn’t right' : ` were below ${need}%`}, {acc}% overall). A run opens the level when at most half of the passages slip and it reaches {need - 10}% overall. Practise the passages, then sing it all again.</>
               : fixes.length && !reaches
-                ? <><strong>The piece keeps level {full.prevLevel}.</strong> {list} slipped in this run: practise {fixes.length > 1 ? 'each one' : 'it'} at level {lr.level} on its own (marked below).</>
-                : fixes.length && everyNote
-                  ? <><strong>Level 1 is open: not every note was right in {list}.</strong> Fix {fixes.length > 1 ? 'each one' : 'it'} at level 1 on its own (marked below) and the piece reaches level 1. No need to sing it all again.</>
-                  : fixes.length
-                    ? <><strong>Level {lr.level} is open{full.overallPassed ? `: ${acc}% overall` : ''}.</strong> {list} {fixes.length > 1 ? 'were' : 'was'} below {need}% in the run. Fix {fixes.length > 1 ? 'each one' : 'it'} at level {lr.level} on its own (marked below) and {lr.level === 5 ? 'the whole piece counts as sung from memory' : `the piece reaches level ${lr.level}`}. No need to sing it all again.</>
+                ? <><strong>The piece keeps Level {full.prevLevel}.</strong> {list} slipped in this run: practise {fixes.length > 1 ? 'each one' : 'it'} at Level {lr.level} in tempo on its own (marked below).</>
+                : fixes.length
+                  ? <><strong>Level {lr.level} is open{full.overallPassed ? `: ${acc}% overall` : ''}.</strong> {list} {fixes.length > 1 ? 'were' : 'was'} below {need}% in the run. Fix {fixes.length > 1 ? 'each one' : 'it'} at Level {lr.level} in tempo on its own (marked below) and {lr.level === 5 ? 'the whole piece counts as sung from memory' : `the piece reaches Level ${lr.level}`}. No need to sing it all again.</>
+                  : entriesLate && lr.result.accuracy >= spec.pass
+                    ? <><strong>Not yet: come in on time.</strong> The notes were right ({acc}%), but {lr.entries!.missed
+                      ? `${lr.entries!.missed === 1 ? 'one entry wasn’t' : `${lr.entries!.missed} of ${lr.entries!.entries} entries weren’t`} sung`
+                      : `your entries came in about ${lr.entries!.meanMs} ms late on average`}. Breathe in tempo during the rests and come in with the beat.</>
                     : lr.timingFail != null
                       ? <><strong>Not yet:</strong> the notes were right ({acc}%), but you came in about {lr.timingFail} ms behind the beat. Breathe early and sing with the music, not after it.</>
                       : everyNote

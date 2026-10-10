@@ -49,7 +49,7 @@ test('Results gives the microphone advice and lets off the notes lost to it', as
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto('/?simulate=perfect#/');
   await page.getByTestId('piece-row').first().click();
-  await page.getByLabel('Sections').getByRole('button', { name: /level 1/ }).first().click();
+  await page.getByLabel('Passages').getByRole('button', { name: /Level 1/ }).first().click();
   await page.getByTestId('hp-yes').click();
   await page.getByTestId('start').click();
   await expect(page.getByTestId('pass-banner')).toBeVisible({ timeout: 90_000 });

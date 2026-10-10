@@ -30,7 +30,8 @@ export function Expert() {
     const p = leapPiece();
     if (!p) return;
     registerVirtual(p);
-    go({ name: 'play', pieceId: p.id, partId: 'drill', sectionId: 'all', level, mode });
+    // (level 1 here is the slow step: "Slow, with guide")
+    go({ name: 'play', pieceId: p.id, partId: 'drill', sectionId: 'all', level, mode, ...(level === 1 && mode === '2d' ? { step: 'slow' as const } : {}) });
   }
 
   return (

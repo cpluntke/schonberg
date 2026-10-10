@@ -9,13 +9,15 @@ const GRADE_VALUE: Record<Grade, number> = { perfect: 1, good: 0.85, ok: 0.5, mi
 
 const LONG_NOTE_SEC = 1.2;
 const DRIFT_CENTS = 15;
-const ENTRY_REST_SEC = 0.5;
+/** A note after a rest at least this long (score seconds) is an entry. */
+export const ENTRY_REST_SEC = 0.5;
 /** A consonant this long (ms) sung on the beat (starting within CONS_ON_BEAT_MS of it) counts for the tip. */
 const CONS_TIP_MS = 120;
 const CONS_ON_BEAT_MS = 80;
 /** Shorter "consonants" (a stop's burst: t, k, p) don't count as consonants for the tip's share. */
 const CONS_REAL_MS = 60;
-const LATE_MS = 180;
+/** Entries later than this on average (ms) are late. */
+export const LATE_MS = 180;
 const LEAP_SEMITONES = 5;
 
 interface Candidate extends Insight {

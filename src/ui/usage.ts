@@ -44,6 +44,8 @@ export interface PlayRun {
   part: Part;
   sectionId: string;
   level: number;
+  /** The level's step (attempts-to-pass are counted per step). */
+  step?: 'slow' | 'tempo';
   mode: '2d' | '3d';
   listenOnly: boolean;
   /** A real section of the piece (not the whole piece, a drill, entries or a cold start). */
@@ -81,7 +83,7 @@ export function trackPlayRun(r: PlayRun): void {
       passed: r.passed,
       counted: r.ladder,
       seconds: r.durationSec,
-      triesKey: r.ladder ? `${r.pieceId}|${r.part.id}|${r.sectionId}` : undefined,
+      triesKey: r.ladder ? `${r.pieceId}|${r.part.id}|${r.sectionId}${r.step === 'slow' ? '|slow' : ''}` : undefined,
       display: r.listenOnly ? undefined : r.fullScore ? 'fullscore' : r.display,
       notes: r.result?.notes.map((n) => ({ sec: (r.part.notes[n.index]?.dur ?? 0) / (r.rate || 1), hit: n.grade !== 'miss' })),
       delaySuggested: r.suggestDelayCheck,

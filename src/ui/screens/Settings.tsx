@@ -126,7 +126,7 @@ export function Settings() {
           {(['forgiving', 'standard', 'strict'] as const).map((s) => (
             <button key={s} aria-pressed={profile.strictness === s} onClick={() => update({ strictness: s })}>
               {s[0].toUpperCase() + s.slice(1)}
-              <span className="sub mono">L4 ±{effectiveTolerance(4, s)}¢</span>
+              <span className="sub mono">L4 ±{effectiveTolerance(4, 'tempo', s)}¢</span>
             </button>
           ))}
         </div>

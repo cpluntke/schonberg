@@ -4,6 +4,7 @@ import { chosenPartId, singableSections, getPiece, type PieceInfo } from './libr
 import { getProgress, dueForReview, attemptLog, loadCycle, loadProfile, allProgress, upgradeFullRuns, type Cycle } from '../progress/store';
 import { pieceReadiness, nextStep, fullRunDue, type Readiness } from '../progress/ladder';
 import type { Route } from './router';
+import { wordsDoneFor } from '../progress/words';
 
 export interface PieceStatus extends Readiness {
   piece: PieceInfo;
@@ -29,13 +30,13 @@ export function pieceStatus(piece: PieceInfo, voice: string): PieceStatus {
     due: dueForReview(piece.id, partId, sections),
     fullDue: fullRunDue(sections, prog),
     multi: sections.length > 1,
-    next: nextStep(sections, prog),
+    next: nextStep(sections, prog, Date.now(), wordsDoneFor(piece.id, partId, part, sections)),
   };
 }
 
 /**
  * Today's plan: pieces the next rehearsal works on come first (if they still need work), then
- * sections to fix after a full run and reviews, then the piece practised most recently. At most three.
+ * passages to fix after a full run and reviews, then the piece practised most recently. At most three.
  */
 /** Something that can't wait: a section to fix after a full run, or a review. */
 function urgent(s: PieceStatus): boolean {
@@ -60,7 +61,7 @@ export function nextUpRoute(): { route: Route; piece: PieceInfo; level: number }
   const statuses = cycle.pieceIds.map((id) => getPiece(id)).filter((p): p is PieceInfo => !!p).map((p) => pieceStatus(p, voice));
   const s = todaysPlan(statuses, cycle)[0];
   if (!s?.next) return null;
-  return { route: { name: 'play', pieceId: s.piece.id, partId: s.partId, sectionId: s.next.sectionId, level: s.next.level, mode: '2d' }, piece: s.piece, level: s.next.level };
+  return { route: { name: 'play', pieceId: s.piece.id, partId: s.partId, sectionId: s.next.sectionId, level: s.next.level, step: s.next.step, mode: '2d' }, piece: s.piece, level: s.next.level };
 }
 
 /**

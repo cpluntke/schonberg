@@ -254,6 +254,8 @@ input[type='range'] { accent-color: var(--accent); width: 100%; }
 }
 .lvl-btn.done { background: var(--voice-bg); border-color: var(--voice-deep); color: var(--voice); }
 .lvl-btn.next { background: var(--accent); color: var(--accent-ink); border: none; }
+.lvl-btn.half { border-color: var(--voice-deep); }
+.lvl-btn.next.half { border: 2px solid var(--voice-deep); }
 
 .tuner-note { font-size: 84px; font-weight: 800; line-height: 1; letter-spacing: -0.03em; }
 .meter { position: relative; height: 54px; width: 100%; }

@@ -7,7 +7,9 @@ import {
   dueForReview, practiceMinutes, loadCycle, saveCycle, exportBackup, importBackup, subscribe,
   personalBest, snapshotReadiness, readinessHistory, saveImportedScore, loadImportedScores,
   deleteImportedScore, LOG_CAP, DEFAULT_PROFILE, practiceDisplay, storageSaveFailed, onStorageSaveFailed,
+  SCHEMA_VERSION, migrateToSteps, upgradeFullRuns, recordFullRun, logStep,
 } from './store';
+import { currentStep, pieceReadiness } from './ladder';
 
 const DAY = 86_400_000;
 const res = (accuracy: number, score = Math.round(accuracy * 1000)): AttemptResult => ({
@@ -120,29 +122,67 @@ describe('profile & corrupted storage', () => {
 });
 
 describe('recordAttempt', () => {
-  it('pass / fail at thresholds', () => {
-    expect(recordAttempt('p', 'S', 's0', 1, res(0.74))).toEqual({ passed: false, newLevel: 0, prevLevel: 0 });
-    expect(recordAttempt('p', 'S', 's0', 1, res(0.75))).toEqual({ passed: true, newLevel: 1, prevLevel: 0 });
-    expect(recordAttempt('p', 'S', 's0', 2, res(0.79))).toEqual({ passed: false, newLevel: 1, prevLevel: 1 });
-    expect(recordAttempt('p', 'S', 's0', 2, res(0.8))).toEqual({ passed: true, newLevel: 2, prevLevel: 1 });
+  it('pass / fail at thresholds: a slow pass ticks the step, a pass in tempo the level', () => {
+    const S = { step: 'slow' as const };
+    const T = { step: 'tempo' as const };
+    const u = undefined;
+    expect(recordAttempt('p', 'S', 's0', 1, res(0.74), u, u, S)).toEqual({ passed: false, step: 'slow', newLevel: 0, prevLevel: 0, prevSlow: 0, newSlow: 0 });
+    // Level 1 slow passed: a step-up, not a level-up.
+    expect(recordAttempt('p', 'S', 's0', 1, res(0.75), u, u, S)).toEqual({ passed: true, step: 'slow', newLevel: 0, prevLevel: 0, prevSlow: 0, newSlow: 1, stepUp: true });
+    expect(getProgress('p', 'S')!.sections.s0).toMatchObject({ level: 0, slow: 1 });
+    // Again slow: passed, but nothing new.
+    expect(recordAttempt('p', 'S', 's0', 1, res(0.9), u, u, S)).toEqual({ passed: true, step: 'slow', newLevel: 0, prevLevel: 0, prevSlow: 1, newSlow: 1 });
+    expect(recordAttempt('p', 'S', 's0', 1, res(0.79), u, u, T)).toEqual({ passed: false, step: 'tempo', newLevel: 0, prevLevel: 0, prevSlow: 1, newSlow: 1 });
+    // In tempo: Level 1 complete (the slow step with it).
+    expect(recordAttempt('p', 'S', 's0', 1, res(0.8), u, u, T)).toEqual({ passed: true, step: 'tempo', newLevel: 1, prevLevel: 0, prevSlow: 1, newSlow: 0 });
+    expect(getProgress('p', 'S')!.sections.s0.slow).toBeUndefined();
+    expect(recordAttempt('p', 'S', 's0', 2, res(0.8), u, u, S)).toMatchObject({ passed: true, newLevel: 1, newSlow: 2, stepUp: true });
+    expect(recordAttempt('p', 'S', 's0', 2, res(0.8), u, u, T)).toEqual({ passed: true, step: 'tempo', newLevel: 2, prevLevel: 1, prevSlow: 2, newSlow: 0 });
     // passing a lower level never lowers
-    expect(recordAttempt('p', 'S', 's0', 1, res(0.99))).toEqual({ passed: true, newLevel: 2, prevLevel: 2 });
+    expect(recordAttempt('p', 'S', 's0', 1, res(0.99), u, u, T)).toEqual({ passed: true, step: 'tempo', newLevel: 2, prevLevel: 2, prevSlow: 0, newSlow: 0 });
+    // nor does a slow pass at or below the level
+    expect(recordAttempt('p', 'S', 's0', 2, res(0.99), u, u, S)).toEqual({ passed: true, step: 'slow', newLevel: 2, prevLevel: 2, prevSlow: 0, newSlow: 0 });
     const sp = getProgress('p', 'S')!.sections.s0;
-    expect(sp.attempts).toBe(5);
+    expect(sp.attempts).toBe(9);
+    // Best results are kept for runs in tempo.
     expect(sp.best[1]).toBe(0.99);
     expect(sp.best[2]).toBe(0.8);
     expect(getProgress('p', 'S')!.bestScore).toBe(990);
     expect(personalBest('p', 'S', 's0', 2)).toEqual({ accuracy: 0.8, score: 800 });
+    expect(personalBest('p', 'S', 's0', 2, 'slow')).toBeNull();
     expect(personalBest('p', 'S', 's0', 4)).toBeNull();
-    expect(attemptLog()).toHaveLength(5);
+    expect(attemptLog()).toHaveLength(9);
+    expect(attemptLog().map((e) => e.step)).toEqual(['slow', 'slow', 'slow', 'tempo', 'tempo', 'slow', 'tempo', 'tempo', 'slow']);
+  });
+  it('a slow pass above the level never reviews, fixes or reaches anything', () => {
+    recordAttempt('p', 'S', 's0', 3, res(0.9), undefined, 1000, { step: 'tempo' });
+    const r = recordAttempt('p', 'S', 's0', 4, res(0.9), undefined, 5000, { step: 'slow' });
+    expect(r).toMatchObject({ passed: true, newLevel: 3, newSlow: 4, stepUp: true });
+    expect(r.fixed).toBeUndefined();
+    expect(getProgress('p', 'S')!.sections.s0).toMatchObject({ level: 3, slow: 4, lastPassed: 1000, lastPracticed: 5000 });
+  });
+  it('level 5: the two-day rule is for the step in tempo only', () => {
+    recordAttempt('p', 'S', 's0', 4, res(0.9), undefined, undefined, { step: 'tempo' });
+    expect(recordAttempt('p', 'S', 's0', 5, res(0.9), undefined, undefined, { step: 'slow' })).toMatchObject({ passed: true, newLevel: 4, newSlow: 5, stepUp: true });
+    expect(getProgress('p', 'S')!.sections.s0.offBookDays).toBeUndefined();
+    // In tempo on day 1: still Level 4 (concert-ready), the slow step stays ticked; then Level 5 in tempo on another day.
+    const day1 = new Date(2026, 9, 4, 12).getTime();
+    expect(recordAttempt('p', 'S', 's0', 5, res(0.9), undefined, day1, { step: 'tempo' })).toMatchObject({ passed: true, newLevel: 4, offBookDays: 1, newSlow: 5 });
+    expect(recordAttempt('p', 'S', 's0', 5, res(0.9), undefined, day1 + 86_400_000, { step: 'tempo' })).toMatchObject({ newLevel: 5, offBookDays: 2, newSlow: 0 });
+  });
+  it('late entries or late timing fail the run', () => {
+    expect(recordAttempt('p', 'S', 's0', 1, res(0.95), undefined, undefined, { step: 'tempo', entriesLate: true }).passed).toBe(false);
+    expect(recordAttempt('p', 'S', 's0', 2, res(0.95), undefined, undefined, { step: 'slow', timingFail: true }).passed).toBe(false);
+    expect(getProgress('p', 'S')!.sections.s0).toMatchObject({ level: 0 });
+    expect(getProgress('p', 'S')!.sections.s0.slow).toBeUndefined();
   });
   it('skip ahead', () => {
     expect(recordAttempt('p', 'S', 's1', 4, res(0.84))).toMatchObject({ passed: false, newLevel: 0 });
-    expect(recordAttempt('p', 'S', 's1', 4, res(0.86))).toEqual({ passed: true, newLevel: 4, prevLevel: 0 });
+    expect(recordAttempt('p', 'S', 's1', 4, res(0.86))).toEqual({ passed: true, step: 'tempo', newLevel: 4, prevLevel: 0, prevSlow: 0, newSlow: 0 });
   });
   it('level 0 listen only updates lastPracticed', () => {
     const r = recordAttempt('p', 'S', 's2', 0, res(0), undefined, 1000);
-    expect(r).toEqual({ passed: false, newLevel: 0, prevLevel: 0 });
+    expect(r).toEqual({ passed: false, step: 'tempo', newLevel: 0, prevLevel: 0, prevSlow: 0, newSlow: 0 });
     const sp = getProgress('p', 'S')!.sections.s2;
     expect(sp).toMatchObject({ level: 0, attempts: 0, lastPracticed: 1000 });
     expect(getProgress('p', 'S')!.totalAttempts).toBe(0);
@@ -373,10 +413,10 @@ describe('piece levels from full runs (docs/LEVELS.md)', () => {
     expect(pieceReadiness(secs4, prog).toFix).toEqual([{ level: 2, sectionIds: ['s1', 's3'] }]);
     const n = nextStep(secs4, prog)!;
     expect(n).toMatchObject({ sectionId: 's1', level: 2, kind: 'fix' });
-    expect(n.reason).toBe('Fix Bars 5–8 at level 2 to reach level 2. 1 more to fix after this one.');
+    expect(n.reason).toBe('Fix Bars 5–8 in tempo to reach Level 2 · Words. 1 more to fix after this one.');
     expect(recordAttempt('p', 'S', 's1', 2, res(0.9)).fixed).toEqual([{ level: 2, remaining: 1 }]);
     expect(getProgress('p', 'S')!.full?.level).toBe(0);
-    expect(nextStep(secs4, getProgress('p', 'S'))!.reason).toBe('Fix Bars 13–16 at level 2 to reach level 2.');
+    expect(nextStep(secs4, getProgress('p', 'S'))!.reason).toBe('Fix Bars 13–16 in tempo to reach Level 2 · Words.');
     // Fixing at a higher level counts too.
     expect(recordAttempt('p', 'S', 's3', 3, res(0.9)).reached).toMatchObject({ level: 2, newLevel: 2 });
     prog = getProgress('p', 'S')!;
@@ -439,7 +479,7 @@ describe('piece levels from full runs (docs/LEVELS.md)', () => {
     recordFullRun('p', 'S', 3, runOf(), secs4, ns4, counted);
     let r = recordFullRun('p', 'S', 3, runOf(2), secs4, ns4, counted);
     expect(r).toMatchObject({ opened: true, prevLevel: 3, newLevel: 3, toFix: ['s2'] });
-    expect(nextStep(secs4, getProgress('p', 'S'))!.reason).toBe('Fix Bars 9–12 at level 3: it slipped in your full run.');
+    expect(nextStep(secs4, getProgress('p', 'S'))!.reason).toBe('Fix Bars 9–12 at Level 3 in tempo: it slipped in your full run.');
     r = recordFullRun('p', 'S', 2, runOf(0, 1), secs4, ns4, counted);
     expect(r.newLevel).toBe(3);
     expect(recordAttempt('p', 'S', 's2', 3, res(0.9)).reached).toMatchObject({ level: 3, prevLevel: 3, newLevel: 3 });
@@ -455,7 +495,7 @@ describe('piece levels from full runs (docs/LEVELS.md)', () => {
     const d1 = at(2026, 10, 5, 18);
     let r = recordFullRun('p', 'S', 5, runOf(1), secs4, ns4, { ...counted, now: d1 });
     expect(r).toMatchObject({ opened: true, newLevel: 0, offBookDays: 0, toFix: ['s1'] });
-    expect(nextStep(secs4, getProgress('p', 'S'), d1)!.reason).toBe('Fix Bars 5–8 at level 5 to finish the whole piece from memory: day 1 of 2.');
+    expect(nextStep(secs4, getProgress('p', 'S'), d1)!.reason).toBe('Fix Bars 5–8 at Level 5 in tempo to finish the whole piece from memory: day 1 of 2.');
     // Fixed the same day: sung from memory on one day, so concert-ready (4).
     const fix = recordAttempt('p', 'S', 's1', 5, res(0.9), 10, d1 + 3600e3);
     expect(fix.reached).toMatchObject({ level: 5, prevLevel: 0, newLevel: 4, offBookDays: 1 });
@@ -598,9 +638,11 @@ describe('progress saved under the earlier level rules (upgradeFullRuns)', () =>
   }));
   const T0 = at(2026, 9, 20);
   const sec = (level: number, lastPassed: number) => ({ level, best: { [level]: 0.9 }, attempts: 2, lastPassed, lastPracticed: lastPassed });
+  // (runs in tempo, saved under the current schema: levels mean in tempo)
   const entry = (sectionId: string, level: number, t: number, passed: boolean, accuracy = 0.82) =>
-    ({ at: t, pieceId: 'p', partId: 'S', sectionId, level, accuracy, score: 800, passed });
+    ({ at: t, pieceId: 'p', partId: 'S', sectionId, level, step: 'tempo', accuracy, score: 800, passed });
   const store = (prog: object, log: object[]) => {
+    localStorage.setItem('sh:schema', String(SCHEMA_VERSION));
     localStorage.setItem('sh:progress:p:S', JSON.stringify({ pieceId: 'p', partId: 'S', totalAttempts: 5, bestScore: 900, ...prog }));
     localStorage.setItem('sh:log', JSON.stringify(log));
   };
@@ -760,5 +802,127 @@ describe('loadCycle validates its fields', () => {
       name: 'This cycle', pieceIds: ['a', 'b'], concertDate: '2026-12-01', rehearsalTime: '19:30',
       wanted: [{ title: 'Vinea', composer: 'Victoria', focus: true }, { title: 'No composer', composer: '' }],
     });
+  });
+});
+
+describe('schema 2: every level has a slow and an in-tempo step (migrateToSteps)', () => {
+  const secs: Section[] = [0, 1, 2, 3].map((i) => ({
+    id: `s${i}`, index: i, label: `Bars ${i * 4 + 1}–${i * 4 + 4}`, startMeasure: i * 4, endMeasure: i * 4 + 3, start: i * 8, end: i * 8 + 8,
+  }));
+  /** Progress as the previous version saved it: level 1 was 70% on "doo" (now Level 1 slow). */
+  const v1 = () => ({
+    pieceId: 'p', partId: 'S', totalAttempts: 12, bestScore: 900,
+    sections: {
+      s0: { level: 1, best: { 1: 0.92 }, attempts: 3, lastPassed: 1000, lastPracticed: 2000 },
+      s1: { level: 2, best: { 1: 0.9, 2: 0.85 }, attempts: 4, lastPassed: 1000 },
+      s2: { level: 0, best: { 1: 0.6 }, attempts: 1 },
+      s3: { level: 4, best: { 4: 0.9 }, attempts: 2, offBookDays: ['2026-10-01'] },
+    },
+    full: { level: 1, best: { 1: 0.9 }, attempts: 2, lastPracticed: 3000, lastPassed: 3000, toFix: { 1: ['s2'], 3: ['s1'] }, toFixLocks: { 1: true, 3: true }, clean: [1] },
+  });
+
+  it('migrateToSteps: old Level 1 passes become Level 1 slow; levels ≥ 2 and best results stay', () => {
+    const m = migrateToSteps(v1() as never);
+    expect(m.sections.s0).toEqual({ level: 0, slow: 1, best: { 1: 0.92 }, attempts: 3, lastPassed: 1000, lastPracticed: 2000 });
+    expect(m.sections.s1).toEqual(v1().sections.s1);
+    expect(m.sections.s2).toEqual(v1().sections.s2);
+    expect(m.sections.s3).toEqual(v1().sections.s3);
+    expect(m.full).toEqual({ level: 0, best: { 1: 0.9 }, attempts: 2, lastPracticed: 3000, lastPassed: 3000, toFix: { 3: ['s1'] }, toFixLocks: { 3: true }, clean: [] });
+    expect(currentStep(m.sections.s0)).toEqual({ level: 1, step: 'tempo' });
+    // A full record above level 1 keeps its level; its level-1 list and star go.
+    const f2 = migrateToSteps({ ...v1(), full: { level: 3, best: {}, attempts: 1, toFix: { 1: ['s2'] }, toFixLocks: { 1: true }, clean: [1, 3] } } as never).full!;
+    expect(f2).toEqual({ level: 3, best: {}, attempts: 1, clean: [3] });
+    // Idempotent.
+    expect(migrateToSteps(m)).toEqual(m);
+  });
+
+  it('local storage is migrated once, on the first read', () => {
+    localStorage.setItem('sh:schema', '1');
+    localStorage.setItem('sh:progress:p:S', JSON.stringify(v1()));
+    const p = getProgress('p', 'S')!;
+    expect(p.sections.s0).toMatchObject({ level: 0, slow: 1 });
+    expect(p.full).toMatchObject({ level: 0, clean: [] });
+    expect(localStorage.getItem('sh:schema')).toBe(String(SCHEMA_VERSION));
+    expect(SCHEMA_VERSION).toBe(2);
+    // Once: a Level 1 reached in tempo after the update stays.
+    recordAttempt('p', 'S', 's0', 1, res(0.9), undefined, undefined, { step: 'tempo' });
+    // A reload: the schema is checked again, with what's stored.
+    const kept = Object.fromEntries(Object.keys(localStorage).map((k) => [k, localStorage.getItem(k)!]));
+    _resetAllForTests();
+    for (const [k, v] of Object.entries(kept)) localStorage.setItem(k, v);
+    expect(getProgress('p', 'S')!.sections.s0).toMatchObject({ level: 1 });
+    expect(getProgress('p', 'S')!.sections.s0.slow).toBeUndefined();
+  });
+
+  it('data without a schema stamp is never migrated (nothing saved yet, or the stamp could not be saved)', () => {
+    localStorage.setItem('sh:progress:p:S', JSON.stringify(v1()));
+    expect(getProgress('p', 'S')!.sections.s0).toMatchObject({ level: 1 });
+    expect(localStorage.getItem('sh:schema')).toBe('2');
+  });
+
+  it('nobody loses a level: readiness only counts what was in tempo, Next up continues in tempo', () => {
+    localStorage.setItem('sh:schema', '1');
+    localStorage.setItem('sh:progress:p:S', JSON.stringify(v1()));
+    const p = getProgress('p', 'S')!;
+    expect(p.sections.s1.level).toBe(2);
+    expect(pieceReadiness(secs, p).pieceLevel).toBe(0);
+  });
+
+  it('old level-1 log entries were slow: they never grant a piece level or a star', () => {
+    expect(logStep({ level: 1 })).toBe('slow');
+    expect(logStep({ level: 2 })).toBe('tempo');
+    expect(logStep({ level: 1, step: 'tempo' })).toBe('tempo');
+    const T = at(2026, 9, 20);
+    localStorage.setItem('sh:schema', '1');
+    // An old level-1 full run (70%) that left s1 to fix, fixed since: under the old rules that's level 1.
+    localStorage.setItem('sh:progress:p:S', JSON.stringify({
+      pieceId: 'p', partId: 'S', totalAttempts: 5, bestScore: 900,
+      sections: Object.fromEntries(secs.map((x) => [x.id, { level: 1, best: { 1: 0.9 }, attempts: 1, lastPassed: T + DAY }])),
+      full: { level: 0, best: { 1: 0.82 }, attempts: 1, lastPracticed: T },
+    }));
+    localStorage.setItem('sh:log', JSON.stringify([
+      { at: T - DAY, pieceId: 'p', partId: 'S', sectionId: 'all', level: 1, accuracy: 0.9, score: 900, passed: true },
+      { at: T, pieceId: 'p', partId: 'S', sectionId: 'all', level: 1, accuracy: 0.82, score: 800, passed: false },
+      { at: T + DAY, pieceId: 'p', partId: 'S', sectionId: 's1', level: 1, accuracy: 0.9, score: 900, passed: true },
+    ]));
+    upgradeFullRuns('p', 'S', secs);
+    const full = getProgress('p', 'S')!.full!;
+    expect(full.level).toBe(0);
+    expect(full.clean).toEqual([]);
+  });
+
+  it('a schema-1 backup is migrated on import; a schema-2 one is not', () => {
+    const backup = (schema: number) => JSON.stringify({
+      app: 'schonberg-hero', schema, exportedAt: 1,
+      data: { 'sh:schema': String(schema), 'sh:progress:p:S': JSON.stringify(v1()) },
+    });
+    importBackup(backup(1));
+    expect(getProgress('p', 'S')!.sections.s0).toMatchObject({ level: 0, slow: 1 });
+    expect(getProgress('p', 'S')!.full?.level).toBe(0);
+    importBackup(backup(2));
+    expect(getProgress('p', 'S')!.sections.s0).toMatchObject({ level: 1 });
+    // A backup without the schema key in its data: the file's own schema decides.
+    importBackup(JSON.stringify({ app: 'schonberg-hero', schema: 1, exportedAt: 1, data: { 'sh:progress:p:S': JSON.stringify(v1()) } }));
+    expect(getProgress('p', 'S')!.sections.s0).toMatchObject({ level: 0, slow: 1 });
+    // What this version exports says schema 2 and comes back unchanged.
+    recordAttempt('p', 'S', 's0', 1, res(0.9), undefined, undefined, { step: 'tempo' });
+    const out = exportBackup();
+    expect(JSON.parse(out).schema).toBe(2);
+    importBackup(out);
+    expect(getProgress('p', 'S')!.sections.s0).toMatchObject({ level: 1 });
+  });
+
+  it('a slow full run is practice; a counted full run in tempo credits held passages (ticking slow)', () => {
+    localStorage.setItem('sh:schema', '2');
+    recordAttempt('p', 'S', 's0', 2, res(0.9), undefined, undefined, { step: 'slow' });
+    expect(getProgress('p', 'S')!.sections.s0).toMatchObject({ level: 0, slow: 2 });
+    const notes = Array.from({ length: 32 }, (_, index) => ({ index, grade: 'perfect' as const, cents: 0, hitRatio: 1, voicedRatio: 1, onsetMs: 20, drift: null, scoop: null, targetOffset: 0, points: 0 }));
+    const r: AttemptResult = { ...res(1), notes: notes as never };
+    const slow = recordFullRun('p', 'S', 2, r, secs, (i) => i, { counted: true, step: 'slow' });
+    expect(slow).toMatchObject({ counted: false, opened: false, newLevel: 0 });
+    const tempo = recordFullRun('p', 'S', 2, r, secs, (i) => i, { counted: true, step: 'tempo' });
+    expect(tempo).toMatchObject({ counted: true, passed: true, newLevel: 2 });
+    expect(getProgress('p', 'S')!.sections.s0.level).toBe(2);
+    expect(getProgress('p', 'S')!.sections.s0.slow).toBeUndefined();
   });
 });

@@ -3,7 +3,7 @@ import { allPieces, getPiece, type PieceInfo } from '../library';
 import { useProfile, useStoreVersion, formatDate, daysUntil, initials } from '../hooks';
 import { go } from '../router';
 import { loadCycle, streakDays, sameWork } from '../../progress/store';
-import { levelSpec } from '../../progress/ladder';
+import { levelLabel, levelSpec, stepLabel } from '../../progress/ladder';
 import { nextRehearsal } from '../../progress/rehearsal';
 import { rowOfTheDay } from '../../game/twelvetone';
 import { IconFlame, IconPlay, IconMic, IconStar } from '../icons';
@@ -198,7 +198,7 @@ export function Home() {
                 <span className="tiny muted">Also today</span>
                 {plan.slice(1).map((st) => (
                   <button key={st.piece.id} className="list-row" style={{ padding: '8px 0' }}
-                    onClick={() => go({ name: 'play', pieceId: st.piece.id, partId: st.partId, sectionId: st.next!.sectionId, level: st.next!.level, mode: '2d' })}>
+                    onClick={() => go({ name: 'play', pieceId: st.piece.id, partId: st.partId, sectionId: st.next!.sectionId, level: st.next!.level, step: st.next!.step, mode: '2d' })}>
                     <IconPlay size={14} color="#FF7A45" />
                     <span className="grow small ellipsis"><strong>{st.piece.title}</strong> · {st.next!.reason}</span>
                   </button>
@@ -305,9 +305,9 @@ export function pieceLabel(s: PieceStatus): string {
   if (s.memorised) return 'memorised';
   if (s.concertReady) return 'concert-ready';
   if (s.rehearsalReady) return 'rehearsal-ready';
-  if (s.pieceLevel > 0) return `level ${s.pieceLevel} · ${levelName(s.pieceLevel)}`;
-  if (s.toFix.length) return 'sections to fix';
-  if (s.multi && s.unconfirmed > 0) return `confirm level ${s.unconfirmed}`;
+  if (s.pieceLevel > 0) return levelLabel(s.pieceLevel);
+  if (s.toFix.length) return 'passages to fix';
+  if (s.multi && s.unconfirmed > 0) return `confirm Level ${s.unconfirmed}`;
   return s.pct > 0 ? 'in progress' : 'not started';
 }
 
@@ -322,14 +322,14 @@ function NextUp({ status, secondary }: { status: PieceStatus; secondary?: boolea
       <div className="col" style={{ gap: 2 }}>
         <span className="small muted">Next up</span>
         <span style={{ fontSize: 20, fontWeight: 800 }}>{status.piece.title}</span>
-        <span className="small muted">{n.reason}{spec && !n.reason.includes(spec.name) ? ` (level ${n.level}, ${spec.name})` : ''}</span>
+        <span className="small muted">{n.reason}{spec && !n.reason.includes(spec.name) ? ` (${stepLabel(n.level, n.step)})` : ''}</span>
       </div>
-      <button className={`btn block${secondary ? '' : ' primary'}`} onClick={() => go({ name: 'play', pieceId: status.piece.id, partId: status.partId, sectionId: n.sectionId, level: n.level, mode: '2d' })}>
+      <button className={`btn block${secondary ? '' : ' primary'}`} onClick={() => go({ name: 'play', pieceId: status.piece.id, partId: status.partId, sectionId: n.sectionId, level: n.level, step: n.step, mode: '2d' })}>
         <IconPlay size={18} {...(secondary ? { color: '#FF7A45' } : {})} /> {n.sectionId === 'all' ? 'Sing it all now' : n.kind === 'fix' ? 'Fix it now' : 'Practise now'}
       </button>
       {skip > 0 && (
-        <button className="btn ghost small" data-testid="skip-to-full" onClick={() => go({ name: 'play', pieceId: status.piece.id, partId: status.partId, sectionId: 'all', level: skip, mode: '2d' })}>
-          Know it already? Sing the whole piece at level {skip}
+        <button className="btn ghost small" data-testid="skip-to-full" onClick={() => go({ name: 'play', pieceId: status.piece.id, partId: status.partId, sectionId: 'all', level: skip, step: 'tempo', mode: '2d' })}>
+          Know it already? Sing the whole piece at Level {skip}
         </button>
       )}
     </div>
@@ -351,8 +351,8 @@ function Countdown({ label, days, date, raw }: { label: string; days: number | n
 
 function cycleTarget(statuses: PieceStatus[], toRehearsal: number | null, toConcert: number | null, focus: PieceStatus[] | null): string | null {
   const goals = [
-    { label: 'Rehearsal', level: 3, days: toRehearsal, name: 'level 3 (Independent)', set: focus ?? statuses },
-    { label: 'Concert', level: 4, days: toConcert, name: 'level 4 (Concert-ready)', set: statuses },
+    { label: 'Rehearsal', level: 3, days: toRehearsal, name: levelLabel(3), set: focus ?? statuses },
+    { label: 'Concert', level: 4, days: toConcert, name: levelLabel(4), set: statuses },
   ];
   for (const g of goals) {
     if (g.days == null || g.days < 0) continue;

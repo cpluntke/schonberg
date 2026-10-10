@@ -7,7 +7,7 @@ import { noteName, rangeFlags, USUAL_RANGE, type SingerRange } from '../../progr
 
 /** Level 0 (no piece level yet) … 5 (memorised): one hue, brighter = further. */
 export const LEVEL_COLOR = ['#3a3f63', '#1d4f63', '#24718e', '#2f97bb', '#4cc9f0', '#b6ecff'];
-export const LEVEL_NAME = ['not yet', 'level 1', 'level 2', 'level 3 · rehearsal-ready', 'level 4 · concert-ready', 'level 5 · memorised'];
+export const LEVEL_NAME = ['not yet', 'Level 1 · Notes', 'Level 2 · Words', 'Level 3 · Alone (rehearsal-ready)', 'Level 4 · Concert (concert-ready)', 'Level 5 · By heart (memorised)'];
 
 /** How many singers are at each piece level, as one stacked bar (with a legend unless `bare`). */
 export function LevelBar({ levels, bare = false, height = 14 }: { levels: number[]; bare?: boolean; height?: number }) {

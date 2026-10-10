@@ -14,7 +14,7 @@
 // win, newer dates win.
 
 import {
-  allProgress, getProgress, keysWithPrefix, loadCycle, loadProfile, progressKey, rawGet, rawRemove, rawSet, reachLevel,
+  allProgress, getProgress, keysWithPrefix, loadCycle, loadProfile, migrateToSteps, progressKey, rawGet, rawRemove, rawSet, reachLevel,
   readinessHistory, readJSON, saveCycle, saveProfile, snapshotReadiness, writeJSON, addSyncedDays, practiceDays,
   type Cycle, type FullRunProgress, type PieceProgress, type Profile, type SectionProgress,
 } from './store';
@@ -23,7 +23,12 @@ import { getWords, wordsKey, type WordsProgress } from './words';
 import { apiBase, endSession, loadSession, onSessionChange, sessionFor, type Session } from './choir';
 import { mergeSyncedPoints, pointsForSync, type CyclePoints } from './points';
 
-export const SNAPSHOT_VERSION = 1;
+/**
+ * 2: levels have a slow and an in-tempo step (SectionC[6] = slow). A copy with v < 2 comes from an
+ * older app, whose level 1 was the slow step: it's migrated (store.migrateToSteps) before merging, so
+ * it never grants Level 1 in tempo.
+ */
+export const SNAPSHOT_VERSION = 2;
 export const MAX_PIECES = 60;
 export const MAX_SECTIONS = 120;
 export const MAX_BARS = 400;
@@ -44,8 +49,12 @@ const TIP_KEY = 'sh:accountTip';
 // Times are whole minutes before the piece's latest time `h` (minutes since 1970), plus one: 1 = that
 // minute, 0 = never. Rounded down, so a saved copy never looks newer than the phone it came from.
 
-/** A section: level, last passed, last practised, attempts, best % per level 1…5, off-book days. */
-export type SectionC = [number, number, number, number, number[], string[]?];
+/**
+ * A section: level (in tempo), last passed, last practised, attempts, best % per level 1…5, off-book
+ * days, slow (the highest level whose slow step passed, when above the level; v2). Older apps read
+ * the first six and ignore the rest.
+ */
+export type SectionC = [number, number, number, number, number[], string[]?, number?];
 /** The full-run record; `pt` = last practised to the millisecond (it decides whose to-fix lists win). */
 export interface FullC { l: number; b: number[]; a: number; lp: number; pr: number; pt?: number; ob?: string[]; fx?: Record<string, string[]>; fk?: number[]; cl?: number[] }
 /**
@@ -129,7 +138,10 @@ const days = (v: unknown): string[] | undefined => {
 
 export function encodeSection(sp: SectionProgress, h: number): SectionC {
   const out: SectionC = [sp.level ?? 0, ago(sp.lastPassed, h), ago(sp.lastPracticed, h), sp.attempts ?? 0, bestArr(sp.best)];
-  if (sp.offBookDays?.length) out.push(sp.offBookDays.slice(-5));
+  const slow = Math.round(num(sp.slow));
+  const withSlow = slow > (sp.level ?? 0) && slow <= 5;
+  if (sp.offBookDays?.length || withSlow) out.push(sp.offBookDays?.length ? sp.offBookDays.slice(-5) : []);
+  if (withSlow) out.push(slow);
   return out;
 }
 export function decodeSection(c: unknown, h: number): SectionProgress | null {
@@ -140,6 +152,8 @@ export function decodeSection(c: unknown, h: number): SectionProgress | null {
   if (pr) sp.lastPracticed = pr;
   const ob = days(c[5]);
   if (ob) sp.offBookDays = ob;
+  const slow = Math.round(num(c[6]));
+  if (slow > sp.level && slow <= 5) sp.slow = slow;
   return sp;
 }
 
@@ -279,8 +293,12 @@ function clean<T extends object>(o: T): T {
 
 export function mergeSection(l: SectionProgress | undefined, r: SectionProgress | undefined): SectionProgress | undefined {
   if (!l || !r) return l ?? r;
+  const level = Math.max(l.level ?? 0, r.level ?? 0);
+  const slow = Math.max(l.slow ?? 0, r.slow ?? 0);
   return clean({
-    level: Math.max(l.level ?? 0, r.level ?? 0),
+    level,
+    // (kept only while above the in-tempo level)
+    slow: slow > level ? slow : undefined,
     best: maxRec(l.best, r.best),
     bestScore: l.bestScore || r.bestScore ? maxRec(l.bestScore, r.bestScore) : undefined,
     attempts: Math.max(l.attempts ?? 0, r.attempts ?? 0),
@@ -560,6 +578,8 @@ export function applySnapshot(d: unknown, opts: { adoptSettings?: boolean } = {}
     const pieceId = k.slice(0, i), partId = k.slice(i + 1);
     const dec = decodePiece(pieceId, partId, pc);
     if (!dec) continue;
+    // A copy from an older app: its level 1 was the slow step (never Level 1 in tempo).
+    if (!(num(d.v) >= 2)) dec.progress = migrateToSteps(dec.progress);
     pieces++;
     writeJSON(progressKey(pieceId, partId), mergeProgress(getProgress(pieceId, partId), dec.progress), false);
     if (Object.keys(dec.bars).length) writeJSON(barsKey(pieceId, partId), mergeBars(getBars(pieceId, partId), dec.bars), false);

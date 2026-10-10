@@ -4,8 +4,10 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
-// Full core loop with the synthetic singer (?simulate=perfect): home → piece → level 1 → results.
-test('a perfect simulated singer passes level 1 and levels up', async ({ page }) => {
+// Full core loop with the synthetic singer (?simulate=perfect): home → piece → Level 1 slow → results
+// (a step-up), then Level 1 in tempo (a level-up).
+test('a perfect simulated singer passes Level 1 slow, then Level 1 in tempo', async ({ page }) => {
+  test.setTimeout(150_000); // two runs in real time
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto('/?simulate=perfect#/');
@@ -13,18 +15,26 @@ test('a perfect simulated singer passes level 1 and levels up', async ({ page })
 
   // Open the first piece in the cycle.
   await page.getByTestId('piece-row').first().click();
-  await expect(page.getByRole('heading', { name: 'Sections' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Passages' })).toBeVisible();
 
-  // Level 1 of the first section.
-  await page.getByLabel('Sections').getByRole('button', { name: /level 1/ }).first().click(); // a section, not the full run
-  await page.getByTestId('hp-yes').click(); // level 1 counts with headphones on
+  // Level 1 of the first passage: new, so slow first.
+  await page.getByLabel('Passages').getByRole('button', { name: /Level 1 · Notes · slow/ }).first().click(); // a passage, not the full run
+  await expect(page.getByTestId('step-label')).toHaveText('Level 1 · Notes · slow');
+  await expect(page.getByTestId('step-slow')).toHaveAttribute('aria-pressed', 'true');
+  await page.getByTestId('hp-yes').click(); // Level 1 slow counts with headphones on
   await page.getByTestId('start').click();
 
-  // Wait for the results screen (sections are short; allow for count-in + 70% tempo).
+  // Wait for the results screen (passages are short; allow for count-in + 70% tempo).
   await expect(page.getByTestId('pass-banner')).toBeVisible({ timeout: 90_000 });
-  await expect(page.getByTestId('pass-banner')).toContainText(/level 1 reached|Passed/);
+  await expect(page.getByTestId('pass-banner')).toContainText(/Level 1 · Notes · slow ✓/);
   const score = await page.getByTestId('result-score').textContent();
   expect(Number((score ?? '0').replace(/\D/g, ''))).toBeGreaterThan(0);
+  // Next: the same passage in tempo (no headphones question there), and Level 1 is complete.
+  await page.getByTestId('now-in-tempo').click();
+  await expect(page.getByTestId('step-label')).toHaveText('Level 1 · Notes · in tempo');
+  await expect(page.getByTestId('headphones-q')).toHaveCount(0);
+  await page.getByTestId('start').click();
+  await expect(page.getByTestId('pass-banner')).toContainText('Level 1 · Notes reached', { timeout: 90_000 });
   expect(errors).toEqual([]);
 });
 
@@ -34,9 +44,9 @@ test('level 1 on “doo”: one flat note fails it, and Results says which', asy
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto('/?simulate=oneflat#/piece/warmup-chorale');
-  await page.getByLabel('Sections').getByRole('button', { name: /level 1/ }).first().click();
+  await page.getByLabel('Passages').getByRole('button', { name: /Level 1/ }).first().click();
   await expect(page.getByTestId('doo-note')).toContainText('doo');
-  await expect(page.getByText(/pass: every note right/)).toBeVisible();
+  await expect(page.getByText(/pass: every note right/)).toBeVisible(); // (Level 1 slow)
   await page.getByTestId('hp-yes').click();
   await page.getByTestId('start').click();
   await expect(page.getByTestId('doo-label')).toBeVisible();
@@ -76,11 +86,12 @@ test('level 1 on “doo”: one flat note fails it, and Results says which', asy
     const r = JSON.parse(sessionStorage.getItem('sh:lastResult')!);
     delete r.everyNote;
     for (const n of r.result.notes) { delete n.unsure; delete n.clearly; }
+    delete r.step;
     Object.assign(r, { passed: true, prevLevel: 0, newLevel: 1 });
     sessionStorage.setItem('sh:lastResult', JSON.stringify(r));
   });
   await page.reload();
-  await expect(page.getByTestId('pass-banner')).toContainText('level 1 reached');
+  await expect(page.getByTestId('pass-banner')).toContainText('Level 1 · Notes reached');
   await expect(page.getByTestId('wrong-notes')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
@@ -90,13 +101,13 @@ test('What to fix: practising the marked bars starts a slow drill of them', asyn
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto('/?simulate=oneflat#/piece/warmup-chorale');
-  await page.getByLabel('Sections').getByRole('button', { name: /level 1/ }).first().click();
+  await page.getByLabel('Passages').getByRole('button', { name: /Level 1/ }).first().click();
   await page.getByTestId('hp-yes').click();
   await page.getByTestId('start').click();
   await expect(page.getByTestId('pass-banner')).toContainText(/one note wasn’t right/, { timeout: 90_000 });
   await page.getByTestId('mistake-zoom-btn').click();
   await page.getByTestId('practise-slow-zoom').click();
-  await expect(page).toHaveURL(/#\/play\/warmup-chorale\/[^/]+\/drill\?level=1&from=[\d.]+&to=[\d.]+&rate=0\.5/);
+  await expect(page).toHaveURL(/#\/play\/warmup-chorale\/[^/]+\/drill\?level=1&from=[\d.]+&to=[\d.]+&step=slow&rate=0\.5/);
   await expect(page.getByTestId('mistake-zoom')).toHaveCount(0);
   await expect(page.getByTestId('start')).toBeVisible();
   expect(errors).toEqual([]);
@@ -110,17 +121,17 @@ test('level 1 asks “Headphones on?”; without them a perfect run is practice'
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto('/?simulate=perfect#/piece/warmup-chorale');
-  await page.getByLabel('Sections').getByRole('button', { name: /level 1/ }).first().click();
+  await page.getByLabel('Passages').getByRole('button', { name: /Level 1/ }).first().click();
   const q = page.getByTestId('headphones-q');
   await expect(q).toContainText('Headphones on?');
   await expect(page.getByTestId('start')).toBeDisabled();
   await page.getByTestId('hp-no').click();
   await expect(page.getByTestId('hp-no')).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByTestId('hp-note')).toContainText('level 1 counts with headphones on');
+  await expect(page.getByTestId('hp-note')).toContainText('Level 1 slow counts with headphones on');
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('sh:profile') ?? '{}').headphones)).toBe(false);
   await page.getByTestId('start').click();
   await expect(page.getByTestId('pass-banner')).toContainText(
-    /Practice: level 1 counts with headphones on, because through the speaker the app can.t hear every note reliably/, { timeout: 90_000 });
+    /Practice: Level 1 slow counts with headphones on, because through the speaker the app can.t hear every note reliably/, { timeout: 90_000 });
   await expect(page.getByTestId('result-score')).toBeVisible();
   await expect(page.getByTestId('again-headphones')).toBeVisible();
   await expect(page.getByTestId('grade')).toHaveAttribute('aria-label', /\(practice\)/);
@@ -138,15 +149,18 @@ test('level 1 asks “Headphones on?”; without them a perfect run is practice'
   await page.getByTestId('hp-no').click();
   // Next time the card is pre-filled; one tap changes it.
   await page.goto('/?simulate=perfect#/piece/warmup-chorale');
-  await page.getByLabel('Sections').getByRole('button', { name: /level 1/ }).first().click();
+  await page.getByLabel('Passages').getByRole('button', { name: /Level 1/ }).first().click();
   await expect(page.getByTestId('hp-no')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByTestId('start')).toBeEnabled();
   await page.getByTestId('hp-yes').click();
   await expect(page.getByTestId('hp-yes')).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByTestId('hp-note')).toHaveText('Level 1 counts with headphones on.');
-  // Level 2 doesn't ask.
+  await expect(page.getByTestId('hp-note')).toHaveText('Level 1 slow counts with headphones on.');
+  // Level 1 in tempo doesn't ask, nor does Level 2.
+  await page.getByTestId('step-tempo').click();
+  await expect(page.getByTestId('step-label')).toHaveText('Level 1 · Notes · in tempo');
+  await expect(page.getByTestId('headphones-q')).toHaveCount(0);
   await page.goto('/?simulate=perfect#/piece/warmup-chorale');
-  await page.getByLabel('Sections').getByRole('button', { name: /, level 2 In time/ }).first().click();
+  await page.getByLabel('Passages').getByRole('button', { name: /, Level 2 · Words/ }).first().click();
   await expect(page.getByTestId('start')).toBeEnabled();
   await expect(page.getByTestId('headphones-q')).toHaveCount(0);
   expect(errors).toEqual([]);
@@ -161,7 +175,7 @@ test('score view: switch display, sing level 1 from sheet music, reach results',
   await page.goto('/?simulate=perfect#/');
   await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
   await page.getByTestId('piece-row').first().click();
-  await page.getByLabel('Sections').getByRole('button', { name: /level 1/ }).first().click(); // a section, not the full run
+  await page.getByLabel('Passages').getByRole('button', { name: /Level 1/ }).first().click(); // a section, not the full run
 
   // Nothing chosen yet: level 1 suggests the score.
   await expect(page.getByTestId('display-score')).toHaveAttribute('aria-pressed', 'true');
@@ -184,7 +198,7 @@ test('score view: switch display, sing level 1 from sheet music, reach results',
   expect(ink).toBeGreaterThan(2000);
 
   await expect(page.getByTestId('pass-banner')).toBeVisible({ timeout: 90_000 });
-  await expect(page.getByTestId('pass-banner')).toContainText(/level 1 reached|Passed/);
+  await expect(page.getByTestId('pass-banner')).toContainText(/Level 1 · Notes · slow ✓|Passed/);
 
   // Settings: the same choice, including going back to automatic.
   await page.goto('/#/settings');
@@ -205,7 +219,7 @@ test('new singer: level 3 opens in score view, a 1280-wide screen shows every vo
   await page.goto('/?simulate=perfect#/');
   await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
   await page.getByTestId('piece-row').first().click();
-  await page.getByLabel('Sections').getByRole('button', { name: /level 3/ }).first().click(); // a section, not the full run
+  await page.getByLabel('Passages').getByRole('button', { name: /Level 3/ }).first().click(); // a section, not the full run
   await expect(page.getByTestId('display-score')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('canvas[data-display="score"]')).toHaveCount(1);
   await expect(page.getByTestId('staves-toggle')).toBeVisible();
@@ -256,9 +270,9 @@ test('off book on a laptop: full score of the voices only', async ({ page }) => 
   expect(errors).toEqual([]);
 });
 
-// Piece levels (docs/LEVELS.md): a full run-through at level 1, available right away, earns piece level 1.
+// Piece levels (docs/LEVELS.md): a full run-through at Level 1 in tempo, available right away, earns piece level 1.
 test('a perfect simulated full run at level 1 grants piece level 1', async ({ page }) => {
-  test.setTimeout(180_000); // the whole piece plays in real time at 70%
+  test.setTimeout(180_000); // the whole piece plays in real time
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto('/?simulate=perfect#/piece/warmup-chorale');
@@ -266,7 +280,9 @@ test('a perfect simulated full run at level 1 grants piece level 1', async ({ pa
   await expect(page.getByTestId('piece-level')).toHaveText('Not sung through yet');
   await page.getByTestId('full-1').click();
   await expect(page.getByTestId('full-info')).toBeVisible();
-  await page.getByTestId('hp-yes').click();
+  // Full runs count in tempo only: no step choice, no headphones question.
+  await expect(page.getByTestId('step-label')).toHaveText('Level 1 · Notes · in tempo');
+  await expect(page.getByTestId('headphones-q')).toHaveCount(0);
   await page.getByTestId('start').click();
   await expect(page.getByTestId('pass-banner')).toContainText('Piece level 1 reached', { timeout: 150_000 });
   // Every section was scored within the run, none to fix.
@@ -295,7 +311,7 @@ test('a full run where most sections slip is practice and does not take over Nex
   await expect(page.getByTestId('fix-first')).toHaveCount(0);
   await expect(page.getByTestId('full-section-fix')).toHaveCount(0);
   await page.goto('/#/piece/warmup-chorale');
-  await expect(page.getByTestId('piece-next')).toContainText('level 1');
+  await expect(page.getByTestId('piece-next')).toContainText('Level 1 · Notes · slow');
   await expect(page.getByTestId('to-fix')).toHaveCount(0);
   await expect(page.getByTestId('full-4')).toBeEnabled();
 });
@@ -331,12 +347,13 @@ test('fixing the section that slipped in a full run reaches the piece level with
   }, { partId, ids, t });
   await page.goto('/?simulate=perfect#/piece/warmup-chorale');
   await expect(page.getByTestId('to-fix')).toContainText('No need to sing it all again');
-  await expect(page.getByTestId('piece-level')).toHaveText('Level 1 open: fix 1 section to reach it');
+  await expect(page.getByTestId('piece-level')).toHaveText('Level 1 open: fix 1 passage to reach it');
   await expect(page.getByTestId('toward-next')).toHaveCount(0);
   await expect(page.getByTestId('piece-next')).toContainText('Fix');
   await expect(page.getByTestId('full-1')).toBeEnabled();
   await page.getByTestId('piece-next').click();
-  await page.getByTestId('hp-yes').click();
+  // Fixes are in tempo (no headphones question there).
+  await expect(page.getByTestId('step-label')).toHaveText('Level 1 · Notes · in tempo');
   await page.getByTestId('start').click();
   await expect(page.getByTestId('fixed-banner')).toContainText('Piece level 1 reached', { timeout: 90_000 });
   await page.goto('/#/piece/warmup-chorale');
@@ -363,7 +380,7 @@ test('progress saved under the earlier rules is upgraded on load', async ({ page
   }, { partId, ids, t });
   await page.reload();
   await expect(page.getByTestId('piece-level')).toHaveText(/Piece level 2/, { timeout: 20_000 });
-  await expect(page.getByTestId('clean-stars')).toContainText('level 1');
+  await expect(page.getByTestId('clean-stars')).toContainText('Level 1');
   await expect(page.getByTestId('star-1')).toBeVisible();
 });
 
@@ -371,7 +388,7 @@ test('a flat simulated singer does not pass level 4', async ({ page }) => {
   await page.goto('/?simulate=flat#/');
   await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
   await page.getByTestId('piece-row').first().click();
-  await page.getByLabel('Sections').getByRole('button', { name: /level 4/ }).first().click(); // a section, not the full run
+  await page.getByLabel('Passages').getByRole('button', { name: /Level 4/ }).first().click(); // a section, not the full run
   await page.getByTestId('start').click();
   await expect(page.getByTestId('pass-banner')).toBeVisible({ timeout: 90_000 });
   await expect(page.getByTestId('pass-banner')).toContainText('Not yet');
@@ -412,7 +429,7 @@ test('a real-microphone run can be shared as a recording (WAV + run.json)', asyn
   await page.goto('/#/');
   await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
   await page.getByTestId('piece-row').first().click();
-  await page.getByLabel('Sections').getByRole('button', { name: /level 1/ }).first().click(); // a section, not the full run
+  await page.getByLabel('Passages').getByRole('button', { name: /Level 1/ }).first().click(); // a section, not the full run
   await page.getByTestId('hp-yes').click();
   await page.getByTestId('start').click();
   await expect(page.getByTestId('pass-banner')).toBeVisible({ timeout: 90_000 });
@@ -444,7 +461,7 @@ test('memorisation: piece map, off-book test with peek, cold start, words in rhy
   await page.goto('/?simulate=perfect#/piece/warmup-chorale');
   await expect(page.getByTestId('piece-map')).toBeVisible({ timeout: 20_000 });
   // Level 5, all hidden, with a peek: shown as a practice run.
-  await page.getByLabel('Sections').getByRole('button', { name: /level 5/ }).first().click(); // a section, not the full run
+  await page.getByLabel('Passages').getByRole('button', { name: /Level 5/ }).first().click(); // a section, not the full run
   await page.getByRole('button', { name: 'Test: all hidden' }).click();
   await page.getByTestId('start').click();
   await expect(page.getByTestId('peek')).toBeVisible({ timeout: 15_000 });

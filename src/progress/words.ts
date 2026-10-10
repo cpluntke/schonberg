@@ -2,6 +2,8 @@
 // read along → first letters → from memory.
 import { readJSON, writeJSON } from './store';
 import { WORDS_PASS, type WordsStage } from '../game/textrhythm';
+import type { Part, Section } from '../music/types';
+import type { WordsDone } from './ladder';
 
 export interface WordsProgress {
   /** Highest stage passed (-1 = none). */
@@ -31,4 +33,17 @@ export function recordWords(pieceId: string, partId: string, sectionId: string, 
   all[sectionId] = w;
   writeJSON(key(pieceId, partId), all);
   return { passed, newStage };
+}
+
+/**
+ * For Next up (ladder.nextStep): whether each passage's words in rhythm were passed (its first stage,
+ * reading along, or more); null for a passage without words.
+ */
+export function wordsDoneFor(pieceId: string, partId: string, part: Pick<Part, 'notes'> | undefined, sections: Section[]): WordsDone {
+  const wp = getWords(pieceId, partId);
+  return (sectionId) => {
+    const s = sections.find((x) => x.id === sectionId);
+    if (!s || !part?.notes.some((n) => n.lyric && n.start >= s.start - 1e-6 && n.start < s.end - 1e-6)) return null;
+    return (wp[sectionId]?.passed ?? -1) >= 0;
+  };
 }

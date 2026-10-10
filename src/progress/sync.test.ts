@@ -9,7 +9,7 @@ import {
   applySnapshot, buildSnapshot, cleanProfile, confirmMerge, decodeBars, decodePiece, encodeBars, encodePiece, loadMeta, accountConfirmed,
   mergeBars, mergeFull, mergeProfile, mergeProgress, mergeSection, pendingQuestion, suggestAccount, accountTipPending, dismissAccountTip, flushProgress, syncEnabled,
   staffSyncQuestion, answerStaffSync, onAccountConfirmed, contentHash,
-  throttle, TOTAL_BUDGET, uploadProgress, type ProgressSnapshot,
+  throttle, TOTAL_BUDGET, uploadProgress, type ProgressSnapshot, SNAPSHOT_VERSION, encodeSection, decodeSection,
 } from './sync';
 import { saveSession, type Session } from './choir';
 
@@ -748,5 +748,65 @@ describe('throttle (at most once a minute)', () => {
     t();
     vi.advanceTimersByTime(0);
     expect(fn).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('the steps (snapshot v2): slow travels with the copy; an older app’s level 1 is slow', () => {
+  it('encodes slow after the off-book days, so an older app still reads the first six', () => {
+    expect(SNAPSHOT_VERSION).toBe(2);
+    const h = Math.floor(T / 60_000);
+    const c = encodeSection(sec({ level: 1, slow: 3, attempts: 2, lastPracticed: T }), h);
+    expect(c).toHaveLength(7);
+    expect(c[5]).toEqual([]); // no off-book days: a placeholder an older app reads as none
+    expect(c[6]).toBe(3);
+    expect(decodeSection(c, h)).toMatchObject({ level: 1, slow: 3, attempts: 2 });
+    // With off-book days, and without slow (nothing extra).
+    expect(encodeSection(sec({ level: 4, slow: 5, offBookDays: ['2026-10-01'] }), h).slice(5)).toEqual([['2026-10-01'], 5]);
+    expect(encodeSection(sec({ level: 2 }), h)).toHaveLength(5);
+    // Slow at or below the level means nothing: not kept.
+    expect(encodeSection(sec({ level: 3, slow: 2 }), h)).toHaveLength(5);
+    expect(decodeSection([2, 0, 0, 1, [], [], 2], h)!.slow).toBeUndefined();
+    expect(decodeSection([2, 0, 0, 1, [], [], 9], h)!.slow).toBeUndefined();
+  });
+
+  it('merging takes the higher slow step, kept only above the level', () => {
+    expect(mergeSection(sec({ level: 0, slow: 1 }), sec({ level: 0, slow: 2 }))).toMatchObject({ level: 0, slow: 2 });
+    expect(mergeSection(sec({ level: 0, slow: 1 }), sec({ level: 0 }))).toMatchObject({ level: 0, slow: 1 });
+    // The other phone passed it in tempo: slow is ticked with it.
+    expect(mergeSection(sec({ level: 0, slow: 1 }), sec({ level: 1 }))!.slow).toBeUndefined();
+    expect(mergeSection(sec({ level: 1, slow: 3 }), sec({ level: 2 }))).toMatchObject({ level: 2, slow: 3 });
+  });
+
+  it('a v1 copy from an older app never grants Level 1 in tempo: its level 1 becomes Level 1 slow', () => {
+    // An older app's copy: section level 1 (sung at 70% on "doo"), piece level 1, a level-1 fix list and star.
+    const old = encodePiece(piece({
+      sections: { a: sec({ level: 1, best: { 1: 0.9 }, attempts: 3, lastPracticed: T }), b: sec({ level: 2, attempts: 2, lastPracticed: T }) },
+      full: { level: 1, best: { 1: 0.9 }, attempts: 1, lastPracticed: T, toFix: { 1: ['b'] }, toFixLocks: { 1: true }, clean: [1] },
+    }), {}, {});
+    applySnapshot({ v: 1, at: T, profile: {}, p: { 'p|P1': old } } as unknown as ProgressSnapshot);
+    const got = getProgress('p', 'P1')!;
+    expect(got.sections.a).toMatchObject({ level: 0, slow: 1 });
+    expect(got.sections.b.level).toBe(2);
+    expect(got.full).toMatchObject({ level: 0, clean: [] });
+    expect(got.full?.toFix).toBeUndefined();
+    // Merged into a phone that has Level 1 in tempo: kept (merging never lowers).
+    writeJSON(progressKey('q', 'P1'), piece({ pieceId: 'q', sections: { a: sec({ level: 1, attempts: 1, lastPracticed: T }) } }));
+    applySnapshot({ v: 1, at: T, profile: {}, p: { 'q|P1': old } } as unknown as ProgressSnapshot);
+    expect(getProgress('q', 'P1')!.sections.a.level).toBe(1);
+    // A copy without a version is as old.
+    applySnapshot({ at: T, profile: {}, p: { 'r|P1': old } } as unknown as ProgressSnapshot);
+    expect(getProgress('r', 'P1')!.sections.a).toMatchObject({ level: 0, slow: 1 });
+    // A v2 copy means what it says.
+    applySnapshot({ v: 2, at: T, profile: {}, p: { 's|P1': old } } as unknown as ProgressSnapshot);
+    expect(getProgress('s', 'P1')!.sections.a.level).toBe(1);
+  });
+
+  it('this version’s own copy round-trips slow', () => {
+    writeJSON(progressKey('p', 'P1'), piece({ sections: { a: sec({ level: 1, slow: 2, attempts: 3, lastPracticed: T }) } }));
+    const snap = buildSnapshot().data;
+    expect(snap.v).toBe(2);
+    localStorage.clear(); _resetAllForTests();
+    applySnapshot(JSON.parse(JSON.stringify(snap)));
+    expect(getProgress('p', 'P1')!.sections.a).toMatchObject({ level: 1, slow: 2 });
   });
 });

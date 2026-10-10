@@ -113,9 +113,13 @@ describe('struggling', () => {
     recordAttempt('p', 'P1', 's2', 2, bad);
     recordAttempt('p', 'P1', 's1', 3, bad);
     recordAttempt('p', 'P1', 's1', 2, bad);
-    expect(failsInARow('p', 'P1', 's1', 2)).toBe(2);
-    expect(failsInARow('p', 'P1', 's1', 3)).toBe(1);
-    expect(failsInARow('p', 'P1', 's3', 2)).toBe(0);
+    expect(failsInARow('p', 'P1', 's1', 2, 'tempo')).toBe(2);
+    expect(failsInARow('p', 'P1', 's1', 3, 'tempo')).toBe(1);
+    expect(failsInARow('p', 'P1', 's3', 2, 'tempo')).toBe(0);
+    // The steps are apart too: misses at slow don't count for in tempo, and the other way round.
+    recordAttempt('p', 'P1', 's1', 2, bad, undefined, undefined, { step: 'slow' });
+    expect(failsInARow('p', 'P1', 's1', 2, 'slow')).toBe(1);
+    expect(failsInARow('p', 'P1', 's1', 2, 'tempo')).toBe(2);
   });
 
   it('first time: never sung nor listened to', () => {
@@ -133,6 +137,11 @@ describe('routes', () => {
     expect(parseHash('#/play/p/P1/s1?level=2&rate=1.5')).not.toHaveProperty('rate');
     expect(parseHash('#/play/p/P1/s1?level=0&after=3')).toMatchObject({ level: 0, after: 3 });
     expect(parseHash('#/play/p/P1/s1?level=2&after=3')).not.toHaveProperty('after');
+    // The step: slow or in tempo (the arcade is always in tempo).
+    expect(parseHash('#/play/p/P1/s1?level=2&step=slow')).toMatchObject({ level: 2, step: 'slow' });
+    expect(parseHash('#/play/p/P1/s1?level=2&step=fast')).not.toHaveProperty('step');
+    expect(parseHash('#/arcade/p/P1/s1?level=2&step=slow')).not.toHaveProperty('step');
+    expect(parseHash(href({ name: 'play', pieceId: 'p', partId: 'P1', sectionId: 's1', level: 0, mode: '2d', after: 2, step: 'tempo' }))).toMatchObject({ level: 0, after: 2, step: 'tempo' });
     expect(parseHash(href({ name: 'play', pieceId: 'p', partId: 'P1', sectionId: 's1', level: 0, mode: '2d', after: 2 }))).toMatchObject({ level: 0, after: 2 });
   });
 });
