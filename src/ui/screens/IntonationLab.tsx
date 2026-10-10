@@ -208,13 +208,13 @@ function Landed({ deg, value, tol }: { deg: Degree; value: number; tol: number }
       <rect x={x(pure - tol)} y={44} width={x(pure + tol) - x(pure - tol)} height={24} rx={6} fill="var(--good)" opacity={0.16} />
       <line x1={10} x2={310} y1={56} y2={56} stroke="var(--line)" strokeWidth={2} />
       <line x1={x(pure)} x2={x(pure)} y1={22} y2={70} stroke="var(--good)" strokeWidth={2.5} />
-      <text x={x(pure)} y={16} textAnchor="middle" fontSize={14} fontWeight={600} fill="var(--good)">pure</text>
+      <text x={x(pure)} y={16} textAnchor="middle" style={{ fontSize: '0.875rem' }} fontWeight={600} fill="var(--good)">pure</text>
       {showPiano && <>
         <line x1={x(piano)} x2={x(piano)} y1={22} y2={70} stroke="var(--muted)" strokeWidth={2} strokeDasharray="4 3" />
-        <text x={x(piano)} y={16} textAnchor="middle" fontSize={14} fill="var(--muted)">piano</text>
+        <text x={x(piano)} y={16} textAnchor="middle" style={{ fontSize: '0.875rem' }} fill="var(--muted)">piano</text>
       </>}
       <circle cx={x(value)} cy={56} r={8} fill="var(--voice)" stroke="var(--bg)" strokeWidth={3} />
-      <text x={Math.max(40, Math.min(280, x(value)))} y={96} textAnchor="middle" fontSize={14} fontWeight={800} fill="var(--voice)">
+      <text x={Math.max(40, Math.min(280, x(value)))} y={96} textAnchor="middle" style={{ fontSize: '0.875rem' }} fontWeight={800} fill="var(--voice)">
         you{value < lo ? ' ◂' : value > hi ? ' ▸' : ''}
       </text>
     </svg>
@@ -669,7 +669,7 @@ function ListenCheck({ iv, root, lab, record, play, playing }: RungProps & {
             <button key={w} className="card grow" aria-pressed={on} data-testid={`lab-chord-${w}`}
               style={{ alignItems: 'center', minHeight: 150, justifyContent: 'center', borderColor: answer && w === round.pure ? 'var(--good)' : on ? 'var(--voice)' : undefined }}
               onClick={() => { setHeard((h) => new Set(h).add(w)); void play(on ? null : `chord-${w}`, chord(w), 3); }}>
-              <span style={{ fontSize: 40, fontWeight: 800, lineHeight: 1 }}>{w}</span>
+              <span style={{ fontSize: '2.5rem', fontWeight: 800, lineHeight: 1 }}>{w}</span>
               <span className="t14 muted">{answer ? (w === round.pure ? 'pure' : iv === 'third' ? 'piano' : 'off') : on ? 'playing…' : 'tap to hear'}</span>
             </button>
           );
@@ -1056,7 +1056,7 @@ function HoldRing({ held, done }: { held: number; done: boolean }) {
         <circle cx={36} cy={36} r={30} fill="none" stroke="var(--line)" strokeWidth={7} />
         <circle cx={36} cy={36} r={30} fill="none" stroke="var(--voice)" strokeWidth={7} strokeLinecap="round"
           strokeDasharray={`${(C * f).toFixed(1)} ${C.toFixed(1)}`} transform="rotate(-90 36 36)" />
-        <text x={36} y={41} textAnchor="middle" fontSize={15} fontWeight={600} fill="var(--text)" fontFamily="var(--mono)">{done ? '✓' : `${(HOLD_SEC * f).toFixed(1)}s`}</text>
+        <text x={36} y={41} textAnchor="middle" style={{ fontSize: '0.9375rem' }} fontWeight={600} fill="var(--text)" fontFamily="var(--mono)">{done ? '✓' : `${(HOLD_SEC * f).toFixed(1)}s`}</text>
       </svg>
       <div className="col grow" style={{ gap: 2 }}>
         <strong className="t16">{done ? 'Got it: see where you landed below' : `Hold it steady for ${HOLD_SEC} s`}</strong>

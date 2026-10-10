@@ -221,8 +221,9 @@ settings a new phone takes them, a set-up phone keeps its own).
   Turning pages shows two systems; the scrolling line goes on in a second row underneath (what comes
   after the right edge, both rows gliding together), so the next bars stay in view.
 - **Live readout** above the music (score view on a phone, not in landscape): the note being sung
-  (its name where the level shows names), the word scale (`pitchReadout`: "a touch flat ↑" — while
-  singing the arrow is the way to go) in teal when within the level's tolerance, light orange outside.
+  (its name where the level shows names), the word scale (`pitchReadout`: "C♯ · a touch flat ↓"; the
+  arrow shows where the voice is, ↓ flat, ↑ sharp, as in Results and the bubble) in teal when within
+  the level's tolerance, light orange outside.
   Computed in the HUD tick (~11×/s, `liveReading`, the same reading as the bubble); the canvas then
   draws only the voice dot. Landscape phones and the laptop's full score keep the small bubble.
 - **Progress strip** for a run over more than one passage (`runProgress`): a segment per passage,

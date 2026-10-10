@@ -64,8 +64,8 @@ test.describe('the singing view on a phone', () => {
     await expect(strip).toHaveAttribute('aria-valuenow', '0');
     await page.getByTestId('start').click();
 
-    // The simulated singer is flat: the readout says so in words, with the way to go.
-    await expect(page.getByTestId('readout')).toContainText(/flat ↑/, { timeout: 15_000 });
+    // The simulated singer is flat: the readout says so in words, the arrow down (where the voice is).
+    await expect(page.getByTestId('readout')).toContainText(/flat ↓/, { timeout: 15_000 });
     const stop = page.getByRole('button', { name: 'Stop' });
     const pause = page.getByRole('button', { name: 'Pause' });
     const [a, b] = [await stop.boundingBox(), await pause.boundingBox()];

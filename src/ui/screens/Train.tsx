@@ -128,10 +128,10 @@ export function Train() {
                 </span>
                 <span style={{ display: 'grid', gridTemplateColumns: 'repeat(12, minmax(0,1fr))', gap: 3 }} aria-hidden="true">
                   {row.map((pc, i) => (
-                    <span key={i} className="mono" style={{ height: 26, borderRadius: 6, background: '#262257', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: '#D4CCFF' }}>{sym(pc)}</span>
+                    <span key={i} className="mono" style={{ minHeight: 26, borderRadius: 6, background: 'var(--expert-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'min(0.875rem, 3.6vw)', color: 'var(--expert-text)' }}>{sym(pc)}</span>
                   ))}
                 </span>
-                <span className="t14" style={{ color: '#D4CCFF' }}>12 notes, no key · the same row for the whole choir today.</span>
+                <span className="t14" style={{ color: 'var(--expert-text)' }}>12 notes, no key · the same row for the whole choir today.</span>
               </span>
             </button>
           </section>

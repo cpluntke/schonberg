@@ -42,9 +42,9 @@ describe('the pitch word scale', () => {
 });
 
 describe('the live readout', () => {
-  it('words and the way to go: flat → ↑, sharp → ↓, nothing when spot on', () => {
-    expect(pitchReadout(-18)).toEqual({ words: 'a touch flat', arrow: '↑', say: 'a touch flat: sing a touch higher' });
-    expect(pitchReadout(62)).toEqual({ words: 'clearly sharp', arrow: '↓', say: 'clearly sharp: sing clearly lower' });
+  it('words and where the voice is: flat ↓, sharp ↑ (as in Results and the bubble), nothing when spot on', () => {
+    expect(pitchReadout(-18)).toEqual({ words: 'a touch flat', arrow: '↓', say: 'a touch flat: sing a touch higher' });
+    expect(pitchReadout(62)).toEqual({ words: 'clearly sharp', arrow: '↑', say: 'clearly sharp: sing clearly lower' });
     expect(pitchReadout(4)).toEqual({ words: 'spot on', arrow: '', say: 'spot on' });
   });
 });

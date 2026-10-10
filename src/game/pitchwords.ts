@@ -60,13 +60,13 @@ export function toleranceWords(tol: number): string {
 }
 
 /**
- * The big live readout over the sheet music (score view on a phone): the words and which way to
- * go, "a touch flat" + "↑" (sing higher), "clearly sharp" + "↓", "spot on" + "". While singing the
- * arrow is the correction; afterwards (Results, pitchTag) it describes the miss.
+ * The big live readout over the sheet music (score view on a phone): the words and an arrow,
+ * "a touch flat" + "↓", "clearly sharp" + "↑", "spot on" + "". One meaning everywhere (Results,
+ * pitchTag, the highway's bubble): the arrow shows where the voice is, ↓ under the note (flat), ↑ over it.
  */
 export function pitchReadout(cents: number): { words: string; arrow: '↑' | '↓' | ''; say: string } {
   const d = pitchDegree(cents);
   if (d === 'spot on') return { words: 'spot on', arrow: '', say: 'spot on' };
   const flat = cents < 0;
-  return { words: pitchWords(cents), arrow: flat ? '↑' : '↓', say: `${pitchWords(cents)}: sing ${d} ${flat ? 'higher' : 'lower'}` };
+  return { words: pitchWords(cents), arrow: flat ? '↓' : '↑', say: `${pitchWords(cents)}: sing ${d} ${flat ? 'higher' : 'lower'}` };
 }

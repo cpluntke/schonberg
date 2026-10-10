@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { applyDisplay, resolveTheme, textScale, textSizeOf, THEME_COLOR } from './theme';
@@ -100,6 +100,7 @@ describe('contrast (WCAG AA: 4.5:1 for text)', () => {
         ['accent-text', 'accent-soft'], ['text', 'accent-soft'], ['voice', 'voice-bg'], ['text', 'voice-bg'], ['good', 'good-bg'], ['text', 'good-bg'],
         ['expert', 'expert-bg'], ['text', 'expert-bg'], ['expert-text', 'expert-ground'], ['expert-muted', 'expert-ground'],
         ['expert-text', 'expert-surface'], ['text', 'bad-bg'], ['muted', 'accent-soft'], ['muted', 'voice-bg'],
+        ['gold', 'gold-bg'], ['text', 'gold-bg'],
       ];
       for (const [fg, bg] of pairs) if (contrast(t[fg], t[bg]) < 4.5) fails.push(`${fg} on ${bg}: ${contrast(t[fg], t[bg]).toFixed(2)}`);
       expect(fails).toEqual([]);
@@ -118,4 +119,46 @@ describe('contrast (WCAG AA: 4.5:1 for text)', () => {
       expect(contrast(bg, name === 'dark' ? dark.canvas : light.canvas)).toBeLessThan(1.1);
     });
   }
+});
+
+describe('colours and sizes come from the theme', () => {
+  /** Files that may name colours: the palettes, and a few things that are the same in both themes. */
+  const ALLOWED = new Set([
+    'play/palette.ts', 'theme.ts', // the palettes themselves
+    'play/arcade3d.ts', // the arcade's night scene, the same in both themes
+    'components/ChoirLogo.tsx', // a logo's white tile
+    'components/IntroVideo.tsx', // the video's black letterbox
+    'screens/MemoryMap.tsx', // its print style (black on white paper)
+  ]);
+  const files = (dir: string): string[] => readdirSync(dir).flatMap((f) => {
+    const p = path.join(dir, f);
+    return statSync(p).isDirectory() ? files(p) : /\.tsx?$/.test(f) && !/\.test\.ts$/.test(f) ? [p] : [];
+  });
+
+  it('no screen, component or renderer writes a colour of its own', () => {
+    const bad: string[] = [];
+    for (const f of files(here)) {
+      const rel = path.relative(here, f).split(path.sep).join('/');
+      if (ALLOWED.has(rel)) continue;
+      const src = readFileSync(f, 'utf8');
+      for (const m of src.matchAll(/['"`(:\s](#[0-9a-fA-F]{3,8})\b|rgba?\(\s*\d/g)) bad.push(`${rel}: ${m[0].trim()}`);
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it('styles.css: colours only in the token blocks, font sizes only in rem', () => {
+    const body = css.slice(css.indexOf('/* Text size'));
+    expect(body.match(/#[0-9a-fA-F]{3,8}\b|rgba?\(/g) ?? []).toEqual([]);
+    expect(body.match(/font(-size)?:[^;]*\d+px/g) ?? []).toEqual([]);
+  });
+
+  it('inline font sizes are in rem (they grow with the text size)', () => {
+    const bad: string[] = [];
+    for (const f of files(here)) {
+      if (!f.endsWith('.tsx')) continue;
+      const src = readFileSync(f, 'utf8');
+      for (const m of src.matchAll(/fontSize[:=] ?\{?\s*\d+/g)) bad.push(`${path.relative(here, f)}: ${m[0]}`);
+    }
+    expect(bad).toEqual([]);
+  });
 });

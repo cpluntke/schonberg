@@ -693,7 +693,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
         <div className="readout-band" data-testid="readout-band">
           {running && hud.rd ? (
             <div className={hud.rd.ok ? 'readout' : 'readout off'} data-testid="readout" title={hud.rd.say}>
-              {hud.rd.name && <span className="n">{hud.rd.name}</span>}
+              {hud.rd.name && <><span className="n">{hud.rd.name}</span><span className="sep" aria-hidden="true">·</span></>}
               <span className="w">{hud.rd.words}{hud.rd.arrow && <span className="arr" aria-hidden="true"> {hud.rd.arrow}</span>}</span>
             </div>
           ) : (

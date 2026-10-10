@@ -1,4 +1,4 @@
-// The singing view's big live readout ("C♯ · a touch flat ↑") and the progress strip of a long
+// The singing view's big live readout ("C♯ · a touch flat ↓") and the progress strip of a long
 // run. Pure functions, called by Play's HUD tick (about 11 times a second, not every frame).
 import type { PitchSample } from '../../game/types';
 import type { Part, Score, Section } from '../../music/types';
