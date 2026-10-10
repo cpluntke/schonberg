@@ -49,6 +49,8 @@ interface Props {
   focus?: boolean;
   /** The bar (measure index) to focus on (Results loops it); default: the worst spot. */
   focusBar?: number;
+  /** The passage step the run was (its loops lead back to it: Route.back). */
+  back?: { sectionId: string; level: number; step: Step };
   /** Listen to bars m0..m1 (the focus card's "Hear it"). */
   hear?: (m0: number, m1: number) => void;
 }
@@ -185,7 +187,7 @@ function Legend() {
   );
 }
 
-export function MistakeScore({ piece, part, notes, tol, level, step: runStep, from, to, play, focus, focusBar, hear }: Props) {
+export function MistakeScore({ piece, part, notes, tol, level, step: runStep, from, to, play, focus, focusBar, hear, back }: Props) {
   const score = piece.score;
   const fonts = useFontsLoaded();
   const lvl = Math.max(1, level);
@@ -221,6 +223,7 @@ export function MistakeScore({ piece, part, notes, tol, level, step: runStep, fr
       name: 'play', pieceId: piece.id, partId: part.id, sectionId: 'drill', level: lvl, step, mode: '2d',
       from: a?.start ?? from, to: b ? b.start + b.dur : to,
       ...(rate < levelRate - 1e-6 ? { rate } : {}),
+      ...(back ? { back } : {}),
     };
   };
 

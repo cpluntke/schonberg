@@ -7,7 +7,7 @@
 import type { Section, Part } from '../music/types';
 import type { PieceProgress, SectionProgress } from '../progress/store';
 import {
-  LEVELS, MAX_LEVEL, currentStep, levelLabel, pendingFixes, pieceLevel, stepWord, type NextStep, type Step,
+  LEVELS, MAX_LEVEL, OFF_BOOK_DAYS, currentStep, levelLabel, pendingFixes, pieceLevel, stepWord, type NextStep, type Step,
 } from '../progress/ladder';
 import type { NoteMap } from '../progress/notestats';
 import type { FaultKind } from './play/noteFault';
@@ -73,6 +73,10 @@ export function passedStep(sp: Pick<SectionProgress, 'level' | 'slow'> | undefin
 export interface PathStatus {
   /** The piece's level (pieceReadiness / pieceLevel). */
   pieceLevel: number;
+  /** Levels drawn filled on the meter: the piece level, or every level under a fix list or a level to confirm. */
+  filled: number;
+  /** By heart, sung from memory today: day 2 has to wait for another day. */
+  waitDay: boolean;
   /** The level and step the piece is being worked on; null once memorised. */
   working: { level: number; step: Step } | null;
   /** Passages that passed the working level at the working step (in score order). */
@@ -89,32 +93,51 @@ export interface PathStatus {
   here: string;
 }
 
+function dayKey(now: number): string {
+  const d = new Date(now);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 /** Where the piece stands: the level it's being worked on, and how many passages are through that step. */
-export function pathStatus(sections: Section[], prog: PieceProgress | undefined): PathStatus {
+export function pathStatus(sections: Section[], prog: PieceProgress | undefined, now: number = Date.now()): PathStatus {
   const order = [...sections].sort((a, b) => a.index - b.index);
   const P = sections.length ? pieceLevel(sections, prog) : 0;
   const sp = (id: string) => prog?.sections[id];
   const fixList = pendingFixes(sections, prog).find((f) => f.level > P);
-  const base = { pieceLevel: P, done: [] as string[], todo: [] as string[], fixes: [] as string[], half: false, allInTempo: false };
+  const base = { pieceLevel: P, filled: P, done: [] as string[], todo: [] as string[], fixes: [] as string[], half: false, allInTempo: false, waitDay: false };
   if (P >= MAX_LEVEL || !sections.length) {
     return { ...base, working: null, half: false, here: P >= MAX_LEVEL ? `${levelLabel(MAX_LEVEL)} reached ✓` : 'No passages to sing' };
   }
-  const W = fixList ? fixList.level : P + 1;
+  const n = order.length;
+  // By heart, between the two days: the whole piece (or the only passage) sung from memory once.
+  const memDays = (n > 1 ? prog?.full?.offBookDays : sp(order[0].id)?.offBookDays) ?? [];
+  if (P === 4 && memDays.length > 0 && !fixList) {
+    const today = memDays.includes(dayKey(now));
+    return {
+      ...base, working: { level: MAX_LEVEL, step: 'tempo' }, half: true, waitDay: today,
+      here: `From memory: day ${memDays.length} of ${OFF_BOOK_DAYS} · sing it ${n > 1 ? 'all ' : ''}from memory again ${today ? 'on another day' : 'today'}`,
+    };
+  }
+  // Every passage is above the piece level (no fix list): confirming that level with a run of the whole piece is what's next.
+  const minSec = Math.min(...order.map((s) => Math.min(MAX_LEVEL, sp(s.id)?.level ?? 0)));
+  const confirm = !fixList && n > 1 && minSec > P;
+  const W = fixList ? fixList.level : confirm ? minSec : P + 1;
   const half = order.every((s) => passedStep(sp(s.id), W, 'slow'));
   const allInTempo = order.every((s) => passedStep(sp(s.id), W, 'tempo'));
   const step: Step = fixList || half ? 'tempo' : 'slow';
   const done = order.filter((s) => passedStep(sp(s.id), W, step)).map((s) => s.id);
   const todo = order.filter((s) => !done.includes(s.id)).map((s) => s.id);
-  const n = order.length;
   let here: string;
   if (fixList) {
     const k = fixList.sectionIds.length;
     here = `Level ${W} · in tempo, ${k === 1 ? 'one passage' : `${k} passages`} to fix`;
   } else if (n === 1) here = `Level ${W} · ${stepWord(step)}`;
-  else if (allInTempo) here = `Level ${W} in every passage · now sing it all through`;
+  else if (allInTempo) here = `Level ${W} in every passage · confirm it with a run of the whole piece`;
   else if (done.length === 0) here = `Level ${W} · ${stepWord(step)}, no passages yet`;
   else here = `Level ${W} · ${stepWord(step)}, ${done.length} of ${n} passages`;
-  return { ...base, working: { level: W, step }, done, todo, fixes: fixList?.sectionIds ?? [], half, allInTempo, here };
+  // The levels under a fix list or a level to confirm are the piece's in all but name: drawn filled.
+  const filled = fixList || confirm ? Math.max(P, W - 1) : P;
+  return { ...base, filled, working: { level: W, step }, done, todo, fixes: fixList?.sectionIds ?? [], half, allInTempo, here };
 }
 
 /** "Bars 1–5 · 6–13 · 14–21": passage labels joined, "Bars" said once. */

@@ -1,3 +1,4 @@
+import { toleranceWords } from '../../game/pitchwords';
 import React, { useRef, useState } from 'react';
 import { setLastRun } from '../play/runExport';
 import { useProfile, useStoreVersion, toast, daysUntil, useWide } from '../hooks';
@@ -126,11 +127,14 @@ export function Settings() {
           {(['forgiving', 'standard', 'strict'] as const).map((s) => (
             <button key={s} aria-pressed={profile.strictness === s} onClick={() => update({ strictness: s })}>
               {s[0].toUpperCase() + s.slice(1)}
-              <span className="sub mono">L4 ±{effectiveTolerance(4, 'tempo', s)}¢</span>
+              <span className="sub">{effectiveTolerance(4, 'tempo', s)} cents at Level 4</span>
             </button>
           ))}
         </div>
-        <span className="small muted">Scales the pitch tolerance of every level. Levels passed on “forgiving” still count.</span>
+        <span className="small muted">
+          Scales the pitch tolerance of every level: at Level 4 · Concert a note may now be up to {toleranceWords(effectiveTolerance(4, 'tempo', profile.strictness))} off
+          (at Level 1 · Notes up to {toleranceWords(effectiveTolerance(1, 'slow', profile.strictness))}). Levels passed on “forgiving” still count.
+        </span>
       </section>
 
       <section className="col" style={{ gap: 8 }}>

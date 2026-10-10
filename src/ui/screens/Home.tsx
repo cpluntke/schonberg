@@ -1,9 +1,10 @@
 import React from 'react';
-import { allPieces, getPiece, type PieceInfo } from '../library';
+import { allPieces, getPiece, singableSections, type PieceInfo } from '../library';
 import { useProfile, useStoreVersion, formatDate, daysUntil, initials } from '../hooks';
 import { go } from '../router';
-import { loadCycle, streakDays, sameWork } from '../../progress/store';
-import { levelLabel, levelSpec, stepLabel } from '../../progress/ladder';
+import { getProgress, loadCycle, streakDays, sameWork } from '../../progress/store';
+import { levelLabel, levelSpec, stepLabel, stepWord } from '../../progress/ladder';
+import { pathStatus } from '../path';
 import { nextRehearsal } from '../../progress/rehearsal';
 import { rowOfTheDay } from '../../game/twelvetone';
 import { IconFlame, IconPlay, IconMic, IconStar } from '../icons';
@@ -235,7 +236,7 @@ export function Home() {
               </span>
             </div>
             <div className="col" style={{ alignItems: 'flex-end', gap: 4 }}>
-              <span className="mono small">{Math.round(s.pct * 100)}%</span>
+              {(s.pct > 0 || pieceLabel(s) === 'not started') && <span className="mono small">{Math.round(s.pct * 100)}%</span>}
               <span className="tiny muted" data-testid="piece-row-level">{pieceLabel(s)}</span>
             </div>
           </button>
@@ -308,6 +309,12 @@ export function pieceLabel(s: PieceStatus): string {
   if (s.pieceLevel > 0) return levelLabel(s.pieceLevel);
   if (s.toFix.length) return 'passages to fix';
   if (s.multi && s.unconfirmed > 0) return `confirm Level ${s.unconfirmed}`;
+  // Practised already (a slow step counts too): where it stands, as on the piece's path.
+  const sections = singableSections(s.piece, s.partId);
+  const prog = getProgress(s.piece.id, s.partId);
+  const started = sections.some((x) => { const sp = prog?.sections[x.id]; return !!sp && (sp.level > 0 || (sp.slow ?? 0) > 0 || sp.attempts > 0); });
+  const w = started ? pathStatus(sections, prog).working : null;
+  if (w) return `working on Level ${w.level} · ${stepWord(w.step)}`;
   return s.pct > 0 ? 'in progress' : 'not started';
 }
 

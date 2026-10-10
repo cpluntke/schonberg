@@ -365,7 +365,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
       ? recordFullRun(piece.id, part.id, level, r, secs, (i) => part.notes[i]?.start,
         { counted: fullCounted, step, timingFail: timingFail != null, entriesLate, durationSec })
       : undefined;
-    const rec = full ?? recordAttempt(piece.id, part.id, recId, level, r, durationSec, Date.now(), { step, timingFail: timingFail != null, entriesLate });
+    const rec = full ?? recordAttempt(piece.id, part.id, recId, level, r, durationSec, Date.now(), { step, timingFail: timingFail != null, entriesLate, practice: !sectionLadder });
     const sectionRec = full ? undefined : (rec as ReturnType<typeof recordAttempt>);
     const fixed = full ? undefined : (rec as ReturnType<typeof recordAttempt>).fixed;
     const reached = full ? full.reached : (rec as ReturnType<typeof recordAttempt>).reached;
@@ -394,6 +394,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
       from: section.start, to: section.end, result: r, ladder, prevBest, tolerance, everyNote: !!spec?.everyNote,
       ...(entries ? { entries, entriesOffsetMs } : {}),
       ...(realSection || isFull ? { pieceBefore, pieceAfter } : {}),
+      ...(route.back ? { back: route.back } : {}),
       ...(sectionRec ? { prevSlow: sectionRec.prevSlow, newSlow: sectionRec.newSlow, ...(sectionRec.stepUp ? { stepUp: true } : {}) } : {}),
       latencyAdjusted,
       alignedMs,
@@ -636,7 +637,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
     : realSec ? lowerLabel(section.label)
       : (() => { const [a, b] = sectionBars(piece.score, section.start, section.end); return barRangeLabel(piece.score, a, b, true); })();
   // A passage's note gone wrong most lately: "Watch bar 25."
-  const watch = realSec && !listenOnly ? troubleNote(part, section.start, section.end, getNoteStats(piece.id, part.id)) : null;
+  const watch = realSec && !listenOnly && phase === 'ready' ? troubleNote(part, section.start, section.end, getNoteStats(piece.id, part.id)) : null;
   const watchBar = watch ? piece.score.measures[watch.measure]?.number ?? null : null;
 
   function togglePart(id: string) {
@@ -708,7 +709,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
               {isFullRun && (
                 <span className="t14 muted" data-testid="full-info">
                   {step === 'slow' ? <><strong>Slow runs of the whole piece are practice:</strong> only a run in tempo counts for the piece. </> : null}
-                  In one go: stopping or pausing makes it practice. All passages right: Level {level} is yours at once, with a clean-run ★.
+                  In one go: stopping or pausing makes it practice. All passages right: {level === 5 ? `that's a day from memory (by heart = ${OFF_BOOK_DAYS} different days)` : `Level ${level} is yours at once`}, with a clean-run ★.
                   More than half slipped, or the run under {Math.round((levelInfo?.pass ?? 0.8) * 100) - 10}% overall: it’s practice.
                 </span>
               )}

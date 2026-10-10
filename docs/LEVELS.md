@@ -61,12 +61,18 @@ Singers start from scratch but aren't held back (`src/progress/struggle.ts`):
   counts); at the slow step, **Slower (50%)** (practice). Whole-piece runs and drills offer **Practise
   slowly** (70%, practice). A run slower than its step is practice: it is scored and kept in the bar
   history but never moves anything; its Results put **Now at 70%/100%** first.
-- **When it goes wrong.** Results of a missed counted run offer listening and singing slower (not
-  for a run whose notes were right but late, nor one through the phone's speaker). After
-  `STUCK_AFTER` (2) misses in a row of the same passage at the same level and step (`failsInARow`, a
-  pass ends the count), they come first: Level 1 slow **Listen again, then sing it**; in tempo **Sing
-  it slow (70%)**; other slow steps **Sing it slower (50%)**. “Easier” after a miss: in tempo → the same
-  level slow; slow → the level below in tempo.
+- **When it goes wrong.** Results of a missed counted run of a passage act on the diagnosis: when
+  notes weren't right, the first button loops the worst bar slowly (**Loop bar 25 slowly (50%)** at a
+  slow step, 70% in tempo; a practice loop that leads back to the passage step it came from:
+  **Now sing bars 22–29 again**), also after misses in a row, since that loop is the slow practice. When
+  the entries were late (Level 1 in tempo) it loops the bar of the first late entry in tempo. Listening
+  and singing slower stay one tap away in the help card (not for a run whose notes were right but late,
+  nor one through the phone's speaker). After `STUCK_AFTER` (2) misses in a row of the same passage at
+  the same level and step (`failsInARow`, a pass ends the count) the card says so (“Tricky one”); a miss
+  without notes to name puts its help first: Level 1 slow **Listen again, then sing it**; in tempo
+  **Sing it slow (70%)**; other slow steps **Sing it slower (50%)**. “Easier” after a miss: in tempo →
+  the same level slow; slow → the level below in tempo (for a run of the whole piece: the whole piece at
+  the level below).
 
 ## Streak and cycle points
 
@@ -331,7 +337,9 @@ Nobody loses a level. The old Level 1 (70%, on “doo”) is the new **Level 1 s
 migrated once (`store.SCHEMA_VERSION` 2, `store.migrateToSteps`), when the app first reads it:
 
 - A passage at level 1 → level 0 with `slow: 1` (“Level 1 · slow ✓”; Next up continues with Level 1 in
-  tempo). Levels 2 and up stay as they are (they were sung at full tempo), and so do best results.
+  tempo). Levels 2 and up stay as they are (they were sung at full tempo), and so do their best results;
+  bests at Level 1 (`best[1]`, `bestScore[1]`, of passages and of the whole piece) were sung at 70% and go, as bests are
+  kept for runs in tempo only.
 - A full-run record at level 1 → level 0. Level-1 fix lists (`toFix[1]`, `toFixLocks[1]`) and a
   level-1 clean-run star were earned slowly: dropped (at any piece level).
 - Attempt-log entries from before the steps have no `step`; at level 1 they count as slow

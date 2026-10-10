@@ -58,11 +58,24 @@ describe('the piece path', () => {
   it('a fresh piece, every passage in tempo, a fix list, memorised', () => {
     expect(pathStatus(secs, undefined).here).toBe('Level 1 · slow, no passages yet');
     expect(pathStatus(secs, prog({ s0: { level: 1 }, s1: { level: 1 }, s2: { level: 2 }, s3: { level: 1 } })).here)
-      .toBe('Level 1 in every passage · now sing it all through');
+      .toBe('Level 1 in every passage · confirm it with a run of the whole piece');
+    // Every passage above the piece level: that level is the one to confirm (as nextStep says).
+    const above = pathStatus(secs, prog({ s0: { level: 3 }, s1: { level: 3 }, s2: { level: 4 }, s3: { level: 3 } }));
+    expect(above.working).toEqual({ level: 3, step: 'tempo' });
+    expect(above.here).toBe('Level 3 in every passage · confirm it with a run of the whole piece');
+    expect(above.filled).toBe(2);
     const fix = pathStatus(secs, prog({ s0: { level: 1 } }, { level: 1, best: {}, attempts: 1, toFix: { 2: ['s2'] }, toFixLocks: { 2: true } }));
     expect(fix.working).toEqual({ level: 2, step: 'tempo' });
     expect(fix.here).toBe('Level 2 · in tempo, one passage to fix');
     expect(fix.fixes).toEqual(['s2']);
+    expect(fix.filled).toBe(1);
+    // By heart, day 1 of 2: only the day-2 message.
+    const NOW = new Date(2026, 9, 10, 12).getTime();
+    const day1 = pathStatus(secs, prog({ s0: { level: 4, slow: 5 } }, { level: 4, best: {}, attempts: 2, offBookDays: ['2026-10-10'] }), NOW);
+    expect(day1.here).toBe('From memory: day 1 of 2 · sing it all from memory again on another day');
+    expect(day1.waitDay).toBe(true);
+    expect(pathStatus(secs, prog({}, { level: 4, best: {}, attempts: 2, offBookDays: ['2026-10-08'] }), NOW).here)
+      .toBe('From memory: day 1 of 2 · sing it all from memory again today');
     const mem = pathStatus(secs, prog({}, { level: 5, best: {}, attempts: 2 }));
     expect(mem.working).toBeNull();
     expect(mem.here).toBe('Level 5 · By heart reached ✓');

@@ -23,6 +23,8 @@ export interface LastResult {
   /** The piece's level before and after this run (a milestone when it crossed 3, 4 or 5). */
   pieceBefore?: number;
   pieceAfter?: number;
+  /** A loop: the passage step it came from (Route.back), to sing whole again after it. */
+  back?: { sectionId: string; level: number; step: 'slow' | 'tempo' };
   mode: '2d' | '3d';
   from: number;
   to: number;

@@ -26,7 +26,7 @@ import { openAccount } from '../components/AccountSync';
 import { LevelMeter } from '../components/LevelMeter';
 import { LEVEL_ASKS } from '../components/PassageSheet';
 import { MILESTONES, joinLabels, lowerLabel, meterNodes, milestoneCrossed, nextLabel, nextReason, passageStatus, pathStatus, slowOf } from '../path';
-import { lateEntries, notesShare, shareWords, type EntryTiming } from '../play/prerun';
+import { lateEntries, notesShare, shareWords, type LateEntry } from '../play/prerun';
 import { pitchWords } from '../../game/pitchwords';
 import { nextRehearsal } from '../../progress/rehearsal';
 import { daysUntil } from '../hooks';
@@ -120,11 +120,15 @@ export function Results() {
   const cellText = (i: number) => (i === 0 && mnum(i) === '0' ? 'Up' : mnum(i));
   const cellName = (i: number) => (i === 0 && mnum(i) === '0' ? 'Upbeat' : `Bar ${mnum(i)}`);
 
+  // A loop started from here remembers the passage step it came from (Route.back): its Results lead
+  // back to singing that passage whole, at that level and step.
+  const loopBack = section && lr.level >= 1 ? { sectionId: section.id, level: lr.level, step: lr.step ?? (lr.level === 1 ? 'slow' as const : 'tempo' as const) }
+    : lr.back;
   const playLoop = (m0: number, m1: number, level = Math.max(1, Math.min(lr.level, 2))) => {
     const from = ms[Math.max(0, m0)]?.start ?? lr.from;
     const last = ms[Math.min(ms.length - 1, m1)];
     const to = last ? last.start + last.dur : lr.to;
-    goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: 'drill', level, mode: '2d', from, to });
+    goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: 'drill', level, mode: '2d', from, to, ...(loopBack ? { back: loopBack } : {}) });
   };
 
   // Level 1 slow: every note must be right. The notes that weren't, by bar, with a loop to drill them.
@@ -141,7 +145,7 @@ export function Results() {
   // Nor a level-1 run through the speaker (practice: "move on to the next level" would be wrong).
   const speakerRun = !!lr.speaker && !!lr.notCounted;
   const insights = (lr.timingFail != null || lr.timingUnsure != null || wrong.length > 0 || speakerRun ? r.insights.filter((i) => i.kind !== 'great') : r.insights)
-    .map((i) => (i.kind === 'great' ? { ...i, detail: onwardText(i.detail, lr.sectionId) } : i));
+    .map((i) => (i.kind === 'great' ? { ...i, detail: onwardText(i.detail, lr.sectionId, lr.ladder && lr.passed && step === 'slow' && lr.level > lr.newLevel) } : i));
   // Microphone trouble: advice for what the input monitor found (through the speaker, the backing in
   // the mic explains the "distortion"), and at level 1 the notes let off because of it.
   const advice = inputAdvice(lr.inputQuality).filter((a) => !(lr.speaker && a.kind === 'distortion'));
@@ -152,7 +156,7 @@ export function Results() {
   // misses in a row that's what comes first; the try at the step's tempo stays one tap away. (Not for
   // a run whose notes were right but late, or one through the phone's speaker: neither helps there.)
   const same = { name: 'play' as const, pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, mode: '2d' as const,
-    ...(lr.sectionId === 'drill' ? { from: lr.from, to: lr.to } : {}) };
+    ...(lr.sectionId === 'drill' ? { from: lr.from, to: lr.to, ...(lr.back ? { back: lr.back } : {}) } : {}) };
   const ladderSec = !!section;
   const listenAgain = () => goPlay({ ...same, level: 0, after: lr.level, step });
   // In tempo on a passage: its slow step (which counts). At slow (or elsewhere): slower practice.
@@ -200,16 +204,28 @@ export function Results() {
     name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: 'drill', level: Math.max(1, lr.level), step, mode: '2d',
     from: ms[worstBar].start, to: ms[worstBar].start + ms[worstBar].dur,
     ...(loopRate < (spec?.rate ?? 1) - 1e-6 ? { rate: loopRate } : {}),
+    ...(loopBack ? { back: loopBack } : {}),
   });
   // Level 1 in tempo: the entries that came in late (or weren't sung).
   const late = entriesLate && part ? lateEntries(part.notes, r.notes, lr.entriesOffsetMs ?? 0) : [];
   const lateBar = late.length ? late[0].measure : null;
   const loopEntry = lateBar == null || !ms[lateBar] ? null : () => goPlay({
     name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: 'drill', level: Math.max(1, lr.level), step: 'tempo', mode: '2d',
-    from: ms[Math.max(0, lateBar - 1)].start, to: ms[lateBar].start + ms[lateBar].dur,
+    from: ms[lateBar].start, to: ms[lateBar].start + ms[lateBar].dur,
+    ...(loopBack ? { back: loopBack } : {}),
   });
-  // A loop of a few bars: the passage they belong to, to sing whole again.
-  const loopHome = lr.sectionId === 'drill' && lr.level >= 1 ? sections.find((s) => lr.from >= s.start - 1e-3 && lr.from < s.end - 1e-3) : undefined;
+  // A loop of a few bars: the passage step it came from (Route.back), else the passage the bars
+  // belong to at its own current step.
+  const loopHome = (() => {
+    if (lr.sectionId !== 'drill' || lr.level < 1) return undefined;
+    const fromBack = lr.back ? sections.find((s) => s.id === lr.back!.sectionId) : undefined;
+    if (fromBack) return { sec: fromBack, level: lr.back!.level, step: lr.back!.step };
+    const sec = sections.find((s) => lr.from >= s.start - 1e-3 && lr.from < s.end - 1e-3);
+    if (!sec) return undefined;
+    const sp = prog?.sections[sec.id];
+    const cur = (sp?.level ?? 0) >= 5 ? { level: 5, step: 'tempo' as Step } : currentStep(sp);
+    return { sec, level: cur.level, step: cur.step };
+  })();
   // The next passage in score order (after a miss: move on, or come back later).
   const secIdx = section ? sections.findIndex((s) => s.id === section.id) : -1;
   const nextSec = secIdx >= 0 ? sections[secIdx + 1] : undefined;
@@ -217,7 +233,12 @@ export function Results() {
   // The piece crossed a milestone in this run (rehearsal-ready, concert-ready, memorised).
   const before = lr.pieceBefore ?? lr.reached?.prevLevel ?? lr.full?.prevLevel;
   const after = lr.pieceAfter ?? lr.reached?.newLevel ?? lr.full?.newLevel;
-  const milestone = lr.ladder && before != null && after != null ? milestoneCrossed(before, after) : null;
+  const crossed = lr.ladder && before != null && after != null && !/^(row|leaps)-/.test(piece.id) ? milestoneCrossed(before, after) : null;
+  // The band takes the run's place only when the run itself was at that level (a clean run of the
+  // whole piece, the last fix, a single passage); otherwise (e.g. a Level 4 run that also finished
+  // the Level 3 fix list, or by heart on day 1) the run's own verdict stays, with a small note.
+  const milestone = crossed && lr.level === crossed ? crossed : null;
+  const milestoneNote = crossed && !milestone ? crossed : null;
   const notesRight = r.notes.filter((n) => noteVerdict(n) !== 'wrong').length;
   const allInTime = lr.timingFail == null && lr.timingUnsure == null && !entriesLate && r.rhythm >= 0.9;
   const notesLine = r.notes.length ? `${notesRight} of ${r.notes.length} notes right${allInTime ? ' · all in time' : ''}` : '';
@@ -231,12 +252,13 @@ export function Results() {
   const play = (sectionId: string, level: number, mode: '2d' | '3d' = '2d', st?: Step) =>
     goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId, level, mode, ...(st && mode === '2d' ? { step: st } : {}) });
   const failed = lr.ladder && !lr.passed;
+  const worstSlipped = lr.full ? [...lr.full.sections].filter((x) => !x.passed).sort((a, b) => a.accuracy - b.accuracy)[0] : undefined;
   let primary: FootStep & { repeats?: boolean };
   if (loopHome) {
     primary = {
-      label: <><IconPlay size={18} /> Now sing {lowerLabel(loopHome.label)} again</>, testid: 'passage-again',
-      why: `${stepLabel(lr.level, step)}: the whole passage, now the loop is in your ears.`,
-      onClick: () => play(loopHome.id, lr.level, '2d', step),
+      label: <><IconPlay size={18} /> Now sing {lowerLabel(loopHome.sec.label)} again</>, testid: 'passage-again',
+      why: `${stepLabel(loopHome.level, loopHome.step)}: the whole passage, now the loop is in your ears.`,
+      onClick: () => play(loopHome.sec.id, loopHome.level, '2d', loopHome.step),
     };
   } else if (lr.slow != null && lr.sectionId !== 'cold') {
     primary = { label: <><IconPlay size={18} /> Now at {Math.round((spec?.rate ?? 1) * 100)}%</>, why: `That was slower practice: now sing it at ${step === 'slow' ? 'the slow step’s tempo' : 'full tempo'}.`, testid: 'full-tempo', onClick: () => goPlay({ ...same, level: lr.level, step, mode: lr.mode }) };
@@ -276,9 +298,13 @@ export function Results() {
       label: <><IconPlay size={18} /> Fix {lowerLabel(label(nextFix))} · Level {lr.level}</>, testid: 'fix-first', onClick: () => play(nextFix, lr.level, '2d', 'tempo'),
       why: `${fixesLeft > 1 ? `${fixesLeft} passages to fix` : 'One passage to fix'} on ${fixesLeft > 1 ? 'their' : 'its'} own, in tempo: no need to sing it all again.`,
     };
-  } else if (lr.full?.tooMuch && next) {
-    // Too much slipped for the run to count: the passages first.
-    primary = { label: <><IconPlay size={18} /> {nextText(next)}</>, why: 'Too much slipped for the run to count: the passages first.', testid: 'practise-sections', onClick: () => play(next.sectionId, next.level, '2d', next.step) };
+  } else if (lr.full?.tooMuch && worstSlipped) {
+    // Too much slipped for the run to count: the passages first, the one that slipped most at the run's level.
+    primary = {
+      label: <><IconPlay size={18} /> {label(worstSlipped.id)} · {stepLabel(lr.level, step)}</>, testid: 'practise-sections',
+      why: 'Too much slipped for the run to count: the passages first, starting with the one that slipped most.',
+      onClick: () => play(worstSlipped.id, lr.level, '2d', step),
+    };
   } else if (failed) {
     primary = {
       label: <><IconPlay size={18} /> Try again</>, testid: 'try-again', repeats: true, onClick: () => play(lr.sectionId, lr.level, lr.mode, step),
@@ -289,6 +315,12 @@ export function Results() {
     };
   } else if (next) {
     primary = { label: <><IconPlay size={18} /> {nextText(next)}</>, why: nextReason(next, label), testid: 'next-step', onClick: () => play(next.sectionId, next.level, '2d', next.step) };
+  } else if (pieceReadiness(sections, prog).pieceLevel < 5 && sections.length > 0) {
+    // Nothing more today (by heart: day 2 waits for another day).
+    primary = {
+      label: <>Finish for today</>, testid: 'finish-primary', onClick: () => leaveTo({ name: 'home' }),
+      why: pieceReadiness(sections, prog).pieceLevel === 4 && lr.level === 5 ? 'Day 2 from memory: come back tomorrow and sing it once more.' : 'Nothing more to do on this piece today.',
+    };
   } else {
     primary = {
       label: <><IconCube size={18} color="#0B0D1A" /> {lr.full?.passed && lr.full.newLevel >= 5 ? 'Memorised!' : 'All done for today!'} Arcade run of the whole piece</>,
@@ -301,7 +333,7 @@ export function Results() {
     ? (step === 'tempo' && !lr.full ? { level: lr.level, step: 'slow' } : lr.level > 1 ? { level: lr.level - 1, step: 'tempo' } : null)
     : null;
   const easierStep: FootStep | null = easier
-    ? { label: `Easier: ${easier.level === lr.level ? stepWord(easier.step) : `Level ${easier.level} in tempo`}`, testid: 'easier', onClick: () => play(lr.sectionId, easier.level, '2d', easier.step) }
+    ? { label: `Easier: ${easier.level === lr.level ? stepWord(easier.step) : `${lr.sectionId === 'all' ? 'the whole piece at ' : ''}Level ${easier.level} in tempo`}`, testid: 'easier', onClick: () => play(lr.sectionId, easier.level, '2d', easier.step) }
     : null;
   const againStep: FootStep = {
     label: <><IconRestart size={16} /> {lr.slow != null ? 'Again, slowly' : 'Again'}</>,
@@ -312,16 +344,20 @@ export function Results() {
   // Second choice: after a miss of a passage the next passage (or the same one again); after a slow
   // pass the same bars in tempo; else the same run again (or an easier step).
   const diagnosed = primary.testid === 'loop-bar' || primary.testid === 'loop-entry';
+  // (after a miss with the help card, "Try it again" is there; without it, it's this button)
+  const tryAgain: FootStep = { ...againStep, label: <><IconRestart size={16} /> Try again</> };
+  // (the primary already is this passage in tempo: no second button for it)
+  const nextIsTempo = !!next && next.sectionId === lr.sectionId && next.level === lr.level && next.step === 'tempo' && primary.testid === 'next-step';
   const again: FootStep | null = diagnosed
-    ? (nextSec && next ? { label: 'Next passage', testid: 'next-passage', onClick: () => play(nextSec.id, Math.min(5, (prog?.sections[nextSec.id]?.level ?? 0) + 1), '2d', stepFor(prog?.sections[nextSec.id], Math.min(5, (prog?.sections[nextSec.id]?.level ?? 0) + 1))) } : againStep)
-    : stepUp ? { label: 'Now in tempo', testid: 'now-in-tempo', onClick: () => play(lr.sectionId, lr.level, '2d', 'tempo') }
+    ? (nextSec && next && offerHelp ? { label: 'Next passage', testid: 'next-passage', onClick: () => play(nextSec.id, Math.min(5, (prog?.sections[nextSec.id]?.level ?? 0) + 1), '2d', stepFor(prog?.sections[nextSec.id], Math.min(5, (prog?.sections[nextSec.id]?.level ?? 0) + 1))) } : tryAgain)
+    : stepUp && !nextIsTempo ? { label: 'Now in tempo', testid: 'now-in-tempo', onClick: () => play(lr.sectionId, lr.level, '2d', 'tempo') }
       : easierStep ?? (primary.repeats ? null : againStep);
   const passed = lr.ladder && lr.passed;
 
   // ---- The main block: what happened, in one place (a milestone, a pass, or what to fix).
   const sp = section ? prog?.sections[section.id] : undefined;
   const main: React.ReactNode = milestone
-    ? <MilestoneBand piece={piece} m={milestone} sections={sections} prog={prog} lr={lr} notesRight={notesRight} />
+    ? <MilestoneBand piece={piece} m={milestone} sections={sections} prog={prog} lr={lr} notesRight={notesRight} passName={passName} />
     : lr.ladder && lr.full ? <FullRunBanner lr={lr} full={lr.full} label={label} />
       : lr.notCounted || speakerRun ? <PracticeNotice lr={lr} speakerRun={speakerRun} wrongCount={wrong.length} />
         : lr.ladder && lr.passed ? (
@@ -369,7 +405,7 @@ export function Results() {
           </div>
         ) : (
           <div className="col verdict" style={{ gap: 4 }} role="status" data-testid="drill-verdict">
-            <h2>{Math.round(r.accuracy * 100)}% of the notes right.</h2>
+            <h2>{notesRight} of {r.notes.length} notes right.</h2>
             <p className="t16 muted" style={{ margin: 0 }}>
               {lr.sectionId === 'cold' ? 'A cold start is practice: it doesn’t change your levels.' : 'Loops and drills are practice: they don’t change your levels.'}
             </p>
@@ -386,6 +422,11 @@ export function Results() {
       <div className="lay res-a">
       {main}
 
+      {milestoneNote && (
+        <div className="notice info" role="status" data-testid="milestone-note">
+          <strong>{MILESTONES[milestoneNote]} ✓</strong> The whole piece is at {levelLabel(milestoneNote)} now.
+        </div>
+      )}
       {fixedNote && !milestone && (
         <div className="notice info" role="status" data-testid="fixed-banner">
           {fixedNote.remaining === 0
@@ -409,7 +450,7 @@ export function Results() {
       <div className="lay res-b">
       {fixNotes.length > 0 && part && (
         <MistakeScore piece={piece} part={part} notes={fixNotes} tol={tol} level={lr.level} step={step} from={lr.from} to={lr.to} play={goPlay}
-          focus focusBar={worstBar ?? undefined}
+          focus focusBar={worstBar ?? undefined} back={loopBack}
           hear={(m0, m1) => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: 'drill', level: 0, mode: '2d', after: Math.max(1, lr.level), step,
             from: ms[m0].start, to: ms[m1].start + ms[m1].dur })} />
       )}
@@ -570,14 +611,14 @@ export function Results() {
       </div>
       </div>
 
-      <ResultsFoot primary={primary} again={again} toPiece={primary.onClick === toPiece ? null : toPiece} finish={passed && !lr.notCounted} />
+      <ResultsFoot primary={primary} again={again} toPiece={primary.onClick === toPiece ? null : toPiece} finish={passed && !lr.notCounted && primary.testid !== 'finish-primary'} />
     </main>
   );
 }
 
 /** "your entries came in about 240 ms late on average", "the entries in bars 3 and 7 came in late; the one in bar 12 wasn't sung". */
-function lateText(late: EntryTiming[], num: (m: number) => string, e: { missed: number; entries: number; meanMs: number | null }): string {
-  const bars = (xs: EntryTiming[]) => listText([...new Set(xs.map((x) => num(x.measure)))]);
+function lateText(late: LateEntry[], num: (m: number) => string, e: { missed: number; entries: number; meanMs: number | null }): string {
+  const bars = (xs: LateEntry[]) => listText([...new Set(xs.map((x) => num(x.measure)))]);
   const lateOnes = late.filter((x) => x.ms != null);
   const missed = late.filter((x) => x.ms == null);
   const parts: string[] = [];
@@ -627,13 +668,13 @@ function PassCard({ lr, step, passName, sp, leveledUp, stepUp, everyNote }: {
   const level = lr.newLevel;
   const slow = lr.newSlow ?? (sp ? slowOf(sp) : 0);
   const fromMemory = lr.level === 5 && step === 'tempo' && lr.newLevel < 5;
-  const pct = Math.round(lr.result.accuracy * 100);
+  const right = lr.result.notes.filter((n) => noteVerdict(n) !== 'wrong').length;
   const title = fromMemory ? 'Sung from memory ✓'
     : leveledUp ? `${levelLabel(lr.newLevel)} ✓`
       : stepUp ? `Level ${lr.level} · slow ✓`
         : `${stepLabel(lr.level, step)} ✓`;
   const line = fromMemory ? `Day ${lr.offBookDays ?? 1} of ${OFF_BOOK_DAYS}: sing it by heart again on another day and the passage is memorised.`
-    : `${everyNote ? 'Every note right.' : `${pct}% of the notes right.`}${leveledUp && lr.newLevel >= 5 ? ' This passage is memorised.' : leveledUp && lr.newLevel === 4 ? ' This passage is concert-ready.' : leveledUp && lr.newLevel === 3 ? ' This passage is rehearsal-ready.' : !leveledUp && !stepUp && lr.newLevel > 0 ? ` It keeps Level ${lr.newLevel}.` : ''}`;
+    : `${everyNote ? 'Every note right.' : `${right} of ${lr.result.notes.length} notes right.`}${leveledUp && lr.newLevel >= 5 ? ' This passage is memorised.' : leveledUp && lr.newLevel === 4 ? ' This passage is concert-ready.' : leveledUp && lr.newLevel === 3 ? ' This passage is rehearsal-ready.' : !leveledUp && !stepUp && lr.newLevel > 0 ? ` It keeps Level ${lr.newLevel}.` : ''}`;
   const now = level < 5 ? currentStep({ level, slow }) : null;
   return (
     <div className="step-up" role="status" data-testid="pass-banner">
@@ -701,8 +742,8 @@ const MILESTONE_LINES: Record<number, string> = {
 };
 
 /** The whole piece reached Level 3, 4 or 5 in this run: the calm, full-width milestone (B7). */
-function MilestoneBand({ piece, m, sections, prog, lr, notesRight }: {
-  piece: PieceInfo; m: 3 | 4 | 5; sections: Section[]; prog: PieceProgress | undefined; lr: LR; notesRight: number;
+function MilestoneBand({ piece, m, sections, prog, lr, notesRight, passName }: {
+  piece: PieceInfo; m: 3 | 4 | 5; sections: Section[]; prog: PieceProgress | undefined; lr: LR; notesRight: number; passName: string;
 }) {
   const cycle = loadCycle();
   const inCycle = cycle.pieceIds.includes(piece.id);
@@ -716,7 +757,13 @@ function MilestoneBand({ piece, m, sections, prog, lr, notesRight }: {
   const goals: Record<number, string> = inCycle && concertShort && P < 4 && toConcert != null && toConcert >= 0 ? { 4: concertShort } : {};
   const spec = stepSpec(lr.level, 'tempo');
   const total = lr.result.notes.length;
-  const passLine = total ? `${notesRight} of ${total} notes right: a pass (${shareWords(spec.pass)} needed).` : '';
+  // What actually happened: a run of the whole piece (a clean one earns a ★), or the last passage to fix.
+  const notes = total ? `${notesRight} of ${total} notes right` : '';
+  const passLine = lr.full
+    ? `${notes ? `${notes}: a pass (${shareWords(spec.pass)} needed).` : ''}${lr.full.clean ? ' Every passage right in one go: a clean run ★.' : ''}`
+    : lr.reached && sections.length > 1
+      ? `${passName} was the last passage to fix${notes ? ` (${notes})` : ''}.`
+      : notes ? `${notes}: a pass (${shareWords(spec.pass)} needed).` : '';
   const took = startedDays(piece.id, lr.partId);
   const nextGoal = m === 3
     ? { h: `Concert-ready${goals[4] ? ` by ${goals[4]}` : ''}`, p: `Level 4 in tempo: no note names, just the starting chord. Until then ${piece.title} comes back once a week for a run-through, so it stays ready.` }
@@ -771,8 +818,9 @@ function ResultsFoot({ primary, again, toPiece, finish }: { primary: FootStep; a
 }
 
 /** The "excellent run" note says what's next; after a drill or a cold start that isn't a new level. */
-function onwardText(detail: string, sectionId: string): string {
-  const onward = sectionId === 'cold' ? 'Try another cold start, or go back to the piece.'
+function onwardText(detail: string, sectionId: string, slowPass = false): string {
+  const onward = slowPass ? 'Now sing it in tempo: that completes the level.'
+    : sectionId === 'cold' ? 'Try another cold start, or go back to the piece.'
     : sectionId === 'drill' ? 'Now sing the whole passage.'
       : sectionId === 'entries' ? 'Come back to the entries now and then to keep them sure.'
         : null;
@@ -832,7 +880,7 @@ function FullRunBanner({ lr, full, label }: { lr: LR; full: NonNullable<LR['full
                       ? <><strong>Not yet:</strong> the notes were right ({acc}%), but you came in about {lr.timingFail} ms behind the beat. Breathe early and sing with the music, not after it.</>
                       : everyNote
                         ? <><strong>Not yet:</strong> {acc}%: too many notes were too unclear to judge. Sing every note on “doo”, clearly and steadily.</>
-                        : <><strong>Not yet:</strong> {acc}% of {need}% needed.</>}
+                        : <><strong>Not yet:</strong> {acc}% this time; {notesShare(spec.pass)} right needed.</>}
     </div>
   );
 }

@@ -208,6 +208,13 @@ function seedCycle() {
   }
 }
 
+/** A stored title worth keeping over the choir's: not empty, not "Untitled", not just the file's name. */
+export function keptTitle(title: string | undefined, fileName: string): boolean {
+  const t = (title ?? '').trim();
+  const stem = fileName.replace(/^.*[\\/]/, '').replace(/\.[^.]+$/, '');
+  return !!t && t !== 'Untitled' && t.toLowerCase() !== stem.toLowerCase();
+}
+
 let syncing: Promise<Awaited<ReturnType<typeof syncChoir>>> | null = null;
 /** Download the choir's new scores and apply its programme. */
 export function syncChoirNow(): Promise<Awaited<ReturnType<typeof syncChoir>>> {
@@ -219,11 +226,12 @@ export function syncChoirNow(): Promise<Awaited<ReturnType<typeof syncChoir>>> {
       if (meta.composer) score.composer = meta.composer;
       if (meta.credit) score.credit = meta.credit;
       score.choir = meta.choir;
-      // Imported again by a newer importer: the singer keeps the names they gave it.
+      // Imported again by a newer importer: the singer keeps the names they gave it, but not a title
+      // that is only the file's name (an earlier import of a score without a title), nor an empty one.
       const old = pieces.get(score.id)?.score;
       if (old?.choir) {
-        score.title = old.title;
-        score.composer = old.composer;
+        if (keptTitle(old.title, name)) score.title = old.title;
+        if (old.composer?.trim()) score.composer = old.composer;
       }
       const saved = await saveImportedScore(score);
       pieces.set(score.id, makePiece(score));
@@ -241,9 +249,29 @@ export function syncChoirNow(): Promise<Awaited<ReturnType<typeof syncChoir>>> {
       const p = pieces.get(id);
       // (MIDI files gain nothing from it: they have no written spelling)
       return !!p && !p.builtin && !!p.score.choir && p.score.source === 'musicxml' && (p.score.parseVersion ?? 1) < PARSE_VERSION;
-    }).then(async (r) => { await adoptLibraryIds(); return r; }).finally(() => { syncing = null; emit(); });
+    }).then(async (r) => { await adoptLibraryIds(); await fixChoirTitles(); return r; }).finally(() => { syncing = null; emit(); });
   }
   return syncing;
+}
+
+/**
+ * A choir score stored with only its file's name as the title (or none, or no composer), e.g. a score
+ * without a title imported before the choir sent one: the choir's title and composer replace them.
+ */
+export async function fixChoirTitles(): Promise<void> {
+  const info = cachedChoir();
+  if (!info) return;
+  for (const p of info.pieces) {
+    const piece = pieces.get(localPieceId(info.code, p));
+    if (!piece || piece.builtin || !piece.score.choir) continue;
+    const score = { ...piece.score };
+    let changed = false;
+    if (p.title?.trim() && !keptTitle(score.title, p.filename || '') && score.title !== p.title) { score.title = p.title; changed = true; }
+    if (p.composer?.trim() && !score.composer?.trim()) { score.composer = p.composer; changed = true; }
+    if (!changed) continue;
+    try { await saveImportedScore(score); } catch (e) { console.error('fixChoirTitles', e); }
+    pieces.set(score.id, makePiece(score));
+  }
 }
 
 /**

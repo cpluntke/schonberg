@@ -15,6 +15,8 @@ export type Route =
     rate?: number;
     /** Listening (level 0) before singing: the level to sing next. */
     after?: number;
+    /** A loop of a few bars (sectionId 'drill'): the passage step it came from, to sing whole again after it. */
+    back?: { sectionId: string; level: number; step: 'slow' | 'tempo' };
   }
   | { name: 'results' }
   | { name: 'setup' }
@@ -59,6 +61,9 @@ export function parseHash(hash: string): Route {
         const sq = q.get('step');
         const stepQ = sq === 'slow' || sq === 'tempo' ? sq : null;
         const mode = seg[0] === 'arcade' ? '3d' : '2d';
+        // "back=<sectionId>:<level>:<step>" on a loop.
+        const bm = /^(.+):([1-5]):(slow|tempo)$/.exec(q.get('back') ?? '');
+        const backQ = bm && seg[3] === 'drill' ? { sectionId: bm[1], level: Number(bm[2]), step: bm[3] as 'slow' | 'tempo' } : null;
         // Arcade is a reward from level 2 up; clamp hand-edited levels.
         const level = Math.max(mode === '3d' ? 2 : 0, Math.min(mode === '3d' ? 4 : 5, Number.isFinite(lv) ? lv : 1));
         return {
@@ -68,6 +73,7 @@ export function parseHash(hash: string): Route {
           ...(stepQ != null && mode === '2d' ? { step: stepQ } : {}),
           ...(rateQ != null ? { rate: rateQ } : {}),
           ...(afterQ != null && level === 0 ? { after: afterQ } : {}),
+          ...(backQ ? { back: backQ } : {}),
         };
       }
       break;
@@ -109,6 +115,7 @@ export function href(r: Route): string {
       if (r.step) q.set('step', r.step);
       if (r.rate != null) q.set('rate', String(r.rate));
       if (r.after != null) q.set('after', String(r.after));
+      if (r.back) q.set('back', `${r.back.sectionId}:${r.back.level}:${r.back.step}`);
       return `#/${r.mode === '3d' ? 'arcade' : 'play'}/${e(r.pieceId)}/${e(r.partId)}/${e(r.sectionId)}?${q}`;
     }
     case 'lyrics':
