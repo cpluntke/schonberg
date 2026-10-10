@@ -29,9 +29,9 @@ import { MILESTONES, joinLabels, lowerLabel, meterNodes, milestoneCrossed, nextL
 import { lateEntries, notesShare, shareWords, type LateEntry } from '../play/prerun';
 import { pitchWords } from '../../game/pitchwords';
 import { nextRehearsal } from '../../progress/rehearsal';
-import { daysUntil } from '../hooks';
-import { SessionStrip, useWeek, weekText } from '../components/Today';
-import { finishToday, goStep, stepShort, todaySession } from '../today';
+import { daysUntil, useDay } from '../hooks';
+import { SessionStrip, sessionFoot, useWeek, weekText } from '../components/Today';
+import { finishToday } from '../today';
 import type { Section } from '../../music/types';
 
 /** Start a run from Results: it takes Results' place in history (router: practice screens replace each other). */
@@ -70,6 +70,7 @@ export function Results() {
   // Results are part of practising: Again, Next… (so a singer doesn't flicker out of the choir's count)
   React.useEffect(() => startPresence(loadProfile().voice), []);
   const [moreOpen, setMoreOpen] = useState(false);
+  useDay(); // (a session left open over midnight: the footer stops offering yesterday's next step)
   const lr = getLastResult();
   const piece = lr ? getPiece(lr.pieceId) : undefined;
   if (!lr || !piece) {
@@ -357,35 +358,9 @@ export function Results() {
   const passed = lr.ladder && lr.passed;
 
   // Today's session (started from Home's plan): once this step is done the footer moves on to the
-  // next step of today; after a miss, "Skip to next step" sits next to the help. Outside a session
-  // nothing changes.
-  const ses = todaySession({ pieceId: piece.id });
-  let sessionFinish = false;
-  if (ses) {
-    const curDone = ses.status.done[ses.index];
-    const n = ses.plan.steps.length;
-    const skip: FootStep | null = ses.next
-      ? { label: 'Skip to next step', testid: 'skip-step', onClick: () => goStep(ses.next!, true) }
-      : null;
-    if (curDone) {
-      const demoted: FootStep | null = primary.repeats || primary.testid === 'next-step' || primary.testid === 'arcade-run' || primary.testid === 'finish-primary' ? null
-        : { label: primary.label, testid: primary.testid, onClick: primary.onClick };
-      primary = ses.next
-        ? {
-          label: <><IconPlay size={18} /> Next: {stepShort(ses.next)}</>, testid: 'today-next',
-          why: `step ${ses.nextIndex + 1} of ${n} · ${ses.next.minutes} min`, onClick: () => goStep(ses.next!, true),
-        }
-        : {
-          label: 'Finish for today', testid: 'today-finish', why: 'Every step of today is done.',
-          onClick: () => { finishToday(); leaveTo({ name: 'home' }); },
-        };
-      again = demoted ?? again;
-      sessionFinish = !!ses.next;
-    } else {
-      again = skip ?? again;
-      sessionFinish = true;
-    }
-  }
+  // next step of today; after a miss "Skip to next step" joins the help. Outside a session nothing changes.
+  const foot = sessionFoot(piece.id, primary, again, passed && !lr.notCounted && primary.testid !== 'finish-primary',
+    primary.testid === 'next-step' && next ? { sectionId: next.sectionId, level: next.level, step: next.step } : undefined);
 
   // ---- The main block: what happened, in one place (a milestone, a pass, or what to fix).
   const sp = section ? prog?.sections[section.id] : undefined;
@@ -641,7 +616,7 @@ export function Results() {
       </div>
       </div>
 
-      <ResultsFoot primary={primary} again={again} toPiece={primary.onClick === toPiece ? null : toPiece} finish={ses ? sessionFinish : passed && !lr.notCounted && primary.testid !== 'finish-primary'} session={!!ses} />
+      <ResultsFoot primary={foot.primary} again={foot.again} toPiece={foot.primary.onClick === toPiece ? null : toPiece} finish={foot.finish} session={foot.session} skip={foot.skip} />
     </main>
   );
 }
@@ -829,7 +804,7 @@ function startedDays(pieceId: string, partId: string): number | null {
 }
 
 /** The sticky footer of Results: one primary step (and why, under it), a second choice and the piece, and on a pass "Finish for today". */
-function ResultsFoot({ primary, again, toPiece, finish, session }: { primary: FootStep; again: FootStep | null; toPiece: (() => void) | null; finish?: boolean; session?: boolean }) {
+function ResultsFoot({ primary, again, toPiece, finish, session, skip }: { primary: FootStep; again: FootStep | null; toPiece: (() => void) | null; finish?: boolean; session?: boolean; skip?: FootStep | null }) {
   return (
     <div className="results-foot" data-testid="results-foot">
       <button className="btn primary block two" data-testid={primary.testid} onClick={primary.onClick}>
@@ -842,7 +817,12 @@ function ResultsFoot({ primary, again, toPiece, finish, session }: { primary: Fo
           {toPiece && <button className="btn small" data-testid="to-piece" onClick={toPiece}>Back to the piece</button>}
         </div>
       )}
-      {finish && <button className="link" data-testid="finish-today" onClick={() => { if (session) finishToday(); leaveTo({ name: 'home' }); }}>Finish for today</button>}
+      {(finish || skip) && (
+        <div className="foot-links">
+          {skip && <button className="link" data-testid={skip.testid} onClick={skip.onClick}>{skip.label}</button>}
+          {finish && <button className="link" data-testid="finish-today" onClick={() => { if (session) finishToday(); leaveTo({ name: 'home' }); }}>Finish for today</button>}
+        </div>
+      )}
     </div>
   );
 }
@@ -991,8 +971,14 @@ function WordsResults({ lr, words }: { lr: NonNullable<ReturnType<typeof getLast
   const again = () => goPlay({ name: 'play', pieceId: piece.id, partId: lr.partId, sectionId: lr.sectionId, level: 0, mode: '2d', words: true });
   const color = { perfect: 'var(--voice)', good: 'var(--voice)', ok: '#E8B86A', miss: '#FF7A45' } as const;
   const up = upOf(piece.id);
+  const foot = sessionFoot(piece.id, {
+    label: <><IconPlay size={18} /> {nextStage != null ? `Next: ${STAGE_NAMES[nextStage]}` : 'Again'}</>, onClick: again, testid: 'words-again',
+    why: nextStage != null ? (nextStage === 1 ? 'Now with only the first letter of each word.' : 'Now from memory, with nothing shown.')
+      : res.accuracy >= WORDS_PASS ? undefined : `${Math.round(WORDS_PASS * 100)}% of the syllables in time to move on.`,
+  }, { label: 'Lyrics quiz', onClick: () => go({ name: 'lyrics', pieceId: piece.id, partId: lr.partId }), testid: 'lyrics-quiz' }, false);
   return (
     <main className="screen practice has-foot">
+      <SessionStrip pieceId={piece.id} />
       <PracticeBar up={up} heading title={piece.title} sub={`${part?.name ?? ''} · ${section?.label ?? 'Whole piece'} · Words: ${STAGE_NAMES[words.stage]}`} />
       <div className={res.accuracy >= WORDS_PASS ? 'notice info' : 'notice'} role="status" data-testid="words-banner">
         {!words.counted
@@ -1035,14 +1021,7 @@ function WordsResults({ lr, words }: { lr: NonNullable<ReturnType<typeof getLast
         </div>
       )}
       <span className="tiny muted">The app hears when each syllable starts, not which word it is: use the lyrics quiz to check the words themselves.</span>
-      <ResultsFoot
-        primary={{
-          label: <><IconPlay size={18} /> {nextStage != null ? `Next: ${STAGE_NAMES[nextStage]}` : 'Again'}</>, onClick: again, testid: 'words-again',
-          why: nextStage != null ? (nextStage === 1 ? 'Now with only the first letter of each word.' : 'Now from memory, with nothing shown.')
-            : res.accuracy >= WORDS_PASS ? undefined : `${Math.round(WORDS_PASS * 100)}% of the syllables in time to move on.`,
-        }}
-        again={{ label: 'Lyrics quiz', onClick: () => go({ name: 'lyrics', pieceId: piece.id, partId: lr.partId }), testid: 'lyrics-quiz' }}
-        toPiece={() => leaveTo(up)} />
+      <ResultsFoot primary={foot.primary} again={foot.again} toPiece={() => leaveTo(up)} finish={foot.finish} session={foot.session} skip={foot.skip} />
     </main>
   );
 }

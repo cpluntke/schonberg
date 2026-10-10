@@ -1,6 +1,31 @@
 import { useEffect, useState, useCallback } from 'react';
 import { loadProfile, saveProfile, subscribe, type Profile } from '../progress/store';
 
+/**
+ * Today's date ('YYYY-MM-DD'): re-renders when the day changes under an open screen (midnight, or the
+ * app coming back from the background, a PWA resumed the next morning).
+ */
+export function useDay(): string {
+  const key = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const [day, setDay] = useState(key);
+  useEffect(() => {
+    let t = 0;
+    const check = () => setDay(key());
+    const arm = () => {
+      clearTimeout(t);
+      const n = new Date();
+      const next = new Date(n.getFullYear(), n.getMonth(), n.getDate() + 1, 0, 0, 1).getTime();
+      t = window.setTimeout(() => { check(); arm(); }, Math.max(1000, next - n.getTime()));
+    };
+    const onShow = () => { if (!document.hidden) { check(); arm(); } };
+    arm();
+    document.addEventListener('visibilitychange', onShow);
+    window.addEventListener('focus', onShow);
+    return () => { clearTimeout(t); document.removeEventListener('visibilitychange', onShow); window.removeEventListener('focus', onShow); };
+  }, []);
+  return day;
+}
+
 export function useStoreVersion(): number {
   const [v, setV] = useState(0);
   useEffect(() => subscribe(() => setV((x) => x + 1)), []);

@@ -65,7 +65,8 @@ export function nextUpRoute(): { route: Route; piece: PieceInfo; level: number }
   const day = dayOf(now);
   const plan = loadToday(day)?.plan ?? computePlan(now, false);
   const status = planStatus(plan, tickContext(day));
-  const s = plan.steps.find((x, i) => x.kind !== 'lab' && x.route.name === 'play' && !status.done[i]);
+  // (a singing step: not the lab, nor the words)
+  const s = plan.steps.find((x, i) => x.kind !== 'lab' && x.kind !== 'words' && x.route.name === 'play' && !status.done[i]);
   const piece = s?.pieceId ? getPiece(s.pieceId) : undefined;
   if (s && piece && s.route.name === 'play') return { route: s.route as Route, piece, level: s.level };
   // (nothing left today: the first programme piece's next step)

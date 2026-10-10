@@ -1,6 +1,6 @@
 import React from 'react';
 import { allPieces, getPiece, singableSections, type PieceInfo } from '../library';
-import { useProfile, useStoreVersion, formatDate, daysUntil, initials } from '../hooks';
+import { useProfile, useStoreVersion, useDay, formatDate, daysUntil, initials } from '../hooks';
 import { go } from '../router';
 import { getProgress, loadCycle, practiceDays, sameWork } from '../../progress/store';
 import { levelLabel, levelSpec, stepWord } from '../../progress/ladder';
@@ -11,8 +11,8 @@ import { IntroVideoButton } from '../components/IntroVideo';
 import { meterNodes, pathStatus } from '../path';
 import { LevelMeter } from '../components/LevelMeter';
 import { PlanCard, RehearsalCheck, StatusLine, TodayDone, WeekCard } from '../components/Today';
-import { dateWords, endSession, lastRehearsal, todayState } from '../today';
-import { dayOf } from '../../progress/today';
+import { computeToday, dateWords, endSession, lastRehearsal } from '../today';
+import { saveToday } from '../../progress/today';
 import { apiBase, cachedChoir, choirCycleNext, choirCycleNow, choirLogo, loadSession, sharingNeedsOk, startSharing } from '../../progress/choir';
 import { shareMyProgress } from '../play/shareProgress';
 import { LoggedOutCard, SyncNotice, openAccount } from '../components/AccountSync';
@@ -37,9 +37,14 @@ export function greeting(now = new Date()): string {
 
 export function Home() {
   const [profile] = useProfile();
-  useStoreVersion();
+  const version = useStoreVersion();
+  const day = useDay();
   const staff = useStaff();
   const labOn = labEnabled(staff);
+  // Today: the plan (frozen once started), and whether it's done; planned once per change of the store
+  // or the day, and stored after rendering (Home never writes while it draws).
+  const today = React.useMemo(() => computeToday(labOn), [version, day, labOn]);
+  React.useEffect(() => { if (today.save) saveToday({ ...today.save, session: null }, false); }, [today]);
   // Back on Home: today's session pauses (the strip shows again once a step is started from here).
   React.useEffect(() => { endSession(); }, []);
   const cycle = loadCycle();
@@ -56,16 +61,15 @@ export function Home() {
   // The concert is over: what comes next (the choir's next programme, or the singer's own dates).
   const fromChoir = !!profile.choirCode || !!cycle.preset?.startsWith('choir:');
   const concertOver = toConcert != null && toConcert < 0;
-  // Today: the plan (frozen once started), and whether it's done.
-  const today = todayState(labOn);
   const { plan, status } = today;
   const done = profile.onboarded && plan.steps.length > 0 && (status.complete || !!today.finished);
   const everPractised = practiceDays(1).length > 0;
   const first = profile.name ? profile.name.split(' ')[0] : '';
   const hello = done ? 'Gut gemacht' : plan.mode === 'welcome' ? 'Welcome back' : greeting();
   const rehearsalTime = plan.mode === 'rehearsal' && cycle.rehearsalWeekday != null ? (cycle.rehearsalTime ?? '19:30') : undefined;
-  const afterRehearsal = !!lastRehearsal(dayOf(new Date()), cycle);
-  const nextLabel = nr ? (nr.days === 0 ? 'tonight' : dateWords(nr.at)
+  const afterRehearsal = !!lastRehearsal(day, cycle);
+  // (only a rehearsal still ahead: a one-off date that has passed isn't the next one)
+  const nextLabel = nr && nr.days >= 0 && !nr.over ? (nr.days === 0 ? 'tonight' : dateWords(nr.at)
     + (cycle.rehearsalWeekday != null ? ` ${cycle.rehearsalTime ?? '19:30'}` : '')) : undefined;
 
   return (
@@ -119,7 +123,7 @@ export function Home() {
       )}
 
       {plan.mode === 'welcome' && !done && (
-        <p className="t16 muted" style={{ margin: 0 }} data-testid="welcome-line">Good to have you here. Everything you learnt is still there: let's ease back in with five minutes.</p>
+        <p className="t16 muted" style={{ margin: 0 }} data-testid="welcome-line">Good to have you here. Everything you learnt is still there: let's ease back in with about {plan.minutes} minute{plan.minutes === 1 ? '' : 's'}.</p>
       )}
       {!betweenCycles && !concertOver && plan.mode !== 'welcome' && <StatusLine cycle={cycle} rehearsalDay={plan.mode === 'rehearsal'} />}
       {!betweenCycles && focusMissing.length > 0 && nr && nr.days >= 0 && (
@@ -131,11 +135,11 @@ export function Home() {
         </span>
       )}
 
-      {profile.onboarded && plan.mode !== 'welcome' && <RehearsalCheck labOn={labOn} />}
+      {profile.onboarded && <RehearsalCheck labOn={labOn} />}
 
       {done ? <TodayDone plan={plan} labOn={labOn} />
         : plan.steps.length > 0 ? (
-          <PlanCard plan={plan} status={status} labOn={labOn} secondary={!profile.onboarded} rehearsalTime={rehearsalTime} />
+          <PlanCard plan={plan} status={status} labOn={labOn} secondary={!profile.onboarded} rehearsalTime={rehearsalTime} started={!!today.started} />
         ) : statuses.length && !betweenCycles ? (
           <div className="notice info" data-testid="all-ready">Everything in this cycle is concert-ready. Try the arcade mode or today's Zwölfton row.</div>
         ) : !betweenCycles ? (
@@ -260,7 +264,7 @@ function TonightsFocus({ statuses }: { statuses: PieceStatus[] }) {
                 <strong className="t16">{s.piece.title}</strong>
                 {s.rehearsalReady
                   ? <span className="t14 good-text">Level {Math.min(5, s.pieceLevel)} reached ✓</span>
-                  : <span className="t14 muted">Working on {ps.here}</span>}
+                  : <span className="t14 muted">{notStarted(s) ? 'Not started' : `Working on ${ps.here}`}</span>}
               </div>
             </div>
           );
@@ -287,7 +291,7 @@ function LeftOff({ statuses }: { statuses: PieceStatus[] }) {
                 <strong className="t16">{s.piece.title}</strong>
                 {s.pieceLevel > 0
                   ? <span className="t14 good-text">Level {s.pieceLevel} reached ✓</span>
-                  : <span className="t14 muted">Working on {ps.here}</span>}
+                  : <span className="t14 muted">{notStarted(s) ? 'Not started' : `Working on ${ps.here}`}</span>}
               </div>
               <LevelMeter nodes={nodes} label={s.piece.title} />
             </div>
@@ -382,4 +386,10 @@ function PractisingNow() {
       ))}
     </div>
   );
+}
+
+/** Nothing sung in the piece yet (no level, no slow step, no attempt). */
+function notStarted(s: PieceStatus): boolean {
+  const prog = getProgress(s.piece.id, s.partId);
+  return !singableSections(s.piece, s.partId).some((x) => { const sp = prog?.sections[x.id]; return !!sp && (sp.level > 0 || (sp.slow ?? 0) > 0 || sp.attempts > 0); });
 }

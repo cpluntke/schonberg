@@ -38,7 +38,8 @@ test('today’s plan: start, the session strip, the next step from Results, fini
   expect(n).toBeGreaterThanOrEqual(2);
   // "about N min" is the exact sum of the steps' minutes
   const mins = (await steps.allInnerTexts()).map((t) => Number(/(\d+) min/.exec(t)?.[1] ?? 0)).reduce((a, b) => a + b, 0);
-  await expect(page.getByTestId('plan-minutes')).toHaveText(`about ${mins} min`);
+  // (one short piece: the plan says honestly that it is a short day)
+  await expect(page.getByTestId('plan-minutes')).toHaveText(mins < 10 ? `A short day: ${mins} min` : `about ${mins} min`);
   // One primary on the screen.
   await expect(page.locator('main .btn.primary')).toHaveCount(1);
 
@@ -122,4 +123,86 @@ test('after a break: welcome back, a short restart, nothing lost', async ({ page
   await expect(page.getByTestId('plan-card')).toHaveAttribute('data-mode', 'welcome');
   await expect(page.getByTestId('plan-card')).toContainText('Your usual plan returns tomorrow');
   await expect(page.getByText(/streak/i)).toHaveCount(0);
+});
+
+/** The singer's part and passages of the Abendlied (vite serves the app's own modules). */
+async function abendlied(page: Page) {
+  return page.evaluate(async () => {
+    const lib = await import('/src/ui/library.ts');
+    await lib.ensureLoaded();
+    const piece = lib.getPiece('warmup-chorale')!;
+    const partId = lib.chosenPartId(piece, 'A');
+    return { partId, ids: lib.singableSections(piece, partId).map((s) => s.id) };
+  });
+}
+
+test('a miss in the session: the help stays, “Skip to next step” moves on', async ({ page }) => {
+  test.setTimeout(180_000);
+  await seeded(page, '/?simulate=sloppy#/');
+  await page.getByTestId('start-today').click();
+  await expect(page.getByTestId('session-strip')).toContainText('Today · step 1 of');
+  await sing(page);
+  await expect(page.getByTestId('session-strip')).toContainText('Today · step 1 of');
+  // Results' own second button is still there; Skip is an extra link.
+  const foot = page.getByTestId('results-foot');
+  await expect(foot.locator('.row .btn').first()).toBeVisible();
+  await expect(foot.getByTestId('skip-step')).toBeVisible();
+  await expect(foot.getByTestId('finish-today')).toBeVisible();
+  await foot.getByTestId('skip-step').click();
+  await expect(page.getByTestId('session-strip')).toContainText('Today · step 2 of');
+});
+
+test('a words step in the session: the strip on the words screen, then the next step', async ({ page }) => {
+  test.setTimeout(180_000);
+  await page.goto('/#/');
+  await expect(page.getByText('Repertoire')).toBeVisible({ timeout: 20_000 });
+  const { partId, ids } = await abendlied(page);
+  const t = Date.now() - 2 * 86_400_000;
+  await seeded(page, '/?simulate=perfect#/', () => ({
+    [`sh:progress:warmup-chorale:${partId}`]: {
+      pieceId: 'warmup-chorale', partId, totalAttempts: 4, bestScore: 900,
+      sections: Object.fromEntries(ids.map((id) => [id, { level: 1, best: { 1: 0.9 }, attempts: 2, lastPracticed: t, lastPassed: t }])),
+      full: { level: 1, best: { 1: 0.9 }, attempts: 1, lastPracticed: t, lastPassed: t, clean: [1] },
+    },
+  }));
+  await expect(page.getByTestId('plan-step').first()).toContainText('the words');
+  await page.getByTestId('start-today').click();
+  await expect(page).toHaveURL(/words=1/);
+  await expect(page.getByTestId('session-strip')).toContainText('Today · step 1 of');
+  await page.getByTestId('start').click();
+  await expect(page.getByTestId('results-foot')).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByTestId('session-strip')).toBeVisible();
+  await expect(page.getByTestId('today-next')).toContainText('Next:');
+});
+
+test('rehearsal day: a short warm-up for tonight', async ({ page }) => {
+  await seeded(page, '/#/', (now) => ({
+    'sh:cycle': { name: 'This cycle', pieceIds: ['warmup-chorale'], rehearsalWeekday: new Date().getDay(), rehearsalTime: '23:59', focusPieceIds: ['warmup-chorale'] },
+    'sh:log': [{ at: now - 2 * 86_400_000, pieceId: 'warmup-chorale', partId: 'P2', sectionId: 'x', level: 1, step: 'slow', accuracy: 0.8, score: 1, passed: false }],
+  }));
+  const card = page.getByTestId('plan-card');
+  await expect(card).toHaveAttribute('data-mode', 'rehearsal');
+  await expect(card).toContainText('Tonight 23:59 · warm up for rehearsal');
+  await expect(card).toContainText('Best in the hour before you leave.');
+  const mins = Number(/(\d+) min/.exec(await page.getByTestId('plan-minutes').innerText())?.[1]);
+  expect(mins).toBeLessThanOrEqual(6);
+  await expect(page.getByTestId('week-card')).toContainText('Tonight counts for your week.');
+});
+
+test('across midnight: yesterday’s session ends, Today plans the new day', async ({ page }) => {
+  test.setTimeout(180_000);
+  const d = new Date();
+  await page.clock.install({ time: new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 58, 0) });
+  await seeded(page, '/?simulate=perfect#/');
+  await page.getByTestId('start-today').click();
+  await sing(page);
+  await expect(page.getByTestId('today-next')).toBeVisible();
+  // Midnight passes while Results is open.
+  await page.clock.fastForward('05:00');
+  await expect(page.getByTestId('session-stale')).toContainText('That was yesterday’s plan', { timeout: 10_000 });
+  await expect(page.getByTestId('today-next')).toHaveCount(0);
+  await page.getByTestId('session-today').click();
+  await expect(page).toHaveURL(/#\/$/);
+  // A new day: the plan isn't under way (nothing sung today yet).
+  await expect(page.getByTestId('start-today')).toContainText('Start today’s practice');
 });

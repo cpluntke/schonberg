@@ -1,10 +1,12 @@
-import { levelLabel } from '../../progress/ladder';
 import React, { useEffect, useRef, useState } from 'react';
 import { IconPlay } from '../icons';
 import { go, type Route } from '../router';
 import { allPieces, getPiece, chosenPartId, singableSections } from '../library';
 import { loadCycle, loadProfile } from '../../progress/store';
 import { nextUpRoute } from '../plan';
+import { computeToday, startToday } from '../today';
+import { useStaff } from '../screens/Admin';
+import { labEnabled } from '../screens/IntonationLab';
 
 const BASE = import.meta.env.BASE_URL || './';
 export const INTRO_SRC = `${BASE}media/onboarding.mp4`;
@@ -83,13 +85,18 @@ export function firstRunRoute(): Route | null {
   return { name: 'play', pieceId: piece.id, partId, sectionId: section.id, level: 1, mode: '2d' };
 }
 
-/** The two things the intro ends on, as buttons right under the video. */
+/**
+ * The two things the intro ends on, as buttons right under the video: the voice setup, then Home's
+ * "Start today's practice" (the same session: the plan's first step not done yet).
+ */
 function TryItNow({ onClose }: { onClose: () => void }) {
   const profile = loadProfile();
+  const labOn = labEnabled(useStaff());
   const setupDone = profile.onboarded && profile.latencyMs > 0;
-  const first = firstRunRoute();
-  const firstPiece = first && first.name === 'play' ? getPiece(first.pieceId) : undefined;
-  const step = (n: number, done: boolean, title: string, sub: string, label: string, onGo: () => void, primary: boolean) => (
+  const today = computeToday(labOn);
+  const firstStep = today.plan.steps[today.status.next >= 0 ? today.status.next : 0];
+  const fallback = firstStep ? null : firstRunRoute();
+  const step = (n: number, done: boolean, title: string, sub: string, label: string, onGo: () => void, primary: boolean, testid?: string) => (
     <div className="row" style={{ gap: 10, alignItems: 'center' }}>
       <span aria-hidden="true" style={{ width: 28, height: 28, borderRadius: 14, flex: 'none', display: 'grid', placeItems: 'center', fontWeight: 700,
         background: done ? 'var(--good, #3fb950)' : 'var(--accent, #f0883e)', color: '#05060d' }}>{done ? '✓' : n}</span>
@@ -97,17 +104,17 @@ function TryItNow({ onClose }: { onClose: () => void }) {
         <strong className="small">{title}</strong>
         <span className="tiny muted">{sub}</span>
       </span>
-      <button className={`btn small${primary ? ' primary' : ''}`} style={{ whiteSpace: 'nowrap', flex: 'none' }} onClick={() => { onClose(); onGo(); }}>{label}</button>
+      <button className={`btn small${primary ? ' primary' : ''}`} style={{ whiteSpace: 'nowrap', flex: 'none' }} data-testid={testid} onClick={() => { onClose(); onGo(); }}>{label}</button>
     </div>
   );
   return (
     <div className="card" style={{ width: '100%', maxWidth: 900, gap: 10, flex: 'none' }} data-testid="intro-next-steps">
-      <span className="eyebrow">Try it now · about 5 minutes</span>
+      <span className="eyebrow">Try it now · about 10 minutes</span>
       {step(1, setupDone, 'Put on headphones, do the voice setup', 'Choir code, a short do-re-mi, and the delay check', setupDone ? 'Redo' : 'Start voice setup',
         () => go({ name: 'setup' }), !setupDone)}
-      {first && first.name === 'play' && step(2, false, first.level <= 1 ? 'Sing Level 1 · Notes of your first passage' : `Sing your next step: ${levelLabel(first.level)}`,
-        firstPiece ? `${firstPiece.title}${first.level <= 1 ? ': slow, on “doo”, with your part playing' : ''}` : 'Slow, on “doo”, with your part playing', 'Sing it',
-        () => go(first), setupDone)}
+      {(firstStep || fallback) && step(2, false, 'Tap \u201cStart today\u2019s practice\u201d',
+        firstStep ? `Today\u2019s first step: ${firstStep.title}` : 'Slow, on \u201cdoo\u201d, with your part playing', 'Start',
+        () => { if (firstStep) startToday(labOn); else if (fallback) go(fallback); }, setupDone, 'intro-start-today')}
     </div>
   );
 }

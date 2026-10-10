@@ -213,6 +213,11 @@ export interface AttemptLog {
   durationSec?: number;
   /** Mean distance from the note of the notes sung (cents, rounded; Your progress, "Getting better"). */
   cents?: number;
+  /**
+   * A run of the whole piece that counted (in tempo, in one go, at full tempo) but didn't open its level
+   * (too much slipped, or late): logged as 'practice', yet a real go at the whole piece (Today ticks it).
+   */
+  fullRun?: true;
 }
 
 /** The step of a logged attempt: entries saved before the steps were level 1 at 70% (slow), the rest in tempo. */
@@ -859,6 +864,7 @@ export function recordFullRun(
 
   // Only runs that opened their level are logged as full runs ('all'); the rest is practice.
   const entry: AttemptLog = { at: now, pieceId, partId, sectionId: opened ? 'all' : 'practice', level: lvl, step, accuracy, score, passed };
+  if (opts.counted && !opened) entry.fullRun = true;
   if (opts.durationSec != null && Number.isFinite(opts.durationSec)) entry.durationSec = opts.durationSec;
   const log = attemptLog();
   log.push(entry);
@@ -971,9 +977,16 @@ export function dueForReview(pieceId: string, partId: string, sections: Section[
 
 // ---------------------------------------------------------------- log & stats
 
+let logCache: { raw: string | null; log: AttemptLog[] } | null = null;
+/** The attempt log (a fresh array each call; parsed once per change of the stored copy). */
 export function attemptLog(): AttemptLog[] {
+  ensureSchema();
+  const raw = rawGet(K.log);
+  if (logCache && logCache.raw === raw && raw != null) return [...logCache.log];
   const v = readJSON<AttemptLog[]>(K.log, [], Array.isArray);
-  return v.filter((e) => isObj(e) && typeof e.at === 'number');
+  const log = v.filter((e) => isObj(e) && typeof e.at === 'number');
+  logCache = { raw: rawGet(K.log), log };
+  return [...log];
 }
 
 const MORE_DAYS = 'sh:moreDays';
@@ -1171,4 +1184,5 @@ export function _resetAllForTests(): void {
   memScores.clear();
   schemaChecked = false;
   storageFull = false;
+  logCache = null;
 }

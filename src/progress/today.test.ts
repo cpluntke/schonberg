@@ -6,6 +6,7 @@ import { nextStep, pieceReadiness } from './ladder';
 import {
   addDays, bestWeek, buildPlan, countedDays, daysBetween, estimateMinutes, gettingBetter, mondayOf, movedOn, pace, planStatus,
   stepDone, stepsTo, weekDots, addDayNotes, notesBetween, noteReached, loadReached, saveRehearsal, confirmedRehearsals,
+  stepsSungOn, loadRehearsals, loadToday,
   type PlanContext, type PlanPiece, type TodayStep,
 } from './today';
 
@@ -280,12 +281,19 @@ describe('what moved, getting better', () => {
   });
   it('first slow runs of new passages, earlier vs the last two weeks, only with enough data and a real gain', () => {
     const first = (i: number, at: number, accuracy: number, cents?: number) => entry({ sectionId: `s${i}`, pieceId: `p${i}`, at, accuracy, ...(cents != null ? { cents } : {}) });
-    const early = [0, 1, 2].map((i) => first(i, SAT - 30 * DAY, 0.6, 26));
-    const late = [3, 4, 5].map((i) => first(i, SAT - 2 * DAY, 0.8, 11));
+    const early = [0, 1, 2, 3, 4].map((i) => first(i, SAT - 30 * DAY, 0.6, 26));
+    const late = [5, 6, 7, 8, 9].map((i) => first(i, SAT - 2 * DAY, 0.8, 11));
     expect(gettingBetter([...early, ...late], SAT)).toMatchObject({ metric: 'cents', earlier: 26, now: 11 });
     expect(gettingBetter([...early.map((e) => ({ ...e, cents: undefined })), ...late], SAT)).toMatchObject({ metric: 'accuracy' });
+    // at least 5 a side
+    expect(gettingBetter([...early.slice(1), ...late], SAT)).toBeNull();
     expect(gettingBetter(late, SAT)).toBeNull();
     expect(gettingBetter([...late.map((e) => ({ ...e, at: SAT - 30 * DAY })), ...early.map((e) => ({ ...e, at: SAT - DAY }))], SAT)).toBeNull();
+    // a gap of 8 cents or more (26 → 20 is noise)
+    expect(gettingBetter([...early, ...late.map((e) => ({ ...e, cents: 20, accuracy: 0.62 }))], SAT)).toBeNull();
+    // a passage whose earlier attempts fell out of the kept log doesn't count as new
+    expect(gettingBetter([...early, ...late], SAT, (pieceId) => (pieceId === 'p5' ? 9 : 1))).toBeNull();
+    expect(gettingBetter([...early, ...late], SAT, () => 1)).toMatchObject({ metric: 'cents' });
   });
 });
 
@@ -302,5 +310,75 @@ describe('stored state', () => {
     saveRehearsal('2026-10-06', { attended: true, answered: true });
     saveRehearsal('2026-09-29', { attended: false, answered: true });
     expect([...confirmedRehearsals()]).toEqual(['2026-10-06']);
+  });
+});
+
+describe('fix round', () => {
+  it('rehearsal day: a passage to fix appears once, at its fix level', () => {
+    const p = piece('fx', 'Fix piece', sections(4), [2, 1, 2, 2], { full: { level: 1, best: {}, attempts: 1, toFix: { 2: ['s1'] }, toFixLocks: { 2: true } }, focus: true });
+    const plan = buildPlan(ctx({ now: TUE, pieces: [p], rehearsal: { days: 0, weekday: 'Tuesday' } }));
+    const ids = plan.steps.map((x) => x.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    const keys = plan.steps.map((x) => x.sectionId);
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(plan.steps.find((x) => x.sectionId === 's1')).toMatchObject({ level: 2, step: 'tempo' });
+  });
+
+  it('a lab tune-up (both ladders done, or rehearsal day) ticks only on rounds sung today', () => {
+    const plan = buildPlan(ctx({ pieces: [dieu()], rehearsal: null, lab: { interval: 'third', rung: 5, done: true } }));
+    const lab = plan.steps[0];
+    expect(lab.lab).toMatchObject({ interval: 'third', rung: 5, tuneUp: true });
+    expect(stepDone(lab, { log: [], day: '2026-10-10', labRung: { third: 6, fifth: 6 } })).toBe(false);
+    expect(stepDone(lab, { log: [], day: '2026-10-10', labRung: { third: 6 }, lab: { day: '2026-10-10', rounds: { 'third:5': 4 } } })).toBe(true);
+  });
+
+  it('sing it all: two real goes where too much slipped tick it; stopped or slower runs don’t', () => {
+    const s: TodayStep = {
+      id: 'x', kind: 'sing-it-all', pieceId: 'dieu', partId: 'A', sectionId: 'all', level: 1, step: 'tempo', minutes: 3, title: '', reason: '', why: 'progress',
+      route: { name: 'play', pieceId: 'dieu', partId: 'A', sectionId: 'all', level: 1, step: 'tempo', mode: '2d' },
+    };
+    const t = (log: AttemptLog[]) => ({ log, day: '2026-10-10' });
+    const slipped = (at: number) => entry({ at, sectionId: 'practice', step: 'tempo', fullRun: true });
+    expect(stepDone(s, t([slipped(SAT + 1e3)]))).toBe(false);
+    expect(stepDone(s, t([slipped(SAT + 1e3), slipped(SAT + 2e3)]))).toBe(true);
+    expect(stepDone(s, t([entry({ sectionId: 'practice', step: 'tempo' }), entry({ sectionId: 'practice', step: 'tempo', at: SAT + 5e3 })]))).toBe(false);
+  });
+
+  it('“sung through lately” uses the last counted full run', () => {
+    const a = abendlied();
+    a.lastFullRun = SAT - 3 * DAY;
+    const plan = buildPlan(ctx({ pieces: [a, dieu()] }));
+    expect(plan.steps.some((x) => x.pieceId === 'abend' && x.kind === 'sing-it-all')).toBe(true);
+    a.lastFullRun = SAT - DAY;
+    expect(buildPlan(ctx({ pieces: [a, dieu()] })).steps.some((x) => x.pieceId === 'abend' && x.kind === 'sing-it-all')).toBe(false);
+  });
+
+  it('what was sung before the day’s plan: one ticked step per passage', () => {
+    const d = dieu();
+    const log = [entry({ sectionId: 's3', passed: true, at: SAT - 3600e3 }), entry({ sectionId: 's1', step: 'tempo', at: SAT - 3000e3 }), entry({ sectionId: 'drill', passed: true })];
+    const steps = stepsSungOn(log, '2026-10-10', [d]);
+    expect(steps.map((x) => x.sectionId)).toEqual(['s3']); // (one try of s1 isn't done yet)
+    expect(steps[0]).toMatchObject({ level: 1, step: 'slow' });
+    expect(steps[0].reason).toMatch(/sung earlier today/);
+  });
+
+  it('welcome back uses the usual estimates', () => {
+    const plan = buildPlan(ctx({ now: SAT + 12 * DAY, pieces: [abendlied(), dieu()], lastPracticeDay: '2026-10-10' }));
+    const normal = buildPlan(ctx({ now: SAT + 12 * DAY, pieces: [abendlied(), dieu()], lastPracticeDay: '2026-10-21' }));
+    const same = normal.steps.find((x) => x.id === plan.steps[1].id);
+    if (same) expect(plan.steps[1].minutes).toBe(same.minutes);
+    expect(plan.minutes).toBe(plan.steps.reduce((a, x) => a + x.minutes, 0));
+  });
+
+  it('stored rehearsal answers with a bad shaky list are cleaned', () => {
+    localStorage.setItem('sh:rehearsals', JSON.stringify({ '2026-10-06': { attended: true, shaky: 'oops' }, '2026-10-13': { shaky: [{ pieceId: 'a', sectionId: 'b', label: 'A b' }, 5] } }));
+    const all = loadRehearsals();
+    expect(all['2026-10-06'].shaky).toEqual([]);
+    expect(all['2026-10-13'].shaky).toEqual([{ pieceId: 'a', sectionId: 'b', label: 'A b' }]);
+  });
+
+  it('a stored plan with malformed steps is dropped', () => {
+    localStorage.setItem('sh:today', JSON.stringify({ day: '2026-10-10', plan: { day: '2026-10-10', mode: 'normal', minutes: 3, steps: [{ id: 1 }] } }));
+    expect(loadToday('2026-10-10')).toBeNull();
   });
 });

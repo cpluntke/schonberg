@@ -65,7 +65,8 @@ export interface TodayStep {
   /** For a lab step: the rung (1–5). */
   level: number;
   step: Step;
-  lab?: { interval: LabInterval; rung: number };
+  /** A lab step; `tuneUp`: a short go at a rung already passed (it ticks only on rounds sung today). */
+  lab?: { interval: LabInterval; rung: number; tuneUp?: boolean };
   minutes: number;
   /** "Dieu! qu'il la fait · bars 22–29". */
   title: string;
@@ -108,6 +109,8 @@ export interface PlanPiece {
   trouble?: (sectionId: string) => string | null;
   /** Last attempt (ms), 0 = never. */
   lastPractised: number;
+  /** The last run of the whole piece that counted (opened its level or not), ms; 0 = none known. */
+  lastFullRun?: number;
 }
 
 export interface PlanContext {
@@ -263,9 +266,11 @@ export function pieceCandidates(p: PlanPiece, now: number, rehearsalDays: number
 export function labStep(lab: NonNullable<PlanContext['lab']>, short = false): TodayStep {
   const rung = Math.max(1, Math.min(5, lab.rung));
   const minutes = short ? 1 : lab.done ? 2 : LAB_MINUTES[rung - 1];
+  // (a rung already passed, or a short tune-up: it ticks on rounds sung today, never by itself)
+  const tuneUp = short || lab.done || lab.rung > 5;
   return {
-    id: `lab:${lab.interval}:${rung}`, kind: 'lab', level: rung, step: 'tempo', minutes, why: 'warm-up',
-    lab: { interval: lab.interval, rung },
+    id: `lab:${lab.interval}:${rung}${tuneUp ? ':tune' : ''}`, kind: 'lab', level: rung, step: 'tempo', minutes, why: 'warm-up',
+    lab: { interval: lab.interval, rung, ...(tuneUp ? { tuneUp: true } : {}) },
     title: short ? (lab.interval === 'third' ? 'Pure-third tune-up' : 'Pure-fifth tune-up') : `Warm-up · ${LAB_NAME[lab.interval]}`,
     reason: short ? (lab.interval === 'third' ? 'So your third rings in the chord' : 'So your fifth rings in the chord')
       : lab.done ? `${LAB_RUNG_NAMES[rung - 1]} · keeps your ear ready` : `Step ${rung} of 5 · ${LAB_RUNG_NAMES[rung - 1]}`,
@@ -342,7 +347,7 @@ function normalSteps(ctx: PlanContext): TodayStep[] {
     });
     // A rehearsal piece that is ready: sing it all once before the rehearsal (unless sung through lately).
     if (p.focus && p.readiness.rehearsalReady && soon && p.sections.length > 1) {
-      const lastFull = p.prog?.full?.lastPracticed ?? 0;
+      const lastFull = p.lastFullRun ?? 0;
       if (ctx.now - lastFull >= 2 * DAY_MS) {
         const l = Math.min(MAX_LEVEL, Math.max(3, p.readiness.pieceLevel));
         cands.push({
@@ -375,12 +380,20 @@ function rehearsalPlan(ctx: PlanContext, day: string): TodayPlan {
     }
     // The passages being worked on (the lowest first): once each, in tempo when the notes are known;
     // a second one while the warm-up is still short.
-    const cands = pieceCandidates(p, ctx.now, 0).filter((x) => (x.kind === 'passage' || x.kind === 'fix' || x.kind === 'review') && x.sectionId !== 'all');
-    for (const c of cands.slice(0, 2)) {
-      if (steps.length >= 3 || (c !== cands[0] && sum(steps) >= 4)) break;
+    const seen = new Set<string>();
+    const cands = pieceCandidates(p, ctx.now, 0).filter((x) => {
+      if (!(x.kind === 'passage' || x.kind === 'fix' || x.kind === 'review') || x.sectionId === 'all' || seen.has(x.sectionId!)) return false;
+      seen.add(x.sectionId!);
+      return true;
+    });
+    let taken = 0;
+    for (const c of cands) {
+      if (taken >= 2 || steps.length >= 3 || (taken > 0 && sum(steps) >= 4)) break;
       const sp = p.prog?.sections[c.sectionId!];
-      const known = (sp?.level ?? 0) >= 1 || (sp?.slow ?? 0) >= 1;
-      const lv = (sp?.level ?? 0) >= 1 ? Math.min(MAX_LEVEL, sp!.level) : 1;
+      const fixing = c.kind === 'fix' || c.kind === 'review';
+      const known = fixing || (sp?.level ?? 0) >= 1 || (sp?.slow ?? 0) >= 1;
+      const lv = fixing ? c.level : (sp?.level ?? 0) >= 1 ? Math.min(MAX_LEVEL, sp!.level) : 1;
+      taken++;
       steps.push(playStep(p, { kind: 'passage', sectionId: c.sectionId!, level: lv, step: known ? 'tempo' : 'slow', why: 'focus', tries: 1,
         title: `${p.short} · ${lower(labelOf(p, c.sectionId!))} once${known ? ', in tempo' : ''}`,
         reason: p.focus ? 'Tonight’s focus' : 'Keeps it in your ear for tonight' }));
@@ -401,8 +414,7 @@ function welcomePlan(ctx: PlanContext, day: string): TodayPlan {
   const steps: TodayStep[] = [];
   const known = pieces.find((p) => p.readiness.pieceLevel >= 1 && p.sections.length > 1 && secOf(p, 'all') <= 150);
   if (known) {
-    const s = playStep(known, { kind: 'sing-it-all', sectionId: 'all', level: Math.min(MAX_LEVEL, known.readiness.pieceLevel), step: 'tempo', why: 'known', tries: 1, reason: 'A piece you know, to warm up' });
-    steps.push({ ...s, minutes: Math.min(3, s.minutes) });
+    steps.push(playStep(known, { kind: 'sing-it-all', sectionId: 'all', level: Math.min(MAX_LEVEL, known.readiness.pieceLevel), step: 'tempo', why: 'known', tries: 1, reason: 'A piece you know, to warm up' }));
   } else {
     // The passage they know best, once, in tempo at its level.
     let best: { p: PlanPiece; id: string; l: number } | null = null;
@@ -411,14 +423,13 @@ function welcomePlan(ctx: PlanContext, day: string): TodayPlan {
       if (l >= 1 && (!best || l > best.l)) best = { p, id: s.id, l };
     }
     if (best) {
-      const s = playStep(best.p, { kind: 'passage', sectionId: best.id, level: Math.min(MAX_LEVEL, best.l), step: 'tempo', why: 'known', tries: 1, reason: 'One you know, to warm up' });
-      steps.push({ ...s, minutes: Math.min(3, s.minutes) });
+      steps.push(playStep(best.p, { kind: 'passage', sectionId: best.id, level: Math.min(MAX_LEVEL, best.l), step: 'tempo', why: 'known', tries: 1, reason: 'One you know, to warm up' }));
     }
   }
   const used = new Set(steps.map(passageKey));
   const pool = [...ctx.pieces].sort(byRecent).flatMap((p) => pieceCandidates(p, ctx.now, ctx.rehearsal?.days ?? null).slice(0, 2));
   const next = pool.find((c) => !used.has(passageKey(c)) && !(steps[0]?.pieceId === c.pieceId && steps[0]?.sectionId === 'all' && c.sectionId === 'all'));
-  if (next) steps.push({ ...next, why: 'new', reason: 'One small new step', minutes: Math.min(next.minutes, 3) });
+  if (next) steps.push({ ...next, why: 'new', reason: 'One small new step' });
   return { day, mode: 'welcome', steps, minutes: sum(steps) };
 }
 
@@ -455,7 +466,7 @@ export const TRIES_TO_TICK = 2;
  */
 export function stepDone(s: TodayStep, t: TickContext): boolean {
   if (s.kind === 'lab' && s.lab) {
-    if ((t.labRung?.[s.lab.interval] ?? 0) > s.lab.rung) return true;
+    if (!s.lab.tuneUp && (t.labRung?.[s.lab.interval] ?? 0) > s.lab.rung) return true;
     const n = t.lab && t.lab.day === t.day ? t.lab.rounds[`${s.lab.interval}:${s.lab.rung}`] ?? 0 : 0;
     return n >= labRoundsFor(s.lab.rung);
   }
@@ -466,11 +477,47 @@ export function stepDone(s: TodayStep, t: TickContext): boolean {
   }
   const from = startOfDay(t.day);
   const to = startOfDay(addDays(t.day, 1));
-  const runs = t.log.filter((e) => e.at >= from && e.at < to && e.pieceId === s.pieceId && e.partId === s.partId && e.sectionId === s.sectionId && e.level > 0);
-  if (s.sectionId === 'all') return runs.some((e) => e.level >= s.level && logStep(e) === 'tempo');
+  const today = t.log.filter((e) => e.at >= from && e.at < to && e.pieceId === s.pieceId && e.partId === s.partId && e.level > 0);
+  if (s.sectionId === 'all') {
+    // A run that opened its level ('all'), or two real goes at the level (counted runs where too much
+    // slipped or that came in late are logged as practice, marked fullRun).
+    const full = today.filter((e) => logStep(e) === 'tempo' && (e.sectionId === 'all' || (e.sectionId === 'practice' && e.fullRun)));
+    if (full.some((e) => e.sectionId === 'all' && e.level >= s.level)) return true;
+    return full.filter((e) => e.level === s.level).length >= TRIES_TO_TICK;
+  }
+  const runs = today.filter((e) => e.sectionId === s.sectionId);
   const passed = runs.some((e) => e.passed && e.level >= s.level && (logStep(e) === 'tempo' || (s.step === 'slow' && logStep(e) === 'slow')));
   if (passed) return true;
   return runs.filter((e) => e.level === s.level && logStep(e) === s.step).length >= TRIES_TO_TICK;
+}
+
+/**
+ * What was sung on `day` before its plan was made (the singer practised before opening Today): one
+ * step per passage (or the whole piece), at the latest level and step sung, kept only when it counts
+ * as done (stepDone). Shown ticked at the top of the day's plan, so the earlier work isn't lost.
+ */
+export function stepsSungOn(log: AttemptLog[], day: string, pieces: PlanPiece[]): TodayStep[] {
+  const from = startOfDay(day), to = startOfDay(addDays(day, 1));
+  const latest = new Map<string, AttemptLog>();
+  for (const e of log) {
+    if (e.at < from || e.at >= to || e.level < 1) continue;
+    const sid = e.sectionId === 'practice' && e.fullRun ? 'all' : e.sectionId;
+    if (sid !== 'all' && !REAL(sid)) continue;
+    const k = `${e.pieceId}|${e.partId}|${sid}`;
+    const cur = latest.get(k);
+    if (!cur || e.at > cur.at) latest.set(k, { ...e, sectionId: sid });
+  }
+  const out: TodayStep[] = [];
+  for (const e of [...latest.values()].sort((a, b) => a.at - b.at)) {
+    const p = pieces.find((x) => x.pieceId === e.pieceId && x.partId === e.partId);
+    if (!p || (e.sectionId !== 'all' && !p.sections.some((x) => x.id === e.sectionId))) continue;
+    const st = playStep(p, {
+      kind: e.sectionId === 'all' ? 'sing-it-all' : 'passage', sectionId: e.sectionId, level: e.level, step: logStep(e), why: 'progress', tries: e.sectionId === 'all' ? 1 : 3,
+      reason: e.sectionId === 'all' ? 'Sung earlier today' : `${stepText(e.level, logStep(e))} · sung earlier today`,
+    });
+    if (stepDone(st, { log, day })) out.push(st);
+  }
+  return out.slice(0, MAX_STEPS);
 }
 
 export interface PlanStatus {
@@ -625,34 +672,47 @@ export function movedOn(log: AttemptLog[], day: string): Moved[] {
   return [...out.values()];
 }
 
+/** Getting better needs this many new passages on each side, and a gap of this much. */
+export const BETTER_MIN = 5;
+export const BETTER_CENTS = 8;
+export const BETTER_SHARE = 0.08;
+
 export interface Better { metric: 'cents' | 'accuracy'; earlier: number; now: number; n: [number, number] }
 
 /**
  * Getting better at learning new notes: the first slow run (Level 1 slow) of each new passage, in the
- * last 14 days vs before. Shown only with at least 3 passages in each and a real gain: cents off (lower
- * is better) when both have them, else the share of notes right.
+ * last 14 days vs before. Shown only with at least BETTER_MIN passages in each and a real gain (8 cents
+ * closer, or 8 points more notes right): cents off (lower is better) when both have them, else the
+ * share of notes right. With `attemptsOf` (the passage's counted attempts), a passage whose earlier
+ * attempts fell out of the kept log is left out (its first run there isn't its first).
  */
-export function gettingBetter(log: AttemptLog[], now: number): Better | null {
+export function gettingBetter(log: AttemptLog[], now: number, attemptsOf?: (pieceId: string, partId: string, sectionId: string) => number): Better | null {
   const first = new Map<string, AttemptLog>();
   for (const e of [...log].sort((a, b) => a.at - b.at)) {
     if (e.level !== 1 || logStep(e) !== 'slow' || !REAL(e.sectionId)) continue;
     const k = `${e.pieceId}|${e.partId}|${e.sectionId}`;
     if (!first.has(k)) first.set(k, e);
   }
+  // (only passages whose first run is in the kept log: all their counted attempts are in it)
+  if (attemptsOf) {
+    const inLog = new Map<string, number>();
+    for (const e of log) if (e.level > 0 && REAL(e.sectionId)) { const k = `${e.pieceId}|${e.partId}|${e.sectionId}`; inLog.set(k, (inLog.get(k) ?? 0) + 1); }
+    for (const [k, e] of [...first]) if (attemptsOf(e.pieceId, e.partId, e.sectionId) > (inLog.get(k) ?? 0)) first.delete(k);
+  }
   const cut = now - 14 * DAY_MS;
   const all = [...first.values()];
   const early = all.filter((e) => e.at < cut);
   const late = all.filter((e) => e.at >= cut);
-  if (early.length < 3 || late.length < 3) return null;
+  if (early.length < BETTER_MIN || late.length < BETTER_MIN) return null;
   const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
   const ec = early.filter((e) => typeof e.cents === 'number').map((e) => e.cents!);
   const lc = late.filter((e) => typeof e.cents === 'number').map((e) => e.cents!);
-  if (ec.length >= 3 && lc.length >= 3) {
+  if (ec.length >= BETTER_MIN && lc.length >= BETTER_MIN) {
     const a = avg(ec), b = avg(lc);
-    return a - b >= 3 ? { metric: 'cents', earlier: Math.round(a), now: Math.round(b), n: [ec.length, lc.length] } : null;
+    return a - b >= BETTER_CENTS ? { metric: 'cents', earlier: Math.round(a), now: Math.round(b), n: [ec.length, lc.length] } : null;
   }
   const a = avg(early.map((e) => e.accuracy)), b = avg(late.map((e) => e.accuracy));
-  return b - a >= 0.05 ? { metric: 'accuracy', earlier: a, now: b, n: [early.length, late.length] } : null;
+  return b - a >= BETTER_SHARE ? { metric: 'accuracy', earlier: a, now: b, n: [early.length, late.length] } : null;
 }
 
 // ---------------------------------------------------------------- stored state (this phone)
@@ -675,12 +735,19 @@ export interface StoredToday {
   session?: { current: string } | null;
 }
 
-const validToday = (v: unknown) => isObj(v) && typeof v.day === 'string' && isObj(v.plan) && Array.isArray((v.plan as { steps?: unknown }).steps);
+const validStep = (x: unknown) => isObj(x) && typeof x.id === 'string' && typeof x.kind === 'string' && typeof x.title === 'string'
+  && typeof x.reason === 'string' && typeof x.minutes === 'number' && Number.isFinite(x.minutes) && isObj(x.route) && typeof (x.route as { name?: unknown }).name === 'string';
+const validToday = (v: unknown) => isObj(v) && typeof v.day === 'string' && isObj(v.plan) && Array.isArray((v.plan as { steps?: unknown }).steps)
+  && ((v.plan as { steps: unknown[] }).steps).every(validStep) && typeof (v.plan as { mode?: unknown }).mode === 'string';
 export function loadToday(day: string): StoredToday | null {
   const s = readJSON<StoredToday | null>(TODAY, null, validToday);
   return s && s.day === day ? s : null;
 }
 export function saveToday(s: StoredToday, notify = true): void { writeJSON(TODAY, s, notify); }
+/** The stored plan whatever its day (a session left open from yesterday). */
+export function loadAnyToday(): StoredToday | null {
+  return readJSON<StoredToday | null>(TODAY, null, validToday);
+}
 
 /** Rehearsal answers, by the rehearsal's date. */
 export interface RehearsalAnswer {
@@ -698,7 +765,15 @@ export interface RehearsalAnswer {
 export function loadRehearsals(): Record<string, RehearsalAnswer> {
   const all = readJSON<Record<string, RehearsalAnswer>>(REHEARSALS, {}, isObj);
   const out: Record<string, RehearsalAnswer> = {};
-  for (const [k, v] of Object.entries(all)) if (/^\d{4}-\d{2}-\d{2}$/.test(k) && isObj(v)) out[k] = v;
+  for (const [k, v] of Object.entries(all)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(k) || !isObj(v)) continue;
+    const a: RehearsalAnswer = { ...v };
+    // (a bad list from an old version or a hand edit: dropped, the rest kept)
+    if (a.shaky !== undefined) {
+      a.shaky = Array.isArray(a.shaky) ? a.shaky.filter((x) => isObj(x) && typeof x.pieceId === 'string' && typeof x.sectionId === 'string' && typeof x.label === 'string') : [];
+    }
+    out[k] = a;
+  }
   return out;
 }
 export function saveRehearsal(date: string, a: RehearsalAnswer): void {
