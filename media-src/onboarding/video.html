@@ -45,7 +45,7 @@ function callout(px,py,lx,ly,label,sub,color,A){ // dot on phone + line + label
 
 /* --- scenes ---
    Line indices (script.json): 0 A title · 1–5 B voice setup (1 choir code, 3 range, 4–5 delay) ·
-   6–8 C practice screen · 9–14 D level ladder + sing it all · 15–16 E after a run (the note to fix) · 17 F home · 18–21 G try it now */
+   6–8 C practice screen · 9–14 D level ladder + sing it all · 15–16 E after a run (the note to fix) · 17 F Today (plan, status line, week) · 18–21 G try it now */
 const C2={green:'#6EE7A8'};
 function sceneA(t,A){const a=A*ease(since(0,t)/0.8);ctx.globalAlpha=a;
   // little highway motif
@@ -146,7 +146,7 @@ function sceneC(t,A){const x=170,y=110,lx=560;
     ctx.globalAlpha=1}
   // 7–8: the toggle on the pre-start screen, then tap Highway
   const kT=A*toT*(1-lap);
-  if(kT>0.01){const sel=ramp(8,0.05,t,0.25),[hx,hy]=P(277,510,x,y);
+  if(kT>0.01){const sel=ramp(8,0.05,t,0.25),[hx,hy]=P(277,478,x,y);
     ctx.globalAlpha=kT*(1-toH);ctx.strokeStyle=C.orange;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(hx+30,hy-14);ctx.lineTo(lx-8,182);ctx.stroke();
     const tap=clamp((t-L(8).start-0.04*L(8).dur)/0.7,0,1);if(tap>0&&tap<1&&toH<1){ctx.globalAlpha=kT*(1-tap)*(1-toH);ctx.lineWidth=3;ctx.beginPath();ctx.arc(hx,hy,10+30*tap,0,7);ctx.stroke()}
     ctx.globalAlpha=1;pill(lx,156,sel,kT);
@@ -181,7 +181,7 @@ function sceneD(t,A){const x=150,y=110,bx=520;
   phone('piece',x,y,A*(1-fx)*(1-mo));if(fx>0.01)phone('piece-tofix',x,y,A*fx);if(mo>0.01)phone('piece-more',x,y,A*mo);
   // 9: what's on the piece screen (gone before the level cards come in)
   const c9=A*(1-ease((t-L(10).start+0.5)/0.4));
-  callout(...P(110,492,x,y),560,380,'Passages','practice steps, level by level',C.cyan,c9*at(9,0.12,t));
+  callout(...P(110,508,x,y),560,380,'Passages','practice steps, level by level',C.cyan,c9*at(9,0.12,t));
   callout(...P(195,180,x,y),560,190,'Your path','the whole piece: sing it through at a level to earn it',C.orange,c9*at(9,0.55,t));
   // level cards; on line 12 they get compact to make room for the run below.
   // Each card has its two steps (slow, then in tempo), lit as line 10 says "first slow, then in tempo".
@@ -222,8 +222,8 @@ function sceneD(t,A){const x=150,y=110,bx=520;
     ctx.globalAlpha=1;
     // on the phone: the passages to fix (Now · Fix), then the clean-run star line
     const pr=A*fx*at(12,0.55,t)*(1-star);if(pr>0.01){ctx.globalAlpha=pr;ctx.strokeStyle=C.orange;ctx.lineWidth=3;
-      const [qx,qy]=P(26,392,x,y);rr(qx,qy,338*PH.s,216*PH.s,10);ctx.stroke();ctx.globalAlpha=1}
-    const ps=A*fx*star;if(ps>0.01){ctx.globalAlpha=ps;ctx.strokeStyle='#FFD166';ctx.lineWidth=3;const [qx,qy]=P(26,328,x,y);rr(qx,qy,338*PH.s,48*PH.s,10);ctx.stroke();ctx.globalAlpha=1}}
+      const [qx,qy]=P(26,408,x,y);rr(qx,qy,338*PH.s,216*PH.s,10);ctx.stroke();ctx.globalAlpha=1}
+    const ps=A*fx*star;if(ps>0.01){ctx.globalAlpha=ps;ctx.strokeStyle='#FFD166';ctx.lineWidth=3;const [qx,qy]=P(26,344,x,y);rr(qx,qy,338*PH.s,48*PH.s,10);ctx.stroke();ctx.globalAlpha=1}}
   // 13–14: know it already? sing it all, at any level
   const kA=A*ease((t-L(13).start+0.2)/0.45);
   if(kA>0.01){ctx.globalAlpha=kA;const yy=436,tap=clamp((t-L(14).start-0.15*L(14).dur)/0.7,0,1);
@@ -253,33 +253,35 @@ function sceneE(t,A){const x=150,y=110,bx=520;phone('results-fix',x,y,A);
     const b=A*at(16,0.8,t);if(b>0.01){ctx.globalAlpha=b;text('then sing the passage again',bx+300,yy+100,SERIF(23),C.muted,'center')}
     ctx.globalAlpha=1}}
 
-/* F: Home, every day */
-function sceneF(t,A){const x=150,y=110;phone('home',x,y,A);
-  const a1=A*at(17,0.02,t);if(a1>0.01){ctx.globalAlpha=a1;text("Today's plan",560,200,DISP(44),C.ink);
-    text('paced to your rehearsal and concert dates',560,240,SERIF(24),C.muted);ctx.globalAlpha=1}
-  callout(...P(60,357,x,y),560,330,'Days to rehearsal & concert',null,C.cyan,A*at(17,0.3,t));
-  const a2=A*at(17,0.7,t);if(a2>0.01){ctx.globalAlpha=a2;text('≈ 10 minutes a day',560,440,DISP(40),C.orange);ctx.globalAlpha=1}}
+/* F: Today (Home): the short plan with minutes, paced to the dates (status line), the week card.
+   Coordinates are css px of home.png (scrolled so the status line is at the top). */
+function sceneF(t,A){const x=150,y=110,lx=560;phone('home',x,y,A);
+  const a1=A*at(17,0.0,t);if(a1>0.01){ctx.globalAlpha=a1;text("Today's plan",lx,170,DISP(44),C.ink);
+    text('three or four steps, about 10–15 minutes',lx,208,SERIF(24),C.muted);ctx.globalAlpha=1}
+  callout(...P(674/2,168,x,y),lx,290,'Each step with its minutes',null,C.orange,A*at(17,0.18,t));
+  callout(...P(40,24,x,y),lx,370,'Paced to rehearsal & concert','“in 3 days · Concert 12 Dec · on track”',C.cyan,A*at(17,0.34,t));
+  callout(...P(200,670,x,y),lx,470,'Your week','practice days count, rehearsals too (♪)',C2.green,A*at(17,0.55,t));
+  const a2=A*at(17,0.82,t);if(a2>0.01){ctx.globalAlpha=a2;text('≈ 10–15 minutes a day',lx,575,DISP(40),C.orange);ctx.globalAlpha=1}}
 
-/* G: try it now, a two-item checklist */
+/* G: try it now, a two-item checklist (matches “Try it now” under the player: voice setup, then Start today's practice) */
 function num(cx,cy,n,col){ctx.fillStyle=col;ctx.beginPath();ctx.arc(cx,cy,28,0,7);ctx.fill();text(n,cx,cy+11,DISP(32),C.paper,'center')}
 function sceneG(t,A){const x0=210;
   const a1=A*at(18,0.22,t);if(a1>0.01){ctx.globalAlpha=a1;const yy=180;num(x0,yy,'1',C.orange);
     text('Put on headphones',x0+52,yy+12,DISP6(36),C.ink);ctx.font=DISP6(36);const w=ctx.measureText('Put on headphones').width;
     text('→',x0+70+w,yy+12,DISP6(36),C.muted);
     const bx=x0+122+w;ctx.fillStyle=C.orange;rr(bx,yy-34,330,68,16);ctx.fill();text('Start voice setup',bx+165,yy+11,DISP6(30),C.paper,'center');ctx.globalAlpha=1}
-  const a2=A*at(18,0.57,t);if(a2>0.01){ctx.globalAlpha=a2;const yy=310;num(x0,yy,'2',C.cyan);
-    let cx=x0+52;const step=(s,last)=>{cx+=chip(cx,yy-24,s,last?C.cyan:C.rule,a2,false)+12;if(!last){text('→',cx+4,yy+10,DISP6(28),C.muted);cx+=40}ctx.globalAlpha=a2};
-    step('Home');step('first piece');
-    // level button look (as on the piece screen)
-    ctx.fillStyle=C.panel;rr(cx,yy-30,250,60,12);ctx.fill();ctx.strokeStyle=C.cyan;ctx.lineWidth=2;rr(cx,yy-30,250,60,12);ctx.stroke();
-    ctx.fillStyle=C.cyan;rr(cx+10,yy-20,40,40,10);ctx.fill();text('1',cx+30,yy+10,DISP(26),C.paper,'center');
-    text('Level 1 · Notes',cx+62,yy-2,DISP6(24),C.ink);text('first passage',cx+62,yy+22,MONO(15),C.muted);ctx.globalAlpha=1}
-  const a3=A*at(20,0.05,t);if(a3>0.01){ctx.globalAlpha=a3;text('≈ 5 minutes today',W/2,430,DISP6(34),C.orange,'center');
-    text('tomorrow, Home shows your next step',W/2,470,SERIF(25),C.muted,'center');ctx.globalAlpha=1}
+  const a2=A*at(18,0.46,t);if(a2>0.01){ctx.globalAlpha=a2;const yy=310;num(x0,yy,'2',C.cyan);
+    const lab='▶  Start today’s practice';ctx.font=DISP6(30);const bw=ctx.measureText(lab).width+56,bx=x0+52;
+    ctx.fillStyle=C.orange;rr(bx,yy-34,bw,68,16);ctx.fill();text(lab,bx+28,yy+11,DISP6(30),C.paper);
+    const tap=clamp((t-L(18).start-0.6*L(18).dur)/0.7,0,1);if(tap>0&&tap<1){ctx.globalAlpha=a2*(1-tap);ctx.strokeStyle=C.ink;ctx.lineWidth=3;ctx.beginPath();ctx.arc(bx+bw-60,yy,12+34*tap,0,7);ctx.stroke()}
+    const a2b=a2*at(18,0.68,t);if(a2b>0.01){ctx.globalAlpha=a2b;text('the app picks your first passage: slow, on “doo”, with your part playing',bx,yy+70,SERIF(24),C.muted)}
+    ctx.globalAlpha=1}
+  const a3=A*at(20,0.12,t);if(a3>0.01){ctx.globalAlpha=a3;text('≈ 10 minutes today',W/2,450,DISP6(34),C.orange,'center');ctx.globalAlpha=1}
+  const a3b=A*at(20,0.53,t);if(a3b>0.01){ctx.globalAlpha=a3b;text('tomorrow, a new plan on Home',W/2,490,SERIF(25),C.muted,'center');ctx.globalAlpha=1}
   const a4=A*at(21,0.0,t);if(a4>0.01){ctx.globalAlpha=a4;text("Let's sing.",W/2,550,DISP(52),C.cyan,'center');ctx.globalAlpha=1}}
 
 const SCENES={A:sceneA,B:sceneB,C:sceneC,D:sceneD,E:sceneE,F:sceneF,G:sceneG};
-const HEAD={B:'Voice setup',C:'The practice screen',D:'The level ladder',E:'After a run',F:'Every day',G:'Try it now'};
+const HEAD={B:'Voice setup',C:'The practice screen',D:'The level ladder',E:'After a run',F:'Today',G:'Try it now'};
 
 function speakers(t){const i=lineIdx(t),l=L(i),talking=t>=l.start&&t<=l.start+l.dur;
   [['N','NORA','coach',C.nora,880],['B','BEN','singer',C.ben,1070]].forEach(s=>{const on=talking&&l.sp===s[0],x=s[4],y=34;

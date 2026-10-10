@@ -104,14 +104,14 @@
  {
   "sp": "N",
   "scene": "F",
-  "say": "Home shows today's plan, paced to your rehearsal and concert dates. Ten minutes a day is plenty.",
-  "show": "Home shows today's plan, paced to your rehearsal and concert dates. Ten minutes a day is plenty."
+  "say": "Today shows a short plan: three or four steps with minutes, paced to your rehearsal and concert. Your week counts practice days, rehearsals too. Ten to fifteen minutes a day is plenty.",
+  "show": "Today shows a short plan: three or four steps with minutes, paced to your rehearsal and concert. Your week counts practice days, rehearsals too. Ten to fifteen minutes a day is plenty."
  },
  {
   "sp": "N",
   "scene": "G",
-  "say": "So, here's what to do right now. One: put on headphones and tap Start voice setup. Two: open the first piece on Home, and sing level one of its first passage.",
-  "show": "So, here's what to do right now. 1: put on headphones and tap “Start voice setup”. 2: open the first piece on Home and sing level 1 of its first passage."
+  "say": "So, here's what to do right now. One: put on headphones and tap Start voice setup. Two: tap Start today's practice: the app picks your first passage, slow, on doo, with your part playing.",
+  "show": "So, here's what to do right now. 1: put on headphones and tap “Start voice setup”. 2: tap “Start today's practice”: the app picks your first passage, slow, on “doo”, with your part playing."
  },
  {
   "sp": "B",
@@ -122,8 +122,8 @@
  {
   "sp": "N",
   "scene": "G",
-  "say": "That's it for today. About five minutes. Tomorrow, Home shows your next step.",
-  "show": "That's it for today. About five minutes. Tomorrow, Home shows your next step."
+  "say": "That's it. About ten minutes today. Tomorrow, Home has a new plan.",
+  "show": "That's it. About ten minutes today. Tomorrow, Home has a new plan."
  },
  {
   "sp": "B",
