@@ -130,7 +130,7 @@ export function ChoirScreen() {
         <>
           <ChoirOverview />
           <section className="col choir-member" style={{ gap: 12 }} id="choir-membership" aria-labelledby="choir-membership-h">
-            <h2 id="choir-membership-h" className="eyebrow">Membership</h2>
+            <h2 id="choir-membership-h" className="h3">Membership</h2>
             <div className="card flat" data-testid="choir-card">
               <strong>{choir!.name}</strong>
               <span className="t14 muted">
