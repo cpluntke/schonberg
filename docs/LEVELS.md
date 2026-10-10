@@ -278,10 +278,12 @@ level in tempo, spread over the days left (today up to the day before).
 
 ## Singers who practised before piece levels (and before “doo”)
 
-Levels already earned are kept. Level 1 on “doo” with every note right applies to runs from now on:
-section and piece levels reached under the old 75% mark stay as they are, and nothing stored is
-rewritten (a full-run section record only gains the list of its wrong notes). Readiness and the
-leaderboard formula are unchanged.
+(History: this section describes earlier changes. For the slow / in-tempo steps, see “Progress saved
+before the steps” below, which does rewrite stored level-1 records once.)
+
+Levels already earned were kept. Level 1 on “doo” with every note right applied to runs from then on:
+passage and piece levels reached under the old 75% mark stayed as they were (a full-run record only
+gained the list of its wrong notes). Readiness and the leaderboard formula were unchanged.
 
 Their section levels stay as they were. Piece levels come only from full runs, so their pieces start
 at piece level 0. The piece screen says "Level 3 in every section. Confirm it with a full

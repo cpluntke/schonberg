@@ -174,37 +174,44 @@ export interface EntriesCheck {
   ok: boolean;
   /** Entry notes in the run. */
   entries: number;
-  /** Entries not sung at all (no onset). */
+  /** Entries not sung at all (no voice in the note). */
   missed: number;
-  /** Mean onset of the sung entries (ms after the written start, minus `offsetMs`); null when none was sung. */
+  /** Mean onset of the entries that landed in tune (ms after the written start, minus `offsetMs`); null when none did. */
   meanMs: number | null;
 }
 
 /**
  * Level 1 in tempo: the entries must each be sung and, on average, on time. Entries as analysis.ts
  * defines them: the first note (of the part, or of the run) and every note after a rest of at least
- * ENTRY_REST_SEC. Each needs an onset (`onsetMs !== null`), and their mean onset must be at most
- * LATE_MS. `offsetMs` is taken off every onset first (the part of the delay the line-up showed to be
- * the device's, on a phone without a measured delay). A run without entries passes.
+ * ENTRY_REST_SEC. Entries the scorer can't judge reliably (`unsure` and not `clearly` wrong) are left
+ * out, as level 1 forgives them. An entry is missed only when it wasn't sung at all (no voice in it,
+ * or `clearly` silent); a sung entry that never landed in tune is a pitch matter, judged by the
+ * accuracy, not here. The mean onset of the timed entries must be at most LATE_MS (2 × LATE_MS when
+ * only one entry has an onset: one late breath shouldn't fail a passage without rests). `offsetMs`
+ * is taken off every onset first (the part of the delay the line-up showed to be the device's, on a
+ * phone without a measured delay). A run without entries passes.
  */
 export function entriesOnTime(
   partNotes: readonly Pick<ScoreNote, 'start' | 'dur'>[],
-  notes: readonly Pick<NoteResult, 'index' | 'onsetMs'>[],
+  notes: readonly (Pick<NoteResult, 'index' | 'onsetMs'> & Partial<Pick<NoteResult, 'unsure' | 'clearly' | 'voicedRatio'>>)[],
   offsetMs = 0,
 ): EntriesCheck {
   const sorted = [...notes].sort((a, b) => a.index - b.index);
   const entries = sorted.filter((n, k) => {
     const i = n.index;
+    if (n.unsure && !n.clearly) return false;
     if (k === 0 || i === 0) return true;
     const prev = partNotes[i - 1];
     const cur = partNotes[i];
     if (!prev || !cur) return false;
     return cur.start - (prev.start + prev.dur) >= ENTRY_REST_SEC - 1e-6;
   });
-  const sung = entries.filter((n) => n.onsetMs !== null);
-  const missed = entries.length - sung.length;
-  const meanMs = sung.length ? sung.reduce((a, n) => a + (n.onsetMs! - offsetMs), 0) / sung.length : null;
-  const ok = entries.length === 0 || (missed === 0 && meanMs !== null && meanMs <= LATE_MS);
+  const silent = (n: (typeof entries)[number]) => n.clearly === 'silent' || (n.onsetMs === null && (n.voicedRatio ?? 0) === 0);
+  const missed = entries.filter(silent).length;
+  const timed = entries.filter((n) => n.onsetMs !== null);
+  const meanMs = timed.length ? timed.reduce((a, n) => a + (n.onsetMs! - offsetMs), 0) / timed.length : null;
+  const bound = timed.length >= 2 ? LATE_MS : 2 * LATE_MS;
+  const ok = entries.length === 0 || (missed === 0 && (meanMs === null || meanMs <= bound));
   return { ok, entries: entries.length, missed, meanMs: meanMs == null ? null : Math.round(meanMs) };
 }
 

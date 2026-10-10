@@ -116,6 +116,26 @@ describe('ladder', () => {
     expect(entriesOnTime(part, run([300, 0, 0, 300, 0, 300]), 150)).toMatchObject({ ok: true, meanMs: 150 });
     expect(entriesOnTime(part, [])).toEqual({ ok: true, entries: 0, missed: 0, meanMs: null });
   });
+  it('entriesOnTime: forgives what the scorer cannot judge; one entry gets more room', () => {
+    const part = [
+      { start: 0, dur: 1 }, { start: 1, dur: 1 }, { start: 2, dur: 1 },
+      { start: 4, dur: 0.12 }, { start: 4.12, dur: 1 },
+      { start: 6.5, dur: 1 },
+    ];
+    const n = (index: number, onsetMs: number | null, extra: object = {}) => ({ index, onsetMs, voicedRatio: 1, ...extra });
+    // A short pickup the tracker couldn't judge (no onset, unsure, not clearly wrong) is left out.
+    expect(entriesOnTime(part, [n(0, 40), n(1, 0), n(2, 0), n(3, null, { unsure: 'short' }), n(4, 0), n(5, 60)]))
+      .toMatchObject({ ok: true, entries: 2, missed: 0 });
+    // Sung but never in tune: not a missed entry (the accuracy judges the pitch).
+    expect(entriesOnTime(part, [n(0, 40), n(1, 0), n(2, 0), n(3, null, { voicedRatio: 0.8 }), n(4, 0), n(5, 60)]))
+      .toMatchObject({ ok: true, missed: 0, meanMs: 50 });
+    // Clearly silent: missed, even when unsure.
+    expect(entriesOnTime(part, [n(0, 40), n(3, null, { unsure: 'short', clearly: 'silent' }), n(5, 60)]))
+      .toMatchObject({ ok: false, missed: 1 });
+    // A passage without rests has one entry: up to 2 × LATE_MS late is still fine.
+    expect(entriesOnTime(part, [n(0, 300), n(1, 0), n(2, 0)]).ok).toBe(true);
+    expect(entriesOnTime(part, [n(0, 400), n(1, 0), n(2, 0)]).ok).toBe(false);
+  });
   it('strictness scales tolerance', () => {
     expect(strictnessFactor('forgiving')).toBe(1.3);
     expect(effectiveTolerance(1, 'slow', 'forgiving')).toBe(65);

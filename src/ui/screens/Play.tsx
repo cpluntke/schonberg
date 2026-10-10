@@ -883,7 +883,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
                     {helpable && (
                       <label className="field" data-testid="tempo">
                         <span className="t14">Tempo {Math.round(rate * 100)}%{rate < (spec?.rate ?? 1) - 1e-6 ? ' (slower than the step: practice only, won’t count)' : ''}</span>
-                        <input type="range" min={40} max={100} step={5} value={Math.round(rate * 100)} onChange={(e) => setRateOverride(Number(e.target.value) / 100 >= (spec?.rate ?? 1) - 1e-6 ? null : Number(e.target.value) / 100)} />
+                        <input type="range" min={40} max={step === 'slow' ? Math.round((spec?.rate ?? 1) * 100) : 100} step={5} value={Math.round(rate * 100)} onChange={(e) => setRateOverride(Number(e.target.value) / 100 >= (spec?.rate ?? 1) - 1e-6 ? null : Number(e.target.value) / 100)} />
                       </label>
                     )}
                     {!listenOnly && levelInfo && !cold && (

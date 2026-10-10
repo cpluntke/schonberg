@@ -267,6 +267,8 @@ export function openAt(r: Route, id: string) {
   if (href(r) === location.hash) { document.getElementById(id)?.scrollIntoView({ block: 'start' }); return; }
   anchor = id;
   go(r);
+  // A navigation that never happens (a guard kept the screen) mustn't leave the target for a later visit.
+  window.setTimeout(() => { if (anchor === id) anchor = null; }, 2000);
 }
 
 /** Once a new screen is drawn: scroll to the part asked for (openAt) when it's there, else to the top. */
