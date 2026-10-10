@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { Route } from '../router';
 import { dropGuard, go, leaveTo, practiceParent, pushGuard, useBackGuard } from '../router';
 import { getPiece, noteRangeFor, singableSections, needsPartChoice, partChoices, rememberPart } from '../library';
+import { pieceStatus } from '../plan';
 import { useMedia, useProfile, useWide } from '../hooks';
 import {
   MAX_LEVEL, OFF_BOOK_DAYS, effectiveTolerance, entriesOnTime, fixesBefore, fullRunCounts, pieceReadiness, sectionRunCounts,
@@ -736,8 +737,15 @@ function SingPlay({ route }: { route: PlayRoute }) {
                   <strong className="t16">Which part do you sing in this piece?</strong>
                   <div className="chips" role="group" aria-label="Your part in this piece">
                     {partChoices(piece, profile.voice, { low: profile.rangeLow, high: profile.rangeHigh }).map(({ part: p }) => (
-                      <button key={p.id} className="chip" aria-pressed={p.id === part.id}
-                        onClick={() => { rememberPart(piece.id, p.id); setAskPart(false); if (p.id !== part.id) go({ ...route, partId: p.id }, true); }}>{p.name}</button>
+                      <button key={p.id} className="chip" data-testid={`prerun-part-${p.id}`} onClick={() => {
+                        rememberPart(piece.id, p.id);
+                        setAskPart(false);
+                        if (p.id === part.id) return;
+                        // Another part: its own next step (its passages, level and step), not this one's.
+                        const st = pieceStatus(piece, profile.voice);
+                        if (st.next) go({ name: 'play', pieceId: piece.id, partId: st.partId, sectionId: st.next.sectionId, level: st.next.level, step: st.next.step, mode: route.mode }, true);
+                        else go({ name: 'piece', pieceId: piece.id }, true);
+                      }}>{p.name}</button>
                     ))}
                   </div>
                 </div>

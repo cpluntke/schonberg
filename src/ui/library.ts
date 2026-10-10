@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Part, Score, Section } from '../music/types';
 import { importScoreFile, PARSE_VERSION, upgradeStored } from '../music/import';
 import { computeSections } from '../music/sections';
-import { loadImportedScores, saveImportedScore, deleteImportedScore, loadCycle, saveCycle, subscribe } from '../progress/store';
+import { loadImportedScores, saveImportedScore, deleteImportedScore, loadCycle, saveCycle, subscribe, getProgress } from '../progress/store';
 import { cachedChoir, choirPieceId, localPieceId, syncChoir } from '../progress/choir';
 import { hasPieceData, movePieceData } from '../progress/rekey';
 
@@ -405,13 +405,13 @@ export function noteRangeFor(p: PieceInfo, partId: string, from: number, to: num
   return a < 0 ? null : [a, b];
 }
 
-/** Pick the part matching the singer's voice type, else the first vocal part. */
 /**
  * The parts of a piece for this voice type, highest first (Bass I before Bass II): more than one when
  * the section splits.
  */
 export function splitParts(p: PieceInfo, voice: string): Part[] {
-  const own = p.score.parts.filter((x) => x.voiceType === voice && x.notes.length);
+  // (a solo line next to the section isn't a split)
+  const own = p.score.parts.filter((x) => x.voiceType === voice && x.notes.length && !/\bsolo\b/i.test(x.name));
   const mid = (x: Part) => {
     const m = x.notes.map((n) => n.midi).sort((a, b) => a - b);
     return m[m.length >> 1] ?? 0;
@@ -420,9 +420,23 @@ export function splitParts(p: PieceInfo, voice: string): Part[] {
   return own.length > 1 ? [...own].sort((a, b) => mid(b) - mid(a) || own.indexOf(a) - own.indexOf(b)) : own;
 }
 
-/** The default part: the first of the singer's voice type (where the section splits, the upper one until they choose). */
+/** Sung parts of this piece the singer has already practised on this phone (or on a synced one). */
+function practisedParts(p: PieceInfo): Part[] {
+  return p.score.parts.filter((x) => {
+    if (x.voiceType === 'other' || !x.notes.length) return false;
+    const g = getProgress(p.id, x.id);
+    return !!g && ((g.totalAttempts ?? 0) > 0 || Object.keys(g.sections ?? {}).length > 0);
+  });
+}
+
+/**
+ * The default part: the one part already practised (before the app asked), else the first of the
+ * singer's voice type (where the section splits, the upper one until they choose).
+ */
 export function defaultPartId(p: PieceInfo, voice: string): string {
   const parts = p.score.parts;
+  const done = practisedParts(p);
+  if (done.length === 1) return done[0].id;
   return (parts.find((x) => x.voiceType === voice) ?? parts.find((x) => x.voiceType !== 'other') ?? parts[0])?.id ?? '';
 }
 
@@ -454,7 +468,8 @@ export function partChoices(p: PieceInfo, voice: string, range?: { low?: number;
  * the singer's voice type (a split section, or names the app can't read), and they haven't chosen yet.
  */
 export function needsPartChoice(p: PieceInfo, voice: string): boolean {
-  if (savedPartId(p)) return false;
+  // A choice made, or practice on exactly one part already (that is the singer's choice).
+  if (savedPartId(p) || practisedParts(p).length === 1) return false;
   const sung = p.score.parts.filter((x) => x.voiceType !== 'other' && x.notes.length);
   return sung.length > 1 && sung.filter((x) => x.voiceType === voice).length !== 1;
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { needsPartChoice, partChoices, rememberPart, chosenPartId, type PieceInfo } from './library';
 import type { Part, VoiceType } from '../music/types';
+import { progressKey, writeJSON } from '../progress/store';
 
 const part = (id: string, name: string, voiceType: VoiceType, midis: number[]): Part => ({
   id, name, voiceType, low: Math.min(...midis), high: Math.max(...midis),
@@ -55,5 +56,16 @@ describe('choosing your part in a piece', () => {
   it('without a measured range: parts named for the voice first, in score order', () => {
     expect(partChoices(poulenc, 'B').slice(0, 3).map((c) => c.part.id)).toEqual(['Bar', 'B1', 'B2']);
     expect(partChoices(poulenc, 'B')[0].fit).toBeNull();
+  });
+
+  it('a part already practised before the question counts as the choice', () => {
+    writeJSON(progressKey('p', 'B2'), { pieceId: 'p', partId: 'B2', sections: { s0: { level: 1, best: {}, attempts: 3 } }, totalAttempts: 3 });
+    expect(needsPartChoice(poulenc, 'B')).toBe(false);
+    expect(chosenPartId(poulenc, 'B')).toBe('B2');
+  });
+
+  it('a solo line next to the section is not a split', () => {
+    const solo = piece([part('AS', 'Alto Solo', 'A', [60, 62]), part('A', 'Alto', 'A', [60, 64]), part('S', 'Soprano', 'S', [67, 69])]);
+    expect(needsPartChoice(solo, 'A')).toBe(true); // still two alto lines: ask which
   });
 });
