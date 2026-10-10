@@ -1,10 +1,11 @@
 # Onboarding video source
 
 `public/media/onboarding.{mp4,webm,jpg}` are rendered from these files: a two-voice dialogue
-(Nora = coach, Ben = singer) over animated app screenshots. Current cut: about 2:37 (157 s),
+(Nora = coach, Ben = singer) over animated app screenshots. Current cut: about 2:40 (160 s),
 scenes A title · B voice setup (choir code, range check, delay) · C practice screen (score
 view with a zoom on a flat note, the Score/Highway toggle under Display & tempo, the highway, a laptop
-showing the full choir score, the bubble in every view: spot on · a touch · a little · clearly) · D passages
+showing the full choir score; how close you are: big words above the staff on the score, a small bubble on the
+highway and the laptop, spot on · a touch · a little · clearly) · D passages
 and Your path, the level ladder (5 levels: Notes on “doo”, Words, Alone, Concert, By heart; each level first
 slow, then in tempo) and "Sing it all" (a full run opens the level, a passage that slips is "to fix" and fixing
 just that bit earns the level, no second run; everything right first time = a clean-run star;
@@ -19,14 +20,17 @@ line paced to rehearsal and concert, the week card; no streak) · G "try it now"
 2. `python3 voice.py <dir>`: Kokoro TTS (kokoro-onnx, voices af_heart / am_michael; model files
    in `/tmp/kokoro`) → `narration.wav` + `timeline.json`.
 3. Fresh screenshots (phone: 390×844 CSS px at deviceScaleFactor 2 → 780×1688) into `<dir>/img/`.
-   `shoot/` takes all but the setup ones from the dev server (`npx vite --port 5191`, then from `<dir>`:
-   `node .../shoot/shoot-piece.cjs`, `node .../shoot/shoot-rest.cjs toggle|score 8|highway 9.5|fix|laptop 14`, `node .../shoot/shoot-today.cjs`;
+   `shoot/` takes them all from the dev server (`npx vite --port 5191`, then from `<dir>`:
+   `node .../shoot/shoot-setup.cjs` (needs a server started with `VITE_CHOIR_URL` set, any URL, so the
+   choir step shows the code field; restart without it for the rest), `node .../shoot/shoot-piece.cjs`, `node .../shoot/shoot-rest.cjs toggle|score 8|highway 9.5|fix|laptop 14`, `node .../shoot/shoot-today.cjs`;
    `BASE=http://localhost:PORT` for another port;
    they import the scores from `library/scores/` and print element boxes in css px, which is what
    `video.html` uses for callouts, boxes and the zoom):
-   - `setup-choir`, `setup-range`, `setup-delay` (voice setup, unchanged by the practice UI);
+   - `setup-choir` (the code typed, not joined), `setup-range` (going up, round 2 “Your turn”, the first
+     round ✓: the script sings each pattern back with the fake mic's oscillator), `setup-delay` (the
+     count-in “3”);
    - `practice-score` (Locus iste, soprano, Level 1 slow, `?simulate=flat`: the blue ink just under the
-     first note, the bubble says “a little”), `practice-highway` (the same after choosing Highway),
+     first note, the readout above the staff says “C · a little flat ↓”), `practice-highway` (the same after choosing Highway),
      `practice-toggle` (the pre-run card with Display & tempo open on the Score/Highway toggle);
    - `piece` (Debussy “Dieu!”, alto, fresh user: Your path with the level meter and the passages),
      `piece-more` (More ways to practise open on the Sing it all card), `piece-tofix` (after a clean full

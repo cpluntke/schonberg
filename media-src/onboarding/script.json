@@ -50,8 +50,8 @@
  {
   "sp": "N",
   "scene": "C",
-  "say": "Switch to Highway, under Display and tempo. Your notes become bars scrolling toward a line, and you keep the blue line on them. On a laptop, you see the whole choir score, with your line highlighted. In every view, the little bubble tells you how close you are, from spot on to clearly flat.",
-  "show": "Switch to “Highway” under Display & tempo. Your notes become bars scrolling toward a line, and you keep the blue line on them. On a laptop, you see the whole choir score, with your line highlighted. In every view, the little bubble tells you how close you are, from spot on to clearly flat."
+  "say": "Switch to Highway, under Display and tempo. Your notes become bars scrolling toward a line, and you keep the blue line on them. On a laptop, you see the whole choir score, with your line highlighted. On the sheet music, big words above the staff tell you how close you are, from spot on to clearly flat; on the highway, a little bubble does.",
+  "show": "Switch to “Highway” under Display & tempo. Your notes become bars scrolling toward a line, and you keep the blue line on them. On a laptop, you see the whole choir score, with your line highlighted. On the sheet music, big words above the staff tell you how close you are, from spot on to clearly flat; on the highway, a little bubble does."
  },
  {
   "sp": "N",
@@ -122,8 +122,8 @@
  {
   "sp": "N",
   "scene": "G",
-  "say": "That's it. About ten minutes today. Tomorrow, Home has a new plan.",
-  "show": "That's it. About ten minutes today. Tomorrow, Home has a new plan."
+  "say": "That's it. About ten minutes today. Tomorrow, the Today tab has a new plan.",
+  "show": "That's it. About ten minutes today. Tomorrow, the Today tab has a new plan."
  },
  {
   "sp": "B",
