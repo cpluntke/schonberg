@@ -20,8 +20,10 @@ import { mistakeSpots, type Spot } from '../play/mistakeSpots';
 import { drawMistakes, layoutMistakes, type MistakeMark, type MistakeOpts } from '../play/mistakeScore';
 import { faultOf, noteFault, type FaultKind } from '../play/noteFault';
 import { IconPlay } from '../icons';
+import { useCanvasGeneration } from '../theme';
 
-const STAFF_BG = '#0F1226';
+/** Behind the snippets: the score view's ground (palette.ts; CSS token --canvas). */
+const STAFF_BG = 'var(--canvas)';
 const CARD_PAD = 10;
 /** Staff space of the snippets (px): as large as fits, never smaller (then they scroll sideways). */
 const SP_MINI: [number, number] = [6.5, 8.5];
@@ -107,6 +109,7 @@ export function SnippetCanvas({ piece, part, spot, marks, opts, fonts, label }: 
   /** Width last drawn (to keep the scroll position when the size changes). */
   const lastW = useRef(0);
   const spKey = Array.isArray(opts.sp) ? opts.sp.join('-') : String(opts.sp);
+  const theme = useCanvasGeneration();
   useLayoutEffect(() => {
     const cv = ref.current;
     const c = cv?.getContext('2d');
@@ -133,7 +136,7 @@ export function SnippetCanvas({ piece, part, spot, marks, opts, fonts, label }: 
     }
     lastW.current = V.W;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [piece, part, spot, marks, spKey, opts.fitWidth, opts.notation, opts.names, fonts]);
+  }, [piece, part, spot, marks, spKey, opts.fitWidth, opts.notation, opts.names, fonts, theme]);
   return <canvas ref={ref} role="img" aria-label={label} style={{ display: 'block' }} />;
 }
 
@@ -173,13 +176,13 @@ function Legend() {
     <div className="row wrap tiny muted" style={{ gap: '4px 12px' }} data-testid="mistake-legend">
       <span className="row" style={{ gap: 5 }}>
         <svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true">
-          <ellipse cx="9" cy="7" rx="7.5" ry="5.8" fill="none" stroke="#FF5D73" strokeWidth="1.5" />
-          <ellipse cx="9" cy="7" rx="3.6" ry="2.6" fill="#FF5D73" transform="rotate(-20 9 7)" />
+          <ellipse cx="9" cy="7" rx="7.5" ry="5.8" fill="none" style={{ stroke: 'var(--bad)' }} strokeWidth="1.5" />
+          <ellipse cx="9" cy="7" rx="3.6" ry="2.6" style={{ fill: 'var(--bad)' }} transform="rotate(-20 9 7)" />
         </svg>
         the note to fix
       </span>
       <span className="row" style={{ gap: 5 }}>
-        <svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M2 7h14" stroke="#FFB08F" strokeWidth="3" strokeLinecap="round" /></svg>
+        <svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M2 7h14" style={{ stroke: 'var(--accent-text)' }} strokeWidth="3" strokeLinecap="round" /></svg>
         where you sang it
       </span>
       <span>↓ flat · ↑ sharp (100 cents = a semitone)</span>
@@ -364,7 +367,7 @@ export function MistakeScore({ piece, part, notes, tol, level, step: runStep, fr
         {fk >= 0 && focusCard(fk)}
         {rest.length > 0 && (
           <>
-            <h2 style={{ fontSize: 16, marginTop: fk >= 0 ? 6 : 0 }}>{fk >= 0 ? 'Also to fix' : 'What to fix'}</h2>
+            <h2 style={{ fontSize: '1rem', marginTop: fk >= 0 ? 6 : 0 }}>{fk >= 0 ? 'Also to fix' : 'What to fix'}</h2>
             <Legend />
             {rest.map(spotCard)}
           </>
@@ -474,11 +477,11 @@ function ZoomView({ title, onClose, canvas, children }: {
         padding: 'calc(10px + var(--safe-top)) 16px calc(16px + var(--safe-bottom))', overflowY: 'auto', overflowX: 'hidden',
       }}>
       <div className="row between" style={{ gap: 8 }}>
-        <strong style={{ fontSize: 17 }}>{title}</strong>
+        <strong style={{ fontSize: '1.0625rem' }}>{title}</strong>
         <div className="row" style={{ gap: 4 }}>
-          <button className="icon-btn filled" aria-label="Smaller" onClick={() => step(1 / 1.25)} disabled={sp <= SP_ZOOM.min} style={{ fontSize: 22 }}>−</button>
-          <button className="icon-btn filled" aria-label="Bigger" onClick={() => step(1.25)} disabled={sp >= SP_ZOOM.max} style={{ fontSize: 22 }}>+</button>
-          <button ref={closeRef} className="icon-btn" aria-label="Close" onClick={onClose} data-testid="mistake-zoom-close" style={{ fontSize: 22 }}>✕</button>
+          <button className="icon-btn filled" aria-label="Smaller" onClick={() => step(1 / 1.25)} disabled={sp <= SP_ZOOM.min} style={{ fontSize: '1.375rem' }}>−</button>
+          <button className="icon-btn filled" aria-label="Bigger" onClick={() => step(1.25)} disabled={sp >= SP_ZOOM.max} style={{ fontSize: '1.375rem' }}>+</button>
+          <button ref={closeRef} className="icon-btn" aria-label="Close" onClick={onClose} data-testid="mistake-zoom-close" style={{ fontSize: '1.375rem' }}>✕</button>
         </div>
       </div>
       <div ref={scrollRef} style={{ overflow: 'auto', touchAction: 'pan-x pan-y', borderRadius: 12, background: STAFF_BG, flex: 'none', maxHeight: '62vh', width: '100%' }}>

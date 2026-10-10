@@ -10,12 +10,15 @@
 import { pitchShort } from '../../game/pitchwords';
 import { F_CLEF, G_CLEF, GLYPH_UNITS_PER_SPACE } from './clefGlyphs';
 import type { KeySig, NoteSpelling, Part, Score, TempoEvent } from '../../music/types';
-import type { Grade, PitchSample } from '../../game/types';
+import type { PitchSample } from '../../game/types';
 import { beatToTime, timeToBeat } from '../../music/time';
 import { keyHint, movesWithKey, noteLabel, spellNote, type NotationMode } from '../../game/notation';
 import { keyAtBeatIn } from '../../music/keymarks';
 import { nameKeysOf, nameKeysSig } from '../../progress/keymarks';
-import { COLORS, wordInitial, type DrawState } from './highway2d';
+import { wordInitial, type DrawState } from './highway2d';
+import { COLORS, INK, STAFF_GRADE, TRACE_COLORS, canvasGeneration, fpx } from './palette';
+
+export { INK, STAFF_GRADE } from './palette';
 
 const EPS = 0.01;
 const mod = (n: number, m: number) => ((n % m) + m) % m;
@@ -1107,29 +1110,9 @@ function roundRect(c: Ctx, x: number, y: number, w: number, h: number, r: number
 // ---------------------------------------------------------------------------------------------
 // Drawing
 
-export const INK = {
-  staff: '#5B638F',
-  bar: '#7E86B4',
-  note: '#E8EBFF',
-  clef: '#B9C0E6',
-  lyric: '#D5DAF5',
-  lyricPast: '#7C84AE',
-  barNo: '#8790BC',
-  outTune: '#FFB08F',
-  rest: '#8A93C2',
-  traceRest: '#8C96CC',
-};
-
-/**
- * Colour of a sung note on the staff by its grade: blue when sung well, yellow when close ("ok"),
- * red when missed. (The highway's dark "ok" blue all but disappears as a thin notehead.)
- */
-export const STAFF_GRADE: Record<Grade, string> = {
-  perfect: COLORS.voice,
-  good: COLORS.voice,
-  ok: '#F2D15C',
-  miss: COLORS.miss,
-};
+// INK (the engraver's colours) and STAFF_GRADE (blue when sung well, yellow when close, red when
+// missed: the highway's dark "ok" blue all but disappears as a thin notehead) live in palette.ts,
+// with their light-theme versions.
 
 // Lyric and bar-number widths depend on the web fonts: lay out again once they have loaded.
 let fontGen = 0;
@@ -1141,8 +1124,9 @@ try {
     fonts.addEventListener?.('loadingdone', bump);
   }
 } catch { /* no font loading API */ }
-/** Bumped when web fonts finish loading (text widths change: lay out again). */
-export const fontGeneration = () => fontGen;
+/** Bumped when web fonts finish loading (text widths change: lay out again), and with the canvas
+ *  theme or text size (palette.ts: colours of cached layers, sizes of the words). */
+export const fontGeneration = () => `${fontGen}.${canvasGeneration()}`;
 
 // ---------------------------------------------------------------------------------------------
 // Per-system geometry (static for a layout; y relative to the middle staff line, down = +)
@@ -1421,8 +1405,11 @@ export function lyricFontFor(sp: number) {
   return `600 ${lyricPx(sp)}px "Bricolage Grotesque", system-ui, sans-serif`;
 }
 
-const lyricPx = (sp: number) => Math.round(Math.max(11, Math.min(15, sp * 1.45)));
-const namePx = (sp: number) => Math.round(Math.max(10, Math.min(13, sp * 1.1)));
+// (Phones: a staff space of 14 px gives 15 px note names and 18 px words; laptops' full score keeps
+// its 10–11 px. Both grow with Settings → Display → Text size.)
+// (a phone-sized staff, 12 px spaces and up, never has names under 15 px or words under 16 px)
+const lyricPx = (sp: number) => fpx(Math.max(sp >= 12 ? 16 : 11, Math.min(18, sp * 1.3)));
+const namePx = (sp: number) => fpx(Math.max(sp >= 12 ? 15 : 10, Math.min(17, sp * 1.1)));
 
 /** Note names: a little smaller than the words, in their own row between the staff and the words. */
 export function nameFontFor(sp: number) {
@@ -1465,17 +1452,26 @@ export function nameMeasure(c: Ctx, font: string, notation: NotationMode): NameW
   };
 }
 
-/** Staff-space size: a portrait phone gets fewer but bigger systems (filling the height), so the
- *  sung line's height against the notes reads; landscape shows two systems. */
+/** A phone held upright (its canvas can be about square on a small phone under big text), or a tall view. */
+export const uprightView = (W: number, H: number) => (W < 600 ? H > W * 0.6 : H > W * 1.15);
+
+/** Staff-space size: a portrait phone gets two big systems (or two rows of the scrolling line), filling
+ *  the height, so the sung line's height against the notes reads and the note names are 15 px+
+ *  (a 390 px phone: 15 px spaces, a 60 px staff); landscape shows two smaller systems. */
 export function staffSpace(W: number, H: number, perSys: number): { sp: number; floor: number } {
-  const portrait = H > W * 1.15;
-  const sp = Math.max(6.5, Math.min(portrait ? 15 : 12, (H - 8) / ((portrait ? 3 : 2) * perSys), W / (portrait ? 33 : 44)));
+  if (uprightView(W, H)) {
+    // (two systems when they fit at a 12 px staff space; a small phone with big text: one, larger)
+    const two = (H - 8) / (2 * perSys);
+    const sp = Math.max(6.5, Math.min(16, W / 26, two >= 12 ? two : (H - 8) / perSys));
+    return { sp, floor: Math.max(6.5, Math.min(sp, W / 34)) };
+  }
+  const sp = Math.max(6.5, Math.min(12, (H - 8) / (2 * perSys), W / 44));
   return { sp, floor: Math.max(6.5, Math.min(sp, W / 44)) };
 }
 
 function getLayout(c: Ctx, W: number, H: number, s: DrawState): Cached {
   const names = namesOn(s);
-  const key = `${s.score.id}|${s.part.id}|${s.part.notes.length}|${s.from}|${s.to}|${W}|${H}|${fontGen}|${names ? s.notation : '-'}|${s.notation}|${nameKeysSig(s.score)}|${s.scroll ? 'scroll' : 'page'}`;
+  const key = `${s.score.id}|${s.part.id}|${s.part.notes.length}|${s.from}|${s.to}|${W}|${H}|${fontGeneration()}|${names ? s.notation : '-'}|${s.notation}|${nameKeysSig(s.score)}|${s.scroll ? 'scroll' : 'page'}`;
   if (cache && cache.key === key) return cache;
   const [m0, m1] = measureSpan(s.score, s.from, s.to);
   const clef = clefFor(s.part);
@@ -1614,17 +1610,17 @@ const SMOOTH_SEC = 1.2;
 const SMOOTH_N = 16;
 
 /** The pinned start of a scrolling line: staff lines, clef and the key (and time) in force at `beat`. */
-export function drawPinned(c: Ctx, g: Pick<SysGeo, 'top' | 'mid'>, layout: Pick<StaffLayout, 'sp' | 'clef'>, first: StaffSystem, key: KeySig, s: Pick<DrawState, 'score' | 'notation'>, showTime: boolean, H: number) {
+export function drawPinned(c: Ctx, g: Pick<SysGeo, 'top' | 'mid'>, layout: Pick<StaffLayout, 'sp' | 'clef'>, first: StaffSystem, key: KeySig, s: Pick<DrawState, 'score' | 'notation'>, showTime: boolean, H: number, y0 = 0) {
   const sp = layout.sp;
   const w = first.prefixEnd;
   c.fillStyle = COLORS.bg;
-  c.fillRect(0, 0, w, H);
+  c.fillRect(0, y0, w, H - y0);
   // Soft edge where the music slides under the clef.
   const grad = c.createLinearGradient(w, 0, w + 1.6 * sp, 0);
   grad.addColorStop(0, COLORS.bg);
-  grad.addColorStop(1, 'rgba(15,18,38,0)');
+  grad.addColorStop(1, COLORS.bgClear);
   c.fillStyle = grad;
-  c.fillRect(w, 0, 1.6 * sp, H);
+  c.fillRect(w, y0, 1.6 * sp, H - y0);
   const pin: StaffSystem = {
     ...first, cont: false, measures: [], x1: w, key, cancelFifths: 0,
     timeSig: showTime ? (first.measures[0]?.sm.timeSig ?? null) : null,
@@ -1684,7 +1680,7 @@ export function drawStaff2D(c: Ctx, W: number, H: number, s: DrawState) {
     const px = beat < sys.startBeat ? sys.prefixEnd - 0.2 * sp : xAtBeat(sys, beat);
     const yTop = cur.top - Math.max(1.5, L.above - 1.2) * sp;
     const yBot = cur.top + (4 + L.lyricOff - 1.4) * sp;
-    c.fillStyle = 'rgba(238,240,255,0.85)';
+    c.fillStyle = COLORS.playhead;
     c.fillRect(Math.round(px) - 1, yTop, 2, yBot - yTop);
     c.beginPath();
     c.moveTo(px - 0.55 * sp, yTop - 0.6 * sp);
@@ -1706,7 +1702,12 @@ function drawStaffScroll(c: Ctx, W: number, H: number, s: DrawState) {
   if (!systems.length) return;
   const beat = timeToBeat(s.score.tempos, s.pos);
   const { off, px, k } = scrollOffset(systems, beat, W, sp, { tempos: s.score.tempos, pos: s.pos });
-  const top = Math.round(Math.max(4, (H - L.band) / 2) + L.above * sp);
+  // A tall phone: the line goes on in a second row underneath, what comes after the right edge
+  // (both rows glide together), so the next bars are in view at a staff size that reads.
+  const rows = uprightView(W, H) && H - 8 >= 2 * L.band ? 2 : 1;
+  const gap = rows === 2 ? Math.min(0.3 * L.band, (H - 8 - 2 * L.band) / 3) : 0;
+  const block = rows * L.band + gap;
+  const top = Math.round(Math.max(4, (H - block) / 2) + L.above * sp);
 
   const notes = s.part.notes;
   const [ra, rb] = s.range ?? [0, -1];
@@ -1732,7 +1733,7 @@ function drawStaffScroll(c: Ctx, W: number, H: number, s: DrawState) {
   const cur = geos.find((g) => g.j === k) ?? geos[0];
   const yTop = top - Math.max(1.5, L.above - 1.2) * sp;
   const yBot = top + (4 + L.lyricOff - 1.4) * sp;
-  c.fillStyle = 'rgba(238,240,255,0.85)';
+  c.fillStyle = COLORS.playhead;
   c.fillRect(Math.round(px) - 1, yTop, 2, yBot - yTop);
   c.beginPath();
   c.moveTo(px - 0.55 * sp, yTop - 0.6 * sp);
@@ -1745,7 +1746,30 @@ function drawStaffScroll(c: Ctx, W: number, H: number, s: DrawState) {
     drawBubble(c, cur, s, L, px, off + W - 0.5 * sp);
   }
   c.restore();
-  drawPinned(c, { top, mid: top + 2 * sp }, layout, systems[0], keyAtBeat(s.score, beat), s, off < 1, H);
+  let split = H;
+  if (rows === 2) {
+    // Row 2: the line from row 1's right edge on, notes only (no voice, no playhead).
+    const off2 = off + W - pinned;
+    const top2 = top + L.band + gap;
+    split = Math.round(top2 - L.above * sp - gap / 2);
+    let key2: KeySig | null = null;
+    c.save();
+    c.translate(-off2, 0);
+    for (let j = 0; j < systems.length; j++) {
+      const sy = systems[j];
+      if (sy.x1 - off2 < pinned - 2 * sp || sy.prefixEnd - off2 > W + 2 * sp) continue;
+      if (!key2 && sy.x1 - off2 > pinned) key2 = sy.key;
+      drawSystem(c, { j, sys: sy, sd: sysDraw(L, j, s), top: top2, mid: top2 + 2 * sp }, layout, L, s, v);
+    }
+    c.restore();
+    if (key2) drawPinned(c, { top: top2, mid: top2 + 2 * sp }, layout, systems[0], key2, s, false, H, split);
+    else {
+      // (past the end of the music: nothing in row 2)
+      c.fillStyle = COLORS.bg;
+      c.fillRect(0, split, W, H - split);
+    }
+  }
+  drawPinned(c, { top, mid: top + 2 * sp }, layout, systems[0], keyAtBeat(s.score, beat), s, off < 1, split);
   void k;
 }
 
@@ -1784,7 +1808,7 @@ export function drawStaffFrame(c: Ctx, g: Pick<SysGeo, 'sys' | 'top' | 'mid'>, l
   }
 
   // Barlines + numbers.
-  const numFont = `600 ${Math.round(Math.max(9, sp * 0.95))}px "JetBrains Mono", monospace`;
+  const numFont = `600 ${fpx(Math.max(10, sp * 0.95))}px "JetBrains Mono", monospace`;
   for (let mi = 0; mi < sys.measures.length; mi++) {
     const m = sys.measures[mi];
     const last = mi === sys.measures.length - 1;
@@ -1800,8 +1824,8 @@ export function drawStaffFrame(c: Ctx, g: Pick<SysGeo, 'sys' | 'top' | 'mid'>, l
     const hint = o.numbers && m.sm.nameChange && movesWithKey(s.notation) ? keyHint(s.notation, m.sm.nameKey) : null;
     if (hint) {
       const hx = nx + (m.sm.number !== '0' ? c.measureText(m.sm.number).width + 0.5 * sp : 0);
-      c.font = `700 ${Math.round(Math.max(10, sp * 1.05))}px system-ui, sans-serif`;
-      const fs = Math.max(10, sp * 1.05);
+      const fs = fpx(Math.max(11, sp * 1.05));
+      c.font = `700 ${fs}px system-ui, sans-serif`;
       // (on a backdrop: high notes' stems and beams can reach up here)
       c.fillStyle = COLORS.bg;
       c.globalAlpha = 0.85;
@@ -2114,7 +2138,6 @@ const TR_HIDE = -1;
 const TR_REST = 0;
 const TR_IN = 1;
 const TR_OUT = 2;
-const TRACE_COLORS = [INK.traceRest, COLORS.voice, INK.outTune];
 /** Half-width (s) of the trace's smoothing window. */
 const SMOOTH = 0.09;
 
@@ -2248,7 +2271,7 @@ export function drawTrace(c: Ctx, g: SysGeo, s: DrawState, L: Cached, beatNow: n
     let color = -2;
     let prevQ = -1;
     c.beginPath();
-    if (pass === 0) c.strokeStyle = 'rgba(15,18,38,0.85)';
+    if (pass === 0) c.strokeStyle = COLORS.traceHalo;
     for (let q = lo; q < end; q++) {
       const col = tr.col[q];
       if (col === TR_HIDE || tr.sys[q] !== g.j) {
@@ -2311,7 +2334,7 @@ export function drawBubble(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: numbe
     const yMax = g.top + (4 + (L.nameOff ?? L.lyricOff) - 1.5) * sp;
     py = Math.max(yMin, Math.min(yMax, g.mid - ((step - L.layout.mid) * sp) / 2));
   }
-  c.fillStyle = 'rgba(76,201,240,0.28)';
+  c.fillStyle = COLORS.voiceHalo;
   c.beginPath();
   c.arc(px, py, Math.max(6, 0.75 * sp), 0, Math.PI * 2);
   c.fill();
@@ -2319,7 +2342,8 @@ export function drawBubble(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: numbe
   c.beginPath();
   c.arc(px, py, Math.max(3, 0.32 * sp), 0, Math.PI * 2);
   c.fill();
-  if (heard < 0 || (s.hide && s.hide(heard) !== 'show' && notes[heard].start + notes[heard].dur > s.pos)) return;
+  // (the screen shows the reading in big words itself: Play's live readout)
+  if (s.readout || heard < 0 || (s.hide && s.hide(heard) !== 'show' && notes[heard].start + notes[heard].dur > s.pos)) return;
   const target = notes[heard].midi;
   let sum = 0;
   let cnt = 0;
@@ -2335,10 +2359,12 @@ export function drawBubble(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: numbe
   if (Math.abs(cents) > 600) cents = ((cents % 1200) + 1800) % 1200 - 600;
   const rc = Math.round(Math.abs(cents));
   const txt = pitchShort(rc === 0 ? 0 : cents);
-  c.font = '600 12px "JetBrains Mono", monospace';
+  const fs = fpx(12);
+  c.font = `600 ${fs}px "JetBrains Mono", monospace`;
   c.textBaseline = 'middle';
   c.textAlign = 'left';
   const bw = textWidth(c, L, c.font, txt) + 14;
+  const bh = fs + 10;
   // Above the notes next to the top of the playhead (right, else left), clear of any stem or beam
   // there: it never hides the notes you're about to sing.
   const bandTop = g.top - L.above * sp + 12;
@@ -2361,8 +2387,8 @@ export function drawBubble(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: numbe
   }
   by = Math.max(bandTop, by);
   const ok = Math.abs(cents) <= s.tolerance;
-  c.fillStyle = '#0B0D1A';
-  roundRect(c, bx, by - 11, bw, 22, 7);
+  c.fillStyle = COLORS.bubble;
+  roundRect(c, bx, by - bh / 2, bw, bh, 7);
   c.fill();
   c.strokeStyle = ok ? COLORS.voice : COLORS.target;
   c.lineWidth = 1;

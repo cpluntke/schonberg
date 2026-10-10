@@ -37,12 +37,12 @@ export function Expert() {
   }
 
   return (
-    <main className="screen wide expert-screen" style={{ background: '#0C0A1F' }}>
+    <main className="screen wide expert-screen" style={{ background: 'var(--expert-ground)' }}>
       <div className="topbar">
         <button className="icon-btn" aria-label="Back" onClick={() => back({ name: 'train' })}><IconBack /></button>
         <div className="grow col" style={{ gap: 0 }}>
-          <h1 style={{ fontSize: 20 }}>Expert mode</h1>
-          <span className="small" style={{ color: '#B8B0E0' }}>Atonal training: no key, no tonic to lean on</span>
+          <h1 style={{ fontSize: '1.25rem' }}>Expert mode</h1>
+          <span className="small" style={{ color: 'var(--expert-muted)' }}>Atonal training: no key, no tonic to lean on</span>
         </div>
         <span className="badge expert">×3</span>
       </div>
@@ -52,26 +52,26 @@ export function Expert() {
       <section className="card expert">
         <div className="row between">
           <strong>Zwölfton of the day</strong>
-          <span className="tiny" style={{ color: '#B8B0E0' }}>same row for the whole choir today</span>
+          <span className="tiny" style={{ color: 'var(--expert-muted)' }}>same row for the whole choir today</span>
         </div>
-        <div className="seg" role="group" aria-label="Row form" style={{ background: '#221E4A' }}>
+        <div className="seg" role="group" aria-label="Row form" style={{ background: 'var(--expert-surface)' }}>
           {Object.keys(forms).map((f) => (
-            <button key={f} aria-pressed={form === f} onClick={() => setForm(f)} style={form === f ? { background: '#B3A6FF' } : undefined}>{f}</button>
+            <button key={f} aria-pressed={form === f} onClick={() => setForm(f)} style={form === f ? { background: 'var(--expert)', borderColor: 'var(--expert)' } : undefined}>{f}</button>
           ))}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, minmax(0, 1fr))', gap: 3 }}>
           {(forms[form] ?? row).map((pc, i) => (
-            <div key={i} style={{ height: 48, borderRadius: 8, background: '#221E4A', color: '#D4CCFF', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-              <span className="mono" style={{ fontWeight: 600, fontSize: 14 }}>{sym(pc)}</span>
-              <span style={{ fontSize: 10 }}>{NAMES[pc]}</span>
+            <div key={i} style={{ height: 48, borderRadius: 8, background: 'var(--expert-surface)', color: 'var(--expert-text)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <span className="mono" style={{ fontWeight: 600, fontSize: '0.875rem' }}>{sym(pc)}</span>
+              <span style={{ fontSize: '0.8125rem' }}>{NAMES[pc]}</span>
             </div>
           ))}
         </div>
-        <span className="small" style={{ color: '#D4CCFF' }}>P = prime, R = retrograde, I = inversion, RI = retrograde inversion. Set to your range ({letterName(lo)}–{letterName(hi)}).</span>
+        <span className="small" style={{ color: 'var(--expert-text)' }}>P = prime, R = retrograde, I = inversion, RI = retrograde inversion. Set to your range ({letterName(lo)}–{letterName(hi)}).</span>
         <div className="row wrap">
           <button className="btn small" onClick={() => playRow(2, '2d')}>With guide tone</button>
           <button className="btn small" onClick={() => playRow(4, '2d')}>No help</button>
-          <button className="btn small" onClick={() => playRow(3, '3d')}><IconCube size={16} color="#B3A6FF" /> Arcade</button>
+          <button className="btn small" onClick={() => playRow(3, '3d')}><IconCube size={16} color="var(--expert)" /> Arcade</button>
         </div>
       </section>
 
@@ -79,17 +79,17 @@ export function Expert() {
         <strong>Leap drill from your repertoire</strong>
         {drillPairs.length ? (
           <>
-            <span className="small" style={{ color: '#D4CCFF' }}>The {drillPairs.length} hardest intervals in your parts of this cycle, one per bar.</span>
+            <span className="small" style={{ color: 'var(--expert-text)' }}>The {drillPairs.length} hardest intervals in your parts of this cycle, one per bar.</span>
             <div className="col" style={{ gap: 4 }}>
               {drillPairs.slice(0, 6).map((l, i) => (
-                <div key={i} className="row small"><span className="mono" style={{ width: 52, color: '#B3A6FF' }}>{l.label}</span><span className="muted ellipsis">{l.where}</span></div>
+                <div key={i} className="row small"><span className="mono" style={{ width: 52, color: 'var(--expert)' }}>{l.label}</span><span className="muted ellipsis">{l.where}</span></div>
               ))}
               {drillPairs.length > 6 && <span className="tiny muted">+ {drillPairs.length - 6} more</span>}
             </div>
             <div className="row wrap">
-              <button className="btn small" onClick={() => playLeaps(1, '2d')}><IconPlay size={16} color="#EEF0FF" /> Slow, with guide</button>
+              <button className="btn small" onClick={() => playLeaps(1, '2d')}><IconPlay size={16} /> Slow, with guide</button>
               <button className="btn small" onClick={() => playLeaps(3, '2d')}>Without guide</button>
-              <button className="btn small" onClick={() => playLeaps(3, '3d')}><IconCube size={16} color="#B3A6FF" /> Arcade</button>
+              <button className="btn small" onClick={() => playLeaps(3, '3d')}><IconCube size={16} color="var(--expert)" /> Arcade</button>
             </div>
           </>
         ) : (

@@ -116,7 +116,7 @@ export function ChoirInsights() {
                   gap: 6, padding: 6, borderRadius: 10, minWidth: 0,
                   border: `1px solid ${need === v ? 'var(--accent)' : 'var(--line)'}`, background: need === v ? 'var(--accent-soft)' : 'transparent',
                 }}>
-                  <span className="eyebrow" style={{ fontSize: 10, letterSpacing: '0.04em', overflowWrap: 'break-word', color: need === v ? 'var(--accent-text)' : undefined }}>
+                  <span className="eyebrow" style={{ fontSize: '0.8125rem', letterSpacing: '0.04em', overflowWrap: 'break-word', color: need === v ? 'var(--accent-text)' : undefined }}>
                     {COLUMN[v] ?? v}{need === v && <span style={{ display: 'block' }}>needs time</span>}
                   </span>
                   <Cell p={cols[v]} minGroup={view.minGroup} />
@@ -127,7 +127,7 @@ export function ChoirInsights() {
                       <div className="col" style={{ gap: 4 }}>
                         <span className="tiny">Hardest: {cols[v]!.hardest!.map((h) => label(h.bar)).join(', ')}</span>
                         {part && loopGroups(cols[v]!.hardest!.map((h) => h.bar)).slice(0, 2).map(([a, b]) => (
-                          <button key={a} className="btn small ghost" style={{ minHeight: 36, padding: '0 6px', fontSize: 12 }} onClick={() => loopBars(piece, part.id, a, b)}>
+                          <button key={a} className="btn small ghost" style={{ minHeight: 44, padding: '0 8px', fontSize: '0.875rem' }} onClick={() => loopBars(piece, part.id, a, b)}>
                             Loop {a === b ? label(a) : `${label(a)}–${label(b)}`}
                           </button>
                         ))}

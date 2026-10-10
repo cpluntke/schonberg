@@ -69,7 +69,7 @@ export function PlanCard({ plan, status, labOn, secondary, rehearsalTime, starte
   const mins = plan.minutes;
   const start = () => startToday(labOn);
   const btn = `btn block start-today${secondary ? '' : ' primary'}`;
-  const icon = <IconPlay size={18} {...(secondary ? { color: '#FF7A45' } : {})} />;
+  const icon = <IconPlay size={18} {...(secondary ? { color: 'var(--accent)' } : {})} />;
   const at = status.next >= 0 ? status.next + 1 : 1;
   const finish = going && <button className="link" data-testid="finish-today-home" onClick={() => finishToday()}>Finish for today</button>;
   if (plan.mode === 'rehearsal') {

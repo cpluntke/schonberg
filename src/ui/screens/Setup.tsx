@@ -176,18 +176,18 @@ export function Setup() {
         <>
           <h1 className="hero">Headphones &amp; delay</h1>
           <div className="card">
-            <div className="row"><IconCheck color="#4CC9F0" /><span><strong>Put on headphones.</strong> <span className="muted small">Wired is best. Without them the mic hears the other voices.</span></span></div>
-            <div className="row"><IconCheck color="#4CC9F0" /><span><strong>Measure the delay.</strong> <span className="muted small">You'll hear 6 clicks. Sing a short “ta” exactly on each click.</span></span></div>
+            <div className="row"><IconCheck color="var(--voice)" /><span><strong>Put on headphones.</strong> <span className="muted small">Wired is best. Without them the mic hears the other voices.</span></span></div>
+            <div className="row"><IconCheck color="var(--voice)" /><span><strong>Measure the delay.</strong> <span className="muted small">You'll hear 6 clicks. Sing a short “ta” exactly on each click.</span></span></div>
           </div>
           <div className="card" style={{ alignItems: 'center' }}>
             {lat.state === 'running' ? (
               <>
-                <span className="tuner-note" style={{ fontSize: 64 }}>{lat.beat || '…'}</span>
+                <span className="tuner-note" style={{ fontSize: '4rem' }}>{lat.beat || '…'}</span>
                 <span className="small muted">Sing “ta” on every click</span>
               </>
             ) : lat.state === 'done' ? (
               <>
-                <span className="mono" style={{ fontSize: 40, fontWeight: 600 }}>{lat.ms} ms</span>
+                <span className="mono" style={{ fontSize: '2.5rem', fontWeight: 600 }}>{lat.ms} ms</span>
                 <span className="small muted">Saved. Scoring compensates for this delay.</span>
               </>
             ) : lat.state === 'fail' ? (
@@ -241,7 +241,7 @@ function ChoirStep({ profile, update, onNext }: { profile: Profile; update: (p: 
       {joined ? (
         <div className="card" data-testid="setup-choir-joined">
           <span className="eyebrow">Joined</span>
-          <strong style={{ fontSize: 20 }}>{choir!.name}</strong>
+          <strong style={{ fontSize: '1.25rem' }}>{choir!.name}</strong>
           {(choirCycleNow(choir) || choir!.pieces.length > 0) && (
             <span className="small muted">
               {choirCycleNow(choir) ? `Programme: ${choirCycleNow(choir)!.name}. ` : ''}{choir!.pieces.length ? (choir!.pieces.length === 1 ? '1 score from the choir is on its way to your phone.' : `${choir!.pieces.length} scores from the choir are on their way to your phone.`) : ''}

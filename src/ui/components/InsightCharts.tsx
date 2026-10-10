@@ -1,12 +1,13 @@
 // Small charts for the section, choir and usage insights: plain HTML/SVG, no chart library.
-// Colours: piece levels are a magnitude (one hue, dim → bright on the dark surface); ranges use the
+// Colours: piece levels are a magnitude (one hue, from faint to strong: tokens --lv0…--lv5); ranges use the
 // voice colour (steady solid, reach lighter); text stays in the text colours.
 
 import React from 'react';
 import { noteName, rangeFlags, USUAL_RANGE, type SingerRange } from '../../progress/insights';
+import { mix } from '../theme';
 
 /** Level 0 (no piece level yet) … 5 (memorised): one hue, brighter = further. */
-export const LEVEL_COLOR = ['#3a3f63', '#1d4f63', '#24718e', '#2f97bb', '#4cc9f0', '#b6ecff'];
+export const LEVEL_COLOR = ['var(--lv0)', 'var(--lv1)', 'var(--lv2)', 'var(--lv3)', 'var(--lv4)', 'var(--lv5)'];
 export const LEVEL_NAME = ['not yet', 'Level 1 · Notes', 'Level 2 · Words', 'Level 3 · Alone (rehearsal-ready)', 'Level 4 · Concert (concert-ready)', 'Level 5 · By heart (memorised)'];
 
 /** How many singers are at each piece level, as one stacked bar (with a legend unless `bare`). */
@@ -35,7 +36,8 @@ export function LevelBar({ levels, bare = false, height = 14 }: { levels: number
   );
 }
 
-const VOICE = '#4cc9f0';
+const VOICE = 'var(--voice)';
+const VOICE_REACH = mix(VOICE, 33);
 
 /**
  * Each singer's range on one pitch axis: steady range solid, reach lighter. Behind them the voice
@@ -73,18 +75,18 @@ export function RangeChart({ ranges, voice, part, label }: {
               {flags.length > 0 && <div className="tiny" style={{ color: 'var(--accent-text)', lineHeight: 1.2 }}>{flags.join(' · ')}</div>}
             </div>
             <div style={{ position: 'relative', flex: 1, minWidth: 0, alignSelf: 'stretch' }}>
-              {usual && band(usual[0], usual[1], { background: 'rgba(168,176,214,0.10)' }, '')}
-              {part && band(part[0], part[1], { borderLeft: '1px dashed rgba(255,176,143,0.7)', borderRight: '1px dashed rgba(255,176,143,0.7)', background: 'rgba(255,122,69,0.07)' }, '')}
+              {usual && band(usual[0], usual[1], { background: mix('var(--muted)', 10) }, '')}
+              {part && band(part[0], part[1], { borderLeft: `1px dashed ${mix('var(--accent-text)', 70)}`, borderRight: `1px dashed ${mix('var(--accent-text)', 70)}`, background: mix('var(--accent)', 7) }, '')}
               {ticks.map((t) => <span key={t} aria-hidden="true" style={{ position: 'absolute', top: 0, bottom: 0, left: pct(t), borderLeft: '1px solid var(--line)' }} />)}
               {r.measured && r.lo != null && r.hi != null ? (
                 <>
                   {r.reachLo != null && r.reachHi != null && (
                     <span title={`${r.name}: reaches ${noteName(r.reachLo)}–${noteName(r.reachHi)} (less steady)`}
-                      style={{ position: 'absolute', top: '50%', height: 10, marginTop: -5, left: pct(r.reachLo), width: width(r.reachLo, r.reachHi), background: VOICE + '55', borderRadius: 4 }} />
+                      style={{ position: 'absolute', top: '50%', height: 10, marginTop: -5, left: pct(r.reachLo), width: width(r.reachLo, r.reachHi), background: VOICE_REACH, borderRadius: 4 }} />
                   )}
                   <span title={`${r.name}: steady ${noteName(r.lo)}–${noteName(r.hi)}${r.at ? `, measured ${new Date(r.at).toLocaleDateString()}` : ''}`}
                     style={{ position: 'absolute', top: '50%', height: 10, marginTop: -5, left: pct(r.lo), width: width(r.lo, r.hi), background: VOICE, borderRadius: 4 }} />
-                  <span className="tiny mono" style={{ position: 'absolute', top: '50%', marginTop: 6, left: pct(r.lo), whiteSpace: 'nowrap', color: 'var(--muted)', fontSize: 10 }}>
+                  <span className="tiny mono" style={{ position: 'absolute', top: '50%', marginTop: 6, left: pct(r.lo), whiteSpace: 'nowrap', color: 'var(--muted)', fontSize: '0.8125rem' }}>
                     {noteName(r.lo)}–{noteName(r.hi)}
                   </span>
                 </>
@@ -98,14 +100,14 @@ export function RangeChart({ ranges, voice, part, label }: {
       <div style={{ display: 'flex' }}>
         <div style={{ width: NAME_W, flex: 'none' }} />
         <div style={{ position: 'relative', flex: 1, height: 14 }} aria-hidden="true">
-          {ticks.map((t) => <span key={t} className="tiny mono muted" style={{ position: 'absolute', left: pct(t), transform: 'translateX(-50%)', fontSize: 10 }}>{noteName(t)}</span>)}
+          {ticks.map((t) => <span key={t} className="tiny mono muted" style={{ position: 'absolute', left: pct(t), transform: 'translateX(-50%)', fontSize: '0.8125rem' }}>{noteName(t)}</span>)}
         </div>
       </div>
       <div className="row wrap tiny muted" style={{ gap: 10 }}>
         <span className="row" style={{ gap: 4 }}><span style={{ width: 14, height: 8, borderRadius: 3, background: VOICE }} />steady, in tune</span>
-        <span className="row" style={{ gap: 4 }}><span style={{ width: 14, height: 8, borderRadius: 3, background: VOICE + '55' }} />reach (less steady)</span>
-        {usual && <span className="row" style={{ gap: 4 }}><span style={{ width: 14, height: 8, background: 'rgba(168,176,214,0.25)' }} />usual {voice} range</span>}
-        {part && <span className="row" style={{ gap: 4 }}><span style={{ width: 14, height: 8, border: '1px dashed rgba(255,176,143,0.9)' }} />notes in the programme ({noteName(part[0])}–{noteName(part[1])})</span>}
+        <span className="row" style={{ gap: 4 }}><span style={{ width: 14, height: 8, borderRadius: 3, background: VOICE_REACH }} />reach (less steady)</span>
+        {usual && <span className="row" style={{ gap: 4 }}><span style={{ width: 14, height: 8, background: mix('var(--muted)', 25) }} />usual {voice} range</span>}
+        {part && <span className="row" style={{ gap: 4 }}><span style={{ width: 14, height: 8, border: `1px dashed ${mix('var(--accent-text)', 90)}` }} />notes in the programme ({noteName(part[0])}–{noteName(part[1])})</span>}
       </div>
     </div>
   );

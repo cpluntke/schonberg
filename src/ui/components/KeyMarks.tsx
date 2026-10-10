@@ -7,7 +7,7 @@ import { choirPieceOf, marksFor, nameKeysOf, saveLocalMarks } from '../../progre
 import { sessionAuth, sessionFor, setChoirPieceKeys, superAuth } from '../../progress/choir';
 import { useStoreVersion } from '../hooks';
 
-const inputStyle: React.CSSProperties = { minHeight: 40, borderRadius: 10, border: '1px solid var(--line)', background: 'var(--surface)', padding: '0 10px' };
+const inputStyle: React.CSSProperties = { minHeight: 44, borderRadius: 10, border: '1px solid var(--line)', background: 'var(--surface)', padding: '0 10px' };
 
 /** Every key, as a select value "fifths:mode". */
 const KEYS: { value: string; label: string }[] = (['major', 'minor'] as const).flatMap((mode) =>

@@ -66,7 +66,7 @@ export function ProgressScreen() {
         <span className="t14 muted">Today</span>
       </div>
       <div className="col" style={{ gap: 2 }}>
-        <h1 className="hero" style={{ fontSize: 28 }}>Your progress</h1>
+        <h1 className="hero" style={{ fontSize: '1.75rem' }}>Your progress</h1>
         <span className="t14 muted">{[cycle.name, cycle.concertDate && toConcert != null && toConcert >= 0 ? `concert ${shortDate(cycle.concertDate)}` : ''].filter(Boolean).join(' · ')}</span>
       </div>
 

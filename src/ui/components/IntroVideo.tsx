@@ -44,7 +44,7 @@ export function IntroVideoModal({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
   return (
-    <div role="dialog" aria-modal="true" aria-label="Intro video" className="overlay" style={{ position: 'fixed', zIndex: 60, background: 'rgba(5,6,13,0.94)', flexDirection: 'column', gap: 12, justifyContent: 'flex-start', overflowY: 'auto' }}
+    <div role="dialog" aria-modal="true" aria-label="Intro video" className="overlay" style={{ position: 'fixed', zIndex: 60, background: 'var(--scrim)', backdropFilter: 'blur(2px)', flexDirection: 'column', gap: 12, justifyContent: 'flex-start', overflowY: 'auto' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={{ width: '100%', maxWidth: 900, marginTop: 'auto', flex: 'none' }}>
         {failed ? (
@@ -98,7 +98,7 @@ function TryItNow({ onClose }: { onClose: () => void }) {
   const step = (n: number, done: boolean, title: string, sub: string, label: string, onGo: () => void, primary: boolean, testid?: string) => (
     <div className="row" style={{ gap: 10, alignItems: 'center' }}>
       <span aria-hidden="true" style={{ width: 28, height: 28, borderRadius: 14, flex: 'none', display: 'grid', placeItems: 'center', fontWeight: 700,
-        background: done ? 'var(--good, #3fb950)' : 'var(--accent, #f0883e)', color: '#05060d' }}>{done ? '✓' : n}</span>
+        background: done ? 'var(--good)' : 'var(--accent)', color: 'var(--accent-ink)' }}>{done ? '✓' : n}</span>
       <span className="col grow" style={{ gap: 0, minWidth: 0 }}>
         <strong className="small">{title}</strong>
         <span className="tiny muted">{sub}</span>

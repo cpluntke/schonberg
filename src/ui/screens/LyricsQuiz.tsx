@@ -18,23 +18,23 @@ const KIND: Record<QuizKind, { label: string; ask: string }> = {
 };
 
 const CSS = `
-.lq-prompt { font-size: 20px; line-height: 1.4; font-weight: 600; overflow-wrap: anywhere; }
+.lq-prompt { font-size: 1.25rem; line-height: 1.4; font-weight: 600; overflow-wrap: anywhere; }
 .lq-prompt.letters { font-family: var(--mono); letter-spacing: 0.04em; }
 .lq-blank { display: inline-block; min-width: 3.2em; border-bottom: 2px solid var(--accent); color: var(--accent-text); text-align: center; }
 .lq-choices { display: flex; flex-direction: column; gap: 8px; }
 .lq-choice {
   min-height: 52px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--text);
-  padding: 10px 14px; text-align: left; font-size: 16px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere;
+  padding: 10px 14px; text-align: left; font-size: 1rem; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere;
   display: flex; align-items: center; gap: 10px;
 }
-.lq-choice.right { border: 2px solid var(--good); background: #12301f; }
-.lq-choice.wrong { border: 2px solid var(--bad); background: #331520; }
+.lq-choice.right { border: 2px solid var(--good); background: var(--good-bg); }
+.lq-choice.wrong { border: 2px solid var(--bad); background: var(--bad-bg); }
 .lq-choice.dim { opacity: 0.55; }
 .lq-choice .mark { margin-left: auto; flex: none; font-weight: 800; }
-.lq-feedback { min-height: 24px; font-size: 15px; }
-.lq-score { font-family: var(--mono); font-size: 54px; font-weight: 600; line-height: 1; }
+.lq-feedback { min-height: 24px; font-size: 0.9375rem; }
+.lq-score { font-family: var(--mono); font-size: 3.375rem; font-weight: 600; line-height: 1; }
 .lq-miss { display: flex; gap: 10px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--surface-2); }
-.lq-miss .bar-no { flex: none; font-family: var(--mono); font-size: 12px; color: var(--muted); min-width: 52px; }
+.lq-miss .bar-no { flex: none; font-family: var(--mono); font-size: 0.8125rem; color: var(--muted); min-width: 52px; }
 .lq-miss .txt { overflow-wrap: anywhere; }
 `;
 
@@ -103,7 +103,7 @@ export function LyricsQuiz({ pieceId, partId }: { pieceId: string; partId: strin
     return (
       <Shell title={piece.title} sub={sub} up={up}>
         <div className="card">
-          <strong style={{ fontSize: 18 }}>This part has no lyrics</strong>
+          <strong style={{ fontSize: '1.125rem' }}>This part has no lyrics</strong>
           <span className="muted small">
             {lines.length
               ? 'It only sings on vowels or syllables like “la” here, so there is no text to learn.'
@@ -119,10 +119,10 @@ export function LyricsQuiz({ pieceId, partId }: { pieceId: string; partId: strin
     return (
       <Shell title={piece.title} sub={sub} up={up}>
         <div className="card">
-          <strong style={{ fontSize: 18 }}>Too little text for a quiz</strong>
+          <strong style={{ fontSize: '1.125rem' }}>Too little text for a quiz</strong>
           <span className="muted small">The whole text of this part is short enough to learn at a glance:</span>
           <div className="col" style={{ gap: 4 }}>
-            {distinct.map((l) => <span key={l.key} style={{ fontWeight: 600, fontSize: 17 }}>{l.text}</span>)}
+            {distinct.map((l) => <span key={l.key} style={{ fontWeight: 600, fontSize: '1.0625rem' }}>{l.text}</span>)}
           </div>
           <button className="btn block" onClick={goBack}>Back to the piece</button>
         </div>
@@ -140,7 +140,7 @@ export function LyricsQuiz({ pieceId, partId }: { pieceId: string; partId: strin
           <span className="eyebrow">Round complete</span>
           <div className="row" style={{ alignItems: 'baseline', gap: 8 }}>
             <span className="lq-score" data-testid="quiz-score">{score}</span>
-            <span className="muted" style={{ fontSize: 20 }}>/ {questions.length}</span>
+            <span className="muted" style={{ fontSize: '1.25rem' }}>/ {questions.length}</span>
           </div>
           <span className="small" style={{ color: 'var(--voice)' }}>
             {score === questions.length ? 'Word-perfect!' : score >= questions.length * 0.8 ? 'Nearly there.' : score >= questions.length / 2 ? 'Getting there.' : 'Worth another look at the text.'}
@@ -149,7 +149,7 @@ export function LyricsQuiz({ pieceId, partId }: { pieceId: string; partId: strin
         </div>
         {missed.length > 0 && (
           <section className="col" style={{ gap: 4 }} aria-label="Lines to look at again">
-            <h2 style={{ fontSize: 16 }}>Lines to look at again</h2>
+            <h2 style={{ fontSize: '1rem' }}>Lines to look at again</h2>
             <span className="tiny muted">These come up more often in the next rounds.</span>
             {missed.map((m) => (
               <div key={m.lineKey} className="lq-miss">

@@ -11,7 +11,7 @@ import { PatternStaff, type NoteState } from './PatternStaff';
 type Phase = 'comfortable' | 'middle' | 'high' | 'low' | 'done';
 type RoundState = 'idle' | 'listen' | 'sing' | 'judging';
 
-const COLOR: Record<Verdict, string> = { good: 'var(--voice)', shaky: '#E8B86A', missed: '#FF7A45' };
+const COLOR: Record<Verdict, string> = { good: 'var(--voice)', shaky: 'var(--warn)', missed: 'var(--accent)' };
 const MAX_ROUNDS = 8;
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -294,7 +294,7 @@ export function RangeCheck({ onDone, onSkip }: { onDone: (range: { lo: number; h
           </span>
           <div className="card" style={{ alignItems: 'center', textAlign: 'center', gap: 6 }} aria-live="polite">
             {/* Room for two lines, so the buttons below don't move when the text wraps. */}
-            <span style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.2, minHeight: '2.4em', display: 'flex', alignItems: 'center', justifyContent: 'center', color: round === 'sing' ? 'var(--accent)' : undefined }}>
+            <span style={{ fontSize: '1.75rem', fontWeight: 800, lineHeight: 1.2, minHeight: '2.4em', display: 'flex', alignItems: 'center', justifyContent: 'center', color: round === 'sing' ? 'var(--accent)' : undefined }}>
               {round === 'listen' ? 'Listen…' : round === 'sing' ? 'Your turn: sing it back' : busy ? (stopping ? 'Stopping…' : 'Next round…') : lastDone ? (phaseRounds[phaseRounds.length - 1].r.unmet ? 'Not met' : 'Done') : 'Ready'}
             </span>
             {pattern && (busy || lastDone) && (

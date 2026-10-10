@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pitchDegree, pitchPhrase, pitchShort, pitchTag, pitchWords, toleranceWords } from './pitchwords';
+import { pitchDegree, pitchPhrase, pitchReadout, pitchShort, pitchTag, pitchWords, toleranceWords } from './pitchwords';
 
 describe('the pitch word scale', () => {
   it('spot on up to 10 cents, a touch to 25, a little to 50, clearly beyond', () => {
@@ -38,5 +38,13 @@ describe('the pitch word scale', () => {
     expect(toleranceWords(30)).toBe('about a third of a semitone (30 cents)');
     expect(toleranceWords(65)).toBe('about two thirds of a semitone (65 cents)');
     expect(toleranceWords(20)).toBe('a fifth of a semitone (20 cents)');
+  });
+});
+
+describe('the live readout', () => {
+  it('words and where the voice is: flat ↓, sharp ↑ (as in Results and the bubble), nothing when spot on', () => {
+    expect(pitchReadout(-18)).toEqual({ words: 'a touch flat', arrow: '↓', say: 'a touch flat: sing a touch higher' });
+    expect(pitchReadout(62)).toEqual({ words: 'clearly sharp', arrow: '↑', say: 'clearly sharp: sing clearly lower' });
+    expect(pitchReadout(4)).toEqual({ words: 'spot on', arrow: '', say: 'spot on' });
   });
 });

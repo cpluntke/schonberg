@@ -184,3 +184,49 @@ at the bottom of Diagnostics (and `#/superadmin`).
   points this week), live "practising now", this week's points (top three and you; all of Ranks behind
   "See all"), what's shared; then the membership (sync, leave, sharing) and the staff login. Without a
   choir: joining.
+
+## ui/ display: themes, text size, the singing view (`src/ui/theme.ts`, `play/palette.ts`)
+
+**Settings → Display** (`settings-display-block`) sets *Appearance* (Dark / Light / Match the phone)
+and *Text size* (Standard / Large / Larger), stored in the profile (`appearance`, `textSize`; unset =
+dark, standard) and kept with a choir account (`sync.ts` `PROFILE_KEYS`, type-checked; like the other
+settings a new phone takes them, a set-up phone keeps its own).
+
+- **Default dark.** The app has always been dark (and the intro video shows it dark); nobody's look
+  changes on update. Light and "Match the phone" are one tap away.
+- **Colours** are CSS tokens on `:root` in `styles.css`, with a light value for every token under
+  `:root[data-theme='light']`. No screen or component writes a hex colour of its own (charts use
+  `--lv0…--lv5`, tints use `mix()` = `color-mix`). `theme.test.ts` checks every text colour against
+  every ground it sits on (≥ 4.5:1) in both themes, and that each token has a light value.
+- **Text size**: every font size in the CSS (and in inline styles) is in `rem`; `<html data-text="large|larger">`
+  sets the root to 115 % / 130 %. Running text and labels are at least 14 px at Standard (eyebrows,
+  badges and tab labels 13 px); touch targets at least 44 px. A few labels that must fit a fifth or a
+  quarter of a phone's width (the level meter's names, the mixer) are capped with `min(…rem, …vw)`.
+- **Applying**: `applyDisplay()` sets `data-theme` / `data-text` on `<html>`, the `theme-color` meta
+  (status bar) and iOS's status-bar style, and the canvas palette. `main.tsx` calls it before the first
+  render (no flash); `App`'s `DisplaySync` keeps it in step with the profile and, for "Match the phone",
+  with `prefers-color-scheme`. The manifest's `theme_color`/`background_color` (splash screen) stay dark.
+- **Canvases** (highway, score view, full score, mistake score, the words lane) read their colours
+  from `play/palette.ts` (`COLORS`, `INK`, `STAFF_GRADE`, `TRACE_COLORS`): objects changed in place by
+  `setCanvasTheme`, so the render loop allocates nothing and keeps no copies. Font sizes go through
+  `fpx(px)` (× the text scale). `canvasGeneration()` is part of the layout and static-layer cache keys
+  (via `staff2d.fontGeneration()`); canvases drawn once (the mistake score) re-draw on
+  `useCanvasGeneration()`. The arcade (3D) keeps its own night scene in both themes. SVG charts use
+  CSS variables.
+
+**The singing view** (`screens/Play.tsx`, `play/staff2d.ts`, `play/readout.ts`):
+
+- On an upright phone (`uprightView`) the score view uses a 15 px staff space (a 60 px staff on a
+  390 px phone; at least 12 px, else one larger system), so note names are 15 px+ and words 16 px+.
+  Turning pages shows two systems; the scrolling line goes on in a second row underneath (what comes
+  after the right edge, both rows gliding together), so the next bars stay in view.
+- **Live readout** above the music (score view on a phone, not in landscape): the note being sung
+  (its name where the level shows names), the word scale (`pitchReadout`: "C♯ · a touch flat ↓"; the
+  arrow shows where the voice is, ↓ flat, ↑ sharp, as in Results and the bubble) in teal when within
+  the level's tolerance, light orange outside.
+  Computed in the HUD tick (~11×/s, `liveReading`, the same reading as the bubble); the canvas then
+  draws only the voice dot. Landscape phones and the laptop's full score keep the small bubble.
+- **Progress strip** for a run over more than one passage (`runProgress`): a segment per passage,
+  filled bar by bar, "n/29 bars".
+- While singing the controls are Restart (an icon on a phone), **Stop** (finish and see results) and
+  **Pause**, equal and plain; orange is kept for the one thing to tap when not singing.

@@ -12,28 +12,28 @@ import { missingText } from '../components/NotFound';
 // buttons marked .mm-noprint), switch the theme tokens to dark-on-white, keep cards whole.
 const CSS = `
 .mm { gap: 14px; }
-.mm-summary { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 14px; }
+.mm-summary { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.875rem; }
 .mm-summary b { font-weight: 800; }
 .mm-sec { gap: 10px; }
 .mm-sec-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-.mm-sec-head h2 { font-size: 17px; }
+.mm-sec-head h2 { font-size: 1.0625rem; }
 .mm-tags { display: flex; flex-wrap: wrap; gap: 6px; }
-.mm-tag { font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 6px; background: var(--surface-2); color: var(--text); }
-.mm-tag.change { background: var(--expert-bg); color: var(--expert); border: 1px solid #3a3380; }
+.mm-tag { font-size: 0.8125rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; background: var(--surface-2); color: var(--text); }
+.mm-tag.change { background: var(--expert-bg); color: var(--expert); border: 1px solid var(--expert-line); }
 .mm-entries { display: flex; flex-direction: column; }
 .mm-entry { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 2px 10px; padding: 7px 0; border-top: 1px solid var(--surface-2); }
 .mm-entry:first-child { border-top: none; }
-.mm-bar { font-family: var(--mono); font-size: 12px; line-height: 1.35; color: var(--muted); }
-.mm-bar b { color: var(--text); font-size: 15px; display: block; }
-.mm-what { font-size: 15px; overflow-wrap: anywhere; }
+.mm-bar { font-family: var(--mono); font-size: 0.8125rem; line-height: 1.35; color: var(--muted); }
+.mm-bar b { color: var(--text); font-size: 0.9375rem; display: block; }
+.mm-what { font-size: 0.9375rem; overflow-wrap: anywhere; }
 .mm-what .w { font-weight: 800; color: var(--accent-text); }
-.mm-cue { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
-.mm-facts { display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+.mm-cue { font-size: 0.875rem; color: var(--muted); overflow-wrap: anywhere; }
+.mm-facts { display: flex; flex-direction: column; gap: 4px; font-size: 0.875rem; }
 .mm-facts .k { font-weight: 700; }
-.mm-text { font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; }
-.mm-text.letters { font-family: var(--mono); font-size: 14px; letter-spacing: 0.03em; }
+.mm-text { font-size: 0.9375rem; line-height: 1.5; overflow-wrap: anywhere; }
+.mm-text.letters { font-family: var(--mono); font-size: 0.875rem; letter-spacing: 0.03em; }
 .mm-text .ln { display: block; }
-.mm-text .ln .bn { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-right: 6px; }
+.mm-text .ln .bn { font-family: var(--mono); font-size: 0.8125rem; color: var(--muted); margin-right: 6px; }
 .mm-rest { color: var(--muted); font-style: italic; }
 @media print {
   :root {

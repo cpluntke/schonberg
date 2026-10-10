@@ -371,6 +371,18 @@ describe('review fixes', () => {
     expect(out.latencyMs).toBe(0);
   });
 
+  it('the display settings (appearance, text size) travel with the account, type-checked', () => {
+    expect(cleanProfile({ appearance: 'light', textSize: 'larger' })).toEqual({ appearance: 'light', textSize: 'larger' });
+    expect(cleanProfile({ appearance: 'system', textSize: 'large' })).toEqual({ appearance: 'system', textSize: 'large' });
+    expect(cleanProfile({ appearance: 'sepia', textSize: 2 })).toEqual({});
+    expect(cleanProfile({ appearance: { dark: true }, textSize: 'huge' })).toEqual({});
+    // A new phone takes them; a set-up phone keeps its own.
+    expect(mergeProfile({ ...DEFAULT_PROFILE }, { appearance: 'light', textSize: 'large' }, false)).toMatchObject({ appearance: 'light', textSize: 'large' });
+    const mine = { ...DEFAULT_PROFILE, onboarded: true, appearance: 'dark' as const };
+    expect(mergeProfile(mine, { appearance: 'light', textSize: 'larger' }, true)).toMatchObject({ appearance: 'dark' });
+    expect(mergeProfile(mine, { appearance: 'light', textSize: 'larger' }, true).textSize).toBeUndefined();
+  });
+
   it('the full-run record keeps its exact time, so the latest run decides the to-fix lists even within one hour', () => {
     const h = Math.floor(T / 3_600_000);
     const a: FullRunProgress = { level: 1, best: {}, attempts: 2, lastPracticed: h * 3_600_000 + 60_000, toFix: { 2: ['x'] } };

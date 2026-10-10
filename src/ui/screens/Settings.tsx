@@ -17,6 +17,7 @@ import { IntroVideoButton } from '../components/IntroVideo';
 import { AccountSync } from '../components/AccountSync';
 import { UsageStats } from '../components/UsageStats';
 import { weekGoalOf } from '../today';
+import { APPEARANCES, TEXT_SIZES, textSizeOf } from '../theme';
 import { ReminderSettings } from '../components/Reminders';
 
 export function Settings() {
@@ -78,7 +79,7 @@ export function Settings() {
         <div className="toggle-row"><span>Name</span><span className="muted">{profile.name || '–'}</span></div>
         <div className="toggle-row"><span>Voice part</span>
           <select aria-label="Voice part" value={profile.voice} onChange={(e) => update({ voice: e.target.value as typeof profile.voice })}
-            style={{ minHeight: 40, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--line)', padding: '0 8px' }}>
+            style={{ minHeight: 44, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--line)', padding: '0 8px' }}>
             <option value="S">Soprano</option><option value="A">Alto</option><option value="T">Tenor</option><option value="B">Bass</option>
           </select>
         </div>
@@ -90,11 +91,11 @@ export function Settings() {
               update({ latencyMs: ms, latencySource: 'measured' });
             }}
             onBlur={() => setDelayText(null)}
-            style={{ width: 90, minHeight: 40, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--line)', padding: '0 8px' }} />
+            style={{ width: 90, minHeight: 44, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--line)', padding: '0 8px' }} />
         </label>
         <label className="toggle-row"><span>Practice beat<span className="tiny muted" style={{ display: 'block' }}>A soft click keeps the tempo where you sing on your own.</span></span>
           <select aria-label="Practice beat" value={profile.beat ?? 'alone'} onChange={(e) => update({ beat: e.target.value as 'off' | 'alone' | 'always' })}
-            style={{ minHeight: 40, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--line)', padding: '0 8px' }}>
+            style={{ minHeight: 44, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--line)', padding: '0 8px' }}>
             <option value="alone">When I sing alone</option>
             <option value="always">Always</option>
             <option value="off">Off</option>
@@ -153,11 +154,11 @@ export function Settings() {
       <section className="col" style={{ gap: 8 }}>
         <h2 className="eyebrow">Tuning target</h2>
         <button className="choice" aria-pressed={profile.tuning === 'equal'} onClick={() => update({ tuning: 'equal' })}>
-          <span className="big" style={{ fontSize: 15 }}>Equal temperament</span>
+          <span className="big" style={{ fontSize: '0.9375rem' }}>Equal temperament</span>
           <span className="sub">Score against the piano</span>
         </button>
         <button className="choice" aria-pressed={profile.tuning === 'just'} onClick={() => update({ tuning: 'just' })}>
-          <span className="big" style={{ fontSize: 15 }}>Just intonation (chord-aware)</span>
+          <span className="big" style={{ fontSize: '0.9375rem' }}>Just intonation (chord-aware)</span>
           <span className="sub">Major thirds 14¢ low, fifths pure: tuned to the chord the others are singing</span>
         </button>
       </section>
@@ -228,8 +229,30 @@ export function Settings() {
       <AccountSync />
 
       <section className="col" style={{ gap: 8 }} id="settings-display-block">
-        <h2 className="eyebrow">Practice display</h2>
-        <div className="seg" role="group" aria-label="Practice display" data-testid="settings-display">
+        <h2 className="eyebrow">Display</h2>
+        <span className="small" id="settings-appearance-label">Appearance</span>
+        <div className="seg" role="group" aria-labelledby="settings-appearance-label" data-testid="settings-appearance">
+          {APPEARANCES.map((a) => (
+            <button key={a.id} aria-pressed={(profile.appearance ?? 'dark') === a.id} data-testid={`appearance-${a.id}`}
+              onClick={() => update({ appearance: a.id === 'dark' ? undefined : a.id })}>{a.label}</button>
+          ))}
+        </div>
+        <span className="small muted">
+          {profile.appearance === 'system' ? 'Light or dark as your phone is set (it can change in the evening).'
+            : profile.appearance === 'light' ? 'Dark text on a light page: easier to read in daylight.' : 'Light text on a dark page (the default).'}
+        </span>
+        <span className="small" id="settings-textsize-label" style={{ marginTop: 6 }}>Text size</span>
+        <div className="seg" role="group" aria-labelledby="settings-textsize-label" data-testid="settings-textsize">
+          {TEXT_SIZES.map((t) => (
+            <button key={t.id} aria-pressed={textSizeOf(profile.textSize) === t.id} data-testid={`textsize-${t.id}`}
+              onClick={() => update({ textSize: t.id === 'standard' ? undefined : t.id })}>
+              <span style={{ fontSize: `${t.scale}em` }}>{t.label}</span>
+            </button>
+          ))}
+        </div>
+        <span className="small muted">All the app's text, the note names and words on the music included.</span>
+        <span className="small" id="settings-practice-display-label" style={{ marginTop: 6 }}>While you practise</span>
+        <div className="seg" role="group" aria-labelledby="settings-practice-display-label" data-testid="settings-display">
           {([[undefined, 'Automatic'], ['score', 'Score'], ['highway', 'Highway']] as const).map(([d, label]) => (
             <button key={label} aria-pressed={profile.display === d} onClick={() => update({ display: d, displayChosen: d !== undefined, scoreDefaultNote: false })}>{label}</button>
           ))}

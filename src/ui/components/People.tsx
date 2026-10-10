@@ -47,7 +47,7 @@ export function InviteLinkBox({ token, title, hint, onClose }: { token: string; 
     <div ref={box} className="notice info col" data-testid="invite-link" style={{ gap: 8, scrollMarginTop: 12 }}>
       <strong>{title}</strong>
       <input ref={ref} type="text" readOnly value={url} aria-label="Invite link" onFocus={(e) => e.currentTarget.select()} className="mono"
-        style={{ ...inputStyle, width: '100%', fontSize: 12 }} />
+        style={{ ...inputStyle, width: '100%', fontSize: '0.875rem' }} />
       <div className="row wrap" style={{ gap: 6 }}>
         <button className="btn small primary" data-testid="copy-invite" onClick={async () => toast(await copy(url, ref.current) ? 'Link copied: paste it into a message' : 'Select the link and copy it')}>Copy link</button>
         {canShare && <button className="btn small" onClick={() => navigator.share({ title: 'Schönberg Hero invite', url }).catch(() => {})}>Share…</button>}

@@ -5,7 +5,8 @@ import type { KeySig, Part } from '../../music/types';
 import { nameKeysSig } from '../../progress/keymarks';
 import type { NotationMode } from '../../game/notation';
 import { beatToTime, timeToBeat } from '../../music/time';
-import { COLORS, type DrawState } from './highway2d';
+import type { DrawState } from './highway2d';
+import { COLORS, fpx } from './palette';
 import {
   INK, buildSysDraw, drawBarline, drawBubble, drawCountdown, drawOutlines, drawStaff2D, drawStaffFrame, drawStaffNotes,
   drawTrace, fontGeneration, lyricFontFor, measureSpan, middleStep, nameFontFor, nameMeasure, namesOn, spell, systemAt,
@@ -40,8 +41,8 @@ export interface ScoreViewInfo {
   systems: number;
 }
 
-const OTHER = { note: '#AEB5DB', lyric: '#9AA2CB' };
-const OWN_BAND = 'rgba(76,201,240,0.075)';
+/** The other voices' colours (read from the theme each time: palette.ts changes INK in place). */
+const OTHER = { get note() { return INK.otherNote; }, get lyric() { return INK.otherLyric; } };
 
 interface StaffRow {
   spec: StaffSpec;
@@ -161,7 +162,7 @@ function getFull(c: Ctx, W: number, H: number, s: DrawState, show: StaffShow): F
   }
   let sp = pick.sp;
   const { specs, ex, lyr } = pick;
-  const nameFont = (size: number) => `700 ${Math.round(size)}px "Bricolage Grotesque", system-ui, sans-serif`;
+  const nameFont = (size: number) => `700 ${fpx(size)}px "Bricolage Grotesque", system-ui, sans-serif`;
   const nameSize = Math.max(11, Math.min(14, sp * 1.45));
   c.font = nameFont(nameSize);
   const nameW = Math.max(...specs.map((x) => c.measureText(x.short).width));
@@ -365,10 +366,10 @@ function drawFullScroll(c: Ctx, W: number, H: number, s: DrawState, F: FullCache
   const last = rows[rows.length - 1];
   const yTop = sysTop + (first.y - 1.4) * sp;
   const yBot = sysTop + (last.y + 4 + Math.min(1.2, last.below)) * sp;
-  c.fillStyle = 'rgba(238,240,255,0.7)';
+  c.fillStyle = INK.playheadSoft;
   c.fillRect(Math.round(px) - 1, yTop, 2, yBot - yTop);
   if (cur) {
-    c.fillStyle = 'rgba(238,240,255,0.95)';
+    c.fillStyle = COLORS.playhead;
     c.fillRect(Math.round(px) - 1, cur.top - 1.2 * sp, 2, (6.4 + Math.max(0, ownRow.L.lyricOff - 1.6)) * sp);
   }
   c.beginPath();
@@ -476,10 +477,10 @@ function drawFull(c: Ctx, W: number, H: number, s: DrawState, F: FullCache) {
     const last = rows[rows.length - 1];
     const yTop = sysTop + (first.y - 1.4) * sp;
     const yBot = sysTop + (last.y + 4 + Math.min(1.2, last.below)) * sp;
-    c.fillStyle = 'rgba(238,240,255,0.7)';
+    c.fillStyle = INK.playheadSoft;
     c.fillRect(Math.round(px) - 1, yTop, 2, yBot - yTop);
     // Brighter across your staff.
-    c.fillStyle = 'rgba(238,240,255,0.95)';
+    c.fillStyle = COLORS.playhead;
     c.fillRect(Math.round(px) - 1, cur.top - 1.2 * sp, 2, (6.4 + Math.max(0, ownRow.L.lyricOff - 1.6)) * sp);
     c.beginPath();
     c.moveTo(px - 0.6 * sp, yTop - 0.7 * sp);
@@ -503,7 +504,7 @@ function drawSystemFrame(c: Ctx, F: FullCache, geos: SysGeo[], s: DrawState, j: 
   const or = rows[F.own];
   // (a stretch of a scrolling score: its band from its first bar; the start is drawn pinned)
   const bandX = sys0.cont ? sys0.prefixEnd : left - 2.2 * sp;
-  c.fillStyle = OWN_BAND;
+  c.fillStyle = INK.ownBand;
   c.fillRect(bandX, og.top - (or.above - 0.4) * sp, sys0.x1 - bandX + (sys0.cont ? 0 : 0.4 * sp), (or.above - 0.4 + 4 + or.below + 0.1) * sp);
   if (!sys0.cont) {
     c.fillStyle = COLORS.voice;

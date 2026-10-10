@@ -40,6 +40,7 @@ import { voiceName } from './screens/Home';
 import { LOGO_TILE } from './components/ChoirLogo';
 import { shareMyProgress } from './play/shareProgress';
 import { retryPrivacyRemovals } from './play/privacy';
+import { useDisplaySync } from './theme';
 
 // Today · Pieces · Train · Choir (nav.ts: which screen lights which tab, where the tab bar shows).
 const TAB_ICON: Record<TabName, React.ReactNode> = { home: <IconSun />, pieces: <IconMusic />, train: <IconEar />, choir: <IconPeople /> };
@@ -176,6 +177,7 @@ export function App() {
       {/* Today's session: the strip on top of the lab (Results and the pre-run card carry their own). */}
       {route.name === 'intonation' && (route.rung != null || route.check || route.done) && lib.ready && <SessionStrip lab />}
       <ErrorBoundary resetKey={JSON.stringify(route)}>{body}</ErrorBoundary>
+      <DisplaySync />
       <UpdatePrompt hidden={route.name === 'play'} />
       <StorageFullNotice hidden={route.name === 'play'} />
       {sidebar && (
@@ -206,6 +208,13 @@ export function App() {
       {toast && <div className="toast" role="status">{toast}</div>}
     </div>
   );
+}
+
+/** Settings → Display applied to the page (its own component: a profile change re-renders only it). */
+function DisplaySync() {
+  const [profile] = useProfile();
+  useDisplaySync(profile);
+  return null;
 }
 
 /** Wide screens: the choir (logo, name) and the singer's voice at the foot of the sidebar. Hidden on phones. */
