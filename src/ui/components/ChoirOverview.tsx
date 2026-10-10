@@ -159,9 +159,9 @@ function Board({ pieces }: { pieces: PieceInfo[] }) {
           : entries == null ? <span className="t14 muted">Looking at the board…</span>
           : week.total > 0 ? (
             <>
-              <span className="row" style={{ gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
+              <span className="row" style={{ gap: 10, alignItems: 'center' }}>
                 <strong className="big-count" data-testid="choir-section-count">{week.practised}</strong>
-                <span className="t16 muted">of the {week.total} {voiceWord} on the board practised this week</span>
+                <span className="t16 muted grow">of the {week.total} {voiceWord} on the board practised this week</span>
               </span>
               <span className="section-dots" aria-hidden="true">
                 {Array.from({ length: Math.min(week.total, 24) }, (_, i) => <i key={i} className={i < week.practised ? (week.me && i === 0 ? 'on me' : 'on') : ''} />)}
