@@ -50,8 +50,8 @@
  {
   "sp": "N",
   "scene": "C",
-  "say": "Tap Highway. Your notes become bars scrolling toward a line, and you keep the blue line on them. On a laptop, you see the whole choir score, with your line highlighted. In every view, the little bubble tells you how many cents sharp or flat you are.",
-  "show": "Tap “Highway”. Your notes become bars scrolling toward a line, and you keep the blue line on them. On a laptop, you see the whole choir score, with your line highlighted. In every view, the little bubble tells you how many cents sharp or flat you are."
+  "say": "Switch to Highway, under Display and tempo. Your notes become bars scrolling toward a line, and you keep the blue line on them. On a laptop, you see the whole choir score, with your line highlighted. In every view, the little bubble tells you how close you are, from spot on to clearly flat.",
+  "show": "Switch to “Highway” under Display & tempo. Your notes become bars scrolling toward a line, and you keep the blue line on them. On a laptop, you see the whole choir score, with your line highlighted. In every view, the little bubble tells you how close you are, from spot on to clearly flat."
  },
  {
   "sp": "N",
@@ -98,8 +98,8 @@
  {
   "sp": "N",
   "scene": "E",
-  "say": "The coach tells you why. Sinking on long notes, late after rests, wrong notes in bar twelve. Tap the note, and it loops just those bars, slowly.",
-  "show": "The coach tells you why: sinking on long notes, late after rests, wrong notes in bar 12. Tap the note, and it loops just those bars, slowly."
+  "say": "You see the one note to fix first, and how far off it was, with a tip. One tap loops just that bar, slowly. Then sing the passage again.",
+  "show": "You see the one note to fix first, and how far off it was, with a tip. One tap loops just that bar, slowly. Then sing the passage again."
  },
  {
   "sp": "N",

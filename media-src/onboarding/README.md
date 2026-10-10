@@ -1,40 +1,46 @@
 # Onboarding video source
 
 `public/media/onboarding.{mp4,webm,jpg}` are rendered from these files: a two-voice dialogue
-(Nora = coach, Ben = singer) over animated app screenshots. Current cut: about 2:28 (148 s),
+(Nora = coach, Ben = singer) over animated app screenshots. Current cut: about 2:30 (150 s),
 scenes A title · B voice setup (choir code, range check, delay) · C practice screen (score
-view with a zoom on a flat note, the Score/Highway toggle, the highway, a laptop showing the full
-choir score, the ± cents bubble in every view) · D passages, the level ladder (5 levels: Notes on “doo”, Words,
-Alone, Concert, By heart; each level first slow, then in tempo) and
-"Sing it all" (a full run opens the level, a passage that slips is "to fix" and fixing
+view with a zoom on a flat note, the Score/Highway toggle under Display & tempo, the highway, a laptop
+showing the full choir score, the bubble in every view: spot on · a touch · a little · clearly) · D passages
+and Your path, the level ladder (5 levels: Notes on “doo”, Words, Alone, Concert, By heart; each level first
+slow, then in tempo) and "Sing it all" (a full run opens the level, a passage that slips is "to fix" and fixing
 just that bit earns the level, no second run; everything right first time = a clean-run star;
-know it already? sing it all at any level) · E coach notes · F Home · G "try it now" checklist.
+know it already? sing it all at any level, under More ways to practise) · E after a run (Results lead with
+the one note to fix, how far off, a tip, Loop that bar slowly) · F Home · G "try it now" checklist.
 
 1. `script.json`: the dialogue (`say` = spoken text, `show` = subtitle, `scene` = visual group).
    `video.html` refers to lines by index (`at(i,frac,t)`, `since(i,t)`, `L(i)`, `win(t,a,b)`), so
    re-map the indices in the scene functions whenever lines are added or removed.
 2. `python3 voice.py <dir>`: Kokoro TTS (kokoro-onnx, voices af_heart / am_michael; model files
    in `/tmp/kokoro`) → `narration.wav` + `timeline.json`.
-3. Fresh phone screenshots (390×844 CSS px at deviceScaleFactor 2 → 780×1688) into `<dir>/img/`
-   and `docs/screenshots/`: `setup-choir`, `setup-range`, `setup-delay`, `practice-score` (score view at
-   level 1, `?simulate=flat`: blue ink just under a note, bubble shows −cents), `practice-highway` (same
-   piece and level after tapping Highway), `practice-toggle` (the pre-start card with the Score/Highway
-   toggle; render `img/` only), `piece` (Debussy “Dieu!”, alto, fresh user, map collapsed, scrolled so the
-   “Sing it all” card and the passages fill the screen), `piece-tofix` (same view after a clean full run
-   at level 1 and a level-2 run where two of the four passages slipped, so level 1 has its ★ and two
-   passages are tagged “To fix at level 2”; both runs in tempo, and the slipped passages graded
-   `good`/`ok` rather than `miss`, so the run still opens the level (within 10 points of the mark); the runs can be recorded through the app's own modules
-   under the dev server, e.g. `await import('/src/progress/store.ts')` → `recordFullRun`; render `img/`
-   only), `fullscore-laptop` (1280×800 at dpr 1, not a phone shot: Vierne Kyrie, alto, whole piece at
-   level 3, `?simulate=flat`, about 14 s into the run), `home`, `results` (plus `results-coach`, a full-page
-   results screen of a sloppy run, used in scene E for its coach notes; `practice-2d` is the
-   project README's highway shot and is no longer used in the video), and `public/icon.svg`. Fonts into `<dir>/fonts/` (IBM Plex Mono
+3. Fresh screenshots (phone: 390×844 CSS px at deviceScaleFactor 2 → 780×1688) into `<dir>/img/`.
+   `shoot/` takes all but the setup ones from the dev server (`npx vite --port 5191`, then from `<dir>`:
+   `node .../shoot/shoot-piece.cjs`, `node .../shoot/shoot-rest.cjs toggle|score 8|highway 9.5|fix|home|laptop 14`;
+   they import the scores from `library/scores/` and print element boxes in css px, which is what
+   `video.html` uses for callouts, boxes and the zoom):
+   - `setup-choir`, `setup-range`, `setup-delay` (voice setup, unchanged by the practice UI);
+   - `practice-score` (Locus iste, soprano, Level 1 slow, `?simulate=flat`: the blue ink just under the
+     first note, the bubble says “a little”), `practice-highway` (the same after choosing Highway),
+     `practice-toggle` (the pre-run card with Display & tempo open on the Score/Highway toggle);
+   - `piece` (Debussy “Dieu!”, alto, fresh user: Your path with the level meter and the passages),
+     `piece-more` (More ways to practise open on the Sing it all card), `piece-tofix` (after a clean full
+     run at level 1 and a level-2 run where two of the four passages slipped: the ★ line and “Now · Fix”;
+     both runs in tempo, the slipped passages graded `good`/`ok` rather than `miss` so the run still
+     opens the level; recorded through the app's own modules, `recordFullRun`);
+   - `fullscore-laptop` (1280×800 at dpr 1: Vierne Kyrie, alto, Level 3 in tempo, `?simulate=flat`,
+     about 14 s into the run);
+   - `results-fix` (the same passage as `practice-score`, `?simulate=oneflat`: “Not yet: one note to fix”);
+   - `home` (Locus iste, Dieu!, Nicolette in a cycle with a weekly rehearsal and a concert date);
+   - and `public/icon.svg`. Fonts into `<dir>/fonts/` (IBM Plex Mono
    → `PlexMono.ttf`, Bricolage Grotesque → `Bricolage.ttf`, Source Serif 4 → `SourceSerif.ttf`).
    Tips: the range-check frame needs a voice; an init script that replaces `getUserMedia` with
    a WebAudio stream (an oscillator for the held note, plus the app's own output delayed by
    2.8 s, which "sings back" each pattern) gives a real mid-exercise frame without touching the
-   app. `?simulate=perfect` (or `localStorage['sh:simulate']`) gives real practice/results
-   screens; `sloppy` gives coach notes.
+   app. `?simulate=perfect|flat|sloppy|oneflat` (or `localStorage['sh:simulate']`) gives real
+   practice/results screens.
 4. Stills to check layout and sync: `node render.cjs <dir> x 3,22,47.5` writes
    `<dir>/still_<t>.png`. Full render: `node render.cjs <dir> <dir>/onboarding.mp4`
    (canvas frames via Playwright → ffmpeg; must print `errors []`). Subtitles: `voice.py` splits each
