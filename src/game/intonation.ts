@@ -214,6 +214,10 @@ export interface LabTrack {
   review?: LabReview;
   /** After a slipped check: the rung to pass once more (4, "Sing it by ear"). */
   redo?: number;
+  /** The last quick check taken: its day and whether it held (kept when a redo books a new check: Today's tick). */
+  lastCheck?: { day: string; kept: boolean };
+  /** The day the redo was passed (Today's tick for the redo step). */
+  redoneOn?: string;
 }
 export type LabProgress = Record<LabInterval, LabTrack>;
 
@@ -225,8 +229,14 @@ export const CHECK_KEEP = 2;
 
 const KEY = 'sh:intonation';
 const fresh = (): LabProgress => ({ fifth: { rung: 1, logs: {} }, third: { rung: 1, logs: {} } });
-const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
-const isDay = (v: unknown): v is string => typeof v === 'string' && DAY_RE.test(v);
+const DAY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+/** A real calendar day, YYYY-MM-DD ("2026-99-99" is not). */
+export function isDay(v: unknown): v is string {
+  const m = typeof v === 'string' ? DAY_RE.exec(v) : null;
+  if (!m) return false;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  return d.getUTCFullYear() === Number(m[1]) && d.getUTCMonth() === Number(m[2]) - 1 && d.getUTCDate() === Number(m[3]);
+}
 
 /** One track from stored (or synced) JSON: anything malformed is dropped. */
 export function cleanTrack(t: unknown): LabTrack | null {
@@ -253,17 +263,25 @@ export function cleanTrack(t: unknown): LabTrack | null {
     if (isDay(rv.checked)) { out.review.checked = rv.checked; out.review.kept = rv.kept === true; }
   }
   if (o.redo === 4 && out.rung > RUNGS) out.redo = 4;
+  const lc = o.lastCheck as Record<string, unknown> | undefined;
+  if (lc && typeof lc === 'object' && isDay(lc.day)) out.lastCheck = { day: lc.day, kept: lc.kept === true };
+  if (isDay(o.redoneOn)) out.redoneOn = o.redoneOn;
   return out;
 }
 
-export function loadLab(): LabProgress {
+export function loadLab(now = Date.now()): LabProgress {
   try {
     const raw = JSON.parse(rawGet(KEY) ?? 'null') as Partial<Record<LabInterval, unknown>> | null;
     const p = fresh();
+    let booked = false;
     for (const k of ['fifth', 'third'] as const) {
       const t = cleanTrack(raw?.[k]);
-      if (t) p[k] = t;
+      if (!t) continue;
+      // A course finished before the quick check existed: its check is a week from the first look.
+      if (t.rung > RUNGS && !t.review) { t.review = { due: addDays(dayOf(now), REVIEW_DAYS) }; booked = true; }
+      p[k] = t;
     }
+    if (booked) saveLab(p);
     return p;
   } catch { return fresh(); }
 }
@@ -289,6 +307,7 @@ export function logRound(p: LabProgress, iv: LabInterval, rung: number, value: n
   if (opens && rung === RUNGS) next.review = { due: addDays(day, REVIEW_DAYS) };
   if (passed && t.redo === rung) {
     delete next.redo;
+    next.redoneOn = day;
     next.review = { due: addDays(day, REVIEW_DAYS) };
   }
   return { p: { ...p, [iv]: next }, passed };
@@ -302,7 +321,7 @@ export function logCheck(p: LabProgress, iv: LabInterval, holds: number[], now =
   const t = p[iv];
   const kept = holds.filter((v) => Math.abs(v) <= TOL_SING).length >= CHECK_KEEP;
   const day = dayOf(now);
-  const next: LabTrack = { ...t, at: now, review: { due: t.review?.due ?? day, checked: day, kept } };
+  const next: LabTrack = { ...t, at: now, lastCheck: { day, kept }, review: { due: t.review?.due ?? day, checked: day, kept } };
   if (!kept) {
     next.redo = 4;
     next.logs = { ...t.logs, 4: [] };

@@ -571,7 +571,8 @@ export function encodeLab(p: LabProgress): LabC | undefined {
     const t = p[k];
     if (fresh(t)) continue;
     const tc: LabTrackC = { r: t.rung };
-    const logs = Object.entries(t.logs).filter(([, v]) => v.length);
+    // (the redo's rung goes even when empty: its rounds start afresh after a slipped check)
+    const logs = Object.entries(t.logs).filter(([r, v]) => v.length || Number(r) === t.redo);
     if (logs.length) tc.l = Object.fromEntries(logs.map(([r, v]) => [r, v.map((x) => Math.round(x * 10) / 10)]));
     if (t.passed && Object.keys(t.passed).length) tc.p = Object.fromEntries(Object.entries(t.passed).map(([r, d]) => [r, d]));
     if (t.at) tc.at = Math.floor(t.at);
@@ -624,10 +625,20 @@ export function mergeLab(local: LabProgress, remote: Partial<LabProgress>): LabP
     const at = Math.max(l.at ?? 0, r.at ?? 0);
     if (at) t.at = at;
     if (rung > RUNGS) {
-      const src = newer.review ? newer : older.review ? older : null;
+      // The later check wins (a redo passed books a new one); on the same day, the one taken; then the newer copy.
+      const score = (x: LabTrack) => (x.review ? `${x.review.due}|${x.review.checked ? 1 : 0}` : '');
+      const src = [newer, older].filter((x) => x.review).sort((a, b) => (score(b) > score(a) ? 1 : score(b) < score(a) ? -1 : 0))[0];
       if (src?.review) t.review = { ...src.review };
-      if (src?.redo) t.redo = src.redo;
+      if (src?.redo) {
+        t.redo = src.redo;
+        // (the redo's rounds only from the copy that asked for it: never the old passing ones)
+        t.logs[src.redo] = src.logs[src.redo] ?? [];
+      }
     }
+    const redone = [l.redoneOn, r.redoneOn].filter((x): x is string => !!x).sort().pop();
+    if (redone) t.redoneOn = redone;
+    const checks = [l.lastCheck, r.lastCheck].filter((x): x is NonNullable<LabTrack['lastCheck']> => !!x).sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
+    if (checks.length) t.lastCheck = { ...checks[checks.length - 1] };
     out[k] = t;
   }
   return out;

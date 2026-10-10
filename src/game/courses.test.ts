@@ -5,6 +5,7 @@ import {
 } from './courses';
 import { REVIEW_DAYS, logCheck, logRound, loadLab, roundsToPass, type LabProgress, type LabTrack } from './intonation';
 import { _resetAllForTests } from '../progress/store';
+import { labStep, stepDone } from '../progress/today';
 
 const fresh = (): LabProgress => ({ fifth: { rung: 1, logs: {} }, third: { rung: 1, logs: {} } });
 const at = (day: string, h = 12) => new Date(`${day}T${String(h).padStart(2, '0')}:00:00`).getTime();
@@ -164,5 +165,35 @@ describe('stored progress', () => {
     const p = loadLab();
     expect(p.fifth).toEqual({ rung: 6, logs: { 4: [] }, passed: { 5: '2026-10-04' }, at: 5, review: { due: '2026-10-11', checked: '2026-10-11', kept: false }, redo: 4 });
     expect(p.third).toEqual({ rung: 2, logs: {} });
+  });
+});
+
+describe('fix round: the check, the redo and Today', () => {
+  it('a slipped check and a redo the same day: the check stays ticked, the redo ticks, neither is offered again', () => {
+    let p = climb(fresh(), 'fifth', ['2026-09-30', '2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04']);
+    const day = '2026-10-11';
+    const checkStep = labStep(courseWarmUp(p, false, day)!);
+    p = logCheck(p, 'fifth', [20, 30, 1], at(day, 9)).p;
+    expect(p.fifth.lastCheck).toEqual({ day, kept: false });
+    const redoStep = labStep(courseWarmUp(p, false, day)!);
+    expect(redoStep.lab).toMatchObject({ rung: 4, redo: true });
+    for (let k = 0; k < 3; k++) p = logRound(p, 'fifth', 4, 1, at(day, 10)).p;
+    expect(p.fifth.redo).toBeUndefined();
+    expect(p.fifth.review).toEqual({ due: '2026-10-18' });
+    expect(p.fifth.redoneOn).toBe(day);
+    const tick = { log: [], day, labRung: { fifth: 6 }, labChecked: { fifth: p.fifth.lastCheck?.day }, labRedone: { fifth: p.fifth.redoneOn } };
+    expect(stepDone(checkStep, tick)).toBe(true);
+    expect(stepDone(redoStep, tick)).toBe(true);
+    expect(reviewState(p.fifth, day)).toBe('booked');
+    expect(courseWarmUp(p, false, day)).toBeNull();
+  });
+
+  it('a course finished before the quick check existed gets one, a week from the first look; days must be real', () => {
+    localStorage.setItem('sh:intonation', JSON.stringify({ fifth: { rung: 6, logs: {}, passed: { 2: '2026-99-99', 3: '2026-02-30', 4: '2026-10-03' } }, third: { rung: 1, logs: {} } }));
+    const p = loadLab(at(SAT));
+    expect(p.fifth.review).toEqual({ due: '2026-10-17' });
+    expect(p.fifth.passed).toEqual({ 4: '2026-10-03' });
+    expect(JSON.parse(localStorage.getItem('sh:intonation')!).fifth.review).toEqual({ due: '2026-10-17' });
+    expect(loadLab(at('2026-10-12')).fifth.review).toEqual({ due: '2026-10-17' });
   });
 });

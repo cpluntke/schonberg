@@ -953,3 +953,30 @@ describe('the intonation courses travel with the account (snapshot `lab`)', () =
     expect(loadLab().third.rung).toBe(4);
   });
 });
+
+describe('fix round: the lab merge after a slipped check', () => {
+  const track = (o: Partial<LabTrack>): LabTrack => ({ rung: 6, logs: {}, ...o });
+  it("the redo's empty rounds travel, and old passing rounds never come back", () => {
+    const slipped = track({ logs: { 4: [], 5: [1, 1, 1] }, at: T + DAY, review: { due: '2026-10-11', checked: '2026-10-11', kept: false }, redo: 4 });
+    const c = encodeLab({ fifth: slipped, third: { rung: 1, logs: {} } })!;
+    expect(c.f?.l?.[4]).toEqual([]);
+    const remote = decodeLab(JSON.parse(JSON.stringify(c)))!;
+    // This phone: the old passing rounds of rung 4, the same check not taken, but practised later (the third course).
+    const here = track({ logs: { 4: [1, 2, 1, 0] }, at: T + 2 * DAY, review: { due: '2026-10-11' } });
+    const m = mergeLab({ fifth: here, third: { rung: 1, logs: {} } }, remote);
+    expect(m.fifth.redo).toBe(4);
+    expect(m.fifth.logs[4]).toEqual([]);
+    expect(m.fifth.review).toEqual({ due: '2026-10-11', checked: '2026-10-11', kept: false });
+  });
+
+  it('a taken check is not lost to an older copy; a later booking (a redo passed) wins over it', () => {
+    const taken = track({ at: T, review: { due: '2026-10-11', checked: '2026-10-11', kept: true }, lastCheck: { day: '2026-10-11', kept: true } });
+    const booked = track({ at: T + DAY, review: { due: '2026-10-11' } });
+    expect(mergeLab({ fifth: booked, third: { rung: 1, logs: {} } }, { fifth: taken }).fifth.review?.checked).toBe('2026-10-11');
+    const rebooked = track({ at: T - DAY, review: { due: '2026-10-19' }, redoneOn: '2026-10-12' });
+    const m = mergeLab({ fifth: taken, third: { rung: 1, logs: {} } }, { fifth: rebooked });
+    expect(m.fifth.review).toEqual({ due: '2026-10-19' });
+    expect(m.fifth.lastCheck).toEqual({ day: '2026-10-11', kept: true });
+    expect(m.fifth.redoneOn).toBe('2026-10-12');
+  });
+});

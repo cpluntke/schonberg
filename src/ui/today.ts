@@ -146,7 +146,8 @@ export function tickContext(day: string, log: AttemptLog[] = attemptLog()): Tick
   return {
     log, day, lab: loadLabDay(),
     labRung: { fifth: lab.fifth.rung, third: lab.third.rung },
-    labChecked: { fifth: lab.fifth.review?.checked, third: lab.third.review?.checked },
+    labChecked: { fifth: lab.fifth.lastCheck?.day, third: lab.third.lastCheck?.day },
+    labRedone: { fifth: lab.fifth.redoneOn, third: lab.third.redoneOn },
     wordsAt: (pieceId, partId, sectionId) => getWords(pieceId, partId)[sectionId]?.at ?? 0,
   };
 }

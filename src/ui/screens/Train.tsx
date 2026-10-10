@@ -154,7 +154,7 @@ function useWarmUp(lab: LabProgress, recommended: boolean): WarmUp | null {
   if (i >= 0) {
     const s = t.plan.steps[i];
     if (t.status.done[i] || !s.lab) return null;
-    return { iv: s.lab.interval, rung: s.lab.rung, check: s.lab.check, redo: !!s.lab.tuneUp && !!lab[s.lab.interval].redo, minutes: s.minutes, start: () => goStep(s) };
+    return { iv: s.lab.interval, rung: s.lab.rung, check: s.lab.check, redo: !!s.lab.redo, minutes: s.minutes, start: () => goStep(s) };
   }
   const w = courseWarmUp(lab, recommended, today);
   if (!w || (w.done && !w.check && !w.redo)) return null;
@@ -232,7 +232,7 @@ export function AllCourses() {
   return (
     <main className="screen crs-page" data-testid="all-courses">
       <div className="topbar">
-        <button className="icon-btn filled" aria-label="Back to Train" onClick={() => back({ name: 'train' })}><IconBack /></button>
+        <button className="icon-btn filled" aria-label="Back" onClick={() => back({ name: 'train' })}><IconBack /></button>
         <h1>All courses</h1>
       </div>
       <span className="t16 muted">Each course is a few short steps, about {COURSE_MINUTES} minutes in all: one step a day is plenty.{recommended ? ' Your choir recommends the intonation courses.' : ''}</span>
@@ -287,7 +287,7 @@ export function DroneScreen() {
   return (
     <main className="screen crs-page" data-testid="drone-screen">
       <div className="topbar">
-        <button className="icon-btn filled" aria-label="Back to Train" onClick={() => back({ name: 'train' })}><IconBack /></button>
+        <button className="icon-btn filled" aria-label="Back" onClick={() => back({ name: 'train' })}><IconBack /></button>
         <h1>Drone</h1>
       </div>
       <span className="t16 muted">A steady note to sing against: hold your note over it and listen for the pulse to stop.</span>

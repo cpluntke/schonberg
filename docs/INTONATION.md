@@ -53,7 +53,11 @@ Passing a course's last step books a **quick check** 7 days later (`LabTrack.rev
 day Train's warm-up and Today's warm-up offer it (1 minute, `#/intonation/<interval>/check`): three
 holds by ear, no picture (rung 4's screen); **kept** when 2 of 3 are within 8¢. If it slipped, rung 4
 ("Sing it by ear") is suggested once more (`LabTrack.redo`, its rounds start afresh); passing it again
-books a new check a week later. A course page and Train show where the check stands.
+books a new check a week later ("It locks again ✓ · quick check on …"). A course page and Train show
+where the check stands. The check's screen opens only on or after its day and until it is taken;
+otherwise its address shows the course page. Today ticks the check once taken today (kept even when a
+redo the same day books the next one) and the redo once passed today; "What moved" says "Quick check:
+it held ✓" or "Quick check: it slipped · sing it by ear once more".
 
 ## Today
 
@@ -114,9 +118,13 @@ to ±25¢), so it can only be found by ear.
 ## Stored, and synced
 
 Progress is on the phone (`sh:intonation`): per interval the rung, the last rounds per rung, the day
-each rung was passed, the last round's time, the quick check (due, taken, kept) and a redo. It travels
-with the choir account as the snapshot's `lab` field (`sync.ts encodeLab/decodeLab/mergeLab`, under
-400 bytes; older apps ignore it, so SNAPSHOT_VERSION stays): merging takes the higher rung, each rung's
-rounds from the copy practised last, the earlier pass day, and the quick check (and a redo) from the
-copy practised last that has one. Never lowers a rung. (An older app that saves the account copy drops
+each rung was passed, the last round's time, the quick check (due, taken, kept), a redo, and (this
+phone only, for Today's ticks) the last check taken and the day a redo was passed. A course finished
+before the quick check existed gets one booked a week from the first look. It travels with the choir
+account as the snapshot's `lab` field (`sync.ts encodeLab/decodeLab/mergeLab`; typically 200–300 bytes,
+about 620 at most with every round of both ladders; older apps ignore it, so SNAPSHOT_VERSION stays):
+merging takes the higher rung, each rung's rounds from the copy practised last, the earlier pass day,
+and the quick check with the later due day (on the same day the one taken) with its redo; the redo's
+rounds come only from that copy (an empty list after a slip is sent too), so old passing rounds never
+come back. Never lowers a rung. (An older app that saves the account copy drops
 the field; the phones that have it keep theirs and put it back on their next save.)

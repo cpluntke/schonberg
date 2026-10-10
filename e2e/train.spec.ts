@@ -135,7 +135,7 @@ test('the drone and all courses', async ({ page }) => {
   await expect(page.getByTestId('drone-toggle')).toHaveAttribute('aria-pressed', 'true');
   await page.getByTestId('drone-toggle').click();
   await expect(page.getByTestId('drone-toggle')).toHaveAttribute('aria-pressed', 'false');
-  await page.getByRole('button', { name: 'Back to Train' }).click();
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
   await page.getByTestId('train-all-courses').click();
   await expect(page.getByTestId('course-fifth')).toContainText('not started');
   await expect(page.getByTestId('course-third')).toContainText('Pure major third');

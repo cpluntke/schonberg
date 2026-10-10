@@ -53,13 +53,15 @@ export function IntonationLab({ route }: { route: LabRoute }) {
       const here = location.hash;
       window.setTimeout(() => { if (location.hash === here) go({ name: 'intonation', interval: iv, done: true }, true); }, 900);
     }
-    return { passed: r.passed, opened: opened || (!!before.redo && !after.redo) };
+    return { passed: r.passed, opened, redone: !!before.redo && !after.redo };
   };
+  // The quick check opens only on its day (taken, or not due yet: the course page); decided once per visit.
+  const [checkOpen] = useState(() => !!route.check && !!route.interval && reviewState(loadLab()[route.interval], dayOf(new Date())) === 'due');
 
   const iv = route.interval ?? activeCourse(lab) ?? suggestedCourse(lab) ?? 'fifth';
   const done = lab[iv].rung > RUNGS;
   if (route.done && done) return <CourseDone iv={iv} lab={lab} />;
-  if (route.check && done) return <QuickCheck iv={iv} root={root} lab={lab} onLab={setLab} />;
+  if (route.check && done && checkOpen) return <QuickCheck iv={iv} root={root} lab={lab} onLab={setLab} />;
   const rung = route.rung;
   if (!route.interval || !rung || rung > lab[iv].rung) return <CourseOverview iv={iv} lab={lab} root={root} />;
   const props = { iv, root, lab, record };
@@ -72,7 +74,7 @@ export function IntonationLab({ route }: { route: LabRoute }) {
 
 interface RungProps {
   iv: LabInterval; root: number; lab: LabProgress;
-  record: (iv: LabInterval, rung: number, v: number) => { passed: boolean; opened: boolean };
+  record: (iv: LabInterval, rung: number, v: number) => { passed: boolean; opened: boolean; redone?: boolean };
 }
 
 /** Check circles: ✓ done, ✗ missed, a number for a step or try still to come, the orange ring for now. */
@@ -99,7 +101,7 @@ function RungTop({ iv, rung, children }: { iv: LabInterval; rung: number | 'chec
   return (
     <>
       <div className="topbar">
-        <button className="icon-btn filled" aria-label="Back to the course" onClick={() => back({ name: 'intonation', interval: iv })}><IconBack /></button>
+        <button className="icon-btn filled" aria-label="Back" onClick={() => back({ name: 'intonation', interval: iv })}><IconBack /></button>
         <h1 className="crs-where">{COURSES[iv].title} · {rung === 'check' ? 'Quick check' : `Step ${rung} of ${RUNGS}`}</h1>
       </div>
       {children}
@@ -121,8 +123,9 @@ function GoalLines({ goal, how }: { goal: string; how?: React.ReactNode }) {
  * Labelled progress: "Pure tries ✓ ✓ ✗ ④ · 1 more to pass". The last tries of the rung's window and
  * the next one (an orange ring), then how many more pure ones would pass it.
  */
-function Tries({ label, results, ok, total, more }: { label: string; results: number[]; ok: (v: number) => boolean; total: number; more: string }) {
-  const passed = more === 'Passed';
+function Tries({ label, results, ok, total, more, done }: { label: string; results: number[]; ok: (v: number) => boolean; total: number; more: string; done?: boolean }) {
+  // (passed, or a quick check finished: all its tries, no ring for a next one)
+  const passed = more === 'Passed' || !!done;
   const shown = passed ? results.slice(-total) : results.slice(-(total - 1));
   const pure = results.slice(-total).filter(ok).length;
   return (
@@ -132,7 +135,7 @@ function Tries({ label, results, ok, total, more }: { label: string; results: nu
         {shown.map((v, i) => <Check key={i} state={ok(v) ? 'done' : 'miss'} />)}
         {!passed && <Check state="now" n={results.length + 1} />}
       </span>
-      <span className={`t14 crs-more${passed ? ' good-text' : ''}`}>{more}</span>
+      <span className={`t14 crs-more${more === 'Passed' ? ' good-text' : ''}`}>{more}</span>
     </div>
   );
 }
@@ -289,7 +292,7 @@ function CourseOverview({ iv, lab, root }: { iv: LabInterval; lab: LabProgress; 
   return (
     <main className="screen has-foot crs-page" data-testid="lab-ladder">
       <div className="topbar">
-        <button className="icon-btn filled" aria-label="Back to Train" onClick={() => back({ name: 'train' })}><IconBack /></button>
+        <button className="icon-btn filled" aria-label="Back" onClick={() => back({ name: 'train' })}><IconBack /></button>
         <span className="t16 muted grow">Train</span>
         {recommended && <span className="crs-rec" data-testid="lab-recommended">Your choir recommends</span>}
       </div>
@@ -400,7 +403,12 @@ function StepDone({ iv, rung, onKeep }: { iv: LabInterval; rung: number; onKeep:
   return <StepDoneSheet iv={iv} rung={rung} onKeep={onKeep} />;
 }
 
-function StepDoneSheet({ iv, rung, onKeep }: { iv: LabInterval; rung: number; onKeep: () => void }) {
+/** The redo after a slipped quick check is passed: "It locks again", and the next check's date. */
+function RedoDone({ iv, onKeep }: { iv: LabInterval; onKeep: () => void }) {
+  return <StepDoneSheet iv={iv} rung={4} onKeep={onKeep} redo />;
+}
+
+function StepDoneSheet({ iv, rung, onKeep, redo }: { iv: LabInterval; rung: number; onKeep: () => void; redo?: boolean }) {
   const c = COURSES[iv];
   const lab = loadLab();
   const ses = todaySession({ lab: true });
@@ -413,8 +421,9 @@ function StepDoneSheet({ iv, rung, onKeep }: { iv: LabInterval; rung: number; on
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  const next = rung < RUNGS ? rung + 1 : null;
-  const sub = `${c.title} · ${c.steps[rung - 1].rule.replace(/^To pass: /, '')}`;
+  const next = rung < RUNGS && !redo ? rung + 1 : null;
+  const due = lab[iv].review?.due;
+  const sub = redo ? `${c.title}${due ? ` · quick check on ${dateWords(due)}` : ''}` : `${c.title} · ${c.steps[rung - 1].rule.replace(/^To pass: /, '')}`;
   return (
     <div className="psheet-scrim" data-testid="lab-step-done-scrim">
       <div ref={sheetRef} className="psheet crs-sheet" role="dialog" aria-modal="true" aria-labelledby="lab-done-h" data-testid="lab-passed">
@@ -422,11 +431,11 @@ function StepDoneSheet({ iv, rung, onKeep }: { iv: LabInterval; rung: number; on
         <div className="crs-donecard">
           <span className="crs-star" aria-hidden="true">★</span>
           <div className="col" style={{ gap: 4 }}>
-            <h2 id="lab-done-h">Step {rung} done ✓</h2>
+            <h2 id="lab-done-h">{redo ? 'It locks again ✓' : `Step ${rung} done ✓`}</h2>
             <span className="t14 muted">{sub}</span>
           </div>
         </div>
-        <p className="t16" style={{ margin: 0 }}>{c.stepCanDo[rung - 1]}</p>
+        <p className="t16" style={{ margin: 0 }}>{redo ? `Your ${c.note} is back where it rings, by ear alone. Another quick check in a week keeps it there.` : c.stepCanDo[rung - 1]}</p>
         <div className="row" style={{ gap: 12 }}>
           <CourseChecks iv={iv} lab={lab} />
           {next && <span className="t14 muted">Step {next} of the course waits for tomorrow.</span>}
@@ -477,7 +486,8 @@ function CourseDone({ iv, lab }: { iv: LabInterval; lab: LabProgress }) {
   const c = COURSES[iv];
   const t = lab[iv];
   const today = dayOf(new Date());
-  const doneDay = t.passed?.[RUNGS] ?? today;
+  // (a course finished before the pass days were kept has no date)
+  const doneDay = t.passed?.[RUNGS];
   const rv = reviewState(t, today);
   const music = useMemo(() => spotInMusic(iv), [iv]);
   const other: LabInterval = iv === 'fifth' ? 'third' : 'fifth';
@@ -494,11 +504,11 @@ function CourseDone({ iv, lab }: { iv: LabInterval; lab: LabProgress }) {
   return (
     <main className="screen has-foot crs-page" data-testid="lab-course-done">
       <div className="topbar">
-        <button className="icon-btn filled" aria-label="Back to the course" onClick={() => back({ name: 'intonation', interval: iv })}><IconBack /></button>
+        <button className="icon-btn filled" aria-label="Back" onClick={() => back({ name: 'intonation', interval: iv })}><IconBack /></button>
         <span className="t16 muted grow">Train · {c.title}</span>
       </div>
       <section className="band" aria-labelledby="crs-done-h">
-        <span className="eb good-text">Course complete · {dateWords(doneDay)}</span>
+        <span className="eb good-text">Course complete{doneDay ? ` · ${dateWords(doneDay)}` : ''}</span>
         <h2 id="crs-done-h">{c.done}</h2>
         <div className="row" style={{ gap: 10 }}><CourseChecks iv={iv} lab={lab} /><span className="t14 muted">all {RUNGS} steps</span></div>
         <ul className="crs-cando">
@@ -815,6 +825,7 @@ function SingRung({ iv, root, lab, record, rung, check }: RungProps & { rung: nu
   const [held, setHeld] = useState(0);
   const [result, setResult] = useState<{ value: number; counted: boolean } | null>(null);
   const [passed, setPassed] = useState(false);
+  const [redone, setRedone] = useState(false);
   const [hinting, setHinting] = useState(false);
   const unsub = useRef<(() => void) | null>(null);
   const hintTimer = useRef(0);
@@ -832,6 +843,15 @@ function SingRung({ iv, root, lab, record, rung, check }: RungProps & { rung: nu
   cur.current = { deg, others, target, showWobble, record };
 
   useEffect(() => () => { unsub.current?.(); unsub.current = null; clearTimeout(hintTimer.current); }, []);
+  // The quick check is finished: the drone and the microphone stop.
+  const checkDone = check?.kept != null;
+  useEffect(() => {
+    if (!checkDone) return;
+    unsub.current?.();
+    unsub.current = null;
+    void drone.get().then((d) => d?.stop());
+    setState('off');
+  }, [checkDone]); // eslint-disable-line react-hooks/exhaustive-deps
   // The chord's notes follow the chosen part; a new part is a new round.
   useEffect(() => {
     if (state !== 'on') return;
@@ -903,7 +923,9 @@ function SingRung({ iv, root, lab, record, rung, check }: RungProps & { rung: nu
     // A different note (more than a semitone away) is no try; in the chord, rounds with the wobble shown are practice.
     const counted = Math.abs(offBy) <= 60 && (!chordRung || !sw);
     setResult({ value: c, counted });
-    if (counted && rec(iv, rung, offBy).opened) setPassed(true);
+    const res = counted ? rec(iv, rung, offBy) : null; // (the quick check's own record never opens a step)
+    if (res?.opened) setPassed(true);
+    else if (res?.redone) setRedone(true);
   }
 
   /** A new round. */
@@ -954,7 +976,7 @@ function SingRung({ iv, root, lab, record, rung, check }: RungProps & { rung: nu
         <GoalLines goal={goal} how={<>{rung === 4 || check ? 'No picture this time: only your ears. ' : chordRung ? 'The app sings the other two notes, already pure. ' : ''}{how}</>} />
       </RungTop>
       {check
-        ? <Tries label="Holds" results={check.holds} ok={(v) => Math.abs(v) <= tol} total={CHECK_HOLDS} more={check.kept != null ? checkLine(check.holds) : `${CHECK_HOLDS - check.holds.length} to go`} />
+        ? <Tries label="Holds" results={check.holds} ok={(v) => Math.abs(v) <= tol} total={CHECK_HOLDS} done={check.kept != null} more={check.kept != null ? checkLine(check.holds) : `${CHECK_HOLDS - check.holds.length} to go`} />
         : <Tries label="Pure tries" results={results} ok={(v) => Math.abs(v) <= tol} total={ROUNDS} more={moreToPass(rung, results)} />}
       {chordRung && (
         <>
@@ -975,7 +997,7 @@ function SingRung({ iv, root, lab, record, rung, check }: RungProps & { rung: nu
         <span className="pill">Drone: {others.map((o) => DEG_NAME[o]).join(' + ')}</span>
         <span className="pill voice">You: {note}</span>
       </div>
-      {state !== 'on' ? (
+      {checkDone ? null : state !== 'on' ? (
         <div className="card" style={{ alignItems: 'center', gap: 10 }}>
           <span className="t14 muted" style={{ textAlign: 'center' }}>
             {state === 'error' ? err : 'Headphones on: the app’s notes must not reach the microphone. Your voice is analysed on this phone only.'}
@@ -1036,6 +1058,7 @@ function SingRung({ iv, root, lab, record, rung, check }: RungProps & { rung: nu
         </div>
       )}
       {passed && !check && <StepDone iv={iv} rung={rung} onKeep={() => setPassed(false)} />}
+      {redone && !check && <RedoDone iv={iv} onKeep={() => setRedone(false)} />}
     </main>
   );
 }

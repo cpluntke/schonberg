@@ -60,8 +60,8 @@ export function leapDrillScore(id: string, title: string, pairs: { a: number; b:
 
 export interface Leap {
   a: number; b: number; label: string; where: string;
-  /** Where it is in the singer's music: the piece, the part and the bar (0-based) the leap lands in. */
-  pieceId: string; partId: string; measure: number;
+  /** Where it is in the singer's music: the piece, the part, the bars (0-based) the leap starts and lands in. */
+  pieceId: string; partId: string; startMeasure: number; measure: number;
 }
 
 export function cycleLeaps(max = 12): Leap[] {
@@ -80,7 +80,7 @@ export function cycleLeaps(max = 12): Leap[] {
         a: a.midi, b: b.midi,
         label: `${h.semitones > 0 ? '↑' : '↓'}${intervalName(Math.abs(h.semitones))}`,
         where: `${pc.title}, bar ${pc.score.measures[h.measure]?.number ?? h.measure + 1}`,
-        pieceId: pc.id, partId: part.id, measure: h.measure,
+        pieceId: pc.id, partId: part.id, startMeasure: a.measure, measure: h.measure,
       });
     }
   }
