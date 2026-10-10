@@ -127,7 +127,7 @@ export function Ranks() {
         <h1>Ranks</h1>
         {pieces.length > 0 && (
           <select aria-label="Piece" value={pieceId} onChange={(e) => setPieceId(e.target.value)}
-            style={{ maxWidth: 190, minHeight: 40, borderRadius: 20, background: 'var(--surface)', border: '1px solid var(--line)', padding: '0 10px', fontWeight: 600 }}>
+            style={{ maxWidth: 190, minHeight: 44, borderRadius: 20, background: 'var(--surface)', border: '1px solid var(--line)', padding: '0 10px', fontWeight: 600 }}>
             <option value={ALL_PIECES}>All pieces</option>
             {pieces.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
           </select>

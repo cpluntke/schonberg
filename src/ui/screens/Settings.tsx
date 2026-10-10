@@ -78,7 +78,7 @@ export function Settings() {
         <div className="toggle-row"><span>Name</span><span className="muted">{profile.name || '–'}</span></div>
         <div className="toggle-row"><span>Voice part</span>
           <select aria-label="Voice part" value={profile.voice} onChange={(e) => update({ voice: e.target.value as typeof profile.voice })}
-            style={{ minHeight: 40, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--line)', padding: '0 8px' }}>
+            style={{ minHeight: 44, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--line)', padding: '0 8px' }}>
             <option value="S">Soprano</option><option value="A">Alto</option><option value="T">Tenor</option><option value="B">Bass</option>
           </select>
         </div>
@@ -90,11 +90,11 @@ export function Settings() {
               update({ latencyMs: ms, latencySource: 'measured' });
             }}
             onBlur={() => setDelayText(null)}
-            style={{ width: 90, minHeight: 40, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--line)', padding: '0 8px' }} />
+            style={{ width: 90, minHeight: 44, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--line)', padding: '0 8px' }} />
         </label>
         <label className="toggle-row"><span>Practice beat<span className="tiny muted" style={{ display: 'block' }}>A soft click keeps the tempo where you sing on your own.</span></span>
           <select aria-label="Practice beat" value={profile.beat ?? 'alone'} onChange={(e) => update({ beat: e.target.value as 'off' | 'alone' | 'always' })}
-            style={{ minHeight: 40, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--line)', padding: '0 8px' }}>
+            style={{ minHeight: 44, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--line)', padding: '0 8px' }}>
             <option value="alone">When I sing alone</option>
             <option value="always">Always</option>
             <option value="off">Off</option>
