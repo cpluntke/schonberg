@@ -21,6 +21,7 @@ import type { PieceInfo } from '../library';
 import { accountTipPending, dismissAccountTip } from '../../progress/sync';
 import { startPresence } from '../../progress/presence';
 import { PracticeBar } from '../components/PracticeBar';
+import { openAccount } from '../components/AccountSync';
 
 /** Start a run from Results: it takes Results' place in history (router: practice screens replace each other). */
 function goPlay(r: Parameters<typeof go>[0]) {
@@ -687,8 +688,7 @@ function AccountTip() {
       <div className="row" style={{ gap: 6 }}>
         <button className="btn small" onClick={() => {
           dismissAccountTip();
-          try { sessionStorage.setItem('sh:openAccount', 'create'); } catch { /* ignore */ }
-          go({ name: 'settings' });
+          openAccount('create');
         }}>Make an account</button>
         <button className="btn small ghost" onClick={() => { dismissAccountTip(); setShow(false); }}>Not now</button>
       </div>

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
-  _resetAllForTests, DEFAULT_PROFILE, getProgress, loadCycle, loadProfile, progressKey, readinessHistory, saveCycle, saveProfile,
+  _resetAllForTests, DEFAULT_PROFILE, getProgress, loadCycle, loadProfile, progressKey, rawSet, readinessHistory, saveCycle, saveProfile,
   snapshotReadiness, writeJSON, type FullRunProgress, type PieceProgress, type SectionProgress,
 } from './store';
 import { barsKey, getBars, type BarMap } from './bars';
@@ -582,14 +582,63 @@ describe('sync with the choir account', () => {
     expect(calls.at(-1)!.method).toBe('PUT');
   });
 
-  it('asks too when the phone\'s progress has no name, or the account has nothing saved yet', async () => {
+  it('asks too when the phone\'s progress has no name and the account keeps progress', async () => {
     fakeServer();
+    seedSinger(1);
+    server = { rev: 1, data: JSON.parse(JSON.stringify(buildSnapshot().data)) };
+    localStorage.clear();
+    _resetAllForTests();
     saveProfile({ ...DEFAULT_PROFILE, onboarded: true, choirCode: 'kammerchor' });
     writeJSON(progressKey('other', 'P1'), piece({ pieceId: 'other', partId: 'P1', sections: { a: sec({ level: 3 }) } }));
     saveSession(session({ role: 'lead', voices: ['A'] }));
     answerStaffSync(true);
     expect(await uploadProgress()).toEqual({ ok: false, ask: true });
-    expect(pendingQuestion()).toMatchObject({ here: 'no name', pieces: 0 });
+    expect(pendingQuestion()).toMatchObject({ here: 'no name', pieces: 1 });
+    expect(calls.some((c) => c.method === 'PUT')).toBe(false);
+  });
+
+  it('a new account (nothing kept yet) just takes this phone\'s progress: no name, or another spelling of it', async () => {
+    for (const [name, account] of [['', 'Anna Example'], ['Anni', 'Anna Example']] as const) {
+      localStorage.clear();
+      _resetAllForTests();
+      fakeServer();
+      saveProfile({ ...DEFAULT_PROFILE, name, onboarded: true, choirCode: 'kammerchor' });
+      writeJSON(progressKey('other', 'P1'), piece({ pieceId: 'other', partId: 'P1', sections: { a: sec({ level: 3, lastPassed: T }) } }));
+      let confirmations = 0;
+      const off = onAccountConfirmed(() => { confirmations++; });
+      saveSession(session({ name: account }));
+      expect(await uploadProgress()).toEqual({ ok: true });
+      off();
+      expect(pendingQuestion()).toBeNull();
+      expect(confirmations).toBe(1);
+      expect(accountConfirmed()).toBe(true);
+      expect(loadProfile().name).toBe(account);
+      // This phone's progress went up to the account.
+      expect(calls.at(-1)!.method).toBe('PUT');
+      expect(Object.keys((server!.data as ProgressSnapshot).p)).toEqual(['other|P1']);
+    }
+  });
+
+  it('an account saved with no pieces counts as empty: the same singer is not asked', async () => {
+    fakeServer();
+    seedSinger(1);
+    // The phone went with an older account of the same singer; the new account kept only settings.
+    rawSet('schonberg:syncMeta', JSON.stringify({ account: 'acc000000009', rev: 4 }));
+    server = { rev: 1, data: { ...JSON.parse(JSON.stringify(buildSnapshot().data)), p: {} } };
+    saveSession(session());
+    expect((await uploadProgress()).ok).toBe(true);
+    expect(pendingQuestion()).toBeNull();
+    expect(Object.keys((server!.data as ProgressSnapshot).p)).toEqual(['piece0|P2']);
+  });
+
+  it('still asks when this phone\'s progress went with another singer\'s account, even into a new account', async () => {
+    fakeServer();
+    saveProfile({ ...DEFAULT_PROFILE, name: 'Ben', onboarded: true, choirCode: 'kammerchor' });
+    writeJSON(progressKey('other', 'P1'), piece({ pieceId: 'other', partId: 'P1', sections: { a: sec({ level: 3, lastPassed: T }) } }));
+    rawSet('schonberg:syncMeta', JSON.stringify({ account: 'acc000000002', rev: 4 }));
+    saveSession(session());
+    expect(await uploadProgress()).toEqual({ ok: false, ask: true });
+    expect(pendingQuestion()).toMatchObject({ accountName: 'Anna Example', here: 'Ben', pieces: 0 });
     expect(calls.some((c) => c.method === 'PUT')).toBe(false);
   });
 

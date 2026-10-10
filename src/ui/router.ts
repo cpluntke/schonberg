@@ -259,6 +259,24 @@ export function back(fallback: Route = { name: 'home' }) {
   else go(fallback, true);
 }
 
+/** The part (element id) the next screen opens on instead of its top: see openAt. */
+let anchor: string | null = null;
+
+/** Go to a screen opened on one of its parts (an element id), e.g. Settings' account block, not its top. */
+export function openAt(r: Route, id: string) {
+  if (href(r) === location.hash) { document.getElementById(id)?.scrollIntoView({ block: 'start' }); return; }
+  anchor = id;
+  go(r);
+}
+
+/** Once a new screen is drawn: scroll to the part asked for (openAt) when it's there, else to the top. */
+export function arrivalScroll() {
+  const el = anchor ? document.getElementById(anchor) : null;
+  anchor = null;
+  if (el) el.scrollIntoView({ block: 'start' });
+  else window.scrollTo(0, 0);
+}
+
 export function useRoute(): Route {
   const [route, setRoute] = useState(() => parseHash(location.hash));
   useEffect(() => {
@@ -270,8 +288,9 @@ export function useRoute(): Route {
       try { sessionStorage.setItem('sh:navd', '1'); } catch { /* storage blocked */ }
       setRoute(parseHash(location.hash));
       window.scrollTo(0, 0);
-      // …and once the new screen is drawn (a taller screen replacing Play could keep an odd offset).
-      requestAnimationFrame(() => window.scrollTo(0, 0));
+      // …and once the new screen is drawn (a taller screen replacing Play could keep an odd offset),
+      // unless it was asked to open on one of its parts (openAt).
+      requestAnimationFrame(arrivalScroll);
     };
     window.addEventListener('hashchange', on);
     window.addEventListener('popstate', on);

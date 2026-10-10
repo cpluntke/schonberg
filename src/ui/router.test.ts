@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import { go, href, leaveTo, parseHash, practiceParent, pushGuard, isDroppingGuard } from './router';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { arrivalScroll, go, href, leaveTo, openAt, parseHash, practiceParent, pushGuard, isDroppingGuard } from './router';
 
 /** history.back() and wait until it has landed. */
 function back(): Promise<void> {
@@ -111,5 +111,65 @@ describe('the intonation lab\'s addresses', () => {
     }
     expect(parseHash('#/intonation/third/9')).toEqual({ name: 'intonation', interval: 'third' });
     expect(parseHash('#/intonation/sixth/2')).toEqual({ name: 'intonation' });
+  });
+});
+
+describe('where a new screen opens', () => {
+  let toTop: ReturnType<typeof vi.fn>;
+  let into: ReturnType<typeof vi.fn>;
+  const orig = Element.prototype.scrollIntoView;
+  beforeEach(async () => {
+    history.replaceState(null, '', '#/');
+    await settle();
+    toTop = vi.fn();
+    into = vi.fn();
+    vi.stubGlobal('scrollTo', toTop);
+    Element.prototype.scrollIntoView = into as unknown as Element['scrollIntoView'];
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    Element.prototype.scrollIntoView = orig;
+    document.getElementById('account')?.remove();
+  });
+  const part = () => { const el = document.createElement('section'); el.id = 'account'; document.body.append(el); return el; };
+
+  it('an ordinary screen change starts at the top', () => {
+    go({ name: 'settings' });
+    part();
+    arrivalScroll();
+    expect(toTop).toHaveBeenCalledWith(0, 0);
+    expect(into).not.toHaveBeenCalled();
+  });
+
+  it('openAt (Log in / Make an account) lands on that part once drawn, and only that once', () => {
+    openAt({ name: 'settings' }, 'account');
+    expect(location.hash).toBe('#/settings');
+    const el = part();
+    arrivalScroll();
+    expect(into).toHaveBeenCalledTimes(1);
+    expect(into.mock.instances[0]).toBe(el);
+    expect(toTop).not.toHaveBeenCalled();
+    // the next screen change is an ordinary one again
+    arrivalScroll();
+    expect(toTop).toHaveBeenCalledWith(0, 0);
+    expect(into).toHaveBeenCalledTimes(1);
+  });
+
+  it('openAt to a part that isn\'t there (no choir server): the top, and nothing left over', () => {
+    openAt({ name: 'settings' }, 'account');
+    arrivalScroll();
+    expect(toTop).toHaveBeenCalledWith(0, 0);
+    part();
+    arrivalScroll();
+    expect(into).not.toHaveBeenCalled();
+  });
+
+  it('openAt on the screen already shown: scrolls there right away', () => {
+    history.replaceState(null, '', '#/settings');
+    const el = part();
+    openAt({ name: 'settings' }, 'account');
+    expect(into.mock.instances[0]).toBe(el);
+    arrivalScroll();
+    expect(toTop).toHaveBeenCalledWith(0, 0);
   });
 });

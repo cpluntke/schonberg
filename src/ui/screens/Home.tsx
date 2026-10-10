@@ -11,7 +11,7 @@ import { cyclePoints, practisedToday } from '../../progress/points';
 import { IntroVideoButton } from '../components/IntroVideo';
 import { apiBase, cachedChoir, choirCycleNext, choirCycleNow, choirLogo, loadSession, sharingNeedsOk, startSharing } from '../../progress/choir';
 import { shareMyProgress } from '../play/shareProgress';
-import { LoggedOutCard, SyncNotice } from '../components/AccountSync';
+import { LoggedOutCard, SyncNotice, openAccount } from '../components/AccountSync';
 import { pieceStatus, todaysPlan, type PieceStatus } from '../plan';
 import { presenceShown, usePresence } from '../../progress/presence';
 import { LOGO_TILE } from '../components/ChoirLogo';
@@ -138,7 +138,7 @@ export function Home() {
           <button className="btn primary block" data-testid="home-setup" onClick={() => go({ name: 'setup' })}>Start setup</button>
           {apiBase() && !loadSession() && ( // (logged in already: nothing to get back)
             <button className="linklike small muted" style={{ alignSelf: 'center', minHeight: 40 }} data-testid="home-account"
-              onClick={() => { try { sessionStorage.setItem('sh:openAccount', 'login'); } catch { /* ignore */ } go({ name: 'settings' }); }}>New phone? Log in to your choir account to get your progress back</button>
+              onClick={() => openAccount('login')}>New phone? Log in to your choir account to get your progress back</button>
           )}
         </div>
       )}

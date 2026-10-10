@@ -7,7 +7,13 @@ import { loadProfile } from '../../progress/store';
 import { answerStaffSync, confirmMerge, loadMeta, pendingQuestion, staffSyncQuestion, syncEnabled, uploadProgress } from '../../progress/sync';
 import { syncChoirNow } from '../library';
 import { shareMyProgress } from '../play/shareProgress';
-import { go } from '../router';
+import { openAt } from '../router';
+
+/** Open Settings on the account block, on the "Make an account" or "Log in" tab. */
+export function openAccount(tab: 'create' | 'login') {
+  try { sessionStorage.setItem('sh:openAccount', tab); } catch { /* ignore */ }
+  openAt({ name: 'settings' }, 'account');
+}
 
 /** What the account keeps, in one line (Settings and the one-time notice). */
 export const KEPT = 'Your levels, best results and practice dates, a summary of each bar, your settings and programme. Never recordings or your practice log.';
@@ -64,10 +70,7 @@ export function LoggedOutCard() {
         : `Log in again to keep your progress in sync${profile.shareProgress ? ' and keep sharing it with your section lead' : ''}.`}</span>
       <div className="row" style={{ gap: 6 }}>
         {!removed && (
-          <button className="btn small" data-testid="logged-out-login" onClick={() => {
-            try { sessionStorage.setItem('sh:openAccount', 'login'); } catch { /* ignore */ }
-            go({ name: 'settings' });
-          }}>Log in again</button>
+          <button className="btn small" data-testid="logged-out-login" onClick={() => openAccount('login')}>Log in again</button>
         )}
         <button className="btn small ghost" onClick={() => dismissLogout()}>{removed ? 'OK' : 'Not now'}</button>
       </div>
@@ -110,13 +113,11 @@ export function AccountSync() {
   useStoreVersion();
   useSessionVersion();
   // Where we came from: Results' "Make an account" ('create'), Home's "Log in again" ('login').
+  // (read here, cleared once mounted: React may run this initializer twice)
   const [asked] = useState(() => {
-    try {
-      const v = sessionStorage.getItem('sh:openAccount');
-      sessionStorage.removeItem('sh:openAccount');
-      return v;
-    } catch { return null; }
+    try { return sessionStorage.getItem('sh:openAccount'); } catch { return null; }
   });
+  useEffect(() => { try { sessionStorage.removeItem('sh:openAccount'); } catch { /* ignore */ } }, []);
   const [mode, setMode] = useState<'create' | 'login'>(() => initialMode(asked, profile.choirCode));
   const [code, setCode] = useState(profile.choirCode ?? lastLogout()?.code ?? '');
   const [name, setName] = useState(lastLogout()?.name ?? profile.name);
@@ -154,7 +155,7 @@ export function AccountSync() {
   };
 
   return (
-    <section className="col" style={{ gap: 8 }} data-testid="account-sync" ref={ref}>
+    <section className="col" style={{ gap: 8, scrollMarginTop: 12 }} id="account" data-testid="account-sync" ref={ref}>
       <h2 className="eyebrow">Keep my progress across phones</h2>
       {!session && !profile.choirCode && !lastLogout() && !meta.account && !asked && !soloOpen ? (
         // A singer without a choir: the backup file is their way; the login is for choir members.

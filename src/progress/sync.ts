@@ -8,7 +8,8 @@
 // Any choir account keeps it: a member's own account (made with the choir code), a section lead's or
 // an admin's. Sync: after runs (at most once a minute) and when the app starts or comes back, if
 // something changed. Logging in on another phone pulls it first; when that phone already has progress
-// under another name (or from another account), it asks before merging. Each save names the revision
+// under another name (or from another account) and the account keeps progress too, it asks before
+// merging (a new, empty account just takes this phone's progress). Each save names the revision
 // it builds on; when another phone of the same account saved in between, the server says so (409) and
 // this phone merges that copy in first. Merging never lowers anything: higher levels and best results
 // win, newer dates win.
@@ -747,12 +748,16 @@ export async function pullForAccount(s: Session, merge = false): Promise<'merged
     throw new SyncError(r.status, r.status === 200 ? 'The progress saved with your account is damaged.' : errText(r));
   }
   // This phone's progress may be someone else's (another account before, another name, or no name):
-  // ask before merging it into this account, even when the account has nothing saved yet.
+  // ask before merging it with progress the account already keeps. An account with no progress yet
+  // (just made on this phone) has nothing to merge: this phone's progress simply becomes its own,
+  // unless it already went with another singer's account.
   const meta = loadMeta();
   const here = loadProfile().name.trim();
-  const mine = meta.account ? meta.account === s.account.id : !!here && nameKey(here) === nameKey(s.account.name);
-  if (!merge && !mine && allProgress().length > 0) {
-    const pieces = empty ? 0 : Object.keys((r.json!.data as Record<string, object>).p).length;
+  const sameName = !!here && nameKey(here) === nameKey(s.account.name);
+  const mine = meta.account ? meta.account === s.account.id : sameName;
+  const pieces = empty ? 0 : Object.keys((r.json!.data as Record<string, object>).p).length;
+  const othersAccount = !!meta.account && meta.account !== s.account.id && !sameName;
+  if (!merge && !mine && allProgress().length > 0 && (pieces > 0 || othersAccount)) {
     setQuestion({ account: s.account.id, accountName: s.account.name, here: here || 'no name', pieces, updatedAt: num(r.json?.updatedAt) });
     return 'ask';
   }
