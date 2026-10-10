@@ -6,6 +6,7 @@ import { getPiece } from '../library';
 import { daysUntil, useDay, useStoreVersion } from '../hooks';
 import { IconPlay } from '../icons';
 import { LevelMeter } from './LevelMeter';
+import { ReminderOffer } from './Reminders';
 import { meterNodes, pathStatus, lowerLabel, joinLabels } from '../path';
 import { stepWord } from '../../progress/ladder';
 import { attemptLog, loadCycle, loadProfile, type Cycle } from '../../progress/store';
@@ -351,6 +352,7 @@ export function TodayDone({ plan, labOn }: { plan: TodayPlan; labOn: boolean }) 
         <button className="link between" data-testid="see-progress" onClick={() => go({ name: 'progress' })}>See your progress <span aria-hidden="true">›</span></button>
       </section>
       <WhatMoved plan={plan} log={log} status={status} />
+      <ReminderOffer />
       {tmr.steps.length > 0 && (
         <section className="card" data-testid="tomorrow">
           <div className="row between" style={{ alignItems: 'baseline' }}>

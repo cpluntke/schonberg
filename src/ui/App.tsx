@@ -29,6 +29,7 @@ import { ChoirScreen } from './screens/Choir';
 import { AdminScreen, ADMIN_ROUTES, adminHome, useStaff } from './screens/Admin';
 import { InviteScreen } from './screens/Invite';
 import { startUsageStats } from './usage';
+import { startReminders } from '../progress/reminders';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { UpdatePrompt } from './components/UpdatePrompt';
 import { StorageFullNotice } from './components/StorageFullNotice';
@@ -81,6 +82,8 @@ export function App() {
   }, [lib.ready, lib.version]);
   // Anonymous usage statistics (Settings → Send anonymous usage statistics): daily totals once a day, plus hourly counts every few minutes for the last 24 hours.
   useEffect(() => { startUsageStats(); }, []);
+  // The daily practice reminder (if on): the server hears the subscription again, and "practised today" after a run.
+  useEffect(() => startReminders(), []);
   // Progress kept with the choir account: on start and whenever the app comes back, if something
   // changed (at most once a minute). A new login also moves this phone's shared progress to the account.
   useEffect(() => {

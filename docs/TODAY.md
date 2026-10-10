@@ -83,7 +83,9 @@ one listen for a passage never sung; whole minutes, 1–6. Lab rungs: 5, 5, 4, 5
   same function for tomorrow 9:00 on today's progress, a preview), the week line and **Practise more
   (optional)**. The week line is honest about the calendar: "your best week so far" only when better
   than every earlier week, "matches your best week" on a tie, no "practise tomorrow" on a Sunday. The
-  reminder offer of the mockups is left out until reminders exist.
+  reminder offer: once, when the browser can show reminders and the daily reminder is off, "Want a
+  nudge tomorrow? · Remind me at 18:00 / No thanks" (`ReminderOffer`; the reminder itself:
+  You → Practice, docs/PRIVACY.md §4).
 
 ## Today's session
 
