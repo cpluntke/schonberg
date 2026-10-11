@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { getLastRun, shareRun } from '../play/runExport';
+import { getLastRun, prefersShareSheet, shareRun } from '../play/runExport';
 import { startColdStart } from '../play/cold';
 import { STAGE_NAMES, WORDS_PASS, type WordsStage } from '../../game/textrhythm';
 import { toast } from '../hooks';
@@ -949,11 +949,11 @@ function ShareRecording({ pieceId, partId }: { pieceId: string; partId: string }
             setBusy(false);
           }
         }}>
-        Share this run’s recording ({secs} s)
+        {prefersShareSheet() ? 'Share' : 'Save'} this run’s recording ({secs} s)
       </button>
       <span className="tiny muted" style={{ textAlign: 'center' }}>
         Scored oddly? Send the recording to whoever looks after the app: it contains your voice and the app’s readings, so the scoring can be checked and tuned.
-        It stays on this phone unless you share it.
+        It stays on this device unless you share it.
       </span>
     </div>
   );

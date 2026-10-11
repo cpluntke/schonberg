@@ -112,11 +112,20 @@ export function runZip(r: RunExport): Uint8Array {
   });
 }
 
-/** Share (phone share sheet: the WAV plus run.json as text, which Android accepts) or download a zip. */
+/**
+ * A phone or tablet (a touch screen as the main pointer): its share sheet can save to Files or send
+ * the recording on. A laptop's (macOS: AirDrop and Messages only, no Save) can't, so there the zip
+ * is downloaded instead.
+ */
+export function prefersShareSheet(): boolean {
+  try { return typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches; } catch { return false; }
+}
+
+/** Share (phone share sheet: the WAV plus run.json as text, which Android accepts) or download a zip (laptops). */
 export async function shareRun(r: RunExport): Promise<'shared' | 'downloaded' | 'cancelled'> {
   const name = runFileName(r);
   const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
-  if (typeof File !== 'undefined' && nav.share && nav.canShare) {
+  if (prefersShareSheet() && typeof File !== 'undefined' && nav.share && nav.canShare) {
     const base = name.replace(/\.zip$/, '');
     const files = [
       new File([encodeWav(r.recording.pcm, r.recording.sampleRate) as BlobPart], `${base}.wav`, { type: 'audio/wav' }),
