@@ -253,11 +253,29 @@ describe('fast turns (E–D♯–E): readings pulled toward the neighbours', () 
     expect(scoreAttempt(ctx, at(part, (i) => (i === 2 ? 52 : 0)), L4).notes[2].grade).toBe('miss');
     // The last D♯ goes on down to C♯: no turn.
     expect(scoreAttempt(ctx, at(part, (i) => (i === 4 ? 40 : 0)), L4).notes[4].grade).toBe('miss');
-    expect(turnBlur(part.notes[2], part.notes[1], part.notes[3], L4)).toBeGreaterThan(20);
-    expect(turnBlur(part.notes[4], part.notes[3], part.notes[5], L4)).toBe(0);
+    const blur = (...a: Parameters<typeof turnBlur>) => turnBlur(...a).cents;
+    expect(blur(part.notes[2], part.notes[1], part.notes[3], L4)).toBeGreaterThan(20);
+    expect(blur(part.notes[4], part.notes[3], part.notes[5], L4)).toBe(0);
     const long = { ...part.notes[2], dur: 0.5 };
-    expect(turnBlur(long, part.notes[1], { ...part.notes[3], start: long.start + 0.5 }, L4)).toBe(0);
+    expect(blur(long, part.notes[1], { ...part.notes[3], start: long.start + 0.5 }, L4)).toBe(0);
     // Slow practice (70%): the same note lasts longer in real time, so less allowance.
-    expect(Math.abs(turnBlur(part.notes[2], part.notes[1], part.notes[3], { ...L4, rate: 0.7 }))).toBeLessThan(Math.abs(turnBlur(part.notes[2], part.notes[1], part.notes[3], L4)));
+    expect(Math.abs(blur(part.notes[2], part.notes[1], part.notes[3], { ...L4, rate: 0.7 }))).toBeLessThan(Math.abs(blur(part.notes[2], part.notes[1], part.notes[3], L4)));
+    // Only between two neighbours: not next to a rest or the end of the run, nor a repeated pitch.
+    expect(blur(part.notes[2], null, part.notes[3], L4)).toBe(0);
+    expect(blur(part.notes[2], part.notes[1], { ...part.notes[3], midi: 63 }, L4)).toBe(0);
+    // Just intonation leaning the target toward the neighbour leaves less room: still short of halfway.
+    const ji = turnBlur(part.notes[2], part.notes[1], part.notes[3], L4, 7);
+    expect(ji.limit - ji.cents).toBeGreaterThanOrEqual(25 + 7);
+  });
+
+  it('a reading nearer the neighbour than the note gets no allowance, even in the short-note rescue', () => {
+    const { part, ctx } = turn();
+    for (const c of [52, 60]) expect(scoreAttempt(ctx, at(part, (i) => (i === 2 ? c : 0)), L4).notes[2].grade, `${c}`).toBe('miss');
+    // One body reading at 45¢ among readings 60¢ sharp (the reviewer's probe).
+    const s = at(part, (i) => (i === 2 ? 60 : 0));
+    const n2 = part.notes[2];
+    const k = s.findIndex((x) => x.time > n2.start + 0.08);
+    s[k] = { ...s[k], midi: n2.midi + 0.45 };
+    expect(scoreAttempt(ctx, s, L4).notes[2].grade).toBe('miss');
   });
 });

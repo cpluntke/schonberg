@@ -275,6 +275,8 @@ interface NoteWindow {
   tolExtra: number;
   /** A fast turn: cents (signed, toward the neighbours) a deviation may reach beyond the tolerance (TURN_BLUR). */
   turn: number;
+  /** …and how far (cents, that way) is halfway to the neighbour: a reading at or past it gets no allowance. */
+  turnLimit: number;
   /** Very short note (body < SHORT_BODY): also judged on all its readings from the written start to end. */
   short: boolean;
   /** Written pitch outside the tracker's range (TRACKER_LOW_HZ…TRACKER_HIGH_HZ). */
@@ -369,11 +371,12 @@ function noteWindows(ctx: ScoringContext, opts: ScoringOptions): NoteWindow[] {
     // amount, so singing either what the (tempered) backing plays or the pure interval is fine.
     const half = targetOffset / 2;
     // A fast turn (TURN_BLUR): the window reaches further toward the neighbours (NoteWindow.turn).
-    const turn = turnBlur(note, prev, next, opts);
+    // Only a turn inside the run (both neighbours sung), judged on the written note's length.
+    const turn = turnBlur(written, i > a ? prev : null, i < b ? next : null, opts, half);
     const short = bodyEnd - bodyStart < SHORT_BODY;
     const hz = 440 * Math.pow(2, (note.midi - 69) / 12);
     out.push({
-      index: i, note, target: note.midi + half / 100, targetOffset, start: note.start, bodyStart, bodyEnd, legatoFrom, legatoTo, tolExtra: Math.abs(half), turn,
+      index: i, note, target: note.midi + half / 100, targetOffset, start: note.start, bodyStart, bodyEnd, legatoFrom, legatoTo, tolExtra: Math.abs(half), turn: turn.cents, turnLimit: turn.limit,
       short, outOfRange: hz < TRACKER_LOW_HZ || hz > TRACKER_HIGH_HZ, lowForOctave: hz < OCTAVE_UP_HZ, doneAt: short ? note.start + note.dur : bodyEnd,
     });
   }
@@ -381,26 +384,31 @@ function noteWindows(ctx: ScoringContext, opts: ScoringOptions): NoteWindow[] {
 }
 
 /**
- * Cents (signed: toward the neighbours) a fast note's window may reach beyond the tolerance (see
- * TURN_BLUR); 0 unless the adjacent notes all lie on one side of it.
+ * A fast turn (see TURN_BLUR): `cents` (signed: toward the neighbours) a note's window may reach beyond
+ * the tolerance, and `limit`, the deviation that way (cents from the window's target, which just
+ * intonation moves by `half`) that is halfway to the nearer neighbour. 0 unless the note is short and
+ * sits between two adjacent notes, both on the same side of it.
  */
-export function turnBlur(note: ScoreNote, prev: ScoreNote | null, next: ScoreNote | null, opts: ScoringOptions): number {
+export function turnBlur(note: ScoreNote, prev: ScoreNote | null, next: ScoreNote | null, opts: ScoringOptions, half = 0): { cents: number; limit: number } {
+  const none = { cents: 0, limit: Infinity };
   const real = note.dur / (opts.rate && opts.rate > 0 ? opts.rate : 1);
   const share = clamp((TURN_NONE - real) / (TURN_NONE - TURN_FULL), 0, 1);
-  if (share === 0) return 0;
-  const sides: number[] = [];
-  if (prev && prev.start + prev.dur >= note.start - TURN_GAP && prev.midi !== note.midi) sides.push(prev.midi - note.midi);
-  if (next && next.start <= note.start + note.dur + TURN_GAP && next.midi !== note.midi) sides.push(next.midi - note.midi);
-  if (!sides.length || !sides.every((d) => Math.sign(d) === Math.sign(sides[0]))) return 0;
-  const nearest = Math.min(...sides.map(Math.abs)) * 100;
+  if (share === 0 || !prev || !next) return none;
+  if (prev.start + prev.dur < note.start - TURN_GAP || next.start > note.start + note.dur + TURN_GAP) return none;
+  const up = prev.midi - note.midi;
+  const down = next.midi - note.midi;
+  if (up === 0 || down === 0 || Math.sign(up) !== Math.sign(down)) return none;
+  const sign = Math.sign(up);
   // Never as far as halfway to the neighbour: a voice nearer it is on the wrong note.
-  const room = Math.max(0, nearest / 2 - opts.toleranceCents - 1);
-  return Math.sign(sides[0]) * Math.min(TURN_BLUR * share, room);
+  const limit = (Math.min(Math.abs(up), Math.abs(down)) * 100) / 2 - sign * half;
+  const room = Math.max(0, limit - opts.toleranceCents - Math.abs(half) - 1);
+  const cents = Math.min(TURN_BLUR * share, room);
+  return cents > 0 ? { cents: sign * cents, limit } : none;
 }
 
 /** A deviation with a fast turn's allowance (NoteWindow.turn) taken off, for every in-tolerance check. */
-export function eased(w: { turn: number }, d: number): number {
-  if (!w.turn || d * w.turn <= 0) return d;
+export function eased(w: { turn: number; turnLimit?: number }, d: number): number {
+  if (!w.turn || d * w.turn <= 0 || Math.abs(d) >= (w.turnLimit ?? Infinity)) return d;
   return Math.sign(d) * Math.max(0, Math.abs(d) - Math.abs(w.turn));
 }
 
