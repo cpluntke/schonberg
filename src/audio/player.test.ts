@@ -69,18 +69,26 @@ describe('cues', () => {
     expect(firstNoteIn(s.parts[1], 4.5, 6)).toBeNull();
   });
 
-  it('the starting chord is the harmony where the singer comes in, also after an opening rest', () => {
+  it('the starting chord is where the music starts, also after an opening rest', () => {
     const s = mkScore();
-    expect(cueChord(s, 's', 0, 6)).toEqual([48, 72]);
-    // Every part rests at the start (a pickup bar of rests, as in Debussy's "Dieu! qu'il la fait").
+    expect(cueChord(s, 0, 6)).toEqual([48, 72]);
+    // Every part rests at the start (a bar of rests, as in Debussy's "Dieu! qu'il la fait").
     for (const p of s.parts) for (const n of p.notes) n.start += 1;
     expect(chordAt(s, 0)).toEqual([]);
-    expect(cueChord(s, 's', 0, 7)).toEqual([48, 72]);
-    // The singer comes in later than the others: the chord under their entry.
-    expect(cueChord(s, 's', 1.5, 7)).toEqual([48, 74]);
-    // A singer silent in the run: where the first part sounds (a note held over `from` counts from `from`).
-    expect(cueChord(s, 'x', 1.5, 7)).toEqual([48, 72]);
-    expect(cueChord(s, 's', 7, 8)).toEqual([]);
+    expect(cueChord(s, 0, 7)).toEqual([48, 72]);
+    // Something already sounds at `from` (a held note): that is the start, not a later entry.
+    expect(cueChord(s, 1.5, 7)).toEqual([48, 72]);
+    expect(cueChord(s, 7, 8)).toEqual([]);
+  });
+
+  it('a chord in one part (piano, organ) counts in full; a unison counts once', () => {
+    const s = mkScore();
+    s.parts.push({ id: 'p', name: 'Piano', voiceType: 'other', low: 0, high: 0, notes: [
+      { midi: 60, start: 0, dur: 1, startBeat: 0, durBeats: 2, measure: 0 },
+      { midi: 64, start: 0, dur: 1, startBeat: 0, durBeats: 2, measure: 0 },
+      { midi: 72, start: 0, dur: 1, startBeat: 0, durBeats: 2, measure: 0 },
+    ] });
+    expect(chordAt(s, 0)).toEqual([48, 60, 64, 72]);
   });
 });
 

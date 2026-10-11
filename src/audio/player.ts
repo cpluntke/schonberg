@@ -114,35 +114,31 @@ export function beatGrid(score: Score, from: number, to: number): { time: number
   return out;
 }
 
-/** MIDI pitches of notes sounding at `t` (attacked at or before `t`) across all parts. */
+/** MIDI pitches of notes sounding at `t` (attacked at or before `t`) across all parts, each pitch once. */
 export function chordAt(score: Score, t: number): number[] {
-  const out: number[] = [];
+  const out = new Set<number>();
   for (const p of score.parts) {
     for (const n of p.notes) {
-      if (n.start <= t + 1e-6 && n.start + n.dur > t + 1e-6) {
-        out.push(n.midi);
-        break;
-      }
+      if (n.start > t + 1e-6) break;
+      // (A piano or organ part can hold several notes at once.)
+      if (n.start + n.dur > t + 1e-6) out.add(n.midi);
     }
   }
-  return out.sort((a, b) => a - b);
+  return [...out].sort((a, b) => a - b);
 }
 
 /**
- * The starting chord for a run from `from` to `to`: the harmony where the singer comes in (their
- * part's first note in the run), or, if they don't sing in it, where the first note of any part
- * starts. A passage that opens on a rest (a pickup, an introduction) has nothing sounding at `from`.
+ * The starting chord for a run from `from` to `to`: the harmony where the music starts, i.e. at
+ * `from`, or, when every part rests there (a pickup bar of rests, a passage opening on a rest), at
+ * the first note of any part after it.
  */
-export function cueChord(score: Score, partId: string | undefined, from: number, to: number): number[] {
-  const part = score.parts.find((p) => p.id === partId);
-  let at = part?.notes.find((n) => n.start >= from - 1e-6 && n.start < to)?.start;
-  if (at === undefined) {
-    for (const p of score.parts) {
-      const n = p.notes.find((x) => x.start + x.dur > from + 1e-6 && x.start < to);
-      if (n) at = Math.min(at ?? Infinity, Math.max(from, n.start));
-    }
+export function cueChord(score: Score, from: number, to: number): number[] {
+  let at = Infinity;
+  for (const p of score.parts) {
+    const n = p.notes.find((x) => x.start + x.dur > from + 1e-6);
+    if (n && n.start < to) at = Math.min(at, Math.max(from, n.start));
   }
-  return at === undefined ? [] : chordAt(score, at);
+  return Number.isFinite(at) ? chordAt(score, at) : [];
 }
 
 export function firstNoteIn(part: Part | undefined, from: number, to: number): number | null {
@@ -290,7 +286,7 @@ export class ScorePlayer {
           ? [firstNoteIn(this.score.parts.find((p) => p.id === opts.cuePartId), from, to)].filter(
               (m): m is number => m != null,
             )
-          : cueChord(this.score, opts.cuePartId, from, to);
+          : cueChord(this.score, from, to);
       // Hold the cue until one beat before the entrance so there's time to breathe.
       const cueDur = Math.max(0.4, (nCount - 1) * beatReal);
       for (const m of midis) {
