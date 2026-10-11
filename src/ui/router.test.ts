@@ -142,6 +142,23 @@ describe('the intonation lab\'s addresses', () => {
   });
 });
 
+describe('the tuning explainer\'s address', () => {
+  it('round-trips its pages; page 1 is the bare address', () => {
+    expect(href({ name: 'tuning' })).toBe('#/tuning');
+    expect(parseHash('#/tuning')).toEqual({ name: 'tuning' });
+    for (let page = 2; page <= 8; page++) {
+      expect(href({ name: 'tuning', page })).toBe(`#/tuning/${page}`);
+      expect(parseHash(href({ name: 'tuning', page }))).toEqual({ name: 'tuning', page });
+    }
+    expect(href({ name: 'tuning', page: 1 })).toBe('#/tuning');
+  });
+
+  it('nonsense pages fall back to the first', () => {
+    for (const h of ['#/tuning/0', '#/tuning/1', '#/tuning/9', '#/tuning/x', '#/tuning/-3']) expect(parseHash(h)).toEqual({ name: 'tuning' });
+    expect(parseHash('#/tuning/3.2')).toEqual({ name: 'tuning', page: 3 });
+  });
+});
+
 describe('where a new screen opens', () => {
   let toTop: ReturnType<typeof vi.fn>;
   let into: ReturnType<typeof vi.fn>;

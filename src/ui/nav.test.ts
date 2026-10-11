@@ -14,6 +14,7 @@ describe('tabs', () => {
     expect(tabOf({ name: 'intonation' })).toBe('train');
     expect(tabOf({ name: 'courses' })).toBe('train');
     expect(tabOf({ name: 'drone' })).toBe('train');
+    expect(tabOf({ name: 'tuning' })).toBe('train');
     // (whatever tab was shown before)
     expect(tabOf({ name: 'ranks' }, 'home')).toBe('choir');
   });
@@ -38,13 +39,13 @@ describe('tabs', () => {
 
   it('phones: the tab bar only under the tab roots and the staff screens', () => {
     const yes: Route['name'][] = ['home', 'pieces', 'train', 'choir', 'choiradmin', 'section', 'choirinsights', 'superadmin', 'usage'];
-    const no: Route['name'][] = ['piece', 'progress', 'ranks', 'settings', 'expert', 'tuner', 'diagnostics', 'play', 'results', 'setup', 'intonation', 'invite'];
+    const no: Route['name'][] = ['piece', 'progress', 'ranks', 'settings', 'expert', 'tuner', 'diagnostics', 'play', 'results', 'setup', 'intonation', 'tuning', 'invite'];
     for (const n of yes) expect(showsTabBar({ name: n }), n).toBe(true);
     for (const n of no) expect(showsTabBar({ name: n }), n).toBe(false);
   });
 
   it('wide screens: the sidebar on sub-screens too, never while practising or in setup', () => {
-    for (const h of ['#/', '#/pieces', '#/piece/x', '#/progress', '#/ranks', '#/settings', '#/expert', '#/tuner', '#/diagnostics', '#/intonation', '#/intonation/fifth/done', '#/courses', '#/drone', '#/choiradmin']) {
+    for (const h of ['#/', '#/pieces', '#/piece/x', '#/progress', '#/ranks', '#/settings', '#/expert', '#/tuner', '#/diagnostics', '#/intonation', '#/intonation/fifth/done', '#/courses', '#/drone', '#/tuning', '#/tuning/4', '#/choiradmin']) {
       expect(showsSidebar(parseHash(h)), h).toBe(true);
     }
     for (const h of ['#/play/p/S/s1?level=1', '#/results', '#/setup', '#/intonation/fifth/2', '#/intonation/fifth/check', '#/lyrics/p/S', '#/memorymap/p/S']) {

@@ -37,6 +37,8 @@ export type Route =
   | { name: 'intonation'; interval?: 'fifth' | 'third'; rung?: number; done?: boolean; check?: boolean }
   /** All courses (Train). */
   | { name: 'courses' }
+  /** "Why choirs tune differently": the explainer before the intonation courses, page 1–6 (absent: page 1). */
+  | { name: 'tuning'; page?: number }
   /** A held drone (do, or do and sol) at a pitch of your choice (Train's tools). */
   | { name: 'drone' }
   | { name: 'diagnostics' }
@@ -50,6 +52,9 @@ export type Route =
   | { name: 'usage' }
   | { name: 'superadmin' }
   | { name: 'invite'; token?: string };
+
+/** The explainer's pages ("Why choirs tune differently"). */
+export const TUNING_PAGES = 8;
 
 export function parseHash(hash: string): Route {
   const h = hash.replace(/^#\/?/, '');
@@ -104,6 +109,10 @@ export function parseHash(hash: string): Route {
     case 'expert': return { name: 'expert' };
     case 'tuner': return { name: 'tuner' };
     case 'courses': return { name: 'courses' };
+    case 'tuning': {
+      const page = Math.round(Number(seg[1]));
+      return page >= 2 && page <= TUNING_PAGES ? { name: 'tuning', page } : { name: 'tuning' };
+    }
     case 'drone': return { name: 'drone' };
     case 'intonation': {
       const iv = seg[1] === 'fifth' || seg[1] === 'third' ? seg[1] : null;
@@ -143,6 +152,7 @@ export function href(r: Route): string {
     case 'lyrics':
     case 'memorymap': return `#/${r.name}/${e(r.pieceId)}/${e(r.partId)}`;
     case 'invite': return r.token ? `#/invite/${e(r.token)}` : '#/invite';
+    case 'tuning': return `#/tuning${r.page && r.page > 1 ? `/${Math.min(TUNING_PAGES, Math.round(r.page))}` : ''}`;
     case 'intonation': return `#/intonation${r.interval ? `/${r.interval}${r.check ? '/check' : r.done ? '/done' : r.rung ? `/${r.rung}` : ''}` : ''}`;
     default: return r.name === 'home' ? '#/' : `#/${r.name}`;
   }

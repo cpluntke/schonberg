@@ -31,6 +31,7 @@ const PARENT: Partial<Record<Route['name'], TabName>> = {
   intonation: 'train',
   courses: 'train',
   drone: 'train',
+  tuning: 'train',
 };
 
 /** Screens reached from several tabs: they light the tab they were opened from, else this one. */

@@ -17,6 +17,7 @@ import { computeToday, dateWords, goStep, shortTitle, tickContext } from '../tod
 import { dayOf, labStep, stepDone } from '../../progress/today';
 import { lastLeapRun, loadLeapRuns } from '../../progress/leaps';
 import { CourseChecks, courseRecommended } from './IntonationLab';
+import { TUNING_TITLE, tuningSeen } from './Tuning';
 import { getAudioContext, unlockAudio } from '../../audio/context';
 import { Drone } from '../../audio/drone';
 import { midiToHz } from '../../audio/pitch';
@@ -79,6 +80,7 @@ export function Train() {
               <h2 id="train-courses-h">Courses</h2>
               <span className="t14 muted">one step a day</span>
             </div>
+            <TuningEntry />
             {active && <CourseCard iv={active} lab={lab} kind="active" recommended={recommended} />}
             {suggested && <CourseCard iv={suggested} lab={lab} kind={active ? 'next' : 'start'} recommended={recommended} />}
             {!active && !suggested && doneCourses.map((k) => <CourseCard key={k} iv={k} lab={lab} kind="done" recommended={recommended} />)}
@@ -138,6 +140,29 @@ export function Train() {
         </div>
       </div>
     </main>
+  );
+}
+
+/** "Why choirs tune differently · 5 min": a card above the courses until it's been seen, then a quiet link. */
+function TuningEntry() {
+  if (tuningSeen()) {
+    return (
+      <button className="link tun-seen" data-testid="train-tuning" onClick={() => go({ name: 'tuning' })}>
+        <span>{TUNING_TITLE} · 5 min</span>
+        <IconChevron size={18} />
+      </button>
+    );
+  }
+  return (
+    <button className="card crs-card tun-entry" data-testid="train-tuning" onClick={() => go({ name: 'tuning' })}>
+      <span className="row between"><span className="eb">Start here · with sound</span><span className="t14 muted nowrap">5 min</span></span>
+      <strong className="crs-card-title">{TUNING_TITLE}</strong>
+      <span className="t14 muted">Why pianos and choirs tune differently, and what to listen for. Short screens to tap and hear.</span>
+      <span className="row between" style={{ gap: 8 }}>
+        <strong className="t16">Read and listen</strong>
+        <IconChevron size={20} color="var(--muted)" />
+      </span>
+    </button>
   );
 }
 

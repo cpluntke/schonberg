@@ -301,6 +301,7 @@ function CourseOverview({ iv, lab, root }: { iv: LabInterval; lab: LabProgress; 
         <span className="eb">Course · Intonation</span>
         <h1 className="crs-title">{c.title}</h1>
         <p className="t16" style={{ margin: 0 }}><strong>{c.outcome}</strong> {c.about}</p>
+        <button className="link start" data-testid="lab-tuning" onClick={() => go({ name: 'tuning' })}>New to this? Why choirs tune differently</button>
       </div>
       <div className="col" style={{ gap: 6 }}>
         <div className="row crs-demo">

@@ -19,6 +19,7 @@ import { Ranks } from './screens/Ranks';
 import { Expert } from './screens/Expert';
 import { TunerScreen } from './screens/TunerScreen';
 import { IntonationLab } from './screens/IntonationLab';
+import { TuningScreen } from './screens/Tuning';
 import { ProgressScreen } from './screens/Progress';
 import { SessionStrip } from './components/Today';
 import './generated';
@@ -158,6 +159,7 @@ export function App() {
       case 'intonation': body = <IntonationLab key={`${route.interval ?? ''}${route.rung ?? ''}${route.done ? 'd' : ''}${route.check ? 'c' : ''}`} route={route} />; break;
       case 'courses': body = <AllCourses />; break;
       case 'drone': body = <DroneScreen />; break;
+      case 'tuning': body = <TuningScreen page={route.page ?? 1} />; break;
       case 'diagnostics': body = <Diagnostics />; break;
       case 'lyrics': body = <LyricsQuiz key={route.pieceId + route.partId} pieceId={route.pieceId} partId={route.partId} />; break;
       case 'memorymap': body = <MemoryMap key={route.pieceId + route.partId} pieceId={route.pieceId} partId={route.partId} />; break;
