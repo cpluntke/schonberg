@@ -593,7 +593,7 @@ function FindPage() {
       ]} />
     </>} after={done.octave && done.fifth ? <p className="t16 tun-callout" data-testid="tuning-found-both">Both found by ear: a just octave and a just fifth.</p> : undefined}>
       <p className="t16">The whole string keeps sounding. Drag the bridge slowly.</p>
-      <p className="t16">Off the spot you hear a wah-wah-wah: the two notes <strong>beat</strong> against each other. The further off, the faster the beats. On the spot the beating stops.</p>
+      <p className="t16">Off the spot you hear a wah-wah-wah: a <strong>wobble</strong>, or <strong>beat</strong>. The two notes beat against each other. The further off, the faster the beats. On the spot the beating stops.</p>
       <p className="t16">Find where it goes <strong>still</strong>: first the octave, then the fifth.</p>
     </PageBody>
   );

@@ -618,7 +618,7 @@ function ListenRung({ iv, root, lab, record }: RungProps) {
   return (
     <main className="screen crs-stepscreen" data-testid="lab-listen">
       <RungTop iv={iv} rung={1}>
-        <GoalLines goal="Hear the beating stop." how={<>Two notes that are nearly in tune beat against each other: a “wah-wah-wah”. The closer they get, the slower the beats. No beating at all: the interval is just.</>} />
+        <GoalLines goal="Hear the beating stop." how={<>Two notes that are nearly in tune make a “wah-wah-wah”: a wobble, or beat. The closer they get, the slower the beats. No beating at all: the interval is just.</>} />
       </RungTop>
       {EXAMPLES[iv].map((e) => {
         const on = playing === e.key;
