@@ -1,17 +1,19 @@
 # Onboarding video source
 
 `public/media/onboarding.{mp4,webm,jpg}` are rendered from these files: a two-voice dialogue
-(Nora = coach, Ben = singer) over animated app screenshots. Current cut: about 2:40 (160 s),
+(Nora = coach, Ben = singer) over animated app screenshots. Current cut: about 2:45 (165 s),
 scenes A title · B voice setup (choir code, range check, delay) · C practice screen (score
-view with a zoom on a flat note, the Score/Highway toggle under Display & tempo, the highway, a laptop
-showing the full choir score; how close you are: big words above the staff on the score, a small bubble on the
-highway and the laptop, spot on · a touch · a little · clearly) · D passages
+view with a zoom on the blue line just under a note: on the note = in tune, just under = flat, just over = sharp;
+the Score/Highway toggle under Display & tempo, the highway, a laptop showing the full choir score; then all three
+views side by side with a ring on the blue line in each: "How close? The blue line." No words about the pitch
+while singing) · D passages
 and Your path, the level ladder (5 levels: Notes on “doo”, Words, Alone, Concert, By heart; each level first
 slow, then in tempo) and "Sing it all" (a full run opens the level, a passage that slips is "to fix" and fixing
 just that bit earns the level, no second run; everything right first time = a clean-run star;
 know it already? sing it all at any level, under More ways to practise) · E after a run (Results lead with
 the one note to fix, how far off, a tip, Loop that bar slowly) · F Today (the plan with minutes, the status
-line paced to rehearsal and concert, the week card; no streak) · G "try it now" checklist (voice setup, then
+line paced to rehearsal and concert, the week card; no streak; then the Intonation tab in the tab bar
+Today · Pieces · Intonation · Train · Choir: how choirs tune, short courses on just intervals) · G "try it now" checklist (voice setup, then
 ▶ Start today's practice: it must match “Try it now” under the player, `src/ui/components/IntroVideo.tsx`).
 
 1. `script.json`: the dialogue (`say` = spoken text, `show` = subtitle, `scene` = visual group).
@@ -30,7 +32,7 @@ line paced to rehearsal and concert, the week card; no streak) · G "try it now"
      round ✓: the script sings each pattern back with the fake mic's oscillator), `setup-delay` (the
      count-in “3”);
    - `practice-score` (Locus iste, soprano, Level 1 slow, `?simulate=flat`: the blue ink just under the
-     first note, the readout above the staff says “C · a little flat ↓”), `practice-highway` (the same after choosing Highway),
+     first note; no words about the pitch, the blue line alone shows it), `practice-highway` (the same after choosing Highway),
      `practice-toggle` (the pre-run card with Display & tempo open on the Score/Highway toggle);
    - `piece` (Debussy “Dieu!”, alto, fresh user: Your path with the level meter and the passages),
      `piece-more` (More ways to practise open on the Sing it all card), `piece-tofix` (after a clean full
@@ -42,7 +44,7 @@ line paced to rehearsal and concert, the week card; no streak) · G "try it now"
    - `results-fix` (the same passage as `practice-score`, `?simulate=oneflat`: “Not yet: one note to fix”);
    - `home` (`shoot-today.cjs`: Today mid-cycle from seeded progress, Abendlied rehearsal-ready, Locus iste
      started, a confirmed rehearsal; clock fixed to Sat 10 Oct 2026 17:30, rehearsal Tue, concert 12 Dec;
-     scrolled so the status line, the plan and the week card fill the phone);
+     scrolled so the status line, the plan and the week card fill the phone; the tab bar shows the five tabs);
    - and `public/icon.svg`. Fonts into `<dir>/fonts/` (IBM Plex Mono
    → `PlexMono.ttf`, Bricolage Grotesque → `Bricolage.ttf`, Source Serif 4 → `SourceSerif.ttf`).
    Tips: the range-check frame needs a voice; an init script that replaces `getUserMedia` with

@@ -38,8 +38,8 @@
  {
   "sp": "N",
   "scene": "C",
-  "say": "Now the practice screen. You sing from the sheet music. The blue line is your voice, drawn at the height you sing. Right on the note means in tune; just under it means flat.",
-  "show": "Now the practice screen. You sing from the sheet music. The blue line is your voice, drawn at the height you sing. Right on the note means in tune; just under it means flat."
+  "say": "Now the practice screen. You sing from the sheet music. The blue line is your voice, drawn at the height you sing. Right on the note means in tune; just under it, flat; just over it, sharp.",
+  "show": "Now the practice screen. You sing from the sheet music. The blue line is your voice, drawn at the height you sing. Right on the note means in tune; just under it, flat; just over it, sharp."
  },
  {
   "sp": "B",
@@ -50,8 +50,8 @@
  {
   "sp": "N",
   "scene": "C",
-  "say": "Switch to Highway, under Display and tempo. Your notes become bars scrolling toward a line, and you keep the blue line on them. On a laptop, you see the whole choir score, with your line highlighted. On the sheet music, big words above the staff tell you how close you are, from spot on to clearly flat; on the highway, a little bubble does.",
-  "show": "Switch to “Highway” under Display & tempo. Your notes become bars scrolling toward a line, and you keep the blue line on them. On a laptop, you see the whole choir score, with your line highlighted. On the sheet music, big words above the staff tell you how close you are, from spot on to clearly flat; on the highway, a little bubble does."
+  "say": "Switch to Highway, under Display and tempo. Your notes become bars scrolling toward a line, and you keep the blue line on them. On a laptop, you see the whole choir score, with your line highlighted. Whichever view you choose, the blue line shows how close you are: on the note, just under, or just over.",
+  "show": "Switch to “Highway” under Display & tempo. Your notes become bars scrolling toward a line, and you keep the blue line on them. On a laptop, you see the whole choir score, with your line highlighted. Whichever view you choose, the blue line shows how close you are: on the note, just under, or just over."
  },
  {
   "sp": "N",
@@ -106,6 +106,12 @@
   "scene": "F",
   "say": "Today shows a short plan: three or four steps with minutes, paced to your rehearsal and concert. Your week counts practice days, rehearsals too. Ten to fifteen minutes a day is plenty.",
   "show": "Today shows a short plan: three or four steps with minutes, paced to your rehearsal and concert. Your week counts practice days, rehearsals too. Ten to fifteen minutes a day is plenty."
+ },
+ {
+  "sp": "N",
+  "scene": "F",
+  "say": "The Intonation tab explains how choirs tune, with short courses on just intervals.",
+  "show": "The Intonation tab explains how choirs tune, with short courses on just intervals."
  },
  {
   "sp": "N",

@@ -134,7 +134,7 @@ export function YouSheet({ onClose }: { onClose: (then?: () => void) => void }) 
     },
     { id: 'display', icon: <IconText />, title: 'Display', sub: `${APPEARANCES.find((a) => a.id === (profile.appearance ?? 'dark'))?.label} · ${TEXT_SIZES.find((t) => t.id === textSizeOf(profile.textSize))?.label.toLowerCase()} text · ${profile.display === 'highway' ? 'highway' : 'score'}`, open: settingsAt('settings-display-block') },
     { id: 'privacy', icon: <IconLock />, title: 'Privacy', sub: profile.choirCode ? 'What your choir sees of your practice' : 'Anonymous usage statistics', open: settingsAt('settings-privacy') },
-    { id: 'help', icon: <IconHelp />, title: 'Help & intro video', sub: 'Watch the 2½-min intro · problem report', open: settingsAt('settings-help') },
+    { id: 'help', icon: <IconHelp />, title: 'Help & intro video', sub: 'Watch the 3-min intro · problem report', open: settingsAt('settings-help') },
     { id: 'data', icon: <IconData />, title: 'Your data', sub: 'Save a copy · restore it', open: settingsAt('settings-data') },
   ];
   // Staff logins on this phone only (members and singers without an account never see these).

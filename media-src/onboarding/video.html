@@ -45,7 +45,7 @@ function callout(px,py,lx,ly,label,sub,color,A){ // dot on phone + line + label
 
 /* --- scenes ---
    Line indices (script.json): 0 A title · 1–5 B voice setup (1 choir code, 3 range, 4–5 delay) ·
-   6–8 C practice screen · 9–14 D level ladder + sing it all · 15–16 E after a run (the note to fix) · 17 F Today (plan, status line, week) · 18–21 G try it now */
+   6–8 C practice screen · 9–14 D level ladder + sing it all · 15–16 E after a run (the note to fix) · 17–18 F Today (plan, status line, week; 18 the Intonation tab) · 19–22 G try it now */
 const C2={green:'#6EE7A8'};
 function sceneA(t,A){const a=A*ease(since(0,t)/0.8);ctx.globalAlpha=a;
   // little highway motif
@@ -102,10 +102,10 @@ function sceneB(t,A){const x=150,y=110;
         if(on)text('ta',cx,cy-28,DISP6(22),C.orange,'center')}
       text('6 clicks → delay measured',880,512,MONO(20),C.muted,'center');ctx.globalAlpha=1}}}
 
-/* C: the practice screen. Line 6: score view (sheet music, blue ink, zoom on a flat note) ·
-   7: the pre-run card, Display & tempo open on the Score/Highway toggle · 8: tap Highway → highway phone, then both
-   phones side by side: how close you are (spot on · a touch · a little · clearly, ↑ sharp ↓ flat) is big words
-   above the staff on the score, a small bubble on the highway and the laptop. Coordinates are css px of the 390×844 screenshots. */
+/* C: the practice screen. Line 6: score view (sheet music, blue ink, zoom on a flat note: on the note = in tune,
+   just under = flat, just over = sharp) · 7: the pre-run card, Display & tempo open on the Score/Highway toggle ·
+   8: tap Highway → highway phone → laptop full score, then the laptop and both phones side by side: in every view the
+   blue line is what shows how close you are (no words while singing). Coordinates are css px of the 390×844 screenshots. */
 const ramp=(i,f,t,d)=>ease((t-L(i).start-f*L(i).dur)/(d||0.45));
 function ring(cx,cy,r,color,A){if(A<=0.01)return;ctx.globalAlpha=A;ctx.strokeStyle=color;ctx.lineWidth=3;ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.stroke();ctx.globalAlpha=1}
 function pill(x,y,sel,A){if(A<=0.01)return;const w=300,h=52,hw=w/2;ctx.globalAlpha=A;
@@ -113,7 +113,7 @@ function pill(x,y,sel,A){if(A<=0.01)return;const w=300,h=52,hw=w/2;ctx.globalAlp
   ctx.fillStyle=C.orange;rr(x+4+sel*(hw-4),y+4,hw-4,h-8,22);ctx.fill();
   text('Score',x+hw/2+2,y+34,DISP6(24),sel<0.5?C.paper:C.ink,'center');text('Highway',x+hw+hw/2-2,y+34,DISP6(24),sel>=0.5?C.paper:C.ink,'center');ctx.globalAlpha=1}
 // zoomed view of the flat note (css box ZB of practice-score) drawn at ZD, scale ZS
-const ZB=[100,224,135,46],ZS=3.1,ZD=[560,372];
+const ZB=[100,181,135,46],ZS=3.1,ZD=[560,388];
 const zx=px=>ZD[0]+(px-ZB[0])*ZS,zy=py=>ZD[1]+(py-ZB[1])*ZS;
 /* laptop mock-up: the 1280×800 screenshot in a simple rounded frame with a base */
 function laptop(x,y,w,A){const h=w*0.625,src=IMG['fullscore-laptop'];if(A<=0.01)return;ctx.globalAlpha=A;
@@ -123,27 +123,28 @@ function laptop(x,y,w,A){const h=w*0.625,src=IMG['fullscore-laptop'];if(A<=0.01)
   ctx.fillStyle=C.paper;rr(x+w/2-44,y+h+13,88,6,3);ctx.fill();ctx.globalAlpha=1}
 const LPt=(px,py,x,y,w)=>[x+px*w/1280,y+py*w/1280];
 function sceneC(t,A){const x=170,y=110,lx=560;
-  // line 8: tap Highway (0–.15) · highway (.15–.44) · laptop full score (.44–.70) · the bubble in every view (.70–1)
-  const toT=ease((t-L(7).start+0.3)/0.45),toH=ramp(8,0.13,t,0.5),lap=ramp(8,0.37,t,0.6),both=ramp(8,0.58,t,0.6);
+  // line 8: tap Highway (0–.15) · highway (.15–.41) · laptop full score (.41–.66) · the blue line in every view (.66–1)
+  const toT=ease((t-L(7).start+0.3)/0.45),toH=ramp(8,0.145,t,0.5),lap=ramp(8,0.41,t,0.6),both=ramp(8,0.655,t,0.6);
   phone('practice-score',x-30*toT,y,A*(1-toT));phone('practice-toggle',x,y,A*toT*(1-toH));phone('practice-highway',x-40*lap,y,A*toH*(1-lap));
   // 6: score view
-  const k6=A*(1-toT),zA=k6*at(6,0.7,t),dim=1-0.55*zA/(A||1);
-  callout(...P(300,256,x,y),lx,165,'Sheet music','your part on a staff, with the words',C.ink,k6*dim*at(6,0.14,t));
-  callout(...P(150,250,x,y),lx,255,'Blue ink = your voice','drawn at the height you sing',C.cyan,k6*dim*at(6,0.4,t));
+  const k6=A*(1-toT),zA=k6*at(6,0.6,t),dim=1-0.55*zA/(A||1);
+  callout(...P(300,212,x,y),lx,165,'Sheet music','your part on a staff, with the words',C.ink,k6*dim*at(6,0.14,t));
+  callout(...P(150,206,x,y),lx,255,'Blue ink = your voice','drawn at the height you sing',C.cyan,k6*dim*at(6,0.4,t));
   if(zA>0.01){const [bx,by,bw,bh]=ZB,w=bw*ZS,h=bh*ZS,[dx,dy]=ZD,s=PH.s,src=IMG['practice-score'];
-    ctx.globalAlpha=zA;text('On the note = in tune',lx,340,DISP6(28),C.orange);
+    ctx.globalAlpha=zA;text('On the note = in tune',lx,334,DISP6(28),C.orange);
     // lens: box on the phone + lines to the zoom
     const px0=x+bx*s,py0=y+by*s,pw=bw*s,ph=bh*s;ctx.strokeStyle=C.orange;ctx.lineWidth=2;ctx.strokeRect(px0,py0,pw,ph);
     ctx.globalAlpha=zA*0.5;ctx.beginPath();ctx.moveTo(px0+pw,py0);ctx.lineTo(dx,dy);ctx.moveTo(px0+pw,py0+ph);ctx.lineTo(dx,dy+h);ctx.stroke();ctx.globalAlpha=zA;
     ctx.fillStyle='#000';rr(dx-4,dy-4,w+8,h+8,14);ctx.fill();ctx.save();rr(dx,dy,w,h,12);ctx.clip();ctx.drawImage(src,bx*2,by*2,bw*2,bh*2,dx,dy,w,h);ctx.restore();
     ctx.strokeStyle=C.orange;ctx.lineWidth=2;rr(dx-4,dy-4,w+8,h+8,14);ctx.stroke();
-    const f=zA*at(6,0.86,t);ctx.globalAlpha=zA;ctx.font=DISP6(28);const tw=ctx.measureText('On the note = in tune').width;
-    if(f>0.01){ctx.globalAlpha=f;text(' · just under = flat',lx+tw,340,DISP6(28),C.cyan);
-      const ny=zy(246),iy=zy(250),ex=dx+w+10;
+    const f=zA*at(6,0.77,t),fo=zA*at(6,0.87,t);ctx.globalAlpha=zA;ctx.font=DISP6(28);const tw=ctx.measureText('On the note = in tune').width;
+    if(f>0.01){ctx.globalAlpha=f;text(' · just under = flat',lx+tw,334,DISP6(28),C.cyan);
+      const ny=zy(202.5),iy=zy(206.5),ex=dx+w+10;
       ctx.strokeStyle=C.orange;ctx.lineWidth=2;ctx.setLineDash([7,6]);ctx.beginPath();ctx.moveTo(zx(200),ny);ctx.lineTo(ex,ny);ctx.stroke();ctx.setLineDash([]);
       text('the note',ex+8,ny+6,MONO(18),C.orange);
       ctx.strokeStyle=C.cyan;ctx.beginPath();ctx.moveTo(zx(160),iy);ctx.lineTo(ex,iy+28);ctx.stroke();
       text('your voice: just under',ex+8,iy+34,MONO(18),C.cyan)}
+    if(fo>0.01){ctx.globalAlpha=fo;ctx.font=DISP6(28);text('just over = sharp',lx+tw+ctx.measureText(' · ').width,368,DISP6(28),C.purple)}
     ctx.globalAlpha=1}
   // 7–8: the toggle on the pre-start screen, then tap Highway
   const kT=A*toT*(1-lap);
@@ -153,24 +154,25 @@ function sceneC(t,A){const x=170,y=110,lx=560;
     ctx.globalAlpha=1;pill(lx,156,sel,kT);
     ctx.globalAlpha=kT*(1-toH);text('remembered for next time',lx,236,SERIF(21),C.muted);ctx.globalAlpha=1}
   const kH=A*toH*(1-lap);
-  callout(...P(310,384,x,y),lx,330,'Highway: bars scroll to the line',null,C.orange,kH*ramp(8,0.15,t));
-  const kb=kH*at(8,0.26,t);if(kb>0.01){ctx.globalAlpha=kb;text('keep the blue line on them',lx,362,SERIF(21),C.muted);ctx.globalAlpha=1;ring(...P(142,366,x,y),18,C.cyan,kb)}
+  callout(...P(310,384,x,y),lx,330,'Highway: bars scroll to the line',null,C.orange,kH*ramp(8,0.17,t));
+  const kb=kH*at(8,0.29,t);if(kb>0.01){ctx.globalAlpha=kb;text('keep the blue line on them',lx,362,SERIF(21),C.muted);ctx.globalAlpha=1;ring(...P(142,366,x,y),18,C.cyan,kb)}
   // laptop: the whole choir score, your line highlighted; then smaller, next to both phone views
   if(lap>0.01){const lw=lerp(600,470,both),lxp=lerp(130+40*(1-lap),70,both),ly=lerp(150,140,both),la=A*lap;
     laptop(lxp,ly,lw,la);
-    const ca=la*(1-both)*at(8,0.40,t);if(ca>0.01){const [ax,ay]=LPt(10,196,lxp,ly,lw),[bx2,by2]=LPt(1270,320,lxp,ly,lw);
+    const ca=la*(1-both)*at(8,0.45,t);if(ca>0.01){const [ax,ay]=LPt(10,196,lxp,ly,lw),[bx2,by2]=LPt(1270,320,lxp,ly,lw);
       ctx.globalAlpha=ca;ctx.strokeStyle=C.cyan;ctx.lineWidth=2.5;rr(ax,ay,bx2-ax,by2-ay,6);ctx.stroke();ctx.globalAlpha=1;
       callout(bx2,(ay+by2)/2,800,262,'On a laptop:',null,C.orange,ca);
       ctx.globalAlpha=ca;text('the whole choir,',800,302,DISP6(28),C.ink);text('your line highlighted',800,340,DISP6(28),C.cyan);
       text('all voices (+ organ or piano)',800,380,SERIF(21),C.muted);ctx.globalAlpha=1}
-    // every view: the bubble says how close you are
-    if(both>0.01){const a=A*both,rS=A*ramp(8,0.62,t,0.4),r2=A*ramp(8,0.80,t,0.4);
+    // every view: the blue line says how close you are (rings on it in all three), then the key
+    if(both>0.01){const a=A*both,r2=A*ramp(8,0.74,t,0.4),kA=A*ramp(8,0.85,t,0.4);
       phone('practice-highway',650+50*(1-both),y,a);phone('practice-score',935+50*(1-both),y,a);
-      ring(...LPt(595,207,lxp,ly,lw),26,C.orange,r2);ring(...P(217,336,650,y),36,C.cyan,r2);
-      if(rS>0.01){const [qx,qy]=P(8,64,935,y);ctx.globalAlpha=rS;ctx.strokeStyle=C.cyan;ctx.lineWidth=3;rr(qx,qy,223*PH.s,54*PH.s,10);ctx.stroke();ctx.globalAlpha=1}
-      ctx.globalAlpha=a*ramp(8,0.60,t,0.4);const by0=ly+lw*0.625+80;text('How close?',lxp,by0,DISP(52),C.cyan);
-      ctx.globalAlpha=rS;text('big words above the staff',lxp,by0+38,SERIF(24),C.muted);
-      ctx.globalAlpha=r2;text('a small bubble on the highway',lxp,by0+70,SERIF(24),C.muted);ctx.globalAlpha=1}}}
+      ring(...LPt(527,248,lxp,ly,lw),22,C.cyan,r2);ring(...P(120,366,650,y),30,C.cyan,r2);ring(...P(160,206,935,y),26,C.cyan,r2);
+      ctx.globalAlpha=a*ramp(8,0.67,t,0.4);const by0=ly+lw*0.625+70;text('How close?',lxp,by0,DISP(44),C.ink);
+      ctx.font=DISP(44);const qw=ctx.measureText('How close? ').width;ctx.globalAlpha=r2;text('The blue line.',lxp+qw,by0,DISP(44),C.cyan);
+      ctx.globalAlpha=kA;ctx.font=SERIF(24);let kx=lxp;
+      [['on the note = in tune',C.orange],['  ·  under = flat',C.cyan],['  ·  over = sharp',C.purple]].forEach(([s2,c])=>{text(s2,kx,by0+40,SERIF(24),c);ctx.font=SERIF(24);kx+=ctx.measureText(s2).width});
+      ctx.globalAlpha=1}}}
 
 /* D: passages, the level ladder (five levels, each first slow, then in tempo), and "Sing it all" (a run in one go opens the level; fixing what slipped earns it; a clean run earns a star) */
 const LV=[['1','Notes','on “doo” · your part plays · note names'],['2','Words','with the words · your part still plays'],['3','Alone','your part muted · the others play'],['4','Concert','no note names · only the starting chord'],['5','By heart','from memory · on two different days']];
@@ -241,7 +243,7 @@ function sceneD(t,A){const x=150,y=110,bx=520;
 
 /* E: Results after a miss: the one note to fix (with how far off and a tip), then Loop that bar slowly.
    FIX: card on the right + the matching box on the phone (css px of results-fix), lit one at a time. */
-const FIX=[['♪','The one note to fix','bar 2: the A, shown on the staff',[24,196,342,136]],['↓','How far off','clearly flat: 71 cents',[26,334,338,56]],['✎','A tip to fix it','aim it a little higher',[24,432,342,56]]];
+const FIX=[['♪','The one note to fix','bar 2: the A, shown on the staff',[24,196,342,136]],['↓','How far off','clearly flat: 68 cents',[26,334,338,56]],['✎','A tip to fix it','aim it a little higher',[24,432,342,56]]];
 const FIXF=[0.03,0.22,0.36,0.5];
 function sceneE(t,A){const x=150,y=110,bx=520;phone('results-fix',x,y,A);
   FIX.forEach((n,k)=>{const a=A*at(16,FIXF[k],t);if(a<0.01)return;ctx.globalAlpha=a;const yy=150+k*100;
@@ -255,32 +257,35 @@ function sceneE(t,A){const x=150,y=110,bx=520;phone('results-fix',x,y,A);
     const b=A*at(16,0.8,t);if(b>0.01){ctx.globalAlpha=b;text('then sing the passage again',bx+300,yy+100,SERIF(23),C.muted,'center')}
     ctx.globalAlpha=1}}
 
-/* F: Today (Home): the short plan with minutes, paced to the dates (status line), the week card.
+/* F: Today (Home): the short plan with minutes, paced to the dates (status line), the week card; line 18: the Intonation tab.
    Coordinates are css px of home.png (scrolled so the status line is at the top). */
 function sceneF(t,A){const x=150,y=110,lx=560;phone('home',x,y,A);
-  const a1=A*at(17,0.0,t);if(a1>0.01){ctx.globalAlpha=a1;text("Today's plan",lx,170,DISP(44),C.ink);
+  const A17=A*(1-ease((t-L(18).start+0.3)/0.4)); // line 18: the plan's callouts make way for the Intonation tab
+  const a1=A17*at(17,0.0,t);if(a1>0.01){ctx.globalAlpha=a1;text("Today's plan",lx,170,DISP(44),C.ink);
     text('three or four steps, about 10–15 minutes',lx,208,SERIF(24),C.muted);ctx.globalAlpha=1}
-  callout(...P(674/2,168,x,y),lx,290,'Each step with its minutes',null,C.orange,A*at(17,0.18,t));
-  callout(...P(40,24,x,y),lx,370,'Paced to rehearsal & concert','“in 3 days · Concert 12 Dec · on track”',C.cyan,A*at(17,0.34,t));
-  callout(...P(200,670,x,y),lx,470,'Your week','practice days count, rehearsals too (♪)',C2.green,A*at(17,0.55,t));
-  const a2=A*at(17,0.82,t);if(a2>0.01){ctx.globalAlpha=a2;text('≈ 10–15 minutes a day',lx,575,DISP(40),C.orange);ctx.globalAlpha=1}}
+  callout(...P(674/2,168,x,y),lx,290,'Each step with its minutes',null,C.orange,A17*at(17,0.18,t));
+  callout(...P(40,24,x,y),lx,370,'Paced to rehearsal & concert','“in 3 days · Concert 12 Dec · on track”',C.cyan,A17*at(17,0.34,t));
+  callout(...P(200,670,x,y),lx,470,'Your week','practice days count, rehearsals too (♪)',C2.green,A17*at(17,0.55,t));
+  const a2=A17*at(17,0.82,t);if(a2>0.01){ctx.globalAlpha=a2;text('≈ 10–15 minutes a day',lx,575,DISP(40),C.orange);ctx.globalAlpha=1}
+  const a3=A*at(18,0.08,t);if(a3>0.01){const [qx,qy]=P(152,783,x,y);ctx.globalAlpha=a3;ctx.strokeStyle=C.purple;ctx.lineWidth=3;rr(qx,qy,86*PH.s,50*PH.s,8);ctx.stroke();ctx.globalAlpha=1}
+  callout(...P(195,783,x,y),lx,420,'Intonation','how choirs tune · short courses on just intervals',C.purple,a3);}
 
 /* G: try it now, a two-item checklist (matches “Try it now” under the player: voice setup, then Start today's practice) */
 function num(cx,cy,n,col){ctx.fillStyle=col;ctx.beginPath();ctx.arc(cx,cy,28,0,7);ctx.fill();text(n,cx,cy+11,DISP(32),C.paper,'center')}
 function sceneG(t,A){const x0=210;
-  const a1=A*at(18,0.22,t);if(a1>0.01){ctx.globalAlpha=a1;const yy=180;num(x0,yy,'1',C.orange);
+  const a1=A*at(19,0.22,t);if(a1>0.01){ctx.globalAlpha=a1;const yy=180;num(x0,yy,'1',C.orange);
     text('Put on headphones',x0+52,yy+12,DISP6(36),C.ink);ctx.font=DISP6(36);const w=ctx.measureText('Put on headphones').width;
     text('→',x0+70+w,yy+12,DISP6(36),C.muted);
     const bx=x0+122+w;ctx.fillStyle=C.orange;rr(bx,yy-34,330,68,16);ctx.fill();text('Start voice setup',bx+165,yy+11,DISP6(30),C.paper,'center');ctx.globalAlpha=1}
-  const a2=A*at(18,0.46,t);if(a2>0.01){ctx.globalAlpha=a2;const yy=310;num(x0,yy,'2',C.cyan);
+  const a2=A*at(19,0.46,t);if(a2>0.01){ctx.globalAlpha=a2;const yy=310;num(x0,yy,'2',C.cyan);
     const lab='▶  Start today’s practice';ctx.font=DISP6(30);const bw=ctx.measureText(lab).width+56,bx=x0+52;
     ctx.fillStyle=C.orange;rr(bx,yy-34,bw,68,16);ctx.fill();text(lab,bx+28,yy+11,DISP6(30),C.paper);
-    const tap=clamp((t-L(18).start-0.6*L(18).dur)/0.7,0,1);if(tap>0&&tap<1){ctx.globalAlpha=a2*(1-tap);ctx.strokeStyle=C.ink;ctx.lineWidth=3;ctx.beginPath();ctx.arc(bx+bw-60,yy,12+34*tap,0,7);ctx.stroke()}
-    const a2b=a2*at(18,0.68,t);if(a2b>0.01){ctx.globalAlpha=a2b;text('the app picks your first passage: slow, on “doo”, with your part playing',bx,yy+70,SERIF(24),C.muted)}
+    const tap=clamp((t-L(19).start-0.6*L(19).dur)/0.7,0,1);if(tap>0&&tap<1){ctx.globalAlpha=a2*(1-tap);ctx.strokeStyle=C.ink;ctx.lineWidth=3;ctx.beginPath();ctx.arc(bx+bw-60,yy,12+34*tap,0,7);ctx.stroke()}
+    const a2b=a2*at(19,0.68,t);if(a2b>0.01){ctx.globalAlpha=a2b;text('the app picks your first passage: slow, on “doo”, with your part playing',bx,yy+70,SERIF(24),C.muted)}
     ctx.globalAlpha=1}
-  const a3=A*at(20,0.12,t);if(a3>0.01){ctx.globalAlpha=a3;text('≈ 10 minutes today',W/2,450,DISP6(34),C.orange,'center');ctx.globalAlpha=1}
-  const a3b=A*at(20,0.48,t);if(a3b>0.01){ctx.globalAlpha=a3b;text('tomorrow, a new plan on the Today tab',W/2,490,SERIF(25),C.muted,'center');ctx.globalAlpha=1}
-  const a4=A*at(21,0.0,t);if(a4>0.01){ctx.globalAlpha=a4;text("Let's sing.",W/2,550,DISP(52),C.cyan,'center');ctx.globalAlpha=1}}
+  const a3=A*at(21,0.12,t);if(a3>0.01){ctx.globalAlpha=a3;text('≈ 10 minutes today',W/2,450,DISP6(34),C.orange,'center');ctx.globalAlpha=1}
+  const a3b=A*at(21,0.48,t);if(a3b>0.01){ctx.globalAlpha=a3b;text('tomorrow, a new plan on the Today tab',W/2,490,SERIF(25),C.muted,'center');ctx.globalAlpha=1}
+  const a4=A*at(22,0.0,t);if(a4>0.01){ctx.globalAlpha=a4;text("Let's sing.",W/2,550,DISP(52),C.cyan,'center');ctx.globalAlpha=1}}
 
 const SCENES={A:sceneA,B:sceneB,C:sceneC,D:sceneD,E:sceneE,F:sceneF,G:sceneG};
 const HEAD={B:'Voice setup',C:'The practice screen',D:'The level ladder',E:'After a run',F:'Today',G:'Try it now'};
