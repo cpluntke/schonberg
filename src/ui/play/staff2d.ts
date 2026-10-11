@@ -7,7 +7,6 @@
 // maps to a float step by piecewise-linear interpolation between the seven letters' pitches in the
 // current key (plus the accidental of the note being sung), so a note sung 30 cents flat sits just
 // below its notehead and a perfectly sung C♮ in D major sits exactly on the C.
-import { pitchShort } from '../../game/pitchwords';
 import { F_CLEF, G_CLEF, GLYPH_UNITS_PER_SPACE } from './clefGlyphs';
 import type { KeySig, NoteSpelling, Part, Score, TempoEvent } from '../../music/types';
 import type { PitchSample } from '../../game/types';
@@ -1094,17 +1093,6 @@ function drawTimeSig(c: Ctx, x: number, midY: number, sp: number, ts: [number, n
   c.fillText(String(ts[0]), cx, midY - 1.0 * sp + 1);
   c.fillText(String(ts[1]), cx, midY + 1.0 * sp + 1);
   c.textAlign = 'left';
-}
-
-function roundRect(c: Ctx, x: number, y: number, w: number, h: number, r: number) {
-  const rr = Math.max(0, Math.min(r, w / 2, h / 2));
-  c.beginPath();
-  c.moveTo(x + rr, y);
-  c.arcTo(x + w, y, x + w, y + h, rr);
-  c.arcTo(x + w, y + h, x, y + h, rr);
-  c.arcTo(x, y + h, x, y, rr);
-  c.arcTo(x, y, x + w, y, rr);
-  c.closePath();
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -2317,27 +2305,11 @@ export function drawTrace(c: Ctx, g: SysGeo, s: DrawState, L: Cached, beatNow: n
   }
 }
 
-export function drawBubble(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: number, rightX = g.sys.x1) {
+export function drawBubble(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: number, _rightX = g.sys.x1) {
   const sp = L.layout.sp;
   const last = s.samples[s.samples.length - 1];
   if (!last || last.midi == null || s.pos - last.time >= 0.2) return;
   const notes = s.part.notes;
-  // The note being sung: of the notes sounding then (a chord in an instrument part), the nearest.
-  let heard = -1;
-  let bestD = Infinity;
-  if (s.range) {
-    const [h0, h1] = s.range;
-    for (let i = h0; i <= h1; i++) {
-      if (notes[i].start > last.time) break;
-      if (last.time >= notes[i].start + notes[i].dur) continue;
-      let d = Math.abs(last.midi - notes[i].midi);
-      if (d > 6) d = Math.abs(((d % 12) + 6) % 12 - 6);
-      if (d < bestD) {
-        bestD = d;
-        heard = i;
-      }
-    }
-  }
   // Live voice dot at the playhead (the trace's last point when it is on this system).
   const q = s.samples.length - 1;
   let py: number;
@@ -2360,59 +2332,6 @@ export function drawBubble(c: Ctx, g: SysGeo, s: DrawState, L: Cached, px: numbe
   c.beginPath();
   c.arc(px, py, Math.max(3, 0.32 * sp), 0, Math.PI * 2);
   c.fill();
-  // (the screen shows the reading in big words itself: Play's live readout)
-  if (s.readout || heard < 0 || (s.hide && s.hide(heard) !== 'show' && notes[heard].start + notes[heard].dur > s.pos)) return;
-  const target = notes[heard].midi;
-  let sum = 0;
-  let cnt = 0;
-  for (let r = s.samples.length - 1; r >= 0 && last.time - s.samples[r].time < 0.2 && s.samples[r].time >= notes[heard].start; r--) {
-    const mm = s.samples[r].midi;
-    if (mm != null && Math.abs(mm - last.midi) < 1.5) {
-      sum += mm;
-      cnt++;
-    }
-  }
-  const shown = cnt ? sum / cnt : last.midi;
-  let cents = (shown - target) * 100;
-  if (Math.abs(cents) > 600) cents = ((cents % 1200) + 1800) % 1200 - 600;
-  const rc = Math.round(Math.abs(cents));
-  const txt = pitchShort(rc === 0 ? 0 : cents);
-  const fs = fpx(12);
-  c.font = `600 ${fs}px "JetBrains Mono", monospace`;
-  c.textBaseline = 'middle';
-  c.textAlign = 'left';
-  const bw = textWidth(c, L, c.font, txt) + 14;
-  const bh = fs + 10;
-  // Above the notes next to the top of the playhead (right, else left), clear of any stem or beam
-  // there: it never hides the notes you're about to sing.
-  const bandTop = g.top - L.above * sp + 12;
-  const base = g.top - Math.max(12, 0.9 * sp);
-  const place = (bx: number) => {
-    let ink = Infinity;
-    for (const e of g.sd.evs) if (e.heads.length && e.x + 0.8 * sp >= bx && e.x - 0.8 * sp <= bx + bw) ink = Math.min(ink, g.mid + e.top);
-    return Math.min(base, ink - 13);
-  };
-  let bx = px + 0.9 * sp;
-  if (bx + bw > rightX + 6) bx = px - 0.9 * sp - bw;
-  let by = place(bx);
-  if (by < bandTop) {
-    const alt = bx > px ? px - 0.9 * sp - bw : px + 0.9 * sp;
-    const by2 = place(alt);
-    if (by2 > by && alt >= 0 && alt + bw <= rightX + 6) {
-      bx = alt;
-      by = by2;
-    }
-  }
-  by = Math.max(bandTop, by);
-  const ok = Math.abs(cents) <= s.tolerance;
-  c.fillStyle = COLORS.bubble;
-  roundRect(c, bx, by - bh / 2, bw, bh, 7);
-  c.fill();
-  c.strokeStyle = ok ? COLORS.voice : COLORS.target;
-  c.lineWidth = 1;
-  c.stroke();
-  c.fillStyle = ok ? COLORS.voice : COLORS.targetText;
-  c.fillText(txt, bx + 7, by + 1);
 }
 
 /** Entry countdown when your next note comes after a rest: beside the playhead's head, on the side

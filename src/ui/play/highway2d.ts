@@ -1,5 +1,4 @@
 // Canvas renderer for the practice "piano-roll" highway: time flows right→left, pitch is vertical.
-import { pitchShort } from '../../game/pitchwords';
 import type { Part, Score, KeySig } from '../../music/types';
 import type { PitchSample, Grade } from '../../game/types';
 import type { LiveScorer } from '../../game/scoring';
@@ -40,9 +39,6 @@ export interface DrawState {
   scroll?: boolean;
   /** The words are only for orientation (level 1 is sung on "doo"): draw them dimmed. */
   dimLyrics?: boolean;
-  /** Score view on a phone: the screen shows the live reading in big words (Play's readout), so
-   *  the canvas draws only the voice dot, not its small bubble. */
-  readout?: boolean;
 }
 
 /** First letter of the word a syllable starts ("" for a syllable inside a word). */
@@ -357,7 +353,7 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
   c.fillStyle = COLORS.playhead;
   c.fillRect(Math.round(nowX) - 1, top - 6, 2, H - top + 6);
 
-  // Live voice dot + cents bubble.
+  // Live voice dot.
   const last = s.samples[s.samples.length - 1];
   if (last && last.midi != null && s.pos - last.time < 0.2) {
     const py = y(Math.max(lo - 0.4, Math.min(hi + 0.4, last.midi)));
@@ -369,47 +365,6 @@ export function drawHighway2D(c: CanvasRenderingContext2D, W: number, H: number,
     c.beginPath();
     c.arc(nowX, py, 6, 0, Math.PI * 2);
     c.fill();
-    // Compare the reading with the note that was due when it was SUNG (its own score time), not
-    // the note under the playhead: the voice reaches us a moment later, and comparing it with the
-    // next note made every note change look like a big overshoot.
-    let heard = -1;
-    if (s.range) {
-      const [h0, h1] = s.range;
-      for (let i = h0; i <= h1; i++) {
-        if (notes[i].start > last.time) break;
-        if (last.time < notes[i].start + notes[i].dur) heard = i;
-      }
-    }
-    if (heard >= 0 && !(s.hide && s.hide(heard) !== 'show' && notes[heard].start + notes[heard].dur > s.pos)) {
-      const target = notes[heard].midi;
-      // Average over ~one vibrato cycle so the readout doesn't flicker.
-      let sum = 0;
-      let cnt = 0;
-      // (only readings from this note: the previous pitch mustn't leak into the average)
-      for (let k = s.samples.length - 1; k >= 0 && last.time - s.samples[k].time < 0.2 && s.samples[k].time >= notes[heard].start; k--) {
-        const mm = s.samples[k].midi;
-        if (mm != null && Math.abs(mm - last.midi) < 1.5) { sum += mm; cnt++; }
-      }
-      const shown = cnt ? sum / cnt : last.midi;
-      let cents = (shown - target) * 100;
-      if (Math.abs(cents) > 600) cents = ((cents % 1200) + 1800) % 1200 - 600; // show octave-folded
-      const txt = pitchShort(cents);
-      c.font = `600 ${fpx(12)}px "JetBrains Mono", monospace`;
-      c.textBaseline = 'middle';
-      const tw = c.measureText(txt).width;
-      const bx = nowX + 14;
-      const by = Math.max(top + 10, Math.min(H - 14, py - 22));
-      const ok = Math.abs(cents) <= s.tolerance;
-      const bh2 = fpx(12) + 10;
-      c.fillStyle = COLORS.bubble;
-      roundRect(c, bx, by - bh2 / 2, tw + 14, bh2, 7);
-      c.fill();
-      c.strokeStyle = ok ? COLORS.voice : COLORS.target;
-      c.lineWidth = 1;
-      c.stroke();
-      c.fillStyle = ok ? COLORS.voice : COLORS.targetText;
-      c.fillText(txt, bx + 7, by + 1);
-    }
   }
 
   // Gutter labels drawn last so they sit on top.

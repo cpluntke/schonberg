@@ -3,7 +3,7 @@ import type { Route } from '../router';
 import { dropGuard, go, leaveTo, practiceParent, pushGuard, useBackGuard } from '../router';
 import { getPiece, noteRangeFor, singableSections, needsPartChoice, partChoices, rememberPart } from '../library';
 import { pieceStatus } from '../plan';
-import { useMedia, useProfile, useWide } from '../hooks';
+import { useProfile, useWide } from '../hooks';
 import {
   MAX_LEVEL, OFF_BOOK_DAYS, effectiveTolerance, entriesOnTime, fixesBefore, fullRunCounts, pieceReadiness, sectionRunCounts,
   speakerPractice, stepFor, stepLabel, stepSpec, type EntriesCheck, type Step,
@@ -42,9 +42,8 @@ import { setLastResult } from '../play/lastResult';
 import { useResume } from '../play/useResume';
 import { IconBack, IconChevronDown, IconEar, IconHome, IconPause, IconPlay, IconRestart, IconStop } from '../icons';
 import { passRule, taskSentence } from '../play/prerun';
-import { pitchReadout, toleranceWords } from '../../game/pitchwords';
-import { barsDone, liveReading, runProgress } from '../play/readout';
-import { noteLabel } from '../../game/notation';
+import { toleranceWords } from '../../game/pitchwords';
+import { barsDone, runProgress } from '../play/readout';
 import { lowerLabel, troubleNote } from '../path';
 import { getNoteStats } from '../../progress/notestats';
 import { barRangeLabel } from '../../music/sections';
@@ -126,7 +125,7 @@ function SingPlay({ route }: { route: PlayRoute }) {
   const [askPart, setAskPart] = useState(() => !!piece && route.mode === '2d' && !/~|^(row|leaps)-/.test(piece.id) && needsPartChoice(piece, profile.voice));
   const [micMsg, setMicMsg] = useState('');
   const [listened, setListened] = useState(false);
-  const [hud, setHud] = useState<Hud>({ score: 0, combo: 0, count: 0, lyricIdx: -1, skip: null, done: 0, rd: null });
+  const [hud, setHud] = useState<Hud>({ score: 0, combo: 0, count: 0, lyricIdx: -1, skip: null, done: 0 });
   const [gains, setGains] = useState<Record<string, number>>(() => {
     const g: Record<string, number> = {};
     for (const p of piece?.score.parts ?? []) {
@@ -206,11 +205,6 @@ function SingPlay({ route }: { route: PlayRoute }) {
   const others = useMemo(() => (piece && part ? hasOtherStaves(piece.score, part.id) : { voices: false, accompaniment: false }), [piece, part]);
   const fullScore = useMemo(() => wide && display === 'score' && !!piece && !!part && isFullScore(piece.score, part.id, staves),
     [wide, display, piece, part, staves]);
-  // The score view on a phone: the live reading in big words above the music (not in landscape,
-  // where the height is the music's); the canvas then draws only the voice dot, not its bubble.
-  const short = useMedia('(max-height: 520px)');
-  // (not off book: the hidden notes have no reading to show, it would say "Listening…" all run)
-  const readoutOn = route.mode === '2d' && display === 'score' && !fullScore && !listenOnly && !short && !offBook;
   // A run over more than one passage (the whole piece, a long stretch): a strip of its bars.
   const progress = useMemo(() => (piece && section && route.mode === '2d' ? runProgress(piece.score, piece.sections, section.start, section.end) : null),
     [piece, section, route.mode]);
@@ -541,7 +535,6 @@ function SingPlay({ route }: { route: PlayRoute }) {
         staves,
         scroll: !scorePages,
         dimLyrics: doo,
-        readout: readoutOn,
         hide: offBook ? (i: number) => {
           // Cold start: nothing of your part before the entry either (it would give the pitch away).
           if (cold && range && i < range[0]) return 'none';
@@ -588,27 +581,15 @@ function SingPlay({ route }: { route: PlayRoute }) {
           if (k) skip = { ...k, bar: piece.score.measures.find((m) => k.entry >= m.start - 1e-6 && k.entry < m.start + m.dur - 1e-6)?.number ?? '' };
         }
         const done = progress ? barsDone(piece.score, section.start, section.end, pos) : 0;
-        // The live readout: the note being sung (its name where the level shows names) and how close.
-        let rd: Hud['rd'] = null;
-        if (readoutOn && s && s.phase === 'playing') {
-          const r = liveReading({ samples: s.samples, pos, part, range, hide: st.hide });
-          if (r) {
-            const n = part.notes[r.index];
-            const w = pitchReadout(r.cents);
-            const name = showNames ? noteLabel(n.midi, notation, keyAtTimeIn(nameKeysOf(piece.score), n.start), n.spelling).text : '';
-            rd = { name, words: w.words, arrow: w.arrow, say: w.say, ok: Math.abs(r.cents) <= tolerance };
-          }
-        }
-        const next: Hud = { score: s?.live?.score ?? 0, combo: s?.live?.combo ?? 0, count, lyricIdx, skip, done, rd };
+        const next: Hud = { score: s?.live?.score ?? 0, combo: s?.live?.combo ?? 0, count, lyricIdx, skip, done };
         setHud((h) => (h.score === next.score && h.combo === next.combo && h.count === next.count && h.lyricIdx === next.lyricIdx
-          && h.skip?.target === next.skip?.target && h.skip?.entry === next.skip?.entry && h.done === next.done
-          && h.rd?.name === next.rd?.name && h.rd?.words === next.rd?.words && h.rd?.ok === next.rd?.ok ? h : next));
+          && h.skip?.target === next.skip?.target && h.skip?.entry === next.skip?.entry && h.done === next.done ? h : next));
       }
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [piece, part, section, route.mode, notation, showNames, rate, tolerance, offBook, cold, display, staves, doo, scorePages, listenOnly, readoutOn, progress]);
+  }, [piece, part, section, route.mode, notation, showNames, rate, tolerance, offBook, cold, display, staves, doo, scorePages, listenOnly, progress]);
 
   // Seen once a run starts with it on screen (switching display before Start shows the other one's).
   useEffect(() => {
@@ -696,18 +677,6 @@ function SingPlay({ route }: { route: PlayRoute }) {
         )} />
 
       {progress && <RunStrip progress={progress} done={hud.done} />}
-      {readoutOn && (
-        <div className="readout-band" data-testid="readout-band">
-          {running && hud.rd ? (
-            <div className={hud.rd.ok ? 'readout' : 'readout off'} data-testid="readout" title={hud.rd.say}>
-              {hud.rd.name && <><span className="n">{hud.rd.name}</span><span className="sep" aria-hidden="true">·</span></>}
-              <span className="w">{hud.rd.words}{hud.rd.arrow && <span className="arr" aria-hidden="true"> {hud.rd.arrow}</span>}</span>
-            </div>
-          ) : (
-            <span className="readout-idle" data-testid="readout-idle">{running ? 'Listening…' : 'How close you are shows here as you sing.'}</span>
-          )}
-        </div>
-      )}
       <div className="play-canvas-wrap" ref={wrapRef}>
         <canvas ref={canvasRef} aria-label={display === 'score' ? undefined : route.mode === '3d' ? 'Arcade' : 'Note highway'} role="img" data-display={display} />
         <div className="sr-only" aria-live="polite" data-testid="countin-live">{hud.count > 0 && running ? String(hud.count) : ''}</div>
@@ -885,13 +854,13 @@ function SingPlay({ route }: { route: PlayRoute }) {
                         ? <span>The full score: your part is the staff with the <span style={{ color: 'var(--voice)' }}>blue</span> band, the other voices are drawn plainly. The white line moves through the bars: sing the note it's on in your staff (it glows <span style={{ color: 'var(--accent)' }}>orange</span>).</span>
                         : <span>Your part as sheet music. The white line moves through the bar: sing the note it's on (it glows <span style={{ color: 'var(--accent)' }}>orange</span>).</span>}
                       <span><span style={{ color: 'var(--voice)' }}>━</span> Your voice draws a blue line at its exact height on the staff: just under the note means flat, just over means sharp (light orange when out of tune).</span>
-                      <span>Notes turn <span style={{ color: 'var(--voice)' }}>blue</span> when sung well, <span style={{ color: 'var(--warn)' }}>yellow</span> when close, <span style={{ color: 'var(--bad)' }}>red</span> when missed. {readoutOn ? 'The box above the music says' : 'The bubble says'} how close you are: spot on, a touch, a little or clearly flat or sharp. Prefer moving bars? Choose Highway under Display &amp; tempo.</span>
+                      <span>Notes turn <span style={{ color: 'var(--voice)' }}>blue</span> when sung well, <span style={{ color: 'var(--warn)' }}>yellow</span> when close, <span style={{ color: 'var(--bad)' }}>red</span> when missed. Prefer moving bars? Choose Highway under Display &amp; tempo.</span>
                     </>
                   ) : (
                     <>
                       <span><span style={{ color: 'var(--accent)' }}>■</span> Orange bars are your notes. They move left to the white line: sing when they reach it.</span>
                       <span><span style={{ color: 'var(--voice)' }}>━</span> The blue line is your voice. Keep it on the bar: the bar fills with blue when you're on the note.</span>
-                      <span>Dashed outlines are the other voices. The bubble says how close you are: spot on, a touch, a little or clearly flat or sharp.</span>
+                      <span>Dashed outlines are the other voices.</span>
                     </>
                   )}
                   </div>
@@ -1054,8 +1023,6 @@ interface Hud {
   skip: { target: number; entry: number; bar: string } | null;
   /** Bars of the run sung so far (the progress strip). */
   done: number;
-  /** The live readout: the note's name ('' where names are hidden), the words, the way to go, in tolerance. */
-  rd: { name: string; words: string; arrow: string; say: string; ok: boolean } | null;
 }
 
 /** The progress of a run over several passages: a segment per passage, filled bar by bar, and "12/64 bars". */

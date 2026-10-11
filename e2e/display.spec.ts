@@ -48,24 +48,25 @@ test('"Match the phone" follows the phone\'s light or dark setting', async ({ pa
   await expect(page.locator('html')).not.toHaveAttribute('data-theme', /.+/);
 });
 
-// The singing view on a phone: the big readout, the progress strip of a whole-piece run, Stop and Pause.
+// The singing view on a phone: no words about the pitch (the blue line shows it), the progress strip of a whole-piece run, Stop and Pause.
 test.describe('the singing view on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test('a whole-piece run in the score view: readout, bar strip, Stop and Pause side by side', async ({ page }) => {
+  test('a whole-piece run in the score view: no pitch words, bar strip, Stop and Pause side by side', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     await page.goto('/?simulate=flat#/piece/warmup-chorale');
     await expect(page.getByTestId('piece-level')).toBeVisible({ timeout: 20_000 });
     await openMore(page);
     await page.getByTestId('full-1').click();
-    await expect(page.getByTestId('readout-idle')).toBeVisible();
     const strip = page.getByTestId('run-strip');
     await expect(strip).toHaveAttribute('aria-valuenow', '0');
     await page.getByTestId('start').click();
 
-    // The simulated singer is flat: the readout says so in words, the arrow down (where the voice is).
-    await expect(page.getByTestId('readout')).toContainText(/flat ↓/, { timeout: 15_000 });
+    // The simulated singer is flat: the blue line shows it; no words say so.
+    await expect.poll(async () => Number(await strip.getAttribute('aria-valuenow')), { timeout: 15_000 }).toBeGreaterThan(0);
+    await expect(page.getByTestId('readout')).toHaveCount(0);
+    await expect(page.getByText(/flat ↓|spot on/)).toHaveCount(0);
     const stop = page.getByRole('button', { name: 'Stop' });
     const pause = page.getByRole('button', { name: 'Pause' });
     const [a, b] = [await stop.boundingBox(), await pause.boundingBox()];

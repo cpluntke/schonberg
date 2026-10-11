@@ -320,17 +320,6 @@ input[type='range'] { accent-color: var(--accent); width: 100%; }
 .run-strip .segs b { display: block; height: 100%; background: var(--voice); transition: width 0.3s ease; }
 .run-strip .n { font: 600 0.875rem var(--mono); color: var(--muted); white-space: nowrap; flex: none; }
 /* The score view on a phone: how close you are, in big words, above the music. */
-.readout-band { flex: none; height: 4.25rem; display: flex; align-items: center; padding: 4px 12px; min-width: 0; }
-.readout {
-  display: inline-flex; align-items: baseline; gap: 12px; max-width: 100%; padding: 8px 16px; border-radius: 16px;
-  border: 2px solid var(--voice); background: var(--voice-bg); white-space: nowrap; overflow: hidden;
-}
-.readout .n { font-size: 1.875rem; font-weight: 800; line-height: 1; color: var(--voice); }
-.readout .sep { font-size: 1.1875rem; font-weight: 700; color: var(--muted); margin: 0 -4px; }
-.readout .w { font-size: 1.1875rem; font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; }
-.readout.off { border-color: var(--accent-text); background: var(--accent-soft); }
-.readout.off .n { color: var(--accent-text); }
-.readout-idle { color: var(--muted); font-size: 0.9375rem; padding-left: 4px; }
 @media (max-width: 340px) {
   .play-actions .lbl { display: none; }
   .mixer button .you { display: none; }
