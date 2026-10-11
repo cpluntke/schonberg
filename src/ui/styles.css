@@ -1200,7 +1200,7 @@ input[type='range'] { height: 44px; margin: 0; }
 }
 
 /* ===================================================================== Why choirs tune differently
-   The explainer before the intonation courses (screens/Tuning.tsx): six pages, each a few sentences,
+   The explainer before the intonation courses (screens/Tuning.tsx): ten pages, each a few sentences,
    a picture (SVG in theme colours) and a sound. Phone: words, then the picture card; wide: side by side. */
 .tun-where { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tun-skip { flex: none; padding: 0 10px; }
@@ -1222,10 +1222,13 @@ input[type='range'] { height: 44px; margin: 0; }
 .tun-label.mono { font-family: var(--mono); }
 .tun-big { font-size: 1.5rem; font-weight: 800; font-family: var(--font); }
 .tun-pair { gap: 10px; align-items: stretch; }
-.tun-pair .btn.two { min-height: 60px; font-size: 1rem; font-weight: 700; }
+.tun-pair .btn.two { min-height: 60px; font-size: 0.9375rem; font-weight: 700; line-height: 1.25; }
 .tun-pair .btn[aria-pressed='true'] { border-color: var(--voice); }
-.tun-pair .btn .sub { font-size: 0.875rem; }
+.tun-pair .btn .sub { font-size: 0.8125rem; }
+.tun-pair .btn.two { padding: 6px 8px; }
 .tun-pair > * { flex: 1 1 0; min-width: 0; }
+.col.tun-pair > * { flex: none; }
+.col.tun-pair .btn.two { min-height: 56px; }
 .tun-reset { height: auto; min-height: 60px; white-space: normal; line-height: 1.2; }
 .tun-rate { font-size: 1.25rem; line-height: 1.25; text-align: center; color: var(--voice); }
 .tun-slider { gap: 4px; }
@@ -1242,9 +1245,37 @@ input[type='range'] { height: 44px; margin: 0; }
   background: var(--voice-bg); color: var(--voice); border: 2px solid var(--voice); font: 800 1.375rem var(--font);
 }
 .tun-rankcard { gap: 10px; }
+/* the string (a monochord): drag sideways, scroll up and down; the bridge's focus ring */
+.tun-string { touch-action: pan-y; cursor: ew-resize; user-select: none; -webkit-user-select: none; }
+.tun-handle { outline: none; }
+.tun-handle .tun-ring { opacity: 0; }
+.tun-handle:focus-visible .tun-ring { opacity: 1; }
+.tun-nudge { gap: 8px; align-items: center; }
+.tun-nudge input[type='range'] { flex: 1 1 auto; min-width: 0; }
+.tun-nudge .btn.icon { flex: none; width: 44px; height: 44px; min-height: 44px; padding: 0; justify-content: center; }
+.tun-tasks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.tun-tasks li { display: flex; align-items: center; gap: 10px; font-size: 1rem; line-height: 1.3; }
+.tun-tasks li.done { color: var(--good); font-weight: 700; }
+.tun-check {
+  width: 24px; height: 24px; flex: none; border-radius: 12px; border: 2px solid var(--line-strong);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.tun-tasks li.done .tun-check { border-color: var(--good); background: var(--good-bg); color: var(--good); }
+.tun-showme { align-self: flex-start; padding: 0; min-height: 44px; }
+.tun-readout { gap: 0; align-items: center; text-align: center; }
+.tun-question { margin: 0; font-size: 1.75rem; font-weight: 800; line-height: 1.2; letter-spacing: -0.01em; }
+.tun-answer { gap: 10px; }
+.tun-answer p { margin: 0; }
+.tun-fact { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); font-size: 1rem; line-height: 1.35; }
+.tun-fact strong { font-size: 1.125rem; }
+.tun-callout { padding: 12px 14px; border-radius: 12px; border: 1px solid var(--good-line); background: var(--good-bg); }
+.tun-et { margin: 0; }
+.tun-staff .tun-hl { transition: opacity 0.2s; }
+@media (prefers-reduced-motion: reduce) { .tun-staff .tun-hl { transition: none; } }
+.tun-now { min-height: 1.4em; }
 .tun-nav { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; }
 .tun-nav .btn { min-height: 52px; }
-/* Train: the explainer's card above the courses; once seen, a quiet link. The course page's link. */
+/* The Intonation tab: the explainer's card above the courses; once seen, a quiet link. The course page's link. */
 .tun-entry { border-color: var(--voice-deep); background: var(--voice-bg); }
 .tun-seen { justify-content: space-between; width: 100%; padding: 0; text-align: left; }
 @media (hover: hover) and (pointer: fine) {

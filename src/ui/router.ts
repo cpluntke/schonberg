@@ -39,7 +39,7 @@ export type Route =
   | { name: 'intonation'; interval?: 'fifth' | 'third'; rung?: number; done?: boolean; check?: boolean }
   /** All courses (Train). */
   | { name: 'courses' }
-  /** "Why choirs tune differently": the explainer before the intonation courses, page 1–6 (absent: page 1). */
+  /** "Why choirs tune differently": the explainer before the intonation courses, page 1–10 (absent: page 1). */
   | { name: 'tuning'; page?: number }
   /** A held drone (do, or do and sol) at a pitch of your choice (Train's tools). */
   | { name: 'drone' }
@@ -56,7 +56,7 @@ export type Route =
   | { name: 'invite'; token?: string };
 
 /** The explainer's pages ("Why choirs tune differently"). */
-export const TUNING_PAGES = 8;
+export const TUNING_PAGES = 10;
 
 export function parseHash(hash: string): Route {
   const h = hash.replace(/^#\/?/, '');

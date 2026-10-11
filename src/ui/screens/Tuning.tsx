@@ -1,21 +1,29 @@
-// "Why choirs tune differently": a 5-minute explainer before the intonation courses, six pages with
-// Back / Next, a progress row and Skip. Each page: a few plain sentences, an animation (SVG, drawn
-// each frame while the page is shown; a still frame with reduced motion) and a sound to play or
-// change (the lab's Drone: held tones rich in overtones, retuned while they sound). The numbers are
-// in game/tuning.ts; the courses themselves in IntonationLab.tsx (docs/INTONATION.md).
+// "Why choirs tune differently": a short explainer before the intonation courses, ten pages with
+// Back / Next, a progress row and Skip. It starts on a string (a monochord: drag the bridge, find the
+// octave and the fifth by ear), shows why (the waves), asks whether the piano plays the same (the
+// octave yes, the fifth a hair apart), walks the circle of fifths to the comma, and ends with what a
+// choir can do that a piano can't. Each page: a few plain sentences, a picture (SVG, drawn each frame
+// while the page is shown; a still frame with reduced motion) and a sound to play or change (the
+// lab's Drone: held tones rich in overtones, retuned while they sound). The numbers are in
+// game/tuning.ts; the courses themselves in IntonationLab.tsx (docs/INTONATION.md).
 
 import React, { useEffect, useRef, useState } from 'react';
 import { back, go, TUNING_PAGES, type Route } from '../router';
-import { IconBack, IconChevron, IconPause, IconPlay } from '../icons';
+import { IconBack, IconCheck, IconChevron, IconPause, IconPlay } from '../icons';
+import { F_CLEF, G_CLEF, GLYPH_UNITS_PER_SPACE } from '../play/clefGlyphs';
 import { getAudioContext, unlockAudio } from '../../audio/context';
 import { Drone } from '../../audio/drone';
+import { ChordPlayer } from '../../audio/cadence';
 import { COURSES, COURSE_IDS, COURSE_MINUTES, courseStatus } from '../../game/courses';
 import { RUNGS, loadLab, type LabInterval } from '../../game/intonation';
 import {
-  COMMA, FIFTHS_FROM_C, PIANO, PURE, STACKED_C, beatRate, centsToRatio, centsWords, fifthDrift, foldInto, oneDecimal, upperHz, wobbleLabel,
+  BRIDGE_MAX, BRIDGE_MIN, CADENCE, COMMA, FIFTHS_FROM_C, JUST, OPEN_HZ, PIANO, PIANO_FIFTH_FRAC, STACKED_C, TARGETS, beatRate, cadenceHz, centsToRatio,
+  fifthDrift, foldInto, nearestTarget, oneDecimal, partHz, stringBeat, wobbleLabel, type StringTarget,
 } from '../../game/tuning';
 
 export const TUNING_TITLE = 'Why choirs tune differently';
+/** How long the explainer takes, as the Train card says. */
+export const TUNING_MINUTES = 10;
 const SEEN_KEY = 'sh:tuningSeen';
 
 /** Has the singer seen the explainer (to its last page, or skipped there) on this phone? */
@@ -26,15 +34,15 @@ function markSeen() {
   try { localStorage.setItem(SEEN_KEY, '1'); } catch { /* storage blocked */ }
 }
 
-/** The root of every sound here: A3, comfortable for every voice to hear. */
+/** The root of the chord on the choir page: A3, comfortable for every voice to hear. */
 const ROOT = 220;
 /** Per-tone level: two tones a little louder than three, so a chord isn't louder than an interval. */
 const LEVEL2 = 0.14;
 const LEVEL3 = 0.11;
 
-const PAGE_NAMES = [
-  'Two notes that fit', 'The wobble', 'Cents', 'So why not make every interval just?', 'Now stack just fifths', 'Share it out',
-  'Choirs have a luxury', 'What matters most',
+export const PAGE_NAMES = [
+  'The string', 'Why? The waves', 'Find them yourself', 'The big question', 'So why not make every interval just?', 'Now stack just fifths',
+  'Share it out', 'Choirs have a luxury', 'Hear a cadence', 'What matters most',
 ];
 
 /** "About 6 wobbles a second", "Still". */
@@ -83,13 +91,15 @@ export function TuningScreen({ page }: { page: number }) {
 
 function Page({ p }: { p: number }) {
   switch (p) {
-    case 1: return <FitPage />;
-    case 2: return <WobblePage />;
-    case 3: return <CentsPage />;
-    case 4: return <PianoFifthsPage />;
-    case 5: return <PureFifthsPage />;
-    case 6: return <ShareOutPage />;
-    case 7: return <ChoirPage />;
+    case 1: return <StringPage />;
+    case 2: return <WavesPage />;
+    case 3: return <FindPage />;
+    case 4: return <QuestionPage />;
+    case 5: return <PianoFifthsPage />;
+    case 6: return <JustFifthsPage />;
+    case 7: return <ShareOutPage />;
+    case 8: return <ChoirPage />;
+    case 9: return <CadencePage />;
     default: return <PractisePage />;
   }
 }
@@ -116,6 +126,17 @@ function PageBody({ n, children, figure, after }: { n: number; children: React.R
 
 type Tones = Record<string, number>;
 
+/** Stop when the app goes to the background. */
+function useOnHidden(stop: () => void) {
+  const ref = useRef(stop);
+  ref.current = stop;
+  useEffect(() => {
+    const on = () => { if (document.hidden) ref.current(); };
+    document.addEventListener('visibilitychange', on);
+    return () => document.removeEventListener('visibilitychange', on);
+  }, []);
+}
+
 /**
  * This page's held tones: nothing until a tap (which unlocks audio), silent for good when the page
  * goes, stopped when the app goes to the background. `playing` is the id of what sounds.
@@ -125,24 +146,17 @@ function useSound() {
   const alive = useRef(true);
   const timer = useRef(0);
   const [playing, setPlaying] = useState<string | null>(null);
+  const stop = () => { clearTimeout(timer.current); ref.current?.stop(); setPlaying(null); };
+  useOnHidden(stop);
   useEffect(() => {
     alive.current = true;
-    const onVis = () => {
-      if (!document.hidden) return;
-      clearTimeout(timer.current);
-      ref.current?.stop();
-      setPlaying(null);
-    };
-    document.addEventListener('visibilitychange', onVis);
     return () => {
       alive.current = false;
-      document.removeEventListener('visibilitychange', onVis);
       clearTimeout(timer.current);
       ref.current?.dispose();
       ref.current = null;
     };
   }, []);
-  const stop = () => { clearTimeout(timer.current); ref.current?.stop(); setPlaying(null); };
   /** Sound `tones` as `id` (afresh), for `ms` or until stopped. */
   const start = async (id: string, tones: Tones, ms = 0) => {
     await unlockAudio();
@@ -228,50 +242,284 @@ function useTween(target: number, ms = 650): number {
   return v;
 }
 
+/** Keep "2 : 1", "Fifth · 3" and "700 cents" from breaking across lines. */
+const nb = (t: string) => t.replace(/ ([:·]) /g, '\u00a0$1\u00a0').replace(/(\d) (cents|keys)/g, '$1\u00a0$2');
+
 /** A play / stop button for one sound, with a second line. */
 function SoundButton({ id, playing, onClick, title, sub, testid }: { id: string; playing: string | null; onClick: () => void; title: string; sub?: string; testid?: string }) {
   const on = playing === id;
   return (
     <button className="btn two grow" aria-pressed={on} data-testid={testid} onClick={onClick}>
-      <span className="row" style={{ gap: 6 }}>{on ? <IconPause size={16} /> : <IconPlay size={16} color="currentColor" />} {on ? 'Stop' : title}</span>
-      {sub && <span className="sub">{sub}</span>}
+      <span className="row" style={{ gap: 6 }}>{on ? <IconPause size={16} /> : <IconPlay size={16} color="currentColor" />} {on ? 'Stop' : nb(title)}</span>
+      {sub && <span className="sub">{nb(sub)}</span>}
     </button>
   );
 }
 
-// ---------- 1. Two notes that fit ----------
+/** Things to find, ticked as they're found. */
+function Tasks({ items }: { items: { id: string; label: string; done: boolean }[] }) {
+  return (
+    <ul className="tun-tasks" aria-label="To find" aria-live="polite">
+      {items.map((t) => (
+        <li key={t.id} className={t.done ? 'done' : ''} data-testid={`tuning-task-${t.id}`} data-done={t.done}>
+          <span className="tun-check" aria-hidden="true">{t.done && <IconCheck size={16} />}</span>
+          <span>{t.label}<span className="sr-only">{t.done ? ': found' : ': not yet'}</span></span>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
-type Fit = 'octave' | 'fifth';
-const FIT: Record<Fit, { ratio: number; label: string; repeat: number }> = {
-  octave: { ratio: 2, label: '2 : 1', repeat: 1 },
-  fifth: { ratio: 1.5, label: '3 : 2', repeat: 2 },
+// ---------- the string ----------
+
+const SX0 = 16, SX1 = 324, SL = SX1 - SX0;
+/** How fast the strings wiggle on screen: the whole string this many times a second, a part 1/frac times faster. */
+const WIGGLE = 1.3;
+const clampFrac = (f: number) => Math.min(BRIDGE_MAX, Math.max(BRIDGE_MIN, f));
+
+/** "half the string", "two thirds of the string", "72.5% of the string". */
+function fracWords(f: number): string {
+  if (Math.abs(f - 0.5) < 0.0004) return 'half the string';
+  if (Math.abs(f - 2 / 3) < 0.0004) return 'two thirds of the string';
+  return `${(f * 100).toFixed(1)}% of the string`;
+}
+
+interface Mark { at: number; label: string; anchor?: 'start' | 'end' }
+
+/** A string held at both ends, wiggling as a standing wave between `a` and `b` (svg x) at `y` while it sounds. */
+function Wiggle({ a, b, y, amp, phase, colour }: { a: number; b: number; y: number; amp: number; phase: number; colour: string }) {
+  const n = 40;
+  const k = Math.cos(2 * Math.PI * phase);
+  let line = '', top = '', bot = '';
+  for (let i = 0; i <= n; i++) {
+    const u = i / n;
+    const x = (a + (b - a) * u).toFixed(1);
+    const s = Math.sin(Math.PI * u);
+    line += `${i ? 'L' : 'M'}${x} ${(y - amp * s * k).toFixed(1)}`;
+    top += `${i ? 'L' : 'M'}${x} ${(y - amp * s).toFixed(1)}`;
+    bot = `L${x} ${(y + amp * s).toFixed(1)}` + bot;
+  }
+  return (
+    <g>
+      {amp > 0 && <path d={`${top}${bot}Z`} fill={colour} opacity={0.13} />}
+      <path d={line} fill="none" stroke={colour} strokeWidth={2.5} strokeLinecap="round" />
+    </g>
+  );
+}
+
+/**
+ * The monochord: a string over two end bridges and a movable bridge, dragged (pointer: absolute; with
+ * `fine`, slow drags move it finely, for the last cent) or moved with the keys. The part left of the
+ * bridge wiggles while it sounds (half the string: twice as fast); `reference`: a second, whole string
+ * above, sounding with it.
+ */
+function Monochord({ frac, onFrac, whole, part, marks, fine, reference, step }: {
+  frac: number; onFrac: (f: number) => void; whole: boolean; part: boolean; marks: Mark[]; fine?: boolean; reference?: boolean; step: number;
+}) {
+  const t = useClock(1);
+  const svg = useRef<SVGSVGElement | null>(null);
+  const cur = useRef(frac);
+  cur.current = frac;
+  const drag = useRef<{ x: number; t: number; f: number } | null>(null);
+  const SY = reference ? 122 : 62;
+  const RY = 46;
+  const H = reference ? 170 : 110;
+  const bx = SX0 + frac * SL;
+  const toX = (clientX: number) => {
+    const r = svg.current!.getBoundingClientRect();
+    return ((clientX - r.left) / Math.max(1, r.width)) * 340;
+  };
+  const set = (f: number) => { const c = clampFrac(f); cur.current = c; onFrac(c); };
+  const down = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (e.button !== 0) return;
+    const x = toX(e.clientX);
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* not supported */ }
+    // (a tap away from the bridge moves it there; on the bridge itself, a fine drag starts where it is)
+    if (!fine || Math.abs(x - (SX0 + cur.current * SL)) > 22) set((x - SX0) / SL);
+    drag.current = { x, t: e.timeStamp, f: cur.current };
+  };
+  const move = (e: React.PointerEvent<SVGSVGElement>) => {
+    const d = drag.current;
+    if (!d) return;
+    const x = toX(e.clientX);
+    if (!fine) { set((x - SX0) / SL); return; }
+    // slow hands, small steps: the speed sets how far the bridge follows the finger (1 : 1 when quick, 1 : 16 when slow)
+    const dx = x - d.x;
+    const v = Math.abs(dx) / Math.max(1, e.timeStamp - d.t);
+    const gain = Math.min(1, Math.max(1 / 16, v / 0.5));
+    drag.current = { x, t: e.timeStamp, f: d.f };
+    set(cur.current + (dx * gain) / SL);
+  };
+  const up = () => { drag.current = null; };
+  const key = (e: React.KeyboardEvent) => {
+    const big = e.shiftKey ? 10 : 1;
+    const k = e.key;
+    if (k === 'ArrowLeft' || k === 'ArrowDown') set(cur.current - step * big);
+    else if (k === 'ArrowRight' || k === 'ArrowUp') set(cur.current + step * big);
+    else if (k === 'PageDown') set(cur.current - step * 20);
+    else if (k === 'PageUp') set(cur.current + step * 20);
+    else if (k === 'Home') set(BRIDGE_MIN);
+    else if (k === 'End') set(BRIDGE_MAX);
+    else return;
+    e.preventDefault();
+  };
+  const amp = 11;
+  const showWhole = whole && !reference;
+  return (
+    <svg ref={svg} className="tun-svg tun-string" viewBox={`0 0 340 ${H}`} data-testid="tuning-string"
+      onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
+      <title>{reference
+        ? `Two strings: the whole string above; below, a bridge at ${fracWords(frac)}, the part left of it sounding.`
+        : `A string with a movable bridge at ${fracWords(frac)}.`}</title>
+      {reference && (
+        <g>
+          <text x={SX0} y={RY - 22} className="tun-label" fill="var(--muted)">Whole string</text>
+          <Bridge x={SX0} y={RY} /><Bridge x={SX1} y={RY} />
+          <Wiggle a={SX0} b={SX1} y={RY} amp={whole ? amp : 0} phase={t * WIGGLE} colour={whole ? 'var(--voice)' : 'var(--line-strong)'} />
+          <text x={SX0} y={SY - 30} className="tun-label" fill="var(--muted)">With a bridge</text>
+        </g>
+      )}
+      {marks.map((m) => {
+        const x = SX0 + m.at * SL;
+        return (
+          <g key={m.label}>
+            <line x1={x} x2={x} y1={SY - 24} y2={SY + 14} stroke="var(--good)" strokeWidth={2} strokeDasharray="3 3" />
+            <text x={x + (m.anchor === 'end' ? 4 : m.anchor === 'start' ? -4 : 0)} y={SY - 29} textAnchor={m.anchor ?? 'middle'} className="tun-label" fontWeight={700} fill="var(--good)">{m.label}</text>
+          </g>
+        );
+      })}
+      <Bridge x={SX0} y={SY} /><Bridge x={SX1} y={SY} />
+      {showWhole
+        ? <Wiggle a={SX0} b={SX1} y={SY} amp={amp} phase={t * WIGGLE} colour="var(--voice)" />
+        : (
+          <>
+            <Wiggle a={SX0} b={bx} y={SY} amp={part ? amp * Math.min(1, frac + 0.3) : 0} phase={(t * WIGGLE) / frac} colour={part ? 'var(--expert)' : 'var(--text)'} />
+            <line x1={bx} x2={SX1} y1={SY} y2={SY} stroke="var(--line-strong)" strokeWidth={2.5} />
+          </>
+        )}
+      <g className="tun-handle" role="slider" tabIndex={0} aria-label="Bridge" aria-orientation="horizontal" data-testid="tuning-bridge"
+        aria-valuemin={BRIDGE_MIN} aria-valuemax={BRIDGE_MAX} aria-valuenow={Number(frac.toFixed(4))} aria-valuetext={`Bridge at ${fracWords(frac)}`}
+        onKeyDown={key} opacity={showWhole ? 0.45 : 1}>
+        <rect x={bx - 22} y={SY - 6} width={44} height={50} fill="transparent" />
+        <circle className="tun-ring" cx={bx} cy={SY + 30} r={17} fill="none" stroke="var(--accent)" strokeWidth={2} />
+        <path d={`M${bx} ${SY}L${bx - 8} ${SY + 17}H${bx + 8}Z`} fill="var(--accent)" />
+        <circle cx={bx} cy={SY + 30} r={11} fill="var(--accent)" />
+        <path d={`M${bx - 3} ${SY + 25}v10M${bx + 3} ${SY + 25}v10`} stroke="var(--accent-ink)" strokeWidth={1.5} strokeLinecap="round" />
+      </g>
+    </svg>
+  );
+}
+
+function Bridge({ x, y }: { x: number; y: number }) {
+  return <path d={`M${x} ${y}L${x - 7} ${y + 14}H${x + 7}Z`} fill="var(--line-strong)" />;
+}
+
+/** The labelled slider under the string (and a hair either way, with `nudge`). */
+function BridgeSlider({ frac, onFrac, step, nudge }: { frac: number; onFrac: (f: number) => void; step: number; nudge?: boolean }) {
+  const words = fracWords(frac);
+  const input = (
+    <input id="tun-bridge" type="range" min={BRIDGE_MIN} max={BRIDGE_MAX} step={step} value={frac} aria-valuetext={`Bridge at ${words}`}
+      data-testid="tuning-bridge-slider" onChange={(e) => onFrac(clampFrac(Number(e.target.value)))} />
+  );
+  return (
+    <div className="col tun-slider">
+      <label className="row between t14" htmlFor="tun-bridge"><span>The bridge</span><span className="mono muted" aria-hidden="true">{words}</span></label>
+      {nudge ? (
+        <div className="row tun-nudge">
+          <button className="btn icon" aria-label="Bridge a hair to the left" data-testid="tuning-nudge-left" onClick={() => onFrac(clampFrac(frac - step))}><IconBack size={18} /></button>
+          {input}
+          <button className="btn icon" aria-label="Bridge a hair to the right" data-testid="tuning-nudge-right" onClick={() => onFrac(clampFrac(frac + step))}><IconChevron size={18} /></button>
+        </div>
+      ) : input}
+    </div>
+  );
+}
+
+// ---------- 1. The string ----------
+
+/** Near enough to count as found by ear on the first page (a fraction of the string: about 30–40 cents). */
+const FIND_TOL = 0.012;
+const MARKS: Record<StringTarget, Mark> = {
+  octave: { at: 0.5, label: '½', anchor: 'end' },
+  fifth: { at: 2 / 3, label: '⅔', anchor: 'start' },
 };
 
-function FitPage() {
+function StringPage() {
   const s = useSound();
-  const [which, setWhich] = useState<Fit>('fifth');
-  const play = (w: Fit) => {
-    setWhich(w);
-    s.toggle(w, { lo: ROOT, [w]: ROOT * FIT[w].ratio }, 6000);
+  const [frac, setFrac] = useState(0.84);
+  const [found, setFound] = useState<Record<StringTarget, boolean>>({ octave: false, fifth: false });
+  const [showAll, setShowAll] = useState(false);
+  const hz = partHz(OPEN_HZ, frac);
+  useEffect(() => { if (s.playing === 'part') s.retune({ part: hz }); }, [hz]); // eslint-disable-line react-hooks/exhaustive-deps
+  // resting near a spot finds it (and the bridge settles onto it, the first time)
+  useEffect(() => {
+    const t = (['octave', 'fifth'] as const).find((k) => Math.abs(frac - TARGETS[k].frac) <= FIND_TOL);
+    if (!t || found[t]) return;
+    const id = window.setTimeout(() => { setFound((f) => ({ ...f, [t]: true })); setFrac(TARGETS[t].frac); }, 600);
+    return () => clearTimeout(id);
+  }, [frac, found]);
+  const showMe = () => {
+    setShowAll(true);
+    setFrac(Math.abs(frac - 0.5) < 0.001 ? 2 / 3 : 0.5);
   };
+  const marks = (['octave', 'fifth'] as const).filter((k) => found[k] || showAll).map((k) => MARKS[k]);
   return (
     <PageBody n={1} figure={<>
-      <FitWaves which={which} />
+      <Monochord frac={frac} onFrac={setFrac} whole={s.playing === 'whole'} part={s.playing === 'part'} marks={marks} step={0.005} />
+      <BridgeSlider frac={frac} onFrac={setFrac} step={0.001} />
       <div className="row tun-pair">
-        <SoundButton id="fifth" playing={s.playing} onClick={() => play('fifth')} title="Fifth · 3 : 2" sub="3 to every 2" testid="tuning-fifth" />
-        <SoundButton id="octave" playing={s.playing} onClick={() => play('octave')} title="Octave · 2 : 1" sub="twice as fast" testid="tuning-octave" />
+        <SoundButton id="whole" playing={s.playing} onClick={() => s.toggle('whole', { whole: OPEN_HZ }, 2500)} title="Whole string" sub="pluck" testid="tuning-whole" />
+        <SoundButton id="part" playing={s.playing} onClick={() => s.toggle('part', { part: hz })} title="Left part" sub="then drag" testid="tuning-part" />
       </div>
+      <Tasks items={[
+        { id: 'octave', label: found.octave ? 'The same note, higher: at ½' : 'The same note, higher', done: found.octave },
+        { id: 'fifth', label: found.fifth ? 'A fifth: at ⅔' : 'A fifth', done: found.fifth },
+      ]} />
+      {!(found.octave && found.fifth) && <button className="link tun-showme" data-testid="tuning-showme" onClick={showMe}>Show me</button>}
     </>}>
-      <p className="t16">Every note is a wave.</p>
-      <p className="t16">In a fifth, the top note’s wave goes up and down 3 times for every 2 of the bottom one’s. The waves line up, again and again, and the two notes blend into one calm sound.</p>
+      <p className="t16">Drag the bridge. Play the whole string, then the part left of the bridge.</p>
+      <p className="t16 tun-ask">Where does it become the same note, higher? Where do you hear a fifth?</p>
     </PageBody>
   );
 }
 
-/** The low note, the high note and both together, scrolling slowly; dashed lines where the pattern repeats. */
+// ---------- 2. Why? The waves ----------
+
+type Fit = 'octave' | 'fifth';
+const FIT: Record<Fit, { ratio: number; label: string; part: string; repeat: number }> = {
+  octave: { ratio: 2, label: '2 : 1', part: 'Half the string', repeat: 1 },
+  fifth: { ratio: 1.5, label: '3 : 2', part: 'Two thirds', repeat: 2 },
+};
+
+function WavesPage() {
+  const s = useSound();
+  const [which, setWhich] = useState<Fit>('octave');
+  const play = (w: Fit) => {
+    setWhich(w);
+    s.toggle(w, { lo: OPEN_HZ, [w]: OPEN_HZ * FIT[w].ratio }, 6000);
+  };
+  return (
+    <PageBody n={2} figure={<>
+      <FitWaves which={which} />
+      <div className="row tun-pair">
+        <SoundButton id="octave" playing={s.playing} onClick={() => play('octave')} title="Octave · 2 : 1" sub="half the string" testid="tuning-octave" />
+        <SoundButton id="fifth" playing={s.playing} onClick={() => play('fifth')} title="Fifth · 3 : 2" sub="two thirds" testid="tuning-fifth" />
+      </div>
+    </>} after={<>
+      <p className="t16 tun-callout">Intervals in such simple whole-number ratios are called <strong>just</strong>. Tuning by them is <strong>just intonation</strong>.</p>
+    </>}>
+      <p className="t16">Every note is a wave.</p>
+      <p className="t16">Half the string: the wave goes up and down <strong>twice as often</strong>. 2 : 1, the octave.</p>
+      <p className="t16">Two thirds: <strong>3 times for every 2</strong>. 3 : 2, the fifth.</p>
+      <p className="t16">The waves line up again and again, so the two notes blend.</p>
+    </PageBody>
+  );
+}
+
+/** The whole string, the part and both together, scrolling slowly; dashed lines where the pattern repeats. */
 function FitWaves({ which }: { which: Fit }) {
   const u = useClock(0.3);
-  const { ratio, repeat, label } = FIT[which];
+  const { ratio, repeat, label, part } = FIT[which];
   const K = 4; // low-note cycles shown
   const X0 = 8, W = 324;
   const x = (s: number) => X0 + (s / K) * W;
@@ -290,11 +538,11 @@ function FitWaves({ which }: { which: Fit }) {
   for (let k = Math.ceil(u / repeat); k * repeat - u <= K; k++) marks.push({ k, at: k * repeat - u });
   return (
     <svg className="tun-svg" viewBox="0 0 340 236" role="img" data-testid="tuning-waves"
-      aria-label={`The low note, the high note (${label}) and both together: the waves line up in a pattern that repeats every ${repeat === 1 ? 'cycle' : `${repeat} cycles`} of the low note.`}>
+      aria-label={`The whole string’s wave, the wave of ${part.toLowerCase()} (${label}) and both together: they line up in a pattern that repeats every ${repeat === 1 ? 'wave' : `${repeat} waves`} of the whole string.`}>
       {marks.map((m) => <line key={m.k} x1={x(m.at)} x2={x(m.at)} y1={22} y2={232} stroke="var(--line-strong)" strokeDasharray="4 4" />)}
-      <text x={X0} y={16} className="tun-label" fill="var(--voice)">Low note</text>
+      <text x={X0} y={16} className="tun-label" fill="var(--voice)">Whole string</text>
       <path d={path(48, 20, lo)} fill="none" stroke="var(--voice)" strokeWidth={2} />
-      <text x={X0} y={88} className="tun-label" fill="var(--expert)">High note · {label}</text>
+      <text x={X0} y={88} className="tun-label" fill="var(--expert)">{part} · {label}</text>
       <path d={path(120, 20, hi)} fill="none" stroke="var(--expert)" strokeWidth={2} />
       <text x={X0} y={162} className="tun-label" fill="var(--text)">Both together</text>
       <path d={path(198, 15, (s) => lo(s) + hi(s))} fill="none" stroke="var(--text)" strokeWidth={2} />
@@ -302,33 +550,50 @@ function FitWaves({ which }: { which: Fit }) {
   );
 }
 
-// ---------- 2. The wobble ----------
+// ---------- 3. Find them yourself ----------
 
-const fifthHz = (off: number) => upperHz(ROOT, [3, 2], off);
+/** Held within this many cents for HOLD_MS ticks a task. */
+const HOLD_CENTS = 3;
+const HOLD_MS = 1000;
+/** Fine steps of the bridge on this page (a fraction of the string: about 1.3–1.7 cents). */
+const FINE = 0.0005;
 
-function WobblePage() {
+function FindPage() {
   const s = useSound();
-  const [off, setOff] = useState(12);
-  const b = beatRate(ROOT, fifthHz(off), [3, 2]);
-  useEffect(() => { s.retune({ do: ROOT, sol: fifthHz(off) }); }, [off]); // eslint-disable-line react-hooks/exhaustive-deps
-  const words = centsWords(off);
+  const [frac, setFrac] = useState(0.8);
+  const [done, setDone] = useState<Record<StringTarget, boolean>>({ octave: false, fifth: false });
+  const near = nearestTarget(frac);
+  const b = stringBeat(OPEN_HZ, frac, near.target);
+  const tones = (): Tones => ({ whole: OPEN_HZ, part: partHz(OPEN_HZ, frac) });
+  useEffect(() => { s.retune(tones()); }, [frac]); // eslint-disable-line react-hooks/exhaustive-deps
+  const within = Math.abs(near.off) <= HOLD_CENTS;
+  useEffect(() => {
+    if (!within || done[near.target]) return;
+    const id = window.setTimeout(() => setDone((d) => ({ ...d, [near.target]: true })), HOLD_MS);
+    return () => clearTimeout(id);
+  }, [within, near.target, done]);
+  const label = wobbleLabel(b);
+  const rate = b > 12 ? 'Rough: too fast to count' : label === 'still' ? 'Still' : cap(label);
+  const marks = (['octave', 'fifth'] as const).map((k) => MARKS[k]);
   return (
-    <PageBody n={2} figure={<>
-      <PulseView rate={b} />
-      <strong className="tun-rate" aria-live="polite" data-testid="tuning-rate">{cap(wobbleLabel(b))}</strong>
-      <label className="col tun-slider" htmlFor="tun-fifth">
-        <span className="row between t14"><span>Top note</span><span className="mono" aria-hidden="true">{words}</span></span>
-        <input id="tun-fifth" type="range" min={-30} max={30} step={1} value={off} aria-valuetext={words} data-testid="tuning-fifth-slider"
-          onChange={(e) => setOff(Number(e.target.value))} />
-        <span className="row between t14 muted" aria-hidden="true"><span>lower</span><span>just</span><span>higher</span></span>
-      </label>
-      <div className="row tun-pair">
-        <SoundButton id="fifth" playing={s.playing} onClick={() => s.toggle('fifth', { do: ROOT, sol: fifthHz(off) })} title="Play the fifth" sub="then slide" testid="tuning-play" />
-        <button className="btn tun-reset" disabled={off === 0} onClick={() => setOff(0)}>Make it just</button>
+    <PageBody n={3} figure={<>
+      <Monochord frac={frac} onFrac={setFrac} whole={s.playing === 'both'} part={s.playing === 'both'} marks={marks} fine reference step={FINE} />
+      <div className="col tun-readout">
+        <span className="t14 muted" data-testid="tuning-near">Near the {near.target}</span>
+        <strong className="tun-rate" aria-live="polite" data-testid="tuning-rate">{rate}</strong>
       </div>
-    </>}>
-      <p className="t16">Play the fifth and move the slider. A little off, the sound pulses: a wobble. The further off, the faster.</p>
-      <p className="t16">When it stops, the fifth is <strong>just</strong>: tuned to the exact ratio, with no wobble. Calm and still: that’s the sound we’re after. Tuning to exact ratios like this is called <strong>just intonation</strong>.</p>
+      <PulseView rate={Math.min(b, 12)} />
+      <BridgeSlider frac={frac} onFrac={setFrac} step={FINE} nudge />
+      <div className="row tun-pair">
+        <SoundButton id="both" playing={s.playing} onClick={() => s.toggle('both', tones())} title="Play both strings" sub="then drag slowly" testid="tuning-find-play" />
+      </div>
+      <Tasks items={[
+        { id: 'octave', label: done.octave ? 'The octave: still' : 'Make the octave still', done: done.octave },
+        { id: 'fifth', label: done.fifth ? 'The fifth: still' : 'Make the fifth still', done: done.fifth },
+      ]} />
+    </>} after={done.octave && done.fifth ? <p className="t16 tun-callout" data-testid="tuning-found-both">Both found by ear: a just octave and a just fifth.</p> : undefined}>
+      <p className="t16">The whole string keeps sounding. Drag the bridge slowly.</p>
+      <p className="t16">A little off the spot, the sound wobbles. Find where it goes <strong>still</strong>: first the octave, then the fifth.</p>
     </PageBody>
   );
 }
@@ -361,108 +626,66 @@ function PulseView({ rate }: { rate: number }) {
   );
 }
 
-// ---------- 3. Cents ----------
+// ---------- 4. The big question ----------
 
-type Zoom = 'octave' | 'fifth' | 'third';
-const VIEW: Record<Zoom, [number, number]> = { octave: [-30, 1230], fifth: [689, 713], third: [372, 414] };
-const NOTE_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
-
-function CentsPage() {
+function QuestionPage() {
   const s = useSound();
-  const [zoom, setZoom] = useState<Zoom>('octave');
-  const pick = (z: Zoom) => { setZoom(z); s.stop(); };
-  const iv = zoom === 'third' ? 'third' : 'fifth';
+  const [shown, setShown] = useState(false);
   return (
-    <PageBody n={3} figure={<>
-      <div className="seg" role="group" aria-label="Show">
-        {(['octave', 'fifth', 'third'] as const).map((z) => (
-          <button key={z} aria-pressed={zoom === z} data-testid={`tuning-zoom-${z}`} onClick={() => pick(z)}>
-            {z === 'octave' ? 'Whole octave' : z === 'fifth' ? 'Fifth' : 'Major third'}
-          </button>
-        ))}
+    <PageBody n={4} figure={<>
+      <div className="col tun-pair">
+        <SoundButton id="just" playing={s.playing} testid="tuning-just-fifth" title="Your just fifth" sub="3 : 2, as on the string"
+          onClick={() => s.toggle('just', { do: OPEN_HZ, sol: OPEN_HZ * 1.5 }, 5000)} />
+        <SoundButton id="piano" playing={s.playing} testid="tuning-piano-fifth" title="The piano’s fifth" sub="700 cents"
+          onClick={() => s.toggle('piano', { do: OPEN_HZ, sol: OPEN_HZ * centsToRatio(PIANO.fifth) }, 5000)} />
       </div>
-      <Ruler zoom={zoom} />
-      {zoom === 'octave' ? (
-        <div className="row tun-pair">
-          <SoundButton id="octave" playing={s.playing} onClick={() => s.toggle('octave', { lo: ROOT, hi: ROOT * 2 }, 5000)} title="Play the octave" sub="1200 cents · the same on the piano" testid="tuning-cents-octave" />
-        </div>
-      ) : (
-        <div className="row tun-pair">
-          <SoundButton id="piano" playing={s.playing} testid="tuning-cents-piano" title={`Piano · ${PIANO[iv]}`} sub="cents above do"
-            onClick={() => s.toggle('piano', { do: ROOT, up: ROOT * centsToRatio(PIANO[iv]) }, 5000)} />
-          <SoundButton id="pure" playing={s.playing} testid="tuning-cents-pure" title={`Just ${iv} · ${oneDecimal(PURE[iv])}`} sub="cents above do"
-            onClick={() => s.toggle('pure', { do: ROOT, up: ROOT * centsToRatio(PURE[iv]) }, 5000)} />
-        </div>
-      )}
+      {!shown
+        ? <button className="btn voice tun-tap" data-testid="tuning-reveal" onClick={() => setShown(true)}>Show the answer</button>
+        : (
+          <div className="col tun-answer" data-testid="tuning-answer" aria-live="polite">
+            <div className="tun-fact"><strong>The octave</strong><span>Exactly the same: half the string.</span></div>
+            <div className="tun-fact"><strong>The fifth</strong><span>A hair apart: the piano’s is <b>700 cents</b>, the just one <b>702</b>.</span></div>
+            <StringZoom />
+            <p className="t14 muted">Cents: 100 from one piano key to the next.</p>
+          </div>
+        )}
     </>}>
-      <p className="t16">One piano key to the next is <strong>100 cents</strong>. An octave is 1200.</p>
-      <p className="t16">In a held chord, trained ears hear 5 to 10 cents. Zoom in: the just intervals and the piano’s aren’t quite the same.</p>
+      <p className="tun-question">Is that the same octave and the same fifth the piano plays?</p>
     </PageBody>
   );
 }
 
-/** One octave as a ruler: the 12 keys every 100 cents, the pure fifth and third against the piano's. Zooms in. */
-function Ruler({ zoom }: { zoom: Zoom }) {
-  const lo = useTween(VIEW[zoom][0]);
-  const hi = useTween(VIEW[zoom][1]);
-  const span = hi - lo;
-  const X0 = 10, W = 320;
-  const x = (c: number) => X0 + ((c - lo) / span) * W;
-  const inView = (c: number) => c >= lo - 0.01 && c <= hi + 0.01;
-  const fine = span < 120;
-  const ticks: { c: number; h: number; label?: string }[] = [];
-  if (fine) {
-    for (let c = Math.ceil(lo); c <= hi; c++) ticks.push({ c, h: c % 10 === 0 ? 14 : c % 5 === 0 ? 9 : 5, label: c % 10 === 0 ? String(c) : undefined });
-  } else {
-    for (let k = 0; k <= 12; k++) ticks.push({ c: k * 100, h: [1, 3, 6, 8, 10].includes(k % 12) ? 9 : 14, label: [0, 400, 700, 1200].includes(k * 100) ? String(k * 100) : undefined });
-  }
-  const pairs = [
-    { name: 'fifth', pure: PURE.fifth, piano: PIANO.fifth, gap: '2 cents' },
-    { name: 'third', pure: PURE.third, piano: PIANO.third, gap: '13.7 cents' },
-  ] as const;
-  const focus = zoom === 'octave' ? null : pairs.find((q) => q.name === zoom)!;
-  const AXIS = 96;
+/** The string with ½ and ⅔ marked, and a magnifier on ⅔: the piano's fifth sits at 0.6674, a hair right of 0.6667. */
+function StringZoom() {
+  const SY = 34;
+  const x = (f: number) => SX0 + f * SL;
+  // the magnified window: 0.6650 to 0.6690 of the string across the whole width
+  const Z0 = 0.665, Z1 = 0.669, ZY = 132;
+  const zx = (f: number) => SX0 + ((f - Z0) / (Z1 - Z0)) * SL;
+  const bx0 = x(Z0) - 4, bx1 = x(Z1) + 4;
+  const zoom = Math.round(1 / (Z1 - Z0));
   return (
-    <svg className="tun-svg" viewBox="0 0 340 150" role="img" data-testid="tuning-ruler"
-      aria-label={zoom === 'octave'
-        ? 'One octave, 1200 cents, with the 12 piano keys every 100 cents. The just fifth (702) sits next to the piano’s 700; the just major third (386.3) below the piano’s 400.'
-        : `Zoomed in: the just ${zoom === 'fifth' ? 'fifth at 702 cents, 2 cents above the piano’s 700' : 'major third at 386.3 cents, 13.7 cents below the piano’s 400'}.`}>
-      <line x1={X0} x2={X0 + W} y1={AXIS} y2={AXIS} stroke="var(--line-strong)" strokeWidth={2} />
-      {ticks.filter((t) => inView(t.c)).map((t) => (
-        <g key={`${fine ? 'f' : 'k'}${t.c}`}>
-          <line x1={x(t.c)} x2={x(t.c)} y1={AXIS} y2={AXIS + t.h} stroke="var(--muted)" strokeWidth={1.5} />
-          {t.label && <text x={x(t.c)} y={AXIS + 30} textAnchor="middle" className="tun-label mono" fill="var(--muted)">{t.label}</text>}
-        </g>
-      ))}
-      {/* key names above the white keys (the whole octave) */}
-      {!fine && [0, 2, 4, 5, 7, 9, 11, 12].map((k) => (
-        <text key={`n${k}`} x={x(k * 100)} y={AXIS - 66} textAnchor="middle" className="tun-label" fill="var(--muted)">{NOTE_NAMES[k % 12]}</text>
-      ))}
-      {pairs.map((q) => (
-        <g key={q.name}>
-          {inView(q.piano) && <line x1={x(q.piano)} x2={x(q.piano)} y1={AXIS - 36} y2={AXIS} stroke="var(--muted)" strokeWidth={2} strokeDasharray="4 3" />}
-          {inView(q.pure) && <line x1={x(q.pure)} x2={x(q.pure)} y1={AXIS - 36} y2={AXIS + 4} stroke="var(--good)" strokeWidth={3} />}
-          {!fine && <text x={x((q.pure + q.piano) / 2)} y={AXIS - 40} textAnchor="middle" className="tun-label" fontWeight={700} fill="var(--good)">{q.name === 'fifth' ? '5th' : '3rd'}</text>}
-        </g>
-      ))}
-      {focus && fine && (() => {
-        const a = x(Math.min(focus.pure, focus.piano)), b = x(Math.max(focus.pure, focus.piano));
-        const pureLeft = focus.pure < focus.piano;
-        return (
-          <g>
-            <path d={`M${a} ${AXIS - 46}V${AXIS - 52}H${b}V${AXIS - 46}`} fill="none" stroke="var(--text)" strokeWidth={1.5} />
-            <text x={(a + b) / 2} y={AXIS - 58} textAnchor="middle" className="tun-label" fontWeight={700} fill="var(--text)">{focus.gap}</text>
-            <text x={x(focus.pure) + (pureLeft ? -6 : 6)} y={AXIS - 24} textAnchor={pureLeft ? 'end' : 'start'} className="tun-label" fontWeight={700} fill="var(--good)">just {focus.name === 'fifth' ? '5th' : '3rd'} {oneDecimal(focus.pure)}</text>
-            <text x={x(focus.piano) + (pureLeft ? 6 : -6)} y={AXIS - 24} textAnchor={pureLeft ? 'start' : 'end'} className="tun-label" fill="var(--muted)">piano {focus.piano}</text>
-          </g>
-        );
-      })()}
-      <text x={X0} y={146} className="tun-label" fill="var(--muted)">cents above do</text>
+    <svg className="tun-svg" viewBox="0 0 340 180" role="img" data-testid="tuning-zoom"
+      aria-label="On the string the octave is half the string, on the piano too. The just fifth sits at two thirds (0.6667); the piano’s fifth at 0.6674, a hair to the right.">
+      <Bridge x={SX0} y={SY} /><Bridge x={SX1} y={SY} />
+      <line x1={SX0} x2={SX1} y1={SY} y2={SY} stroke="var(--text)" strokeWidth={2} />
+      <line x1={x(0.5)} x2={x(0.5)} y1={SY - 16} y2={SY + 10} stroke="var(--good)" strokeWidth={2} />
+      <text x={x(0.5) - 4} y={SY - 20} textAnchor="end" className="tun-label" fontWeight={700} fill="var(--good)">½ both</text>
+      <rect x={bx0} y={SY - 12} width={bx1 - bx0} height={24} rx={4} fill="none" stroke="var(--accent)" strokeWidth={1.5} />
+      <text x={bx1 + 4} y={SY - 16} className="tun-label" fontWeight={700} fill="var(--accent-text)">⅔</text>
+      <path d={`M${bx0} ${SY + 12}L${SX0} ${ZY - 30}M${bx1} ${SY + 12}L${SX1} ${ZY - 30}`} stroke="var(--accent)" strokeWidth={1} strokeDasharray="3 3" fill="none" />
+      <rect x={SX0 - 6} y={ZY - 30} width={SL + 12} height={64} rx={8} fill="var(--surface-2)" stroke="var(--accent)" strokeWidth={1.5} />
+      <line x1={SX0} x2={SX1} y1={ZY} y2={ZY} stroke="var(--text)" strokeWidth={2} />
+      <line x1={zx(2 / 3)} x2={zx(2 / 3)} y1={ZY - 22} y2={ZY + 12} stroke="var(--good)" strokeWidth={3} />
+      <text x={zx(2 / 3) - 6} y={ZY - 10} textAnchor="end" className="tun-label" fontWeight={700} fill="var(--good)">just 0.6667</text>
+      <line x1={zx(PIANO_FIFTH_FRAC)} x2={zx(PIANO_FIFTH_FRAC)} y1={ZY - 22} y2={ZY + 12} stroke="var(--muted)" strokeWidth={2} strokeDasharray="4 3" />
+      <text x={zx(PIANO_FIFTH_FRAC) + 6} y={ZY - 10} className="tun-label" fill="var(--muted)">piano {PIANO_FIFTH_FRAC.toFixed(4)}</text>
+      <text x={SX0} y={ZY + 46} className="tun-label" fill="var(--muted)">{zoom}× closer</text>
     </svg>
   );
 }
 
-// ---------- 4–6. So why not tune everything pure? (the comma, by hand) ----------
+// ---------- 5–7. So why not make every interval just? (the comma, by hand) ----------
 
 const C3 = 130.81;
 const C4 = 2 * C3;
@@ -534,12 +757,12 @@ function Centre({ big, small, tone = 'var(--text)' }: { big: string; small?: str
   );
 }
 
-/** Twelve fifths up from C, one tap at a time; each tap plays the fifth it adds. `pure`: 702 cents, else the piano's 700. */
-function useFifthWalk(pure: boolean) {
+/** Twelve fifths up from C, one tap at a time; each tap plays the fifth it adds. `just`: 702 cents, else the piano's 700. */
+function useFifthWalk(just: boolean) {
   const s = useSound();
   const [k, setK] = useState(0);
   const shown = useTween(k, 450);
-  const ratio = pure ? 1.5 : centsToRatio(700);
+  const ratio = just ? 1.5 : centsToRatio(700);
   const add = () => {
     if (k >= 12) { setK(0); s.stop(); return; }
     const nk = k + 1;
@@ -547,7 +770,7 @@ function useFifthWalk(pure: boolean) {
     const lo = foldInto(C3 * ratio ** (nk - 1), C3);
     void s.start('step', { lo, hi: lo * ratio }, 1400);
   };
-  const bothCs = () => s.toggle('cs', { c: C4, c2: C4 * (pure ? STACKED_C : 1.0000001) }, 8000);
+  const bothCs = () => s.toggle('cs', { c: C4, c2: C4 * (just ? STACKED_C : 1.0000001) }, 8000);
   return { s, k, shown, add, bothCs };
 }
 
@@ -555,7 +778,7 @@ function PianoFifthsPage() {
   const w = useFifthWalk(false);
   const done = w.k >= 12;
   return (
-    <PageBody n={4} figure={<>
+    <PageBody n={5} figure={<>
       <FifthsCircle steps={w.shown} extra={0} label={done ? 'Twelve piano fifths from C land exactly on C again, seven octaves up: the circle closes.' : `${w.k} of 12 fifths up from C.`}>
         {w.k === 0 ? <Centre big="C" small="start here" />
           : done ? <Centre big="C again" small="7 octaves up · it closes" tone="var(--good)" />
@@ -573,13 +796,13 @@ function PianoFifthsPage() {
   );
 }
 
-function PureFifthsPage() {
+function JustFifthsPage() {
   const w = useFifthWalk(true);
   const done = w.k >= 12;
   const drift = fifthDrift(w.k);
   return (
-    <PageBody n={5} figure={<>
-      <FifthsCircle steps={w.shown} extra={PURE.fifth - 700} gap label={done
+    <PageBody n={6} figure={<>
+      <FifthsCircle steps={w.shown} extra={JUST.fifth - 700} gap label={done
         ? `Twelve just fifths from C overshoot C by ${oneDecimal(COMMA)} cents: the circle doesn't close. That gap is the Pythagorean comma.`
         : `${w.k} of 12 just fifths up from C: ${oneDecimal(drift)} cents above the piano's.`}>
         {w.k === 0 ? <Centre big="C" small="start here" />
@@ -602,12 +825,12 @@ function ShareOutPage() {
   const s = useSound();
   const [shared, setShared] = useState(false);
   const t = useTween(shared ? 1 : 0, 1800);
-  const extra = (PURE.fifth - 700) * (1 - t);
+  const extra = (JUST.fifth - 700) * (1 - t);
   const fifth = (): Tones => ({ do: C4, sol: C4 * centsToRatio(700 + extra) });
   useEffect(() => { if (s.playing === 'fifth') s.retune(fifth()); }, [extra]); // eslint-disable-line react-hooks/exhaustive-deps
   const closed = t > 0.995;
   return (
-    <PageBody n={6} figure={<>
+    <PageBody n={7} figure={<>
       <FifthsCircle steps={12} extra={extra} gap label={closed ? 'The comma shared out: every fifth 2 cents narrow, and the circle closes.' : `Twelve fifths of ${oneDecimal(700 + extra)} cents: ${oneDecimal(12 * extra)} cents past C.`}>
         {closed ? <Centre big="It closes" small="every fifth 700 cents" tone="var(--good)" />
           : <Centre big={`${oneDecimal(12 * extra)} cents`} small="left over" tone="var(--accent-text)" />}
@@ -621,23 +844,28 @@ function ShareOutPage() {
         <SoundButton id="chord" playing={s.playing} onClick={() => s.toggle('chord', { do: C4, mi: C4 * centsToRatio(400), sol: C4 * centsToRatio(700) }, 6000)}
           title="The piano’s major chord" sub="its third shimmers" testid="tuning-share-chord" />
       </div>
-    </>} after={<>
-      <p className="t16">Pianos share it out: every fifth is a tiny bit narrow. That’s <strong>equal temperament</strong>. Every key works, but everything is a little out of tune.</p>
+      {closed && (
+        <p className="t16 tun-callout tun-et" data-testid="tuning-et">
+          When this difference is distributed equally, it is called <strong>equal temperament</strong>. Every octave is 1200 cents, every fifth is 700 cents, every major third is 400 cents.
+        </p>
+      )}
+    </>} after={closed ? <>
+      <p className="t16">That’s how pianos are tuned. Every key works, but the piano and most modern instruments are a little out of tune everywhere.</p>
       <p className="t16">The thirds pay most: 13.7 cents too wide, so they shimmer.</p>
-    </>}>
+    </> : undefined}>
       <p className="t16 tun-ask">For the octaves to add up, that extra has to go somewhere.</p>
       <p className="t16">Tap “Share it out”.</p>
     </PageBody>
   );
 }
 
-// ---------- 7. Choirs have a luxury ----------
+// ---------- 8. Choirs have a luxury ----------
 
-const GAP3 = PIANO.third - PURE.third; // 13.7
+const GAP3 = PIANO.third - JUST.third; // 13.7
 
 function ChoirPage() {
   const s = useSound();
-  // how far below the piano's third mi sits: 0 (the piano) to 13.7 (pure)
+  // how far below the piano's third mi sits: 0 (the piano) to 13.7 (just)
   const [low, setLow] = useState(0);
   const [glide, setGlide] = useState<number | null>(null);
   const shown = useTween(glide ?? low, 1400);
@@ -650,10 +878,10 @@ function ChoirPage() {
   const chord = (): Tones => ({ do: ROOT, mi: miHz, sol: ROOT * 1.5 });
   useEffect(() => { s.retune(chord()); }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
   const b = beatRate(ROOT, miHz, [5, 4]);
-  const atPure = value >= GAP3 - 0.05;
-  const words = value < 0.05 ? 'the piano’s third' : atPure ? `just third: ${oneDecimal(GAP3)} cents below the piano` : `${oneDecimal(value)} cents below the piano`;
+  const atJust = value >= GAP3 - 0.05;
+  const words = value < 0.05 ? 'the piano’s third' : atJust ? `just third: ${oneDecimal(GAP3)} cents below the piano` : `${oneDecimal(value)} cents below the piano`;
   return (
-    <PageBody n={7} figure={<>
+    <PageBody n={8} figure={<>
       <PulseView rate={b} />
       <strong className="tun-rate" aria-live="polite" data-testid="tuning-chord-rate">{wobbleLabel(b) === 'still' ? 'Still: the chord rings' : cap(wobbleLabel(b))}</strong>
       <label className="col tun-slider" htmlFor="tun-third">
@@ -664,7 +892,7 @@ function ChoirPage() {
       </label>
       <div className="row tun-pair">
         <SoundButton id="chord" playing={s.playing} onClick={() => s.toggle('chord', chord())} title="Play" sub="the chord" testid="tuning-chord" />
-        <button className="btn tun-reset" data-testid="tuning-make-pure" onClick={() => setGlide(atPure ? 0 : GAP3)}>{atPure ? 'Back to the piano' : 'Make it just'}</button>
+        <button className="btn tun-reset" data-testid="tuning-make-just" onClick={() => setGlide(atJust ? 0 : GAP3)}>{atJust ? 'Back to the piano' : 'Make it just'}</button>
       </div>
     </>} after={<>
       <table className="tun-table" aria-label="Just intervals, against the piano">
@@ -678,12 +906,125 @@ function ChoirPage() {
       <p className="t14 muted">It’s the note’s place in the chord that counts, not its name: an E sits lower in C major (the third) than in E major (the root).</p>
     </>}>
       <p className="t16 tun-ask">Choirs don’t have fixed keys.</p>
-      <p className="t16">We can tune every chord on its own, so every interval can be just and the chord sounds amazing. Make the third just and hear the shimmer stop.</p>
+      <p className="t16">We can tune every chord on its own, so every interval in it can be just, and the chord rings. Make the third just and hear the shimmer stop.</p>
     </PageBody>
   );
 }
 
-// ---------- 8. What matters most ----------
+// ---------- 9. Hear a cadence ----------
+
+type Version = 'equal' | 'just';
+const VERSION_NAME: Record<Version, string> = { equal: 'Piano', just: 'Choir' };
+const CADENCE_MIDI = CADENCE.map((c) => c.notes);
+
+/** The cadence played on the ChordPlayer: which version and chord sound now (for the highlight). */
+function useCadence() {
+  const ref = useRef<ChordPlayer | null>(null);
+  const alive = useRef(true);
+  const timers = useRef<number[]>([]);
+  const [playing, setPlaying] = useState<Version | 'both' | null>(null);
+  const [now, setNow] = useState<{ v: Version; i: number } | null>(null);
+  const clear = () => { timers.current.forEach((t) => clearTimeout(t)); timers.current = []; };
+  const stop = () => { clear(); ref.current?.stop(); setPlaying(null); setNow(null); };
+  useOnHidden(stop);
+  useEffect(() => {
+    alive.current = true;
+    return () => { alive.current = false; clear(); ref.current?.dispose(); ref.current = null; };
+  }, []);
+  const play = async (which: Version | 'both') => {
+    if (playing === which) { stop(); return; }
+    await unlockAudio();
+    if (!alive.current) return;
+    const ctx = getAudioContext();
+    if (!ref.current) ref.current = new ChordPlayer(ctx);
+    clear();
+    ref.current.stop();
+    setPlaying(which);
+    let at = ctx.currentTime + 0.12;
+    const at0 = ctx.currentTime;
+    const ms = (t: number) => Math.max(0, (t - at0) * 1000);
+    for (const v of which === 'both' ? (['equal', 'just'] as const) : [which]) {
+      const r = ref.current.play(cadenceHz(v), CADENCE_MIDI, at);
+      r.starts.forEach((st, i) => timers.current.push(window.setTimeout(() => setNow({ v, i }), ms(st))));
+      at = r.end + 0.5;
+    }
+    timers.current.push(window.setTimeout(() => { setPlaying(null); setNow(null); }, ms(at - 0.5)));
+  };
+  return { playing, now, play };
+}
+
+function CadencePage() {
+  const c = useCadence();
+  const ids = (v: Version | 'both') => (c.playing === v ? v : null);
+  return (
+    <PageBody n={9} figure={<>
+      <GrandStaff active={c.now?.i ?? null} />
+      <span className="t14 muted center tun-now" aria-live="polite" data-testid="tuning-cadence-now">
+        {c.now ? `${VERSION_NAME[c.now.v]}: ${CADENCE[c.now.i].name} (${CADENCE[c.now.i].key} major)` : 'I · IV · V · I in C major'}
+      </span>
+      <div className="col tun-pair">
+        <SoundButton id="equal" playing={ids('equal')} onClick={() => void c.play('equal')} title="Piano: equal temperament" sub="every note at its piano pitch" testid="tuning-cadence-equal" />
+        <SoundButton id="just" playing={ids('just')} onClick={() => void c.play('just')} title="Choir: just intonation" sub="each chord tuned on its own" testid="tuning-cadence-just" />
+        <SoundButton id="both" playing={ids('both')} onClick={() => void c.play('both')} title="Both, one after the other" sub="piano first" testid="tuning-cadence-both" />
+      </div>
+    </>}>
+      <p className="t16">Four chords, I–IV–V–I. Listen to the thirds: on the piano they shimmer; tuned just, each chord rings still.</p>
+      <p className="t16">A choir retunes every chord as it goes. A piano can’t.</p>
+    </PageBody>
+  );
+}
+
+/** I–IV–V–I as whole notes on a grand staff, the chord that sounds lit. */
+function GrandStaff({ active }: { active: number | null }) {
+  const SP = 9;
+  const TOP = 22; // the treble staff's top line (F5)
+  const BTOP = TOP + 4 * SP + 6 * SP; // the bass staff's top line (A3)
+  // diatonic steps from C0: E4 30 … F5 38 on the treble staff, G2 18 … A3 26 on the bass staff
+  const step = (m: number) => { const pc = m % 12; return (Math.floor(m / 12) - 1) * 7 + [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6][pc]; };
+  const y = (m: number, treble: boolean) => (treble ? TOP + (38 - step(m)) * (SP / 2) : BTOP + (26 - step(m)) * (SP / 2));
+  const X0 = 6, X1 = 334, COL0 = 64, COL = (X1 - COL0) / 4;
+  const k = SP / GLYPH_UNITS_PER_SPACE;
+  const lines = (top: number) => [0, 1, 2, 3, 4].map((i) => top + i * SP);
+  const bottom = BTOP + 4 * SP;
+  return (
+    <svg className="tun-svg tun-staff" viewBox={`0 0 340 ${bottom + 52}`} role="img" data-testid="tuning-staff"
+      aria-label="A cadence in C major on a grand staff, four chords in whole notes: I (C), IV (F), V (G), I (C).">
+      {CADENCE.map((c, i) => (
+        <rect key={`hl${i}`} className="tun-hl" x={COL0 + i * COL + 3} y={TOP - 14} width={COL - 6} height={bottom - TOP + 60} rx={8}
+          fill="var(--accent)" opacity={active === i ? 0.16 : 0} />
+      ))}
+      {[...lines(TOP), ...lines(BTOP)].map((ly) => <line key={ly} x1={X0} x2={X1} y1={ly} y2={ly} stroke="var(--muted)" strokeWidth={1} opacity={0.75} />)}
+      <line x1={X0} x2={X0} y1={TOP} y2={bottom} stroke="var(--muted)" strokeWidth={1.5} />
+      {[1, 2, 3].map((i) => <line key={`bar${i}`} x1={COL0 + i * COL} x2={COL0 + i * COL} y1={TOP} y2={bottom} stroke="var(--muted)" strokeWidth={1} opacity={0.75} />)}
+      <line x1={X1} x2={X1} y1={TOP} y2={bottom} stroke="var(--muted)" strokeWidth={1} />
+      <line x1={X1 - 4} x2={X1 - 4} y1={TOP} y2={bottom} stroke="var(--muted)" strokeWidth={1} />
+      <path d={G_CLEF} fill="var(--text)" transform={`translate(${X0 + 6} ${TOP + 3 * SP}) scale(${k} ${-k})`} />
+      <path d={F_CLEF} fill="var(--text)" transform={`translate(${X0 + 6} ${BTOP + SP}) scale(${k} ${-k})`} />
+      {CADENCE.map((c, i) => {
+        const cx = COL0 + (i + 0.5) * COL;
+        const on = active === i;
+        const colour = on ? 'var(--accent)' : 'var(--text)';
+        return (
+          <g key={i} data-testid={`tuning-chord-${i + 1}`} data-on={on}>
+            {c.notes.map((m, v) => {
+              const cy = y(m, v >= 2);
+              return (
+                <g key={v}>
+                  <ellipse cx={cx} cy={cy} rx={0.78 * SP} ry={0.5 * SP} fill={colour} />
+                  <ellipse cx={cx} cy={cy} rx={0.36 * SP} ry={0.24 * SP} transform={`rotate(-50 ${cx} ${cy})`} fill="var(--surface)" />
+                </g>
+              );
+            })}
+            <text x={cx} y={bottom + 26} textAnchor="middle" className="tun-big" fill={on ? 'var(--accent-text)' : 'var(--text)'}>{c.name}</text>
+            <text x={cx} y={bottom + 44} textAnchor="middle" className="tun-label" fill="var(--muted)">{c.key}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// ---------- 10. What matters most ----------
 
 const WHY: Record<LabInterval, { rank: number; why: string; go: string }> = {
   fifth: { rank: 1, why: 'The frame of the chord. Lock it, and do and sol sound like one calm note.', go: 'Start here' },
@@ -693,7 +1034,7 @@ const WHY: Record<LabInterval, { rank: number; why: string; go: string }> = {
 function PractisePage() {
   const lab = loadLab();
   return (
-    <PageBody n={8}>
+    <PageBody n={10}>
       <p className="t16">Two intervals matter most. Learn to feel them in this order.</p>
       <div className="col tun-courses">
         {COURSE_IDS.map((iv: LabInterval) => {

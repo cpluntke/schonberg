@@ -17,7 +17,7 @@ import { computeToday, dateWords, goStep, shortTitle, tickContext } from '../tod
 import { dayOf, labStep, stepDone } from '../../progress/today';
 import { lastLeapRun, loadLeapRuns } from '../../progress/leaps';
 import { CourseChecks, courseRecommended } from './IntonationLab';
-import { TUNING_TITLE, tuningSeen } from './Tuning';
+import { TUNING_MINUTES, TUNING_TITLE, tuningSeen } from './Tuning';
 import { getAudioContext, unlockAudio } from '../../audio/context';
 import { Drone } from '../../audio/drone';
 import { midiToHz } from '../../audio/pitch';
@@ -171,21 +171,21 @@ export function IntonationHome() {
   );
 }
 
-/** "Why choirs tune differently · 5 min": a card above the courses until it's been seen, then a quiet link. */
+/** "Why choirs tune differently · 10 min": a card above the courses until it's been seen, then a quiet link. */
 function TuningEntry() {
   if (tuningSeen()) {
     return (
       <button className="link tun-seen" data-testid="train-tuning" onClick={() => go({ name: 'tuning' })}>
-        <span>{TUNING_TITLE} · 5 min</span>
+        <span>{TUNING_TITLE} · {TUNING_MINUTES} min</span>
         <IconChevron size={18} />
       </button>
     );
   }
   return (
     <button className="card crs-card tun-entry" data-testid="train-tuning" onClick={() => go({ name: 'tuning' })}>
-      <span className="row between"><span className="eb">Start here · with sound</span><span className="t14 muted nowrap">5 min</span></span>
+      <span className="row between"><span className="eb">Start here · with sound</span><span className="t14 muted nowrap">{TUNING_MINUTES} min</span></span>
       <strong className="crs-card-title">{TUNING_TITLE}</strong>
-      <span className="t14 muted">Why pianos and choirs tune differently, and what to listen for. Short screens to tap and hear.</span>
+      <span className="t14 muted">A string, a piano and a choir: find the just octave and fifth by ear, and hear why choirs tune differently from pianos.</span>
       <span className="row between" style={{ gap: 8 }}>
         <strong className="t16">Read and listen</strong>
         <IconChevron size={20} color="var(--muted)" />
