@@ -53,7 +53,7 @@ async function click(id: string) {
 
 describe('Why choirs tune differently', () => {
   const titles = [
-    'Two notes that fit', 'The wobble', 'Cents', 'So why not tune everything pure?', 'Now stack pure fifths', 'Share it out',
+    'Two notes that fit', 'The wobble', 'Cents', 'So why not make every interval just?', 'Now stack just fifths', 'Share it out',
     'Choirs have a luxury', 'What matters most',
   ];
 

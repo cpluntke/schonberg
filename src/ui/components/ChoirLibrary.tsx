@@ -165,7 +165,7 @@ function LabEntry({ code, auth, draft, cycle, stamp, onAdded }: {
         <strong className="grow" style={{ fontSize: '0.9375rem' }}>{LAB_TITLE}</strong>
         <span className="badge muted">Exercise</span>
       </div>
-      <span className="small">Find the pure fifth and the pure major third by ear: listen, tune by hand, sing with and without help, then in a chord. No score needed.</span>
+      <span className="small">Find the just fifth and the just major third by ear: listen, tune by hand, sing with and without help, then in a chord. No score needed.</span>
       {err && <span className="small" role="alert" style={{ color: 'var(--accent-text)' }}>{err}</span>}
       <div className="row wrap" style={{ gap: 8, marginTop: 4 }}>
         {viaEditor ? (

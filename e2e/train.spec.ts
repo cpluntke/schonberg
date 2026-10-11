@@ -26,7 +26,7 @@ test('courses for every singer: Train, a course page, its first step; no warm-up
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Intonation');
   await expect(page.getByTestId('train-lab')).toHaveCount(0);
   const card = page.getByTestId('train-course-fifth');
-  await expect(card).toContainText('Pure fifth');
+  await expect(card).toContainText('Just fifth');
   await expect(card).toContainText('Start: Listen');
   await expect(page.getByTestId('train-all-courses')).toContainText('All courses (2)');
   // Today doesn't grow for a singer who hasn't started a course (and whose choir doesn't recommend one).
@@ -62,9 +62,9 @@ test('courses for every singer: Train, a course page, its first step; no warm-up
   // Started: the course is active on Train, and Today has its warm-up.
   await page.goto('/#/tune');
   await expect(page.getByTestId('train-course-fifth')).toContainText('step 1 of 5');
-  await expect(page.getByTestId('train-lab')).toContainText('Pure fifth · step 1 of 5');
+  await expect(page.getByTestId('train-lab')).toContainText('Just fifth · step 1 of 5');
   await page.goto('/#/');
-  await expect(page.getByTestId('plan-card')).toContainText('Warm-up · the pure fifth');
+  await expect(page.getByTestId('plan-card')).toContainText('Warm-up · the just fifth');
   expect(errors).toEqual([]);
 });
 
@@ -79,7 +79,7 @@ test('a step done: the quiet card, back to Train; the next step waits for tomorr
   await page.getByTestId('lab-answer-B').click();
   const done = page.getByTestId('lab-passed');
   await expect(done).toContainText('Step 1 done ✓');
-  await expect(done).toContainText('Pure fifth · 5 of your last 6 answers right');
+  await expect(done).toContainText('Just fifth · 5 of your last 6 answers right');
   await expect(done).toContainText('Step 2 of the course waits for tomorrow.');
   await done.getByTestId('lab-to-train').click();
   await expect(page).toHaveURL(/#\/tune$/);
@@ -94,8 +94,8 @@ test('a step done: the quiet card, back to Train; the next step waits for tomorr
   await expect(page.getByTestId('lab-goal')).toHaveText('Move sol until the pulse stops.');
   await page.getByTestId('lab-start').click();
   await page.getByTestId('lab-lock').click();
-  await expect(page.getByTestId('lab-feel')).toHaveText(/^(Still|Almost still|Pulsing|Fast buzz) · (pure|(a touch|a little|clearly) (high|low) \(\d+ cents?\))$/);
-  await expect(page.getByTestId('lab-tries')).toContainText('Pure tunings');
+  await expect(page.getByTestId('lab-feel')).toHaveText(/^(Still|Almost still|Pulsing|Fast buzz) · (on the just pitch|(a touch|a little|clearly) (high|low) \(\d+ cents?\))$/);
+  await expect(page.getByTestId('lab-tries')).toContainText('Tunings that rang just');
   expect(errors).toEqual([]);
 });
 
@@ -105,7 +105,7 @@ test('course complete: what you can do now, the quick check a week later (Train 
   const fifth = (now: number, due: string) => ({ rung: 6, logs: { 5: [1, 2, 1] }, passed: { 1: dayOf(now - 10 * DAY), 5: dayOf(now - 6 * DAY) }, at: now - 6 * DAY, review: { due } });
   await seeded(page, '/#/intonation/fifth/done', (now) => ({ fifth: fifth(now, dayOf(now + DAY)), third: { rung: 1, logs: {} } }));
   const page6 = page.getByTestId('lab-course-done');
-  await expect(page6).toContainText('You can hear a pure fifth');
+  await expect(page6).toContainText('You can hear a just fifth');
   await expect(page6).toContainText('Sing sol so it locks onto do, by ear, with no picture.');
   await expect(page.getByTestId('lab-review')).toContainText('Quick check tomorrow');
   await expect(page.getByTestId('lab-use-it')).toContainText('the open fifths');
@@ -114,7 +114,7 @@ test('course complete: what you can do now, the quick check a week later (Train 
 
   // On its day: Train's warm-up is the quick check.
   await seeded(page, '/#/tune', (now) => ({ fifth: fifth(now, dayOf(now)), third: { rung: 1, logs: {} } }));
-  await expect(page.getByTestId('train-lab')).toContainText('Pure fifth · quick check');
+  await expect(page.getByTestId('train-lab')).toContainText('Just fifth · quick check');
   await page.getByTestId('train-lab-go').click();
   await expect(page).toHaveURL(/#\/intonation\/fifth\/check$/);
   await expect(page.getByTestId('lab-check-screen')).toBeVisible();
@@ -138,7 +138,7 @@ test('the drone and all courses', async ({ page }) => {
   await page.getByRole('button', { name: 'Back', exact: true }).click();
   await page.getByTestId('train-all-courses').click();
   await expect(page.getByTestId('course-fifth')).toContainText('not started');
-  await expect(page.getByTestId('course-third')).toContainText('Pure major third');
+  await expect(page.getByTestId('course-third')).toContainText('Just major third');
 });
 
 test('the leap drill: results lead with what landed, last time, and the leap to practise', async ({ page }) => {
@@ -170,7 +170,7 @@ test("inside today's session: the course step is the warm-up; step done leads to
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await seeded(page, '/?simulate=perfect#/', (now) => ({ fifth: { rung: 1, logs: { 1: [0, 0, 0, 0, 0] }, at: now - DAY }, third: { rung: 1, logs: {} } }));
-  await expect(page.getByTestId('plan-step').first()).toContainText('Warm-up · the pure fifth');
+  await expect(page.getByTestId('plan-step').first()).toContainText('Warm-up · the just fifth');
   await page.getByTestId('start-today').click();
   await expect(page).toHaveURL(/#\/intonation\/fifth\/1$/);
   await expect(page.getByTestId('session-strip')).toContainText('Today · step 1 of');

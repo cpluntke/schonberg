@@ -29,8 +29,8 @@ describe('courses: content', () => {
     expect(COURSES.third.steps.map((s) => s.name)).toEqual(['Listen', 'Tune it by hand', 'Sing it, with the wobble', 'Sing it by ear', 'In the chord']);
     expect(COURSES.third.steps.map((s) => s.minutes)).toEqual([5, 5, 4, 5, 6]);
     expect(passRule(1)).toBe('To pass: 5 of your last 6 answers right');
-    expect(passRule(3)).toBe('To pass: 3 of your last 4 holds close to pure');
-    expect(passRule(5)).toBe('To pass: 3 of your last 4 holds close to pure, picture off');
+    expect(passRule(3)).toBe('To pass: 3 of your last 4 holds close to the just pitch');
+    expect(passRule(5)).toBe('To pass: 3 of your last 4 holds close to the just pitch, picture off');
     expect(COURSES.third.outcome).toBe('Make the chord ring.');
   });
 });
@@ -151,7 +151,7 @@ describe('feedback in words', () => {
     expect(feelWords(6)).toBe('Almost still · a touch high (6 cents)');
     expect(feelWords(-30)).toBe('Fast buzz · a little low (30 cents)');
     expect(feelWords(14)).toBe('Pulsing · a touch high (14 cents)');
-    expect(feelWords(1)).toBe('Still · pure');
+    expect(feelWords(1)).toBe('Still · on the just pitch');
     expect(feelAdvice(4)).toBeNull();
     expect(feelAdvice(12)).toBe('Slide a little lower and hold where it settles.');
     expect(feelAdvice(-40)).toBe('Start again a little higher, then slide slowly until it goes still.');

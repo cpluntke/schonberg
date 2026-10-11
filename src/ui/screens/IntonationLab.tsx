@@ -120,7 +120,7 @@ function GoalLines({ goal, how }: { goal: string; how?: React.ReactNode }) {
 }
 
 /**
- * Labelled progress: "Pure tries ✓ ✓ ✗ ④ · 1 more to pass". The last tries of the rung's window and
+ * Labelled progress: "Tries that rang just ✓ ✓ ✗ ④ · 1 more to pass". The last tries of the rung's window and
  * the next one (an orange ring), then how many more pure ones would pass it.
  */
 function Tries({ label, results, ok, total, more, done }: { label: string; results: number[]; ok: (v: number) => boolean; total: number; more: string; done?: boolean }) {
@@ -150,7 +150,7 @@ function CentHelp() {
       {open && (
         <div className="cent-help t14" role="note">
           A cent is a hundredth of a semitone: a very small step. Most ears notice about 5 to 10 cents between two notes
-          held together, as a slow pulse. Pure and the piano differ by 2 cents for a fifth and 14 cents for a major third.
+          held together, as a slow pulse. Just intervals and the piano’s differ by 2 cents for a fifth and 14 cents for a major third.
         </div>
       )}
     </div>
@@ -208,11 +208,11 @@ function Landed({ deg, value, tol }: { deg: Degree; value: number; tol: number }
   const showPiano = Math.abs(piano - pure) >= 3;
   return (
     <svg viewBox="0 0 320 112" width="100%" style={{ maxWidth: 400 }} role="img" data-testid="lab-landed"
-      aria-label={`You: ${Math.round(value - pure)} cents from pure${showPiano ? `; the piano is ${Math.round(piano - pure)} cents above pure` : ''}.`}>
+      aria-label={`You: ${Math.round(value - pure)} cents from the just pitch${showPiano ? `; the piano is ${Math.round(piano - pure)} cents above it` : ''}.`}>
       <rect x={x(pure - tol)} y={44} width={x(pure + tol) - x(pure - tol)} height={24} rx={6} fill="var(--good)" opacity={0.16} />
       <line x1={10} x2={310} y1={56} y2={56} stroke="var(--line)" strokeWidth={2} />
       <line x1={x(pure)} x2={x(pure)} y1={22} y2={70} stroke="var(--good)" strokeWidth={2.5} />
-      <text x={x(pure)} y={16} textAnchor="middle" style={{ fontSize: '0.875rem' }} fontWeight={600} fill="var(--good)">pure</text>
+      <text x={x(pure)} y={16} textAnchor="middle" style={{ fontSize: '0.875rem' }} fontWeight={600} fill="var(--good)">just</text>
       {showPiano && <>
         <line x1={x(piano)} x2={x(piano)} y1={22} y2={70} stroke="var(--muted)" strokeWidth={2} strokeDasharray="4 3" />
         <text x={x(piano)} y={16} textAnchor="middle" style={{ fontSize: '0.875rem' }} fill="var(--muted)">piano</text>
@@ -244,7 +244,7 @@ function TryResult({ deg, off, tol, title = 'Your last try', note, practice }: {
         <span className="t14 mono" style={{ color: good ? 'var(--good)' : 'var(--voice)' }}>{wobbleWord(off)}</span>
       </div>
       <strong className="crs-feel" data-testid="lab-feel">{feelWords(off)}</strong>
-      <span className="t16">{good ? 'Pure: you found it. Remember how still that sounded.' : a}</span>
+      <span className="t16">{good ? 'You found it: the interval is just. Remember how still that sounded.' : a}</span>
       <Landed deg={deg} value={pureCents(deg) + off} tol={tol} />
       {note && <span className="t14 muted">{note}</span>}
     </div>
@@ -583,14 +583,14 @@ function CourseDone({ iv, lab }: { iv: LabInterval; lab: LabProgress }) {
 
 const EXAMPLES: Record<LabInterval, { key: string; title: string; off: number; hear: string }[]> = {
   third: [
-    { key: 'pure', title: 'Pure third', off: 0, hear: 'Still. The two notes melt into one calm sound.' },
+    { key: 'pure', title: 'Just third', off: 0, hear: 'Still. The two notes melt into one calm sound.' },
     { key: 'near', title: 'Nearly there', off: 6, hear: 'A slow pulse. Close: keep going.' },
-    { key: 'piano', title: 'Piano third', off: pianoCents('mi') - pureCents('mi'), hear: 'A fast shimmer. That’s 14 cents too high for a pure chord.' },
+    { key: 'piano', title: 'Piano third', off: pianoCents('mi') - pureCents('mi'), hear: 'A fast shimmer. That’s 14 cents above the just third.' },
   ],
   fifth: [
-    { key: 'pure', title: 'Pure fifth', off: 0, hear: 'Still and open, almost one sound.' },
+    { key: 'pure', title: 'Just fifth', off: 0, hear: 'Still and open, almost one sound.' },
     { key: 'near', title: 'Nearly there', off: 6, hear: 'A slow pulse. Close: keep going.' },
-    { key: 'far', title: 'Further off', off: 20, hear: 'A quick wobble. (The piano’s fifth is only 2 cents off pure: for fifths, it’s about locking it.)' },
+    { key: 'far', title: 'Further off', off: 20, hear: 'A quick wobble. (The piano’s fifth is only 2 cents from the just fifth: for fifths, it’s about locking it.)' },
   ],
 };
 
@@ -618,7 +618,7 @@ function ListenRung({ iv, root, lab, record }: RungProps) {
   return (
     <main className="screen crs-stepscreen" data-testid="lab-listen">
       <RungTop iv={iv} rung={1}>
-        <GoalLines goal="Hear the pulse stop." how={<>Two notes that are nearly in tune make a pulse, a “wah-wah-wah”. The closer they get, the slower it pulses. Pure means no pulse at all.</>} />
+        <GoalLines goal="Hear the pulse stop." how={<>Two notes that are nearly in tune make a pulse, a “wah-wah-wah”. The closer they get, the slower it pulses. No pulse at all: the interval is just.</>} />
       </RungTop>
       {EXAMPLES[iv].map((e) => {
         const on = playing === e.key;
@@ -672,7 +672,7 @@ function ListenCheck({ iv, root, lab, record, play, playing }: RungProps & {
   return (
     <main className="screen crs-stepscreen" data-testid="lab-quiz">
       <RungTop iv={iv} rung={1}>
-        <GoalLines goal="Which is calmer?" how={<>One is pure, one isn't. Same notes, same sound: listen to {iv === 'third' ? 'the third' : 'the fifth'}.</>} />
+        <GoalLines goal="Which is calmer?" how={<>One is just, one isn't. Same notes, same sound: listen to {iv === 'third' ? 'the third' : 'the fifth'}.</>} />
       </RungTop>
       <Tries label="Right answers" results={results} ok={(v) => v === 0} total={CHECK_ROUNDS} more={moreToPass(1, results)} />
       <div className="row" style={{ gap: 12 }}>
@@ -683,7 +683,7 @@ function ListenCheck({ iv, root, lab, record, play, playing }: RungProps & {
               style={{ alignItems: 'center', minHeight: 150, justifyContent: 'center', borderColor: answer && w === round.pure ? 'var(--good)' : on ? 'var(--voice)' : undefined }}
               onClick={() => { setHeard((h) => new Set(h).add(w)); void play(on ? null : `chord-${w}`, chord(w), 3); }}>
               <span style={{ fontSize: '2.5rem', fontWeight: 800, lineHeight: 1 }}>{w}</span>
-              <span className="t14 muted">{answer ? (w === round.pure ? 'pure' : iv === 'third' ? 'piano' : 'off') : on ? 'playing…' : 'tap to hear'}</span>
+              <span className="t14 muted">{answer ? (w === round.pure ? 'just' : iv === 'third' ? 'piano' : 'off') : on ? 'playing…' : 'tap to hear'}</span>
             </button>
           );
         })}
@@ -696,7 +696,7 @@ function ListenCheck({ iv, root, lab, record, play, playing }: RungProps & {
         </div>
       ) : (
         <div className={right ? 'notice info' : 'notice'} role="status" data-testid="lab-quiz-feedback">
-          <strong>{right ? `Yes: ${round.pure} is pure.` : `Not this time: ${round.pure} was pure.`}</strong>{' '}
+          <strong>{right ? `Yes: ${round.pure} is the just one.` : `Not this time: ${round.pure} was the just one.`}</strong>{' '}
           {iv === 'third' ? 'The piano’s third pulses against do several times a second.' : 'The other fifth was 12 cents off and pulsed.'} Play them again and listen for it.
         </div>
       )}
@@ -757,7 +757,7 @@ function TuneRung({ iv, root, lab, record }: RungProps) {
       <RungTop iv={iv} rung={2}>
         <GoalLines goal={`Move ${DEG_NAME[deg]} until the pulse stops.`} how={<>No singing yet. The app plays do and an out-of-tune {DEG_NAME[deg]}; the picture shows how much it pulses.</>} />
       </RungTop>
-      <Tries label="Pure tunings" results={results} ok={(v) => Math.abs(v) <= TOL_HAND} total={ROUNDS} more={moreToPass(2, results)} />
+      <Tries label="Tunings that rang just" results={results} ok={(v) => Math.abs(v) <= TOL_HAND} total={ROUNDS} more={moreToPass(2, results)} />
       <div className="card" style={{ gap: 8 }}>
         <div className="row between">
           <span className="t14 muted">What you hear</span>
@@ -976,11 +976,11 @@ function SingRung({ iv, root, lab, record, rung, check }: RungProps & { rung: nu
   return (
     <main className="screen crs-stepscreen" data-testid={check ? 'lab-check-screen' : `lab-sing-${rung}`}>
       <RungTop iv={iv} rung={check ? 'check' : rung}>
-        <GoalLines goal={goal} how={<>{rung === 4 || check ? 'No picture this time: only your ears. ' : chordRung ? 'The app sings the other two notes, already pure. ' : ''}{how}</>} />
+        <GoalLines goal={goal} how={<>{rung === 4 || check ? 'No picture this time: only your ears. ' : chordRung ? 'The app sings the other two notes, already tuned just. ' : ''}{how}</>} />
       </RungTop>
       {check
         ? <Tries label="Holds" results={check.holds} ok={(v) => Math.abs(v) <= tol} total={CHECK_HOLDS} done={check.kept != null} more={check.kept != null ? checkLine(check.holds) : `${CHECK_HOLDS - check.holds.length} to go`} />
-        : <Tries label="Pure tries" results={results} ok={(v) => Math.abs(v) <= tol} total={ROUNDS} more={moreToPass(rung, results)} />}
+        : <Tries label="Tries that rang just" results={results} ok={(v) => Math.abs(v) <= tol} total={ROUNDS} more={moreToPass(rung, results)} />}
       {chordRung && (
         <>
           <div className="seg" role="group" aria-label="You sing">
@@ -1045,7 +1045,7 @@ function SingRung({ iv, root, lab, record, rung, check }: RungProps & { rung: nu
       {check && check.kept != null && <CheckDone iv={iv} kept={check.kept} holds={check.holds} />}
       {chordRung && state === 'on' && !holding && (
         <div className="notice info t14">
-          <strong>Listen for the ghost note.</strong> When all three are pure, you may hear a soft hum two octaves below do. Nobody sings it: your ears make it.
+          <strong>Listen for the ghost note.</strong> When the chord is just, you may hear a soft hum two octaves below do. Nobody sings it: your ears make it.
         </div>
       )}
       {state === 'on' && !holding && check?.kept == null && (
@@ -1056,7 +1056,7 @@ function SingRung({ iv, root, lab, record, rung, check }: RungProps & { rung: nu
       )}
       {!holding && (
         <div className="row between wrap" style={{ gap: 4 }}>
-          <span className="t14 muted">{check ? `Kept when ${CHECK_KEEP} of ${CHECK_HOLDS} holds are close to pure.` : `${COURSES[iv].steps[rung - 1].rule}.`} Straight tone, no vibrato.</span>
+          <span className="t14 muted">{check ? `Kept when ${CHECK_KEEP} of ${CHECK_HOLDS} holds are close to the just pitch.` : `${COURSES[iv].steps[rung - 1].rule}.`} Straight tone, no vibrato.</span>
           <CentHelp />
         </div>
       )}
@@ -1121,7 +1121,7 @@ function CheckDone({ iv, kept, holds }: { iv: LabInterval; kept: boolean; holds:
     <div className={`card crs-result${kept ? ' good' : ''}`} role="status" data-testid="lab-check-done">
       <strong className="crs-feel">{kept ? 'It held ✓' : 'It slipped a little'}</strong>
       <span className="t16">{kept
-        ? `${checkLine(holds)}: your ${iv === 'third' ? 'pure third' : 'pure fifth'} is still there.`
+        ? `${checkLine(holds)}: your ${iv === 'third' ? 'just third' : 'just fifth'} is still there.`
         : `${checkLine(holds)}. One step again brings it back: sing it by ear, until it locks.`}</span>
       {kept ? (
         nx ? <button className="btn primary block two" data-testid="today-next" onClick={() => goStep(nx, true)}><span>Next: {stepShort(nx)}</span><span className="sub">step {ses!.nextIndex + 1} of {ses!.plan.steps.length} · {nx.minutes} min</span></button>

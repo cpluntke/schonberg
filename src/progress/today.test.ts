@@ -78,7 +78,7 @@ describe('today’s plan: a normal Saturday', () => {
     expect(plan.steps.length).toBeGreaterThanOrEqual(3);
     expect(plan.steps.length).toBeLessThanOrEqual(4);
     expect(plan.minutes).toBe(plan.steps.reduce((a, s) => a + s.minutes, 0));
-    expect(plan.steps[0]).toMatchObject({ kind: 'lab', title: 'Warm-up · the pure third', minutes: 4, route: { name: 'intonation', interval: 'third', rung: 3 } });
+    expect(plan.steps[0]).toMatchObject({ kind: 'lab', title: 'Warm-up · the just third', minutes: 4, route: { name: 'intonation', interval: 'third', rung: 3 } });
     // Dieu! (rehearsal focus, not rehearsal-ready) before Schaffe (not in the focus)
     const firstPiece = plan.steps.find((s) => s.kind !== 'lab')!;
     expect(firstPiece.pieceId).toBe('dieu');
@@ -387,7 +387,7 @@ describe('the course quick check and a redo in the plan', () => {
   it('the quick check: 1 minute, ticks once taken today', () => {
     const plan = buildPlan(ctx({ pieces: [dieu()], rehearsal: null, lab: { interval: 'fifth', rung: 4, done: true, check: true } }));
     const s = plan.steps[0];
-    expect(s).toMatchObject({ kind: 'lab', minutes: 1, title: 'Quick check · the pure fifth', route: { name: 'intonation', interval: 'fifth', rung: 4, check: true } });
+    expect(s).toMatchObject({ kind: 'lab', minutes: 1, title: 'Quick check · the just fifth', route: { name: 'intonation', interval: 'fifth', rung: 4, check: true } });
     expect(stepDone(s, { log: [], day: '2026-10-10', labRung: { fifth: 6 } })).toBe(false);
     expect(stepDone(s, { log: [], day: '2026-10-10', labRung: { fifth: 6 }, labChecked: { fifth: '2026-10-09' } })).toBe(false);
     expect(stepDone(s, { log: [], day: '2026-10-10', labRung: { fifth: 6 }, labChecked: { fifth: '2026-10-10' } })).toBe(true);

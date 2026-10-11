@@ -159,7 +159,7 @@ export function Settings() {
         </button>
         <button className="choice" aria-pressed={profile.tuning === 'just'} onClick={() => update({ tuning: 'just' })}>
           <span className="big" style={{ fontSize: '0.9375rem' }}>Just intonation (chord-aware)</span>
-          <span className="sub">Major thirds 14¢ low, fifths pure: tuned to the chord the others are singing</span>
+          <span className="sub">Thirds and fifths tuned just (thirds 14¢ low), to the chord the others are singing</span>
         </button>
       </section>
 

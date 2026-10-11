@@ -554,7 +554,7 @@ function ProgrammeEditor({ code, auth, info, cycle, all, base, library, draft, o
         <div className="row" style={{ gap: 6 }}>
           <button className="chip grow" style={{ textAlign: 'left' }} aria-pressed={ids.includes(LAB_ID)} data-testid="programme-lab"
             onClick={() => setIds(toggle(ids, LAB_ID))}>
-            {LAB_TITLE}<span className="tiny muted"> · exercise: pure fifths and thirds by ear</span>
+            {LAB_TITLE}<span className="tiny muted"> · exercise: tune fifths and thirds just, by ear</span>
           </button>
         </div>
         {missing.map((id) => {

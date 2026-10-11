@@ -46,10 +46,10 @@ export function wobbleLabel(perSecond: number): string {
   return `about ${n} wobble${n === 1 ? '' : 's'} a second`;
 }
 
-/** A slider's spoken value: "pure", "12 cents sharp", "1 cent flat". */
+/** A slider's spoken value: "just", "12 cents sharp", "1 cent flat". */
 export function centsWords(c: number): string {
   const r = Math.round(c);
-  if (r === 0) return 'pure';
+  if (r === 0) return 'just';
   const a = Math.abs(r);
   return `${a} cent${a === 1 ? '' : 's'} ${r > 0 ? 'sharp' : 'flat'}`;
 }

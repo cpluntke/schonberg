@@ -140,7 +140,7 @@ export const PLAN_MIN = 10;
 export const PLAN_MAX = 15;
 /** Minutes of each lab rung (Listen, Tune it by hand, Sing it with the wobble, Sing it by ear, In the chord). */
 export const LAB_MINUTES = [5, 5, 4, 5, 6];
-const LAB_NAME: Record<LabInterval, string> = { fifth: 'the pure fifth', third: 'the pure third' };
+const LAB_NAME: Record<LabInterval, string> = { fifth: 'the just fifth', third: 'the just third' };
 const LAB_RUNG_NAMES = ['Listen', 'Tune it by hand', 'Sing it, with the wobble', 'Sing it by ear', 'In the chord'];
 const COUNT_IN_SEC = 8;
 const RESULTS_SEC = 20;
@@ -285,7 +285,7 @@ export function labStep(lab: NonNullable<PlanContext['lab']>, short = false): To
   return {
     id: `lab:${lab.interval}:${rung}${tuneUp ? ':tune' : ''}`, kind: 'lab', level: rung, step: 'tempo', minutes, why: 'warm-up',
     lab: { interval: lab.interval, rung, ...(tuneUp ? { tuneUp: true } : {}), ...(lab.redo ? { redo: true } : {}) },
-    title: short ? (lab.interval === 'third' ? 'Pure-third tune-up' : 'Pure-fifth tune-up') : `Warm-up · ${LAB_NAME[lab.interval]}`,
+    title: short ? (lab.interval === 'third' ? 'Just-third tune-up' : 'Just-fifth tune-up') : `Warm-up · ${LAB_NAME[lab.interval]}`,
     reason: short ? (lab.interval === 'third' ? 'So your third rings in the chord' : 'So your fifth rings in the chord')
       : lab.redo ? `${LAB_RUNG_NAMES[rung - 1]}, once more · it slipped a little` : lab.done ? `${LAB_RUNG_NAMES[rung - 1]} · keeps your ear ready` : `Step ${rung} of 5 · ${LAB_RUNG_NAMES[rung - 1]}`,
     route: { name: 'intonation', interval: lab.interval, rung },

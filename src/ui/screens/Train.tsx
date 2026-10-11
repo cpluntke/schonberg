@@ -136,7 +136,7 @@ export function IntonationHome() {
         <h1 className="hero">Intonation</h1>
         <YouButton />
       </div>
-      <span className="t16 muted" style={{ marginTop: -8 }}>Hear and sing pure intervals, so the chords you sing ring. A few minutes a day.</span>
+      <span className="t16 muted" style={{ marginTop: -8 }}>Hear and sing intervals tuned just, so the chords you sing ring. A few minutes a day.</span>
 
       <div className="lay train-cols">
         <div className="col crs-col">
@@ -361,7 +361,7 @@ export function DroneScreen() {
       <button className="btn primary block" data-testid="drone-toggle" aria-pressed={on} onClick={() => void toggle()}>
         {on ? <><IconPause size={18} /> Stop</> : <><IconPlay size={18} /> Play the drone</>}
       </button>
-      <span className="t14 muted">Sol is tuned pure (a 3:2 fifth), not as on the piano. With headphones, the tuner and the drone don’t get in each other’s way.</span>
+      <span className="t14 muted">Sol is tuned just (a 3:2 fifth), not as on the piano. With headphones, the tuner and the drone don’t get in each other’s way.</span>
     </main>
   );
 }

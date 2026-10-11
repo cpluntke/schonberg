@@ -33,7 +33,7 @@ const LEVEL2 = 0.14;
 const LEVEL3 = 0.11;
 
 const PAGE_NAMES = [
-  'Two notes that fit', 'The wobble', 'Cents', 'So why not tune everything pure?', 'Now stack pure fifths', 'Share it out',
+  'Two notes that fit', 'The wobble', 'Cents', 'So why not make every interval just?', 'Now stack just fifths', 'Share it out',
   'Choirs have a luxury', 'What matters most',
 ];
 
@@ -262,8 +262,8 @@ function FitPage() {
         <SoundButton id="octave" playing={s.playing} onClick={() => play('octave')} title="Octave · 2 : 1" sub="twice as fast" testid="tuning-octave" />
       </div>
     </>}>
-      <p className="t16">Every note is a vibration.</p>
-      <p className="t16">In a fifth, the top note vibrates 3 times for every 2 of the bottom one. The waves line up, again and again, and the two notes blend into one calm sound.</p>
+      <p className="t16">Every note is a wave.</p>
+      <p className="t16">In a fifth, the top note’s wave goes up and down 3 times for every 2 of the bottom one’s. The waves line up, again and again, and the two notes blend into one calm sound.</p>
     </PageBody>
   );
 }
@@ -320,15 +320,15 @@ function WobblePage() {
         <span className="row between t14"><span>Top note</span><span className="mono" aria-hidden="true">{words}</span></span>
         <input id="tun-fifth" type="range" min={-30} max={30} step={1} value={off} aria-valuetext={words} data-testid="tuning-fifth-slider"
           onChange={(e) => setOff(Number(e.target.value))} />
-        <span className="row between t14 muted" aria-hidden="true"><span>lower</span><span>pure</span><span>higher</span></span>
+        <span className="row between t14 muted" aria-hidden="true"><span>lower</span><span>just</span><span>higher</span></span>
       </label>
       <div className="row tun-pair">
         <SoundButton id="fifth" playing={s.playing} onClick={() => s.toggle('fifth', { do: ROOT, sol: fifthHz(off) })} title="Play the fifth" sub="then slide" testid="tuning-play" />
-        <button className="btn tun-reset" disabled={off === 0} onClick={() => setOff(0)}>Make it pure</button>
+        <button className="btn tun-reset" disabled={off === 0} onClick={() => setOff(0)}>Make it just</button>
       </div>
     </>}>
-      <p className="t16">Play the fifth and move the slider. Off pure, the sound pulses: a wobble. The further off, the faster.</p>
-      <p className="t16">At pure it stops: calm and still. That’s the sound we’re after.</p>
+      <p className="t16">Play the fifth and move the slider. A little off, the sound pulses: a wobble. The further off, the faster.</p>
+      <p className="t16">When it stops, the fifth is <strong>just</strong>: tuned to the exact ratio, with no wobble. Calm and still: that’s the sound we’re after. Tuning to exact ratios like this is called <strong>just intonation</strong>.</p>
     </PageBody>
   );
 }
@@ -384,19 +384,19 @@ function CentsPage() {
       <Ruler zoom={zoom} />
       {zoom === 'octave' ? (
         <div className="row tun-pair">
-          <SoundButton id="octave" playing={s.playing} onClick={() => s.toggle('octave', { lo: ROOT, hi: ROOT * 2 }, 5000)} title="Play the octave" sub="1200 cents · pure on the piano too" testid="tuning-cents-octave" />
+          <SoundButton id="octave" playing={s.playing} onClick={() => s.toggle('octave', { lo: ROOT, hi: ROOT * 2 }, 5000)} title="Play the octave" sub="1200 cents · the same on the piano" testid="tuning-cents-octave" />
         </div>
       ) : (
         <div className="row tun-pair">
           <SoundButton id="piano" playing={s.playing} testid="tuning-cents-piano" title={`Piano · ${PIANO[iv]}`} sub="cents above do"
             onClick={() => s.toggle('piano', { do: ROOT, up: ROOT * centsToRatio(PIANO[iv]) }, 5000)} />
-          <SoundButton id="pure" playing={s.playing} testid="tuning-cents-pure" title={`Pure · ${oneDecimal(PURE[iv])}`} sub="cents above do"
+          <SoundButton id="pure" playing={s.playing} testid="tuning-cents-pure" title={`Just ${iv} · ${oneDecimal(PURE[iv])}`} sub="cents above do"
             onClick={() => s.toggle('pure', { do: ROOT, up: ROOT * centsToRatio(PURE[iv]) }, 5000)} />
         </div>
       )}
     </>}>
       <p className="t16">One piano key to the next is <strong>100 cents</strong>. An octave is 1200.</p>
-      <p className="t16">In a held chord, trained ears hear 5 to 10 cents. Zoom in: pure and piano aren’t quite the same.</p>
+      <p className="t16">In a held chord, trained ears hear 5 to 10 cents. Zoom in: the just intervals and the piano’s aren’t quite the same.</p>
     </PageBody>
   );
 }
@@ -425,8 +425,8 @@ function Ruler({ zoom }: { zoom: Zoom }) {
   return (
     <svg className="tun-svg" viewBox="0 0 340 150" role="img" data-testid="tuning-ruler"
       aria-label={zoom === 'octave'
-        ? 'One octave, 1200 cents, with the 12 piano keys every 100 cents. The pure fifth (702) sits next to the piano’s 700; the pure major third (386.3) below the piano’s 400.'
-        : `Zoomed in: the pure ${zoom === 'fifth' ? 'fifth at 702 cents, 2 cents above the piano’s 700' : 'major third at 386.3 cents, 13.7 cents below the piano’s 400'}.`}>
+        ? 'One octave, 1200 cents, with the 12 piano keys every 100 cents. The just fifth (702) sits next to the piano’s 700; the just major third (386.3) below the piano’s 400.'
+        : `Zoomed in: the just ${zoom === 'fifth' ? 'fifth at 702 cents, 2 cents above the piano’s 700' : 'major third at 386.3 cents, 13.7 cents below the piano’s 400'}.`}>
       <line x1={X0} x2={X0 + W} y1={AXIS} y2={AXIS} stroke="var(--line-strong)" strokeWidth={2} />
       {ticks.filter((t) => inView(t.c)).map((t) => (
         <g key={`${fine ? 'f' : 'k'}${t.c}`}>
@@ -452,7 +452,7 @@ function Ruler({ zoom }: { zoom: Zoom }) {
           <g>
             <path d={`M${a} ${AXIS - 46}V${AXIS - 52}H${b}V${AXIS - 46}`} fill="none" stroke="var(--text)" strokeWidth={1.5} />
             <text x={(a + b) / 2} y={AXIS - 58} textAnchor="middle" className="tun-label" fontWeight={700} fill="var(--text)">{focus.gap}</text>
-            <text x={x(focus.pure) + (pureLeft ? -6 : 6)} y={AXIS - 24} textAnchor={pureLeft ? 'end' : 'start'} className="tun-label" fontWeight={700} fill="var(--good)">pure {oneDecimal(focus.pure)}</text>
+            <text x={x(focus.pure) + (pureLeft ? -6 : 6)} y={AXIS - 24} textAnchor={pureLeft ? 'end' : 'start'} className="tun-label" fontWeight={700} fill="var(--good)">just {focus.name === 'fifth' ? '5th' : '3rd'} {oneDecimal(focus.pure)}</text>
             <text x={x(focus.piano) + (pureLeft ? 6 : -6)} y={AXIS - 24} textAnchor={pureLeft ? 'start' : 'end'} className="tun-label" fill="var(--muted)">piano {focus.piano}</text>
           </g>
         );
@@ -466,8 +466,8 @@ function Ruler({ zoom }: { zoom: Zoom }) {
 
 const C3 = 130.81;
 const C4 = 2 * C3;
-/** Degrees of the circle per cent of drift: the drift is drawn larger than life (23.5 cents ≈ a third of a step). */
-const DEG_PER_CENT = 1;
+/** Degrees of the circle per cent of drift: to scale, as on a clock face of the octave (1200 cents = 360°: the comma ≈ 7°). */
+const DEG_PER_CENT = 360 / 1200;
 
 /**
  * The circle of fifths from C as a slow spiral (each turn a little further in: octaves up). `steps`
@@ -580,20 +580,19 @@ function PureFifthsPage() {
   return (
     <PageBody n={5} figure={<>
       <FifthsCircle steps={w.shown} extra={PURE.fifth - 700} gap label={done
-        ? `Twelve pure fifths from C overshoot C by ${oneDecimal(COMMA)} cents: the circle doesn't close. That gap is the Pythagorean comma.`
-        : `${w.k} of 12 pure fifths up from C: ${oneDecimal(drift)} cents above the piano's.`}>
+        ? `Twelve just fifths from C overshoot C by ${oneDecimal(COMMA)} cents: the circle doesn't close. That gap is the Pythagorean comma.`
+        : `${w.k} of 12 just fifths up from C: ${oneDecimal(drift)} cents above the piano's.`}>
         {w.k === 0 ? <Centre big="C" small="start here" />
           : done ? <Centre big={`${oneDecimal(COMMA)} cents`} small="too far: the comma" tone="var(--accent-text)" />
             : <Centre big={`+${oneDecimal(drift)}`} small={`cents · ${FIFTHS_FROM_C[w.k]}, fifth ${w.k}`} tone="var(--accent-text)" />}
       </FifthsCircle>
       <div className="row tun-pair">
-        <button className="btn voice grow tun-tap" data-testid="tuning-add-fifth" onClick={w.add}>{done ? 'Start again' : '+ a pure fifth'}</button>
+        <button className="btn voice grow tun-tap" data-testid="tuning-add-fifth" onClick={w.add}>{done ? 'Start again' : '+ a just fifth'}</button>
         {done && <SoundButton id="cs" playing={w.s.playing} onClick={w.bothCs} title="Play both Cs" sub="hear them wobble" testid="tuning-both-cs" />}
       </div>
       <span className="t14 muted center" aria-live="polite">{done ? 'The gap is the Pythagorean comma. Your C and the stacked C wobble against each other.' : 'Watch the needle drift: about 2 cents a tap.'}</span>
-      <span className="t14 muted center">(the drift is drawn larger than life)</span>
     </>}>
-      <p className="t16 tun-ask">Each pure fifth is 702 cents: 2 more than the piano’s.</p>
+      <p className="t16 tun-ask">Each just fifth is 702 cents: 2 more than the piano’s.</p>
       <p className="t16">Tap 12 times. Where do you land now?</p>
     </PageBody>
   );
@@ -615,7 +614,7 @@ function ShareOutPage() {
       </FifthsCircle>
       <span className="t16 center mono" data-testid="tuning-each-fifth">Each fifth: {(700 + extra).toFixed(1)} cents</span>
       <div className="row tun-pair">
-        <button className="btn voice grow tun-tap" data-testid="tuning-share" onClick={() => setShared(!shared)}>{shared ? 'Pure again' : 'Share it out'}</button>
+        <button className="btn voice grow tun-tap" data-testid="tuning-share" onClick={() => setShared(!shared)}>{shared ? 'Back to just fifths' : 'Share it out'}</button>
         <SoundButton id="fifth" playing={s.playing} onClick={() => s.toggle('fifth', fifth())} title="Play a fifth" sub="almost still" testid="tuning-share-fifth" />
       </div>
       <div className="row tun-pair">
@@ -652,7 +651,7 @@ function ChoirPage() {
   useEffect(() => { s.retune(chord()); }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
   const b = beatRate(ROOT, miHz, [5, 4]);
   const atPure = value >= GAP3 - 0.05;
-  const words = value < 0.05 ? 'the piano’s third' : atPure ? `pure: ${oneDecimal(GAP3)} cents below the piano` : `${oneDecimal(value)} cents below the piano`;
+  const words = value < 0.05 ? 'the piano’s third' : atPure ? `just third: ${oneDecimal(GAP3)} cents below the piano` : `${oneDecimal(value)} cents below the piano`;
   return (
     <PageBody n={7} figure={<>
       <PulseView rate={b} />
@@ -661,14 +660,14 @@ function ChoirPage() {
         <span className="row between t14"><span>The third (mi)</span><span className="mono" aria-hidden="true">{value < 0.05 ? 'piano' : `−${oneDecimal(value)} cents`}</span></span>
         <input id="tun-third" type="range" min={0} max={Number(GAP3.toFixed(1))} step={0.1} value={Number(value.toFixed(1))} aria-valuetext={words} data-testid="tuning-third-slider"
           onChange={(e) => { setGlide(null); setLow(Number(e.target.value)); }} />
-        <span className="row between t14 muted" aria-hidden="true"><span>piano</span><span>pure</span></span>
+        <span className="row between t14 muted" aria-hidden="true"><span>piano</span><span>just</span></span>
       </label>
       <div className="row tun-pair">
         <SoundButton id="chord" playing={s.playing} onClick={() => s.toggle('chord', chord())} title="Play" sub="the chord" testid="tuning-chord" />
-        <button className="btn tun-reset" data-testid="tuning-make-pure" onClick={() => setGlide(atPure ? 0 : GAP3)}>{atPure ? 'Back to the piano' : 'Make it pure'}</button>
+        <button className="btn tun-reset" data-testid="tuning-make-pure" onClick={() => setGlide(atPure ? 0 : GAP3)}>{atPure ? 'Back to the piano' : 'Make it just'}</button>
       </div>
     </>} after={<>
-      <table className="tun-table" aria-label="Pure, against the piano">
+      <table className="tun-table" aria-label="Just intervals, against the piano">
         <thead><tr><th scope="col">In a chord</th><th scope="col">Against the piano</th></tr></thead>
         <tbody>
           <tr><th scope="row">Major third</th><td>about 14 cents lower</td></tr>
@@ -679,7 +678,7 @@ function ChoirPage() {
       <p className="t14 muted">It’s the note’s place in the chord that counts, not its name: an E sits lower in C major (the third) than in E major (the root).</p>
     </>}>
       <p className="t16 tun-ask">Choirs don’t have fixed keys.</p>
-      <p className="t16">We can tune every chord on its own, so we can sound amazing: pure. Make the third pure and hear the shimmer stop.</p>
+      <p className="t16">We can tune every chord on its own, so every interval can be just and the chord sounds amazing. Make the third just and hear the shimmer stop.</p>
     </PageBody>
   );
 }

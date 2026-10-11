@@ -34,28 +34,28 @@ export interface Course {
   steps: CourseStep[];
   /** What a passed step lets you do (C4), per rung 1–4. */
   stepCanDo: string[];
-  /** The milestone: "You can hear a pure fifth", and what you can do now (C6). */
+  /** The milestone: "You can hear a just fifth", and what you can do now (C6). */
   done: string;
   canDo: string[];
 }
 
-/** The pass rule of a rung, in words ("To pass: 3 of your last 4 holds close to pure"). */
+/** The pass rule of a rung, in words ("To pass: 3 of your last 4 holds close to the just pitch"). */
 export function passRule(rung: number): string {
   if (rung === 1) return `To pass: ${CHECK_PASS} of your last ${CHECK_ROUNDS} answers right`;
-  if (rung === 2) return `To pass: ${PASS} of your last ${ROUNDS} tunings close to pure`;
-  return `To pass: ${PASS} of your last ${ROUNDS} holds close to pure${rung === 5 ? ', picture off' : ''}`;
+  if (rung === 2) return `To pass: ${PASS} of your last ${ROUNDS} tunings close to the just pitch`;
+  return `To pass: ${PASS} of your last ${ROUNDS} holds close to the just pitch${rung === 5 ? ', picture off' : ''}`;
 }
 
 const steps = (goals: string[]): CourseStep[] => RUNG_NAMES.map((name, i) => ({ name, goal: goals[i], minutes: STEP_MINUTES[i], rule: passRule(i + 1) }));
 
 export const COURSES: Record<LabInterval, Course> = {
   fifth: {
-    id: 'fifth', title: 'Pure fifth', outcome: 'Make the open fifth stand still.', note: 'sol',
-    about: 'The piano’s fifth is almost pure; the skill is to lock it, so do and sol sound like one calm note.',
+    id: 'fifth', title: 'Just fifth', outcome: 'Make the open fifth stand still.', note: 'sol',
+    about: 'The piano’s fifth is close to the just fifth; the skill is to lock it, so do and sol sound like one calm note.',
     line: 'Lock the open fifth: sing sol so it stops moving against do.',
-    demo: { off: { title: 'A little off', sub: 'a slow wobble', cents: 12 }, pure: { title: 'Pure fifth', sub: 'calm and still' } },
+    demo: { off: { title: 'A little off', sub: 'a slow wobble', cents: 12 }, pure: { title: 'Just fifth', sub: 'calm and still' } },
     steps: steps([
-      'Hear pure and a little off; pick the calmer one.',
+      'Hear the just fifth and one a little off; pick the calmer one.',
       'Slide sol until the pulse stops. No singing.',
       'Sing sol over the drone; the picture shows the pulse.',
       'The same, with no picture: only your ears.',
@@ -64,10 +64,10 @@ export const COURSES: Record<LabInterval, Course> = {
     stepCanDo: [
       'You can hear when a fifth pulses, and when it stands still.',
       'You can find the still spot by ear, with your hands.',
-      'You found the pure fifth with your own voice: sol locks onto do and stops moving.',
+      'You found the just fifth with your own voice: sol locks onto do and stops moving.',
       'You found it with your ears alone, with no picture.',
     ],
-    done: 'You can hear a pure fifth',
+    done: 'You can hear a just fifth',
     canDo: [
       'Hear when an open fifth pulses, and when it stands still.',
       'Sing sol so it locks onto do, by ear, with no picture.',
@@ -75,26 +75,26 @@ export const COURSES: Record<LabInterval, Course> = {
     ],
   },
   third: {
-    id: 'third', title: 'Pure major third', outcome: 'Make the chord ring.', note: 'mi',
+    id: 'third', title: 'Just major third', outcome: 'Make the chord ring.', note: 'mi',
     about: 'Pianos tune the third a little wide; choirs that sing it lower get a calm, ringing chord.',
     line: 'Make the chord ring: sing the third a little lower than the piano.',
-    demo: { off: { title: 'Piano chord', sub: 'a soft shimmer', cents: 400 - 386.31 }, pure: { title: 'Pure chord', sub: 'calm and still' } },
+    demo: { off: { title: 'Piano chord', sub: 'a soft shimmer', cents: 400 - 386.31 }, pure: { title: 'Just-tuned chord', sub: 'calm and still' } },
     steps: steps([
-      'Hear pure and piano; pick the calmer one.',
+      'Hear the just third and the piano’s; pick the calmer one.',
       'Slide mi until the pulse stops. No singing.',
       'Sing mi over the drone; the picture shows the pulse.',
       'The same, with no picture: only your ears.',
       'The app sings do and sol; you add mi and lock the chord.',
     ]),
     stepCanDo: [
-      'You can hear the piano’s third shimmer, and the pure one ring.',
+      'You can hear the piano’s third shimmer, and the just third ring.',
       'You can find the still spot by ear, with your hands.',
-      'You found the pure third with your own voice. Your mi now sits a little lower than the piano’s, where the chord rings.',
+      'You found the just third with your own voice. Your mi now sits a little lower than the piano’s, where the chord rings.',
       'You found it with your ears alone, with no picture.',
     ],
-    done: 'You can hear a pure major third',
+    done: 'You can hear a just major third',
     canDo: [
-      'Hear the piano’s third shimmer, and the pure one ring.',
+      'Hear the piano’s third shimmer, and the just third ring.',
       'Sing mi a little lower than the piano, by ear, with no picture.',
       'Lock your note into a full chord while others sing.',
     ],
@@ -188,13 +188,13 @@ function degree(a: number): string {
 
 /**
  * Feedback words first: the pulse word, then the direction on the pitch scale with the cents in
- * brackets ("Almost still · a touch high (6 cents)"; "Still · pure" within 2.5 cents).
+ * brackets ("Almost still · a touch high (6 cents)"; "Still · on the just pitch" within 2.5 cents).
  */
 export function feelWords(off: number): string {
   const a = Math.abs(Math.round(off));
   const pulse = wobbleWord(off);
   const cap = pulse[0].toUpperCase() + pulse.slice(1);
-  if (Math.abs(off) <= 2.5) return `${cap} · pure`;
+  if (Math.abs(off) <= 2.5) return `${cap} · on the just pitch`;
   return `${cap} · ${degree(a)} ${off > 0 ? 'high' : 'low'} (${a} cent${a === 1 ? '' : 's'})`;
 }
 
@@ -206,5 +206,5 @@ export function feelAdvice(off: number, tol = TOL_SING): string | null {
   return a <= 25 ? `Slide a little ${way} and hold where it settles.` : `Start again a little ${way}, then slide slowly until it goes still.`;
 }
 
-/** The quick check's holds as words: "2 of 3 close to pure". */
-export const checkLine = (holds: number[]) => `${holds.filter((v) => Math.abs(v) <= TOL_SING).length} of ${holds.length} close to pure`;
+/** The quick check's holds as words: "2 of 3 close to the just pitch". */
+export const checkLine = (holds: number[]) => `${holds.filter((v) => Math.abs(v) <= TOL_SING).length} of ${holds.length} close to the just pitch`;

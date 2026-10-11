@@ -304,7 +304,7 @@ function IntonationCard({ inProgramme = false }: { inProgramme?: boolean }) {
         <strong>Intonation courses</strong>
         {inProgramme ? <span className="crs-rec" style={{ whiteSpace: 'nowrap', flex: 'none' }}>Your choir recommends</span> : <span className="badge">Train</span>}
       </div>
-      <span className="small muted">Find the pure fifth and the pure major third by ear: listen, tune by hand, then sing.</span>
+      <span className="small muted">Find the just fifth and the just major third by ear: listen, tune by hand, then sing.</span>
       <span className="tiny mono" style={{ color: 'var(--voice)' }}>Fifth: {step('fifth')} · Third: {step('third')}</span>
     </button>
   );

@@ -1,12 +1,14 @@
 # Intonation courses (the lab)
 
-Find a **pure fifth** (3:2, 702¢, about 2¢ wider than the piano's) and a **pure major third**
-(5:4, 386¢, about 14¢ lower than the piano's) by ear, at home, on your own phone.
+Find a **just fifth** (3:2, 702¢, about 2¢ wider than the piano's) and a **just major third**
+(5:4, 386¢, about 14¢ lower than the piano's) by ear, at home, on your own phone. "Just" is the
+word the app uses for an interval tuned to its exact ratio, with no pulse (as in *just intonation*);
+the wording avoids sentences where "just" could be read as "only".
 
 ## Courses, for every singer
 
 The lab's two ladders are two **courses** under Train (`src/game/courses.ts`, the screens in
-`src/ui/screens/IntonationLab.tsx`): **Pure fifth** ("Make the open fifth stand still.") and **Pure
+`src/ui/screens/IntonationLab.tsx`): **Just fifth** ("Make the open fifth stand still.") and **Just
 major third** ("Make the chord ring."). Each is that interval's 5-step ladder (below), about 25 minutes
 (5 · 5 · 4 · 5 · 6), with "one step a day" suggested and never enforced: every step up to the current
 one opens; a step passed today makes the next one "tomorrow" on the course page, Train and Today.
@@ -19,17 +21,17 @@ page and Train's course card say "Your choir recommends", Today keeps its "Inton
 and Today offers the warm-up (below).
 
 - **Train** (C1): today's warm-up (the active course's next step, while it isn't done today), the tools
-  (Check a note, a Drone: do or do + a pure sol at any pitch), the active course (its steps as check
+  (Check a note, a Drone: do or do + a sol tuned just, at any pitch), the active course (its steps as check
   circles, "Next: … · N min") and one suggestion, "All courses" (`#/courses`), drills from your music
   and the Zwölfton row. A course is **active** once its first round is sung and until its last step is
   passed (both started: the one practised last).
 - **The course page** (`#/intonation/<fifth|third>`, C2): the outcome, two demo sounds through the
-  drone (piano chord · a soft shimmer / pure chord · calm and still; for the fifth: a little off · a
+  drone (piano chord · a soft shimmer / just-tuned chord · calm and still; for the fifth: a little off · a
   slow wobble), "5 steps · about 25 min · one step a day", "What's a cent?", the steps with goal,
   minutes, the day (done Wed · today · Sun) and the pass rule in words ("To pass: 3 of your last 4
-  holds close to pure"), and a sticky Continue.
+  holds close to the just pitch"), and a sticky Continue.
 - **A step** (`#/intonation/<interval>/<1–5>`, C3): which course and step, a goal line, a how line,
-  labelled progress ("Pure tries ✓ ✓ ✗ ④ · 1 more to pass"), then the feedback words first: the pulse
+  labelled progress ("Tries that rang just ✓ ✓ ✗ ④ · 1 more to pass"), then the feedback words first: the pulse
   word, then the direction on the app's pitch scale with the cents in brackets ("Almost still · a touch
   high (6 cents)"; `feelWords`), what to do next, and where it landed. While a hold is under way only
   the picture (or the ear) and the hold timer show. Rung 4 is now called **Sing it by ear**.
@@ -37,7 +39,7 @@ and Today offers the warm-up (below).
   course's progress, "Step 4 of the course waits for tomorrow."). Inside today's session the primary
   is today's next step, with "Keep practising this step" and "Finish for today"; outside it "Back to
   Train", "Keep practising this step" and "Or go on to step 4 now".
-- **Course done** (`#/intonation/<interval>/done`, C6): the green band ("You can hear a pure fifth",
+- **Course done** (`#/intonation/<interval>/done`, C6): the green band ("You can hear a just fifth",
   what you can do now), **Use it in your music**, the quick check's date and the next course. Inside a
   session the primary is today's next step.
 - **Use it in your music** (`src/game/heldIntervals.ts`): the programme's pieces are searched for a
@@ -75,7 +77,7 @@ sound pulses ("wah-wah-wah").
 - In a fifth, the root's 3rd partial meets the fifth's 2nd partial.
 - In a major third, the root's 5th partial meets the third's 4th partial.
 
-The closer the notes, the slower the pulse. When the interval is pure, the pulse stops.
+The closer the notes, the slower the pulse. When the interval is just, the pulse stops.
 
 The lab shows that pulse as one second of waveform. It shows how much the sound pulses, never which
 way to move: finding the direction is the singer's ear's job. The rate is `|m·f_hi − n·f_lo|` for a
@@ -88,11 +90,11 @@ On middle C, the piano's third pulses about 10 times a second. On a lower do it 
 
 | Step | What | Passes with |
 |---|---|---|
-| 1 Listen | Three examples (pure, nearly, piano or further off), then "which is calmer?" pairs | 5 of the last 6 right |
+| 1 Listen | Three examples (just, nearly, piano or further off), then "which is calmer?" pairs | 5 of the last 6 right |
 | 2 Tune it by hand | The app plays do and an off note (15–40¢ above or below, at random). Move it with a slider (no numbers) until the pulse stops | 3 of the last 4 within 5¢ |
 | 3 Sing it, with the wobble | Drone (do, and sol for the third). Sing, see the pulse, hold 2 s | 3 of the last 4 within 8¢ |
 | 4 Sing it by ear | The same with no pulse on screen; the result is shown after the hold | 3 of the last 4 within 8¢ |
-| 5 In the chord | The app sings the other two triad notes (pure). You pick do, mi or sol. The wobble can be shown for practice; only rounds with it off count | 3 of the last 4 within 8¢, wobble off |
+| 5 In the chord | The app sings the other two triad notes (tuned just). You pick do, mi or sol. The wobble can be shown for practice; only rounds with it off count | 3 of the last 4 within 8¢, wobble off |
 
 ## How singing is judged
 
@@ -106,13 +108,13 @@ On middle C, the piano's third pulses about 10 times a second. On a lower do it 
   otherwise S D4, A A3, T D3, B A2.
 - **Headphones:** the singing steps need them, so the drone doesn't reach the microphone.
 
-"3 of the last 4" also passes after the first 3 tries if all 3 are pure.
+"3 of the last 4" also passes after the first 3 tries if all 3 rang just.
 
 The pulse on screen and its words ("still", "almost still", "pulsing", "fast buzz") follow the cents
-off pure, drawn as the pulse would be on a do of D3. The real pulse is faster on a higher do, but
+off the just pitch, drawn as the pulse would be on a do of D3. The real pulse is faster on a higher do, but
 this way every voice sees the same picture for the same tolerance (`shownBeats`, `wobbleWord`).
 
-In "tune it by hand", pure sits at a different place on the slider every round (a hidden shift of up
+In "tune it by hand", the just pitch sits at a different place on the slider every round (a hidden shift of up
 to ±25¢), so it can only be found by ear.
 
 ## Stored, and synced

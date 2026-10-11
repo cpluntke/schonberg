@@ -428,7 +428,7 @@ function WhatMoved({ plan, log, status }: { plan: TodayPlan; log: ReturnType<typ
           <div key={s.id} className="li" style={{ alignItems: 'flex-start' }}>
             <span className="check done" aria-hidden="true">✓</span>
             <div className="grow col" style={{ gap: 2 }}>
-              <strong className="t16">{s.lab!.interval === 'third' ? 'Pure third' : 'Pure fifth'} · step {s.lab!.rung} of 5</strong>
+              <strong className="t16">{s.lab!.interval === 'third' ? 'Just third' : 'Just fifth'} · step {s.lab!.rung} of 5</strong>
               <span className="t14 muted">Passed</span>
             </div>
           </div>
@@ -440,7 +440,7 @@ function WhatMoved({ plan, log, status }: { plan: TodayPlan; log: ReturnType<typ
             <div key={s.id} className="li" style={{ alignItems: 'flex-start' }} data-testid="moved-check">
               <span className={`check ${held ? 'done' : 'miss'}`} aria-hidden="true">{held ? '✓' : '✗'}</span>
               <div className="grow col" style={{ gap: 2 }}>
-                <strong className="t16">{s.lab!.interval === 'third' ? 'Pure third' : 'Pure fifth'}</strong>
+                <strong className="t16">{s.lab!.interval === 'third' ? 'Just third' : 'Just fifth'}</strong>
                 <span className="t14 muted">{s.lab!.check
                   ? (held ? 'Quick check: it held ✓' : 'Quick check: it slipped · sing it by ear once more')
                   : 'Sing it by ear, once more ✓ · it locks again'}</span>

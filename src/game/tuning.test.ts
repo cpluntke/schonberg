@@ -49,10 +49,10 @@ describe('the wobble', () => {
     expect(wobbleLabel(0.5)).toBe('under 1 wobble a second');
     expect(wobbleLabel(1.1)).toBe('about 1 wobble a second');
     expect(wobbleLabel(-6.4)).toBe('about 6 wobbles a second');
-    expect(centsWords(0)).toBe('pure');
+    expect(centsWords(0)).toBe('just');
     expect(centsWords(12)).toBe('12 cents sharp');
     expect(centsWords(-1)).toBe('1 cent flat');
-    expect(centsWords(0.4)).toBe('pure');
+    expect(centsWords(0.4)).toBe('just');
   });
 });
 
