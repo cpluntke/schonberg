@@ -410,7 +410,7 @@ export function turnBlur(note: ScoreNote, prev: ScoreNote | null, next: ScoreNot
  * A note read partly an octave up between readings at the right pitch: the tracker's octave error,
  * not the voice (nobody leaves a note for the octave above and comes back within it). A vowel whose
  * second harmonic is much stronger than the fundamental, with weak odd harmonics (a nasal "on" on
- * A♯4: H2 15 dB over H1), looks periodic at twice the pitch. Those readings are folded down an octave
+ * A♯4: H2 15 dB over H1), looks periodic at twice the pitch, and flips back and forth. Those readings are folded down an octave
  * before the note is judged, at any pitch (OCTAVE_UP_HZ lets off low notes read an octave up even
  * without right readings). Needs right-octave readings (within OCTAVE_FLIP_NEAR tolerances, at least
  * OCTAVE_FLIP_MIN of them and OCTAVE_FLIP_SHARE of the readings near either octave) and no neighbour
@@ -419,20 +419,30 @@ export function turnBlur(note: ScoreNote, prev: ScoreNote | null, next: ScoreNot
 export const OCTAVE_FLIP_NEAR = 2;
 export const OCTAVE_FLIP_MIN = 3;
 export const OCTAVE_FLIP_SHARE = 0.3;
-export function foldOctaveFlips(a: { w: NoteWindow; bD: number[]; devs: number[]; nD: number[]; octaveSamples: number }, tol: number): void {
+export function foldOctaveFlips(a: { w: NoteWindow; bD: number[]; devs: number[]; nD: number[]; scoopDevs: number[]; octaveSamples: number }, tol: number): void {
   const w = a.w;
-  const up = (d: number) => d > 600 && d < 1800;
-  const right = (d: number) => Math.abs(d) <= OCTAVE_FLIP_NEAR * tol;
+  // Within OCTAVE_FLIP_NEAR tolerances of the octave (or of the note): a reading heading for a next
+  // note a fifth or a sixth up is the voice leaving, not an octave flip.
+  const near = OCTAVE_FLIP_NEAR * tol;
+  const up = (d: number) => Math.abs(d - 1200) <= near;
+  const right = (d: number) => Math.abs(d) <= near;
+  const firstUp = a.bD.findIndex(up);
+  if (firstUp < 0) return;
+  let lastUp = firstUp;
+  a.bD.forEach((d, k) => { if (up(d)) lastUp = k; });
   const nUp = a.bD.filter(up).length;
-  if (nUp === 0) return;
   const nRight = a.bD.filter(right).length;
   if (nRight < OCTAVE_FLIP_MIN || nRight < OCTAVE_FLIP_SHARE * (nUp + nRight)) return;
+  // Back and forth, not one switch: a voice that goes up the octave for the rest of the note (or
+  // starts it up there and comes down) really is there.
+  if (!a.bD.slice(firstUp + 1).some(right) || !a.bD.slice(0, lastUp).some(right)) return;
   const octaveAbove = (m: number | null) => m !== null && Math.abs(m - (w.note.midi + 12)) <= 2;
   if (octaveAbove(w.legatoFrom) || octaveAbove(w.legatoTo)) return;
   const fold = (d: number) => (up(d) ? d - 1200 : d);
   a.bD = a.bD.map(fold);
   a.devs = a.devs.map(fold);
   a.nD = a.nD.map(fold);
+  a.scoopDevs = a.scoopDevs.map(fold);
   a.octaveSamples = a.devs.filter((d) => Math.abs(d) > 600 && Math.abs(d - 1200 * Math.round(d / 1200)) <= Math.max(tol, 50)).length;
 }
 

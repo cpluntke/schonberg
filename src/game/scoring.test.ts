@@ -273,6 +273,27 @@ describe('octave flips of the tracker', () => {
     expect(r.notes[2].octave).toBe(true);
   });
 
+  it('a voice that goes up the octave for the rest of the note is in the wrong octave', () => {
+    const r = scoreAttempt(ctx, take((u) => (u > 0.35 ? 12 : 0)), L1);
+    expect(r.notes[2].grade).not.toBe('perfect');
+    expect(r.notes[2].octave).toBe(true);
+    const down = scoreAttempt(ctx, take((u) => (u < 0.65 ? 12 : 0)), L1);
+    expect(down.notes[2].grade).not.toBe('perfect');
+  });
+
+  it('readings heading for a leap of a fifth or a sixth up are not folded', () => {
+    for (const leap of [7, 8, 9]) {
+      const p = makePart('A', [[64, 1], [69, 1], [69 + leap, 1]], 120);
+      const c: ScoringContext = { score: makeScore([p], 120), part: p, range: [0, 2] };
+      const s = [];
+      for (const n of p.notes) for (let t = n.start + 0.01; t < n.start + n.dur; t += 0.024) {
+        const leaving = n === p.notes[1] && t > n.start + 0.85 * n.dur;
+        s.push({ time: t, midi: leaving ? n.midi + leap : n.midi, clarity: 0.95, rms: 0.1 });
+      }
+      for (const tol of [25, 50]) expect(scoreAttempt(c, s, { ...L1, toleranceCents: tol }).notes[1].grade, `+${leap} at ${tol}¢`).toBe('perfect');
+    }
+  });
+
   it('only upward: readings an octave down stay wrong', () => {
     const r = scoreAttempt(ctx, take((u) => (u > 0.2 && u < 0.9 ? -12 : 0)), L1);
     expect(r.notes[2].grade).not.toBe('perfect');
