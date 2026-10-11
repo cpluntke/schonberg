@@ -1,4 +1,4 @@
-// "You": the round avatar at the top right of every tab (Today, Pieces, Train, Choir) and the sheet
+// "You": the round avatar at the top right of every tab (Today, Pieces, Intonation, Train, Choir) and the sheet
 // it opens (the UX review's A7). Who you are, whether your progress is safe, and one row per part of
 // Settings; each row opens Settings on that part (openAt), or its own screen. Staff rows only for
 // staff logins. Settings itself stays a screen ("All settings").

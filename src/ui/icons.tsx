@@ -39,7 +39,7 @@ export const IconShield = (p: P) => <S {...p}><path d="M12 3l8 3v6c0 4.5-3.4 7.8
 export const IconChevron = (p: P) => <S {...p}><path d="M9 6l6 6-6 6" /></S>;
 export const IconChevronDown = (p: P) => <S {...p}><path d="M6 9l6 6 6-6" /></S>;
 export const IconClose = (p: P) => <S {...p}><path d="M6 6l12 12M18 6L6 18" /></S>;
-// The tabs (Today · Pieces · Train · Choir; Pieces is IconMusic, Train IconEar) and the You sheet's rows.
+// The tabs (Today · Pieces · Intonation · Train · Choir; Pieces is IconMusic, Intonation IconEar, Train IconLoop) and the You sheet's rows.
 export const IconSun = (p: P) => <S {...p}><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></S>;
 export const IconPeople = (p: P) => <S {...p}><circle cx="8" cy="8" r="3" /><circle cx="16" cy="8" r="3" /><path d="M2 20c0-3.3 2.7-6 6-6s6 2.7 6 6M12 20c0-3.3 2.7-6 6-6 1.5 0 2.9.5 4 1.4" /></S>;
 export const IconUser = (p: P) => <S {...p}><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8" /></S>;

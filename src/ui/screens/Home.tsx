@@ -134,7 +134,7 @@ export function Home() {
         : plan.steps.length > 0 ? (
           <PlanCard plan={plan} status={status} labOn={labOn} secondary={!profile.onboarded} rehearsalTime={rehearsalTime} started={!!today.started} />
         ) : statuses.length && !betweenCycles ? (
-          <div className="notice info" data-testid="all-ready">Everything in this cycle is concert-ready. Keep them fresh, or train your ear under Train.</div>
+          <div className="notice info" data-testid="all-ready">Everything in this cycle is concert-ready. Keep them fresh, or train your ear under Intonation.</div>
         ) : !betweenCycles ? (
           <div className="notice info" data-testid="no-pieces">{labInProgramme()
             ? 'No scores in this cycle yet. Start with the intonation courses below.'
@@ -302,7 +302,7 @@ function IntonationCard({ inProgramme = false }: { inProgramme?: boolean }) {
       onClick={() => go({ name: 'intonation' })}>
       <div className="row between">
         <strong>Intonation courses</strong>
-        {inProgramme ? <span className="crs-rec" style={{ whiteSpace: 'nowrap', flex: 'none' }}>Your choir recommends</span> : <span className="badge">Train</span>}
+        {inProgramme ? <span className="crs-rec" style={{ whiteSpace: 'nowrap', flex: 'none' }}>Your choir recommends</span> : <span className="badge">Intonation</span>}
       </div>
       <span className="small muted">Find the just fifth and the just major third by ear: listen, tune by hand, then sing.</span>
       <span className="tiny mono" style={{ color: 'var(--voice)' }}>Fifth: {step('fifth')} · Third: {step('third')}</span>

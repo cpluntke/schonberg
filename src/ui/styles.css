@@ -248,6 +248,8 @@ h2 { margin: 0; font-size: 1.125rem; font-weight: 800; }
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 0.8125rem; font-weight: 600;
 }
 .nav button[aria-current] { color: var(--accent); }
+/* Labels on one line, shrinking to fit the tab's width (about 6.2 characters' worth per tab: "Intonation"). */
+.nav-lab { white-space: nowrap; font-size: min(1em, calc(100vw / var(--tabs, 5) / 6.2)); letter-spacing: -0.01em; }
 
 .field { display: flex; flex-direction: column; gap: 6px; font-size: 0.875rem; }
 .field input[type='text'], .field input[type='password'], .field input[type='email'], .field input[type='date'], .field input[type='time'], .field input[type='number'], .field select, .field textarea {
@@ -525,6 +527,7 @@ html:has(.results-foot) { scroll-padding-bottom: 200px; }
     flex: none; height: 46px; flex-direction: row; justify-content: flex-start; gap: 14px; padding: 0 12px;
     border-radius: 12px; font-size: 0.9375rem; font-weight: 600; color: var(--muted); position: relative;
   }
+  .nav-lab { font-size: inherit; letter-spacing: normal; }
   .nav button svg { flex: none; }
   .nav button:hover { background: var(--surface); color: var(--text); }
   @media (hover: none) { .nav button:hover { background: none; color: var(--muted); } }

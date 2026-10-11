@@ -43,7 +43,7 @@ import { shareMyProgress } from './play/shareProgress';
 import { retryPrivacyRemovals } from './play/privacy';
 import { useDisplaySync } from './theme';
 
-// Today · Pieces · Train · Choir (nav.ts: which screen lights which tab, where the tab bar shows).
+// Today · Pieces · Intonation · Train · Choir (nav.ts: which screen lights which tab, where the tab bar shows).
 const TAB_ICON: Record<TabName, React.ReactNode> = { home: <IconSun />, pieces: <IconMusic />, tune: <IconEar />, train: <IconLoop />, choir: <IconPeople /> };
 
 export function App() {
@@ -133,7 +133,7 @@ export function App() {
   }, [route]); // eslint-disable-line react-hooks/exhaustive-deps
   const tab = tabOf(route, stamped ?? fromTab);
   const isAdmin = ADMIN_ROUTES.includes(route.name);
-  // Phones: the tab bar under the four tabs (and the staff screens); sub-screens have their back arrow.
+  // Phones: the tab bar under the tabs (and the staff screens); sub-screens have their back arrow.
   // Wide screens: the sidebar on sub-screens too; never while practising.
   // (a staff screen opened to log in, with no staff login on this phone: a sub-screen with its back arrow, no tab bar)
   const showNav = showsTabBar(route) && !(isAdmin && !staff.label);
@@ -191,18 +191,19 @@ export function App() {
             <span>Schönberg</span>
             <span className="badge">Hero</span>
           </div>
-          <div className="nav-inner">
+          {/* (--tabs: the labels shrink to fit five or six tabs on a small phone, also with larger text) */}
+          <div className="nav-inner" style={{ '--tabs': TAB_NAMES.length + (staff.label ? 1 : 0) } as React.CSSProperties}>
             {TAB_NAMES.map((t) => (
               <button key={t} data-testid={`tab-${t}`} aria-current={tab === t ? (route.name === t ? 'page' : 'true') : undefined} onClick={() => go({ name: t } as Route)}>
                 {TAB_ICON[t]}
-                {TAB_LABEL[t]}
+                <span className="nav-lab">{TAB_LABEL[t]}</span>
               </button>
             ))}
             {/* Only with a staff login on this phone: "Section" for a section lead, else "Admin". */}
             {staff.label && (
               <button aria-current={isAdmin ? 'page' : undefined} data-testid="nav-admin" onClick={() => go(adminHome(staff))}>
                 <IconShield />
-                {staff.label}
+                <span className="nav-lab">{staff.label}</span>
               </button>
             )}
           </div>

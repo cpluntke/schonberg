@@ -294,7 +294,7 @@ function CourseOverview({ iv, lab, root }: { iv: LabInterval; lab: LabProgress; 
     <main className="screen has-foot crs-page" data-testid="lab-ladder">
       <div className="topbar">
         <button className="icon-btn filled" aria-label="Back" onClick={() => back({ name: 'tune' })}><IconBack /></button>
-        <span className="t16 muted grow">Train</span>
+        <span className="t16 muted grow">Intonation</span>
         {recommended && <span className="crs-rec" data-testid="lab-recommended">Your choir recommends</span>}
       </div>
       <div className="col" style={{ gap: 8 }}>
@@ -508,7 +508,7 @@ function CourseDone({ iv, lab }: { iv: LabInterval; lab: LabProgress }) {
     <main className="screen has-foot crs-page" data-testid="lab-course-done">
       <div className="topbar">
         <button className="icon-btn filled" aria-label="Back" onClick={() => back({ name: 'intonation', interval: iv })}><IconBack /></button>
-        <span className="t16 muted grow">Train · {c.title}</span>
+        <span className="t16 muted grow">Intonation · {c.title}</span>
       </div>
       <section className="band" aria-labelledby="crs-done-h">
         <span className="eb good-text">Course complete{doneDay ? ` · ${dateWords(doneDay)}` : ''}</span>
