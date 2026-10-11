@@ -320,7 +320,7 @@ function Monochord({ frac, onFrac, whole, part, marks, fine, reference, step }: 
   const svg = useRef<SVGSVGElement | null>(null);
   const cur = useRef(frac);
   cur.current = frac;
-  const drag = useRef<{ x: number; t: number; f: number } | null>(null);
+  const drag = useRef<{ x: number; t: number; f: number; live: boolean; x0: number; cx: number; cy: number } | null>(null);
   const SY = reference ? 122 : 62;
   const RY = 46;
   const H = reference ? 170 : 110;
@@ -330,27 +330,46 @@ function Monochord({ frac, onFrac, whole, part, marks, fine, reference, step }: 
     return ((clientX - r.left) / Math.max(1, r.width)) * 340;
   };
   const set = (f: number) => { const c = clampFrac(f); cur.current = c; onFrac(c); };
+  // (a tap away from the bridge moves it there; on the bridge itself, a fine drag starts where it is)
+  const jumpTo = (x: number) => { if (!fine || Math.abs(x - (SX0 + cur.current * SL)) > 22) set((x - SX0) / SL); };
   const down = (e: React.PointerEvent<SVGSVGElement>) => {
     if (e.button !== 0) return;
     const x = toX(e.clientX);
-    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* not supported */ }
-    // (a tap away from the bridge moves it there; on the bridge itself, a fine drag starts where it is)
-    if (!fine || Math.abs(x - (SX0 + cur.current * SL)) > 22) set((x - SX0) / SL);
-    drag.current = { x, t: e.timeStamp, f: cur.current };
+    // A finger may be starting to scroll the page: the bridge moves only once the finger goes
+    // sideways (or on a tap); scrolling up or down cancels the pointer and leaves it where it was.
+    const touch = e.pointerType === 'touch';
+    if (!touch) {
+      try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* not supported */ }
+      jumpTo(x);
+    }
+    drag.current = { x, t: e.timeStamp, f: cur.current, live: !touch, x0: x, cx: e.clientX, cy: e.clientY };
   };
   const move = (e: React.PointerEvent<SVGSVGElement>) => {
     const d = drag.current;
     if (!d) return;
     const x = toX(e.clientX);
+    if (!d.live) {
+      const dxPx = Math.abs(e.clientX - d.cx);
+      if (dxPx < 4 || dxPx < Math.abs(e.clientY - d.cy)) return;
+      try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* not supported */ }
+      jumpTo(d.x0);
+      drag.current = { ...d, live: true, x: d.x0, t: e.timeStamp };
+      return;
+    }
     if (!fine) { set((x - SX0) / SL); return; }
     // slow hands, small steps: the speed sets how far the bridge follows the finger (1 : 1 when quick, 1 : 16 when slow)
     const dx = x - d.x;
     const v = Math.abs(dx) / Math.max(1, e.timeStamp - d.t);
-    const gain = Math.min(1, Math.max(1 / 16, v / 0.5));
-    drag.current = { x, t: e.timeStamp, f: d.f };
+    const gain = Math.min(1, Math.max(1 / 16, v / 0.15));
+    drag.current = { ...d, x, t: e.timeStamp };
     set(cur.current + (dx * gain) / SL);
   };
-  const up = () => { drag.current = null; };
+  const up = (e: React.PointerEvent<SVGSVGElement>) => {
+    const d = drag.current;
+    drag.current = null;
+    // A tap (a finger that never moved sideways) still moves the bridge there.
+    if (d && !d.live && e.type === 'pointerup') jumpTo(d.x0);
+  };
   const key = (e: React.KeyboardEvent) => {
     const big = e.shiftKey ? 10 : 1;
     const k = e.key;

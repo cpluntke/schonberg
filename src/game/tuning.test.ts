@@ -143,7 +143,7 @@ describe('the cadence', () => {
     expect(CADENCE.map((c) => c.name)).toEqual(['I', 'IV', 'V', 'I']);
     expect(CADENCE.map((c) => c.key)).toEqual(['C', 'F', 'G', 'C']);
     expect(CADENCE[1].notes).toEqual([53, 57, 65, 72]);
-    expect(CADENCE[2].notes).toEqual([55, 59, 62, 71]);
+    expect(CADENCE[2].notes).toEqual([43, 55, 62, 71]); // (the root doubled, not the leading tone)
   });
 
   it('tuned just on each root: roots stay, fifths +1.96, major thirds −13.69 cents', () => {
@@ -171,7 +171,7 @@ describe('the cadence', () => {
       const root = b;
       for (const hz of notes) {
         let r = hz / root;
-        while (r >= 2) r /= 2;
+        while (r >= 2 - 1e-9) r /= 2;
         expect([1, 5 / 4, 3 / 2].some((q) => Math.abs(r - q) < 1e-9), `chord ${i + 1}: ${r}`).toBe(true);
       }
     }

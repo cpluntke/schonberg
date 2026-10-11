@@ -128,7 +128,7 @@ export const stringBeat = (openHz: number, frac: number, t: StringTarget): numbe
 export const CADENCE = [
   { name: 'I', key: 'C', root: 48, notes: [48, 55, 64, 72] },
   { name: 'IV', key: 'F', root: 53, notes: [53, 57, 65, 72] },
-  { name: 'V', key: 'G', root: 55, notes: [55, 59, 62, 71] },
+  { name: 'V', key: 'G', root: 55, notes: [43, 55, 62, 71] },
   { name: 'I', key: 'C', root: 48, notes: [48, 55, 64, 72] },
 ] as const;
 
