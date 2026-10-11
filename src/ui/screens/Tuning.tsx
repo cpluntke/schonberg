@@ -477,7 +477,8 @@ function StringPage() {
       ]} />
       {!(found.octave && found.fifth) && <button className="link tun-showme" data-testid="tuning-showme" onClick={showMe}>Show me</button>}
     </>}>
-      <p className="t16">Drag the bridge. Play the whole string, then the part left of the bridge.</p>
+      <p className="t16">Imagine plucking or bowing a string: it vibrates, and you hear a note. Every string instrument works like this, and your voice does too: your vocal folds vibrate the same way.</p>
+      <p className="t16">Now press the string down somewhere along it, like a violinist’s finger. Only part of it can vibrate, and the note goes up. Try it: drag the bridge, then play the whole string and the part left of the bridge.</p>
       <p className="t16 tun-ask">Where does it become the same note, higher? Where do you hear a fifth?</p>
     </PageBody>
   );
