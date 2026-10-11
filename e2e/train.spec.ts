@@ -91,10 +91,10 @@ test('a step done: the quiet card, back to Train; the next step waits for tomorr
   await expect(page.getByTestId('lab-rung-2')).toContainText('tomorrow · 5 min');
 
   await page.getByTestId('lab-rung-2').click();
-  await expect(page.getByTestId('lab-goal')).toHaveText('Move sol until the pulse stops.');
+  await expect(page.getByTestId('lab-goal')).toHaveText('Move sol until the beating stops.');
   await page.getByTestId('lab-start').click();
   await page.getByTestId('lab-lock').click();
-  await expect(page.getByTestId('lab-feel')).toHaveText(/^(Still|Almost still|Pulsing|Fast buzz) · (on the just pitch|(a touch|a little|clearly) (high|low) \(\d+ cents?\))$/);
+  await expect(page.getByTestId('lab-feel')).toHaveText(/^(Still|Almost still|Beating|Fast beats) · (on the just pitch|(a touch|a little|clearly) (high|low) \(\d+ cents?\))$/);
   await expect(page.getByTestId('lab-tries')).toContainText('Tunings that rang just');
   expect(errors).toEqual([]);
 });

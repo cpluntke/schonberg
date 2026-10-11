@@ -48,13 +48,13 @@ describe('intonation lab: the physics', () => {
     }
   });
 
-  it('the shown pulse and its words follow the cents, the same for every voice', () => {
+  it('the shown beats and their words follow the cents, the same for every voice', () => {
     expect(shownBeats(0, 'mi', ['do', 'sol'])).toBeLessThan(1e-6);
     expect(shownBeats(8, 'mi', ['do'])).toBeCloseTo(shownBeats(-8, 'mi', ['do']), 0);
     expect(wobbleWord(1)).toBe('still');
     expect(wobbleWord(-7)).toBe('almost still');
-    expect(wobbleWord(14)).toBe('pulsing');
-    expect(wobbleWord(30)).toBe('fast buzz');
+    expect(wobbleWord(14)).toBe('beating');
+    expect(wobbleWord(30)).toBe('fast beats');
     expect(wobbleWord(null)).toBe('listening…');
   });
 

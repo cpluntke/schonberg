@@ -26,7 +26,7 @@ function climb(p: LabProgress, iv: 'fifth' | 'third', days: string[]): LabProgre
 describe('courses: content', () => {
   it('two courses, 5 steps, about 25 minutes, the pass rule in words', () => {
     expect(COURSE_MINUTES).toBe(25);
-    expect(COURSES.third.steps.map((s) => s.name)).toEqual(['Listen', 'Tune it by hand', 'Sing it, with the wobble', 'Sing it by ear', 'In the chord']);
+    expect(COURSES.third.steps.map((s) => s.name)).toEqual(['Listen', 'Tune it by hand', 'Sing it, beats shown', 'Sing it by ear', 'In the chord']);
     expect(COURSES.third.steps.map((s) => s.minutes)).toEqual([5, 5, 4, 5, 6]);
     expect(passRule(1)).toBe('To pass: 5 of your last 6 answers right');
     expect(passRule(3)).toBe('To pass: 3 of your last 4 holds close to the just pitch');
@@ -147,10 +147,10 @@ describe("Today's warm-up from the courses", () => {
 });
 
 describe('feedback in words', () => {
-  it('the pulse word first, then the direction on the pitch scale, cents in brackets', () => {
+  it('the beats word first, then the direction on the pitch scale, cents in brackets', () => {
     expect(feelWords(6)).toBe('Almost still · a touch high (6 cents)');
-    expect(feelWords(-30)).toBe('Fast buzz · a little low (30 cents)');
-    expect(feelWords(14)).toBe('Pulsing · a touch high (14 cents)');
+    expect(feelWords(-30)).toBe('Fast beats · a little low (30 cents)');
+    expect(feelWords(14)).toBe('Beating · a touch high (14 cents)');
     expect(feelWords(1)).toBe('Still · on the just pitch');
     expect(feelAdvice(4)).toBeNull();
     expect(feelAdvice(12)).toBe('Slide a little lower and hold where it settles.');

@@ -153,7 +153,7 @@ describe('Why choirs tune differently', () => {
     expect(sounded[0]).toEqual({ whole: 196, part: 196 / 0.8 });
     await input('tuning-bridge-slider', 0.51);
     expect(q('tuning-near')?.textContent).toBe('Near the octave');
-    expect(q('tuning-rate')?.textContent).toBe('About 8 wobbles a second'); // |196/0.51 − 392|
+    expect(q('tuning-rate')?.textContent).toBe('About 8 beats a second'); // |196/0.51 − 392|
     await input('tuning-bridge-slider', 0.5);
     expect(q('tuning-rate')?.textContent).toBe('Still');
     expect(q('tuning-task-octave')?.getAttribute('data-done')).toBe('false');

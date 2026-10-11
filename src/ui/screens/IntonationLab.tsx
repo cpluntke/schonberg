@@ -1,5 +1,5 @@
 // The intonation courses (the lab): find a pure fifth and a pure major third by ear, one interval at
-// a time, up a ladder where the help fades: listen, tune by hand, sing with the pulse shown, sing it by
+// a time, up a ladder where the help fades: listen, tune by hand, sing with the beats shown, sing it by
 // ear, sing it in a chord. Every singer has them (Train); a choir can recommend them by putting the
 // lab into its programme. The course page (C2), a step (C3), a step done (C4), the course done (C6)
 // and its quick check a week later. docs/INTONATION.md has the why.
@@ -150,7 +150,7 @@ function CentHelp() {
       {open && (
         <div className="cent-help t14" role="note">
           A cent is a hundredth of a semitone: a very small step. Most ears notice about 5 to 10 cents between two notes
-          held together, as a slow pulse. Just intervals and the piano’s differ by 2 cents for a fifth and 14 cents for a major third.
+          held together, as slow beats. Just intervals and the piano’s differ by 2 cents for a fifth and 14 cents for a major third.
         </div>
       )}
     </div>
@@ -179,7 +179,7 @@ function useDrone() {
 
 const toneHz = (root: number, d: Degree, offsetCents = 0) => midiToHz(root) * (RATIO[d][0] / RATIO[d][1]) * 2 ** (offsetCents / 1200);
 
-/** One second of the sound: a wave whose swell shows the pulse (how much, never which way). */
+/** One second of the sound: a wave whose swell shows the beats (how much, never which way). */
 function Wave({ beats, colour = 'var(--voice)', height = 110, label }: { beats: number | null; colour?: string; height?: number; label: string }) {
   const b = beats == null ? null : Math.min(14, Math.round(beats * 10) / 10);
   const d = useMemo(() => {
@@ -229,7 +229,7 @@ function Landed({ deg, value, tol }: { deg: Degree; value: number; tol: number }
 function advice(deg: Degree, off: number, tol: number): string | null {
   const pure = pureCents(deg), piano = pianoCents(deg);
   if (Math.abs(off) <= tol) return null;
-  if (Math.abs(piano - pure) >= 3 && Math.abs(pure + off - piano) <= 4) return 'That’s the piano’s note: most of us learned it there. Go a little lower, until the pulse settles.';
+  if (Math.abs(piano - pure) >= 3 && Math.abs(pure + off - piano) <= 4) return 'That’s the piano’s note: most of us learned it there. Go a little lower, until the beating stops.';
   return feelAdvice(off, tol);
 }
 
@@ -312,7 +312,7 @@ function CourseOverview({ iv, lab, root }: { iv: LabInterval; lab: LabProgress; 
             </button>
           ))}
         </div>
-        <span className="t14 muted">Play one, then the other: hear the {iv === 'third' ? 'shimmer' : 'wobble'} stop.</span>
+        <span className="t14 muted">Play one, then the other: hear the {iv === 'third' ? 'shimmer' : 'beating'} stop.</span>
       </div>
       <div className="col" style={{ gap: 4 }}>
         <span className="t16">{RUNGS} steps · about {COURSE_MINUTES} min · one step a day</span>
@@ -584,13 +584,13 @@ function CourseDone({ iv, lab }: { iv: LabInterval; lab: LabProgress }) {
 const EXAMPLES: Record<LabInterval, { key: string; title: string; off: number; hear: string }[]> = {
   third: [
     { key: 'pure', title: 'Just third', off: 0, hear: 'Still. The two notes melt into one calm sound.' },
-    { key: 'near', title: 'Nearly there', off: 6, hear: 'A slow pulse. Close: keep going.' },
+    { key: 'near', title: 'Nearly there', off: 6, hear: 'Slow beats. Close: keep going.' },
     { key: 'piano', title: 'Piano third', off: pianoCents('mi') - pureCents('mi'), hear: 'A fast shimmer. That’s 14 cents above the just third.' },
   ],
   fifth: [
     { key: 'pure', title: 'Just fifth', off: 0, hear: 'Still and open, almost one sound.' },
-    { key: 'near', title: 'Nearly there', off: 6, hear: 'A slow pulse. Close: keep going.' },
-    { key: 'far', title: 'Further off', off: 20, hear: 'A quick wobble. (The piano’s fifth is only 2 cents from the just fifth: for fifths, it’s about locking it.)' },
+    { key: 'near', title: 'Nearly there', off: 6, hear: 'Slow beats. Close: keep going.' },
+    { key: 'far', title: 'Further off', off: 20, hear: 'Fast beats. (The piano’s fifth is only 2 cents from the just fifth: for fifths, it’s about locking it.)' },
   ],
 };
 
@@ -618,7 +618,7 @@ function ListenRung({ iv, root, lab, record }: RungProps) {
   return (
     <main className="screen crs-stepscreen" data-testid="lab-listen">
       <RungTop iv={iv} rung={1}>
-        <GoalLines goal="Hear the pulse stop." how={<>Two notes that are nearly in tune make a pulse, a “wah-wah-wah”. The closer they get, the slower it pulses. No pulse at all: the interval is just.</>} />
+        <GoalLines goal="Hear the beating stop." how={<>Two notes that are nearly in tune beat against each other: a “wah-wah-wah”. The closer they get, the slower the beats. No beating at all: the interval is just.</>} />
       </RungTop>
       {EXAMPLES[iv].map((e) => {
         const on = playing === e.key;
@@ -697,7 +697,7 @@ function ListenCheck({ iv, root, lab, record, play, playing }: RungProps & {
       ) : (
         <div className={right ? 'notice info' : 'notice'} role="status" data-testid="lab-quiz-feedback">
           <strong>{right ? `Yes: ${round.pure} is the just one.` : `Not this time: ${round.pure} was the just one.`}</strong>{' '}
-          {iv === 'third' ? 'The piano’s third pulses against do several times a second.' : 'The other fifth was 12 cents off and pulsed.'} Play them again and listen for it.
+          {iv === 'third' ? 'The piano’s third beats against do several times a second.' : 'The other fifth was 12 cents off, so it beats against do.'} Play them again and listen for it.
         </div>
       )}
       {heard.size < 2 && !answer && <span className="t14 muted">Hear both first.</span>}
@@ -755,7 +755,7 @@ function TuneRung({ iv, root, lab, record }: RungProps) {
   return (
     <main className="screen crs-stepscreen" data-testid="lab-tune">
       <RungTop iv={iv} rung={2}>
-        <GoalLines goal={`Move ${DEG_NAME[deg]} until the pulse stops.`} how={<>No singing yet. The app plays do and an out-of-tune {DEG_NAME[deg]}; the picture shows how much it pulses.</>} />
+        <GoalLines goal={`Move ${DEG_NAME[deg]} until the beating stops.`} how={<>No singing yet. The app plays do and an out-of-tune {DEG_NAME[deg]}; the picture shows the beating.</>} />
       </RungTop>
       <Tries label="Tunings that rang just" results={results} ok={(v) => Math.abs(v) <= TOL_HAND} total={ROUNDS} more={moreToPass(2, results)} />
       <div className="card" style={{ gap: 8 }}>
@@ -763,8 +763,8 @@ function TuneRung({ iv, root, lab, record }: RungProps) {
           <span className="t14 muted">What you hear</span>
           <span className="mono t14" style={{ color: Math.abs(off) <= TOL_HAND ? 'var(--good)' : 'var(--voice)' }} data-testid="lab-word">{on ? wobbleWord(off) : '–'}</span>
         </div>
-        <Wave beats={on ? shownBeats(off, deg, ['do']) : null} label={on ? `Pulse: ${wobbleWord(off)}` : 'Not playing'} />
-        <span className="t14 muted">One second of sound. A slower pulse means closer.</span>
+        <Wave beats={on ? shownBeats(off, deg, ['do']) : null} label={on ? `Beats: ${wobbleWord(off)}` : 'Not playing'} />
+        <span className="t14 muted">One second of sound. Slower beats mean closer.</span>
       </div>
       {!on ? (
         <button className="btn primary block" data-testid="lab-start" onClick={() => void start()}>Play do and {DEG_NAME[deg]}</button>
@@ -841,7 +841,7 @@ function SingRung({ iv, root, lab, record, rung, check }: RungProps & { rung: nu
   const target = pureCents(deg);
   const tol = TOL_SING;
   const wobbleOn = chordRung ? showWobble : rung === 3;
-  // What the mic's callbacks need now (they outlive renders: the part or the wobble switch may change).
+  // What the mic's callbacks need now (they outlive renders: the part or the beats switch may change).
   const cur = useRef({ deg, others, target, showWobble, record });
   cur.current = { deg, others, target, showWobble, record };
 
@@ -923,7 +923,7 @@ function SingRung({ iv, root, lab, record, rung, check }: RungProps & { rung: nu
     window.setTimeout(() => verdictRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }), 50);
     const { target: tg, showWobble: sw, record: rec } = cur.current;
     const offBy = c - tg;
-    // A different note (more than a semitone away) is no try; in the chord, rounds with the wobble shown are practice.
+    // A different note (more than a semitone away) is no try; in the chord, rounds with the beats shown are practice.
     const counted = Math.abs(offBy) <= 60 && (!chordRung || !sw);
     setResult({ value: c, counted });
     const res = counted ? rec(iv, rung, offBy) : null; // (the quick check's own record never opens a step)
@@ -1018,7 +1018,7 @@ function SingRung({ iv, root, lab, record, rung, check }: RungProps & { rung: nu
                 <span className="mono t14" style={{ color: offNow != null && Math.abs(offNow) <= tol ? 'var(--good)' : 'var(--voice)' }} data-testid="lab-word">{wobbleWord(offNow)}</span>
               </div>
               <Wave beats={offNow == null ? null : shownBeats(offNow, deg, others)} label={`Your voice against the drone: ${wobbleWord(offNow)}`} />
-              {!holding && <span className="t14 muted">Shows how much it pulses, never which way. Which way to move is for your ear.</span>}
+              {!holding && <span className="t14 muted">Shows how fast it beats, never which way. Which way to move is for your ear.</span>}
             </>
           ) : (
             <div className="col" style={{ alignItems: 'center', gap: 6, padding: '12px 0' }}>

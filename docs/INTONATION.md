@@ -2,7 +2,7 @@
 
 Find a **just fifth** (3:2, 702¢, about 2¢ wider than the piano's) and a **just major third**
 (5:4, 386¢, about 14¢ lower than the piano's) by ear, at home, on your own phone. "Just" is the
-word the app uses for an interval tuned to its exact ratio, with no pulse (as in *just intonation*);
+word the app uses for an interval tuned to its exact ratio, with no beating (as in *just intonation*);
 the wording avoids sentences where "just" could be read as "only".
 
 ## Courses, for every singer
@@ -26,12 +26,12 @@ and Today offers the warm-up (below).
   and the Zwölfton row. A course is **active** once its first round is sung and until its last step is
   passed (both started: the one practised last).
 - **The course page** (`#/intonation/<fifth|third>`, C2): the outcome, two demo sounds through the
-  drone (piano chord · a soft shimmer / just-tuned chord · calm and still; for the fifth: a little off · a
-  slow wobble), "5 steps · about 25 min · one step a day", "What's a cent?", the steps with goal,
+  drone (piano chord · a soft shimmer / just-tuned chord · calm and still; for the fifth: a little off · slow
+  beats), "5 steps · about 25 min · one step a day", "What's a cent?", the steps with goal,
   minutes, the day (done Wed · today · Sun) and the pass rule in words ("To pass: 3 of your last 4
   holds close to the just pitch"), and a sticky Continue.
 - **A step** (`#/intonation/<interval>/<1–5>`, C3): which course and step, a goal line, a how line,
-  labelled progress ("Tries that rang just ✓ ✓ ✗ ④ · 1 more to pass"), then the feedback words first: the pulse
+  labelled progress ("Tries that rang just ✓ ✓ ✗ ④ · 1 more to pass"), then the feedback words first: the beats
   word, then the direction on the app's pitch scale with the cents in brackets ("Almost still · a touch
   high (6 cents)"; `feelWords`), what to do next, and where it landed. While a hold is under way only
   the picture (or the ear) and the hold timer show. Rung 4 is now called **Sing it by ear**.
@@ -72,18 +72,19 @@ docs/TODAY.md.
 
 ## What to listen for
 
-Two notes that are nearly in tune *beat*: a pair of their overtones lands a few hertz apart and the
-sound pulses ("wah-wah-wah").
+Two notes that are nearly in tune *beat* against each other: a pair of their overtones lands a few
+hertz apart and you hear a "wah-wah-wah". The app calls these **beats** ("about 5 beats a second")
+and **beating** ("until the beating stops"), never "the beat", which in this app is the rhythm.
 - In a fifth, the root's 3rd partial meets the fifth's 2nd partial.
 - In a major third, the root's 5th partial meets the third's 4th partial.
 
-The closer the notes, the slower the pulse. When the interval is just, the pulse stops.
+The closer the notes, the slower the beats. When the interval is just, the beating stops.
 
-The lab shows that pulse as one second of waveform. It shows how much the sound pulses, never which
+The lab shows the beats as one second of waveform. It shows how fast the sound beats, never which
 way to move: finding the direction is the singer's ear's job. The rate is `|m·f_hi − n·f_lo|` for a
 ratio n:m (`beatHz`, `wobble` in `src/game/intonation.ts`).
 
-On middle C, the piano's third pulses about 10 times a second. On a lower do it pulses more slowly
+On middle C, the piano's third beats about 10 times a second. On a lower do it beats more slowly
 (about 6 times a second on D3).
 
 ## The ladder (per interval; help fades as you climb)
@@ -91,10 +92,10 @@ On middle C, the piano's third pulses about 10 times a second. On a lower do it 
 | Step | What | Passes with |
 |---|---|---|
 | 1 Listen | Three examples (just, nearly, piano or further off), then "which is calmer?" pairs | 5 of the last 6 right |
-| 2 Tune it by hand | The app plays do and an off note (15–40¢ above or below, at random). Move it with a slider (no numbers) until the pulse stops | 3 of the last 4 within 5¢ |
-| 3 Sing it, with the wobble | Drone (do, and sol for the third). Sing, see the pulse, hold 2 s | 3 of the last 4 within 8¢ |
-| 4 Sing it by ear | The same with no pulse on screen; the result is shown after the hold | 3 of the last 4 within 8¢ |
-| 5 In the chord | The app sings the other two triad notes (tuned just). You pick do, mi or sol. The wobble can be shown for practice; only rounds with it off count | 3 of the last 4 within 8¢, wobble off |
+| 2 Tune it by hand | The app plays do and an off note (15–40¢ above or below, at random). Move it with a slider (no numbers) until the beating stops | 3 of the last 4 within 5¢ |
+| 3 Sing it, beats shown | Drone (do, and sol for the third). Sing, see the beats, hold 2 s | 3 of the last 4 within 8¢ |
+| 4 Sing it by ear | The same with no beats on screen; the result is shown after the hold | 3 of the last 4 within 8¢ |
+| 5 In the chord | The app sings the other two triad notes (tuned just). You pick do, mi or sol. The beats can be shown for practice; only rounds with them off count | 3 of the last 4 within 8¢, beats off |
 
 ## How singing is judged
 
@@ -110,8 +111,8 @@ On middle C, the piano's third pulses about 10 times a second. On a lower do it 
 
 "3 of the last 4" also passes after the first 3 tries if all 3 rang just.
 
-The pulse on screen and its words ("still", "almost still", "pulsing", "fast buzz") follow the cents
-off the just pitch, drawn as the pulse would be on a do of D3. The real pulse is faster on a higher do, but
+The beats on screen and their words ("still", "almost still", "beating", "fast beats") follow the cents
+off the just pitch, drawn as the beats would be on a do of D3. The real beats are faster on a higher do, but
 this way every voice sees the same picture for the same tolerance (`shownBeats`, `wobbleWord`).
 
 In "tune it by hand", the just pitch sits at a different place on the slider every round (a hidden shift of up

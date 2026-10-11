@@ -1,6 +1,6 @@
 // "Why choirs tune differently": the numbers behind the explainer before the intonation courses
 // (ui/screens/Tuning.tsx). Pure functions only: cents and ratios, the string and its bridge, beat
-// rates, the comma, the cadence's two tunings and the words for a wobble. docs/INTONATION.md has the
+// rates, the comma, the cadence's two tunings and the words for beats. docs/INTONATION.md has the
 // why of the courses.
 
 import { beatHz, cents } from './intonation';
@@ -30,7 +30,7 @@ export const oneDecimal = (x: number): string => {
 };
 
 /**
- * Wobbles a second of an upper note `hiHz` over `loHz` near the just ratio n:m (n over m, e.g. 3:2):
+ * Beats a second of an upper note `hiHz` over `loHz` near the just ratio n:m (n over m, e.g. 3:2):
  * |m·hi − n·lo|. A fifth over f: |2x − 3f|; a major third: |4x − 5f|.
  */
 export const beatRate = (loHz: number, hiHz: number, ratio: [number, number]): number => beatHz(loHz, hiHz, ratio);
@@ -38,13 +38,13 @@ export const beatRate = (loHz: number, hiHz: number, ratio: [number, number]): n
 /** The upper note of a just ratio over `rootHz`, moved by `offCents`. */
 export const upperHz = (rootHz: number, ratio: [number, number], offCents = 0): number => rootHz * (ratio[0] / ratio[1]) * centsToRatio(offCents);
 
-/** "still", "under 1 wobble a second", "about 1 wobble a second", "about 6 wobbles a second". */
+/** "still", "under 1 beat a second", "about 1 beat a second", "about 6 beats a second". */
 export function wobbleLabel(perSecond: number): string {
   const b = Math.abs(perSecond);
   if (b < 0.35) return 'still';
-  if (b < 0.75) return 'under 1 wobble a second';
+  if (b < 0.75) return 'under 1 beat a second';
   const n = Math.round(b);
-  return `about ${n} wobble${n === 1 ? '' : 's'} a second`;
+  return `about ${n} beat${n === 1 ? '' : 's'} a second`;
 }
 
 /** A slider's spoken value: "just", "12 cents sharp", "1 cent flat". */
@@ -117,7 +117,7 @@ export function nearestTarget(frac: number): { target: StringTarget; off: number
 }
 
 /**
- * Wobbles a second between the whole string (f) and the part x = f / frac, near a just interval:
+ * Beats a second between the whole string (f) and the part x = f / frac, near a just interval:
  * the octave |x − 2f|, the fifth |2x − 3f|.
  */
 export const stringBeat = (openHz: number, frac: number, t: StringTarget): number => beatRate(openHz, partHz(openHz, frac), TARGETS[t].ratio);

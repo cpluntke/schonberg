@@ -6,7 +6,7 @@
 //   25–50         "a little flat / sharp"
 //   over 50       "clearly flat / sharp"
 //
-// (The intonation lab keeps its own words for the pulse; see IntonationLab.)
+// (The intonation lab keeps its own words for the beats; see IntonationLab.)
 
 /** How far off, in words, without a direction: 'spot on' | 'a touch' | 'a little' | 'clearly'. */
 export function pitchDegree(cents: number): 'spot on' | 'a touch' | 'a little' | 'clearly' {

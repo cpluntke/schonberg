@@ -45,7 +45,7 @@ export const PAGE_NAMES = [
   'Share it out', 'Choirs have a luxury', 'Hear a cadence', 'What matters most',
 ];
 
-/** "About 6 wobbles a second", "Still". */
+/** "About 6 beats a second", "Still". */
 const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
 const pageRoute = (n: number): Route => (n <= 1 ? { name: 'tuning' } : { name: 'tuning', page: n });
@@ -593,12 +593,13 @@ function FindPage() {
       ]} />
     </>} after={done.octave && done.fifth ? <p className="t16 tun-callout" data-testid="tuning-found-both">Both found by ear: a just octave and a just fifth.</p> : undefined}>
       <p className="t16">The whole string keeps sounding. Drag the bridge slowly.</p>
-      <p className="t16">A little off the spot, the sound wobbles. Find where it goes <strong>still</strong>: first the octave, then the fifth.</p>
+      <p className="t16">Off the spot you hear a wah-wah-wah: the two notes <strong>beat</strong> against each other. The further off, the faster the beats. On the spot the beating stops.</p>
+      <p className="t16">Find where it goes <strong>still</strong>: first the octave, then the fifth.</p>
     </PageBody>
   );
 }
 
-/** Loudness over the last two seconds at the real wobble rate, newest on the right, and a dot that swells with it. */
+/** Loudness over the last two seconds at the real rate of the beats, newest on the right, and a dot that swells with it. */
 function PulseView({ rate }: { rate: number }) {
   const phase = useClock(rate);
   const depth = Math.min(1, rate / 0.6) * 0.9;
@@ -811,9 +812,9 @@ function JustFifthsPage() {
       </FifthsCircle>
       <div className="row tun-pair">
         <button className="btn voice grow tun-tap" data-testid="tuning-add-fifth" onClick={w.add}>{done ? 'Start again' : '+ a just fifth'}</button>
-        {done && <SoundButton id="cs" playing={w.s.playing} onClick={w.bothCs} title="Play both Cs" sub="hear them wobble" testid="tuning-both-cs" />}
+        {done && <SoundButton id="cs" playing={w.s.playing} onClick={w.bothCs} title="Play both Cs" sub="hear them beat" testid="tuning-both-cs" />}
       </div>
-      <span className="t14 muted center" aria-live="polite">{done ? 'The gap is the Pythagorean comma. Your C and the stacked C wobble against each other.' : 'Watch the needle drift: about 2 cents a tap.'}</span>
+      <span className="t14 muted center" aria-live="polite">{done ? 'The gap is the Pythagorean comma. Your C and the stacked C beat against each other.' : 'Watch the needle drift: about 2 cents a tap.'}</span>
     </>}>
       <p className="t16 tun-ask">Each just fifth is 702 cents: 2 more than the piano’s.</p>
       <p className="t16">Tap 12 times. Where do you land now?</p>

@@ -1,11 +1,11 @@
 // The intonation lab: finding a pure (just) fifth and major third by ear.
 //
 // Two notes that are nearly in tune "beat": a pair of their overtones lands a few hertz apart and
-// the sound pulses. For a fifth (3:2) the root's 3rd partial meets the fifth's 2nd; for a major
-// third (5:4) the root's 5th meets the third's 4th. Pure = the pulse stops. The lab shows that pulse
+// the sound beats. For a fifth (3:2) the root's 3rd partial meets the fifth's 2nd; for a major
+// third (5:4) the root's 5th meets the third's 4th. Pure = the beating stops. The lab shows the beats
 // (how much, never which way) instead of a tuning needle.
 //
-// Each interval is a ladder (docs/INTONATION.md): listen, tune by hand, sing with the pulse shown,
+// Each interval is a ladder (docs/INTONATION.md): listen, tune by hand, sing with the beats shown,
 // sing it by ear, sing it in a chord.
 
 import type { VoiceType } from '../music/types';
@@ -45,7 +45,7 @@ export const pureCents = (d: Degree) => cents(RATIO[d][0] / RATIO[d][1]);
 export const pianoCents = (d: Degree) => ET_SEMIS[d] * 100;
 
 export const RUNGS = 5;
-export const RUNG_NAMES = ['Listen', 'Tune it by hand', 'Sing it, with the wobble', 'Sing it by ear', 'In the chord'] as const;
+export const RUNG_NAMES = ['Listen', 'Tune it by hand', 'Sing it, beats shown', 'Sing it by ear', 'In the chord'] as const;
 
 /** Rounds that count towards a rung (the last ROUNDS), and how many of them must be pure. */
 export const ROUNDS = 4;
@@ -94,7 +94,7 @@ export function wobble(hz: number, deg: Degree, rootHz: number, others: Degree[]
 }
 
 /**
- * The pulse to show for a tone `offCents` from pure: as it would beat on a do of D3, whatever the
+ * The beats to show for a tone `offCents` from pure: as it would beat on a do of D3, whatever the
  * singer's do. (The real rate grows with the pitch; the screen and its words follow the cents, so a
  * soprano and a bass within the same tolerance see the same.)
  */
@@ -108,7 +108,7 @@ export function shownBeats(offCents: number, deg: Degree, others: Degree[]): num
 export function wobbleWord(offCents: number | null): string {
   if (offCents == null) return 'listening…';
   const a = Math.abs(offCents);
-  return a <= 2.5 ? 'still' : a <= TOL_SING ? 'almost still' : a <= 20 ? 'pulsing' : 'fast buzz';
+  return a <= 2.5 ? 'still' : a <= TOL_SING ? 'almost still' : a <= 20 ? 'beating' : 'fast beats';
 }
 
 /** Cents of `hz` above `rootHz`, folded to the octave nearest `target` (an octave slip still counts). */

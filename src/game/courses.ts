@@ -1,6 +1,6 @@
 // Courses: the intonation lab's two ladders as courses for every singer (docs/INTONATION.md).
 //
-// A course is one interval's 5-rung ladder (Listen · Tune it by hand · Sing it, with the wobble ·
+// A course is one interval's 5-rung ladder (Listen · Tune it by hand · Sing it, beats shown ·
 // Sing it by ear · In the chord), about 25 minutes, one step a day suggested (never enforced). A
 // course is "active" once its first round is logged and until its last rung is passed; a week after
 // it is done comes a 1-minute quick check (rungs 3–4: three holds by ear); a slip suggests rung 4 once
@@ -53,23 +53,23 @@ export const COURSES: Record<LabInterval, Course> = {
     id: 'fifth', title: 'Just fifth', outcome: 'Make the open fifth stand still.', note: 'sol',
     about: 'The piano’s fifth is close to the just fifth; the skill is to lock it, so do and sol sound like one calm note.',
     line: 'Lock the open fifth: sing sol so it stops moving against do.',
-    demo: { off: { title: 'A little off', sub: 'a slow wobble', cents: 12 }, pure: { title: 'Just fifth', sub: 'calm and still' } },
+    demo: { off: { title: 'A little off', sub: 'slow beats', cents: 12 }, pure: { title: 'Just fifth', sub: 'calm and still' } },
     steps: steps([
       'Hear the just fifth and one a little off; pick the calmer one.',
-      'Slide sol until the pulse stops. No singing.',
-      'Sing sol over the drone; the picture shows the pulse.',
+      'Slide sol until the beating stops. No singing.',
+      'Sing sol over the drone; the picture shows the beating.',
       'The same, with no picture: only your ears.',
       'The app sings the other notes of the chord; you lock yours in.',
     ]),
     stepCanDo: [
-      'You can hear when a fifth pulses, and when it stands still.',
+      'You can hear when a fifth beats, and when it stands still.',
       'You can find the still spot by ear, with your hands.',
       'You found the just fifth with your own voice: sol locks onto do and stops moving.',
       'You found it with your ears alone, with no picture.',
     ],
     done: 'You can hear a just fifth',
     canDo: [
-      'Hear when an open fifth pulses, and when it stands still.',
+      'Hear when an open fifth beats, and when it stands still.',
       'Sing sol so it locks onto do, by ear, with no picture.',
       'Hold it inside a full chord while others sing.',
     ],
@@ -81,8 +81,8 @@ export const COURSES: Record<LabInterval, Course> = {
     demo: { off: { title: 'Piano chord', sub: 'a soft shimmer', cents: 400 - 386.31 }, pure: { title: 'Just-tuned chord', sub: 'calm and still' } },
     steps: steps([
       'Hear the just third and the piano’s; pick the calmer one.',
-      'Slide mi until the pulse stops. No singing.',
-      'Sing mi over the drone; the picture shows the pulse.',
+      'Slide mi until the beating stops. No singing.',
+      'Sing mi over the drone; the picture shows the beating.',
       'The same, with no picture: only your ears.',
       'The app sings do and sol; you add mi and lock the chord.',
     ]),
@@ -187,7 +187,7 @@ function degree(a: number): string {
 }
 
 /**
- * Feedback words first: the pulse word, then the direction on the pitch scale with the cents in
+ * Feedback words first: the beats word, then the direction on the pitch scale with the cents in
  * brackets ("Almost still · a touch high (6 cents)"; "Still · on the just pitch" within 2.5 cents).
  */
 export function feelWords(off: number): string {

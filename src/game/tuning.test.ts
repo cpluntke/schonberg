@@ -26,18 +26,18 @@ describe('cents and ratios', () => {
   });
 });
 
-describe('the wobble', () => {
-  it('a fifth over f wobbles |2x − 3f| times a second; just, not at all', () => {
+describe('the beats', () => {
+  it('a fifth over f beats |2x − 3f| times a second; just, not at all', () => {
     expect(beatRate(220, 330, [3, 2])).toBeCloseTo(0, 9);
     expect(beatRate(220, 331, [3, 2])).toBeCloseTo(2, 9);
     expect(beatRate(220, 329, [3, 2])).toBeCloseTo(2, 9);
-    // the piano's fifth on A3: under a wobble a second
+    // the piano's fifth on A3: under a beat a second
     expect(beatRate(220, 220 * centsToRatio(700), [3, 2])).toBeCloseTo(0.75, 1);
     // further off, faster
     expect(beatRate(220, upperHz(220, [3, 2], 30), [3, 2])).toBeGreaterThan(beatRate(220, upperHz(220, [3, 2], 10), [3, 2]));
   });
 
-  it('a major third over f wobbles |4x − 5f| times a second', () => {
+  it('a major third over f beats |4x − 5f| times a second', () => {
     expect(beatRate(220, 275, [5, 4])).toBeCloseTo(0, 9);
     expect(beatRate(220, 276, [5, 4])).toBeCloseTo(4, 9);
     // the piano's third on A3: about 9 a second
@@ -47,9 +47,9 @@ describe('the wobble', () => {
   it('in words', () => {
     expect(wobbleLabel(0)).toBe('still');
     expect(wobbleLabel(0.2)).toBe('still');
-    expect(wobbleLabel(0.5)).toBe('under 1 wobble a second');
-    expect(wobbleLabel(1.1)).toBe('about 1 wobble a second');
-    expect(wobbleLabel(-6.4)).toBe('about 6 wobbles a second');
+    expect(wobbleLabel(0.5)).toBe('under 1 beat a second');
+    expect(wobbleLabel(1.1)).toBe('about 1 beat a second');
+    expect(wobbleLabel(-6.4)).toBe('about 6 beats a second');
     expect(centsWords(0)).toBe('just');
     expect(centsWords(12)).toBe('12 cents sharp');
     expect(centsWords(-1)).toBe('1 cent flat');
@@ -123,17 +123,17 @@ describe('the string', () => {
     expect(nearestTarget(0.67).off).toBeLessThan(0);
   });
 
-  it('wobbles: the octave |x − 2f|, the fifth |2x − 3f|; still at the exact spot', () => {
+  it('beats: the octave |x − 2f|, the fifth |2x − 3f|; still at the exact spot', () => {
     expect(stringBeat(196, 0.5, 'octave')).toBeCloseTo(0, 9);
     expect(stringBeat(196, 2 / 3, 'fifth')).toBeCloseTo(0, 9);
     const x = 196 / 0.49;
     expect(stringBeat(196, 0.49, 'octave')).toBeCloseTo(Math.abs(x - 2 * 196), 9);
     const y = 196 / 0.66;
     expect(stringBeat(196, 0.66, 'fifth')).toBeCloseTo(Math.abs(2 * y - 3 * 196), 9);
-    // 3 cents off: under a wobble or about one a second
+    // 3 cents off: under a beat or about one a second
     expect(stringBeat(196, centsToFrac(1203), 'octave')).toBeCloseTo(0.68, 2);
     expect(stringBeat(196, centsToFrac(JUST.fifth + 3), 'fifth')).toBeCloseTo(1.02, 2);
-    // the piano's fifth on the open string: about 2 wobbles every 3 seconds
+    // the piano's fifth on the open string: about 2 beats every 3 seconds
     expect(stringBeat(196, PIANO_FIFTH_FRAC, 'fifth')).toBeCloseTo(0.66, 2);
   });
 });

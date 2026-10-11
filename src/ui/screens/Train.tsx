@@ -343,7 +343,7 @@ export function DroneScreen() {
         <button className="icon-btn filled" aria-label="Back" onClick={() => back({ name: 'tune' })}><IconBack /></button>
         <h1>Drone</h1>
       </div>
-      <span className="t16 muted">A steady note to sing against: hold your note over it and listen for the pulse to stop.</span>
+      <span className="t16 muted">A steady note to sing against: hold your note over it and listen for the beating to stop.</span>
       <div className="card" style={{ gap: 14 }}>
         <div className="row between">
           <button className="btn crs-step-btn" aria-label="A semitone lower" data-testid="drone-lower" onClick={() => setRoot((r) => Math.max(36, r - 1))}>−</button>
