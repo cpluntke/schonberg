@@ -9,7 +9,8 @@ import type { AttemptResult, PitchSample, ScoringOptions } from '../../src/game/
 import type { ScoringContext } from '../../src/game/scoring';
 import * as cur from '../../src/game/scoring';
 import type { Part } from '../../src/music/types';
-import { attemptPasses, effectiveTolerance, levelSpec, noteVerdict } from '../../src/progress/ladder';
+import { attemptPasses, effectiveTolerance, stepSpec, noteVerdict } from '../../src/progress/ladder';
+import { harnessStep } from './harness';
 import { Rng } from './prng';
 import { loadPiece, REPO_ROOT } from './scores';
 import { gitVariant } from './variants';
@@ -89,8 +90,8 @@ export async function vibratoExperiment(singers: VibSinger[], levels = [1]): Pro
   }
   const rows: VibRow[] = [];
   for (const level of levels) {
-    const spec = levelSpec(level);
-    const opts: ScoringOptions = { toleranceCents: effectiveTolerance(level, 'standard'), tuning: 'equal', octaveTolerant: false, rate: spec.rate };
+    const spec = stepSpec(level, harnessStep(level));
+    const opts: ScoringOptions = { toleranceCents: effectiveTolerance(level, spec.step, 'standard'), tuning: 'equal', octaveTolerant: false, rate: spec.rate };
     for (const s of singers) {
       const row: VibRow = { singer: s.name, level, sections: 0, before: 0, after: 0, failedAfter: [] };
       let seed = 1;
@@ -106,9 +107,9 @@ export async function vibratoExperiment(singers: VibSinger[], levels = [1]): Pro
             const samples = singVibrato(part, a, b, spec.rate, s, seed++);
             row.sections++;
             const ra = cur.scoreAttempt(ctx, samples, opts);
-            if (attemptPasses(level, ra)) row.after++;
+            if (attemptPasses(level, spec.step, ra)) row.after++;
             else if (row.failedAfter.length < 8) row.failedAfter.push(`${p.id} ${part.name} ${sec.label}`);
-            if (base && attemptPasses(level, base(ctx, samples, opts))) row.before++;
+            if (base && attemptPasses(level, spec.step, base(ctx, samples, opts))) row.before++;
           }
         }
       }

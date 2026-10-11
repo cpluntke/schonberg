@@ -2,7 +2,7 @@
 // consonant cuts the vowel short, and the pitch tracker sees only a handful of readings per note.
 // A good singer's fast notes must still count, and singers on the wrong notes must still fail.
 import { describe, expect, it } from 'vitest';
-import { LiveScorer, scoreAttempt, type ScoringContext } from './scoring';
+import { LiveScorer, scoreAttempt, turnBlur, type ScoringContext } from './scoring';
 import { makePart, makeScore, singRealistic as sing } from './testutil';
 import type { PitchSample, ScoringOptions } from './types';
 
@@ -143,7 +143,11 @@ describe('fast notes: singers on the wrong notes still fail', () => {
       return [fromPrev - 40, 12, -48, -55, null][k]; // (still on the previous pitch, 40¢ low)
     });
     const r = scoreAttempt(ctx, s, L4);
-    expect(r.counts.miss).toBe(RUN.length);
+    // Every note misses, except those between two lower neighbours (a fast turn, TURN_BLUR): there
+    // flat is toward the neighbours, as far as the tracker and the voice blur it.
+    const turnDown = (i: number) => i > 0 && i < RUN.length - 1 && RUN[i - 1] < RUN[i] && RUN[i + 1] < RUN[i];
+    r.notes.forEach((n, i) => { if (!turnDown(i)) expect(n.grade, `note ${i}`).toBe('miss'); });
+    expect(r.accuracy).toBeLessThan(0.25);
   });
   it('a silent singer is not credited for one reading per note (an attack, a consonant)', () => {
     // Nothing but one correct reading 2 ms into each note: the short-note rule needs two readings
@@ -214,5 +218,46 @@ describe('fast notes: singers on the wrong notes still fail', () => {
     });
     const r = scoreAttempt(ctx, s, L2);
     expect(r.counts.miss).toBeGreaterThanOrEqual(RUN.length - 3);
+  });
+});
+
+describe('fast turns (E–D♯–E): readings pulled toward the neighbours', () => {
+  // A recorded alto turn at 120 bpm (16th triplets, 0.17 s): the D♯ between two Es reads 35–45¢
+  // sharp — the voice doesn't settle in 0.17 s, and the tracker's window takes in some of the Es.
+  const TURN = [61, 64, 63, 64, 63, 61];
+  const DURS = [1, 1 / 3, 1 / 3, 1 / 3, 1 / 3, 1];
+  const turn = () => {
+    const part = makePart('A', TURN.map((m, i) => [m, DURS[i]] as [number, number]), 120);
+    const ctx: ScoringContext = { score: makeScore([part], 120), part, range: [0, part.notes.length - 1] };
+    return { part, ctx };
+  };
+  const at = (part: ReturnType<typeof turn>['part'], cents: (i: number) => number) => {
+    const s: PitchSample[] = [];
+    part.notes.forEach((n, i) => {
+      for (let t = n.start + 0.012; t < n.start + n.dur; t += 0.024) s.push({ time: t, midi: n.midi + cents(i) / 100, clarity: 0.95, rms: 0.05 });
+    });
+    return s;
+  };
+
+  it('a D♯ 40¢ sharp between two Es counts; 40¢ flat (away from them) does not', () => {
+    const { part, ctx } = turn();
+    const sharp = scoreAttempt(ctx, at(part, (i) => (i === 2 ? 40 : 0)), L4);
+    expect(sharp.notes[2].grade).toBe('good');
+    expect(sharp.notes[2].cents).toBeCloseTo(40, 0);
+    const flat = scoreAttempt(ctx, at(part, (i) => (i === 2 ? -40 : 0)), L4);
+    expect(flat.notes[2].grade).toBe('miss');
+  });
+
+  it('never as far as halfway to the neighbour, and not for long notes or notes between a lower and a higher one', () => {
+    const { part, ctx } = turn();
+    expect(scoreAttempt(ctx, at(part, (i) => (i === 2 ? 52 : 0)), L4).notes[2].grade).toBe('miss');
+    // The last D♯ goes on down to C♯: no turn.
+    expect(scoreAttempt(ctx, at(part, (i) => (i === 4 ? 40 : 0)), L4).notes[4].grade).toBe('miss');
+    expect(turnBlur(part.notes[2], part.notes[1], part.notes[3], L4)).toBeGreaterThan(20);
+    expect(turnBlur(part.notes[4], part.notes[3], part.notes[5], L4)).toBe(0);
+    const long = { ...part.notes[2], dur: 0.5 };
+    expect(turnBlur(long, part.notes[1], { ...part.notes[3], start: long.start + 0.5 }, L4)).toBe(0);
+    // Slow practice (70%): the same note lasts longer in real time, so less allowance.
+    expect(Math.abs(turnBlur(part.notes[2], part.notes[1], part.notes[3], { ...L4, rate: 0.7 }))).toBeLessThan(Math.abs(turnBlur(part.notes[2], part.notes[1], part.notes[3], L4)));
   });
 });

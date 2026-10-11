@@ -56,6 +56,18 @@ const SHORT_FULL_COVER = 0.4;
 /** A very short note is "on the note" (for the in-tune-moment rescue) with its median within this many tolerances, at most ON_NOTE_MAX cents. */
 const ON_NOTE_TOL = 1.6;
 const ON_NOTE_MAX = 50;
+/**
+ * Fast turns and neighbour notes (E–D♯–E, F♯–G♯–F♯): in a note this short (real time) the voice
+ * doesn't settle before it leaves, and the tracker's 43–64 ms window spans part of the neighbours'
+ * pitch, so every reading of the note is pulled toward them. A note whose adjacent notes all lie on
+ * one side may be up to TURN_BLUR cents further toward that side: in full at TURN_FULL seconds or
+ * shorter, nothing from TURN_NONE on, and never closer to the neighbour than to the note.
+ */
+export const TURN_BLUR = 25;
+const TURN_FULL = 0.15;
+const TURN_NONE = 0.35;
+/** Notes this close (score seconds) count as adjacent for TURN_BLUR. */
+const TURN_GAP = 0.03;
 /** Default vibrato smoothing window (≈ one vibrato cycle at 5.5 Hz). */
 export const DEFAULT_VIBRATO_WINDOW = 0.18;
 /**
@@ -261,6 +273,8 @@ interface NoteWindow {
   legatoTo: number | null;
   /** Extra tolerance (cents) — just-intonation mode accepts both the pure and the tempered pitch. */
   tolExtra: number;
+  /** A fast turn: cents (signed, toward the neighbours) a deviation may reach beyond the tolerance (TURN_BLUR). */
+  turn: number;
   /** Very short note (body < SHORT_BODY): also judged on all its readings from the written start to end. */
   short: boolean;
   /** Written pitch outside the tracker's range (TRACKER_LOW_HZ…TRACKER_HIGH_HZ). */
@@ -354,14 +368,40 @@ function noteWindows(ctx: ScoringContext, opts: ScoringOptions): NoteWindow[] {
     // Just intonation: aim halfway between pure and tempered and widen the window by the same
     // amount, so singing either what the (tempered) backing plays or the pure interval is fine.
     const half = targetOffset / 2;
+    // A fast turn (TURN_BLUR): the window reaches further toward the neighbours (NoteWindow.turn).
+    const turn = turnBlur(note, prev, next, opts);
     const short = bodyEnd - bodyStart < SHORT_BODY;
     const hz = 440 * Math.pow(2, (note.midi - 69) / 12);
     out.push({
-      index: i, note, target: note.midi + half / 100, targetOffset, start: note.start, bodyStart, bodyEnd, legatoFrom, legatoTo, tolExtra: Math.abs(half),
+      index: i, note, target: note.midi + half / 100, targetOffset, start: note.start, bodyStart, bodyEnd, legatoFrom, legatoTo, tolExtra: Math.abs(half), turn,
       short, outOfRange: hz < TRACKER_LOW_HZ || hz > TRACKER_HIGH_HZ, lowForOctave: hz < OCTAVE_UP_HZ, doneAt: short ? note.start + note.dur : bodyEnd,
     });
   }
   return out;
+}
+
+/**
+ * Cents (signed: toward the neighbours) a fast note's window may reach beyond the tolerance (see
+ * TURN_BLUR); 0 unless the adjacent notes all lie on one side of it.
+ */
+export function turnBlur(note: ScoreNote, prev: ScoreNote | null, next: ScoreNote | null, opts: ScoringOptions): number {
+  const real = note.dur / (opts.rate && opts.rate > 0 ? opts.rate : 1);
+  const share = clamp((TURN_NONE - real) / (TURN_NONE - TURN_FULL), 0, 1);
+  if (share === 0) return 0;
+  const sides: number[] = [];
+  if (prev && prev.start + prev.dur >= note.start - TURN_GAP && prev.midi !== note.midi) sides.push(prev.midi - note.midi);
+  if (next && next.start <= note.start + note.dur + TURN_GAP && next.midi !== note.midi) sides.push(next.midi - note.midi);
+  if (!sides.length || !sides.every((d) => Math.sign(d) === Math.sign(sides[0]))) return 0;
+  const nearest = Math.min(...sides.map(Math.abs)) * 100;
+  // Never as far as halfway to the neighbour: a voice nearer it is on the wrong note.
+  const room = Math.max(0, nearest / 2 - opts.toleranceCents - 1);
+  return Math.sign(sides[0]) * Math.min(TURN_BLUR * share, room);
+}
+
+/** A deviation with a fast turn's allowance (NoteWindow.turn) taken off, for every in-tolerance check. */
+export function eased(w: { turn: number }, d: number): number {
+  if (!w.turn || d * w.turn <= 0) return d;
+  return Math.sign(d) * Math.max(0, Math.abs(d) - Math.abs(w.turn));
 }
 
 /** A sample with the time span it stands for. */
@@ -637,7 +677,7 @@ export class LiveScorer {
         smooth = a.smSum / (a.smT.length - a.smHead);
       }
       a.voicedTime += overlap;
-      if (Math.abs(smooth) <= tol) a.hitTime += overlap;
+      if (Math.abs(eased(w, smooth)) <= tol) a.hitTime += overlap;
       a.bT.push(t);
       a.bD.push(dev);
       a.bW.push(overlap);
@@ -718,10 +758,10 @@ export class LiveScorer {
       if (jT.length) {
         const sm = vibratoSmoothed(jT, D, this.vibWin);
         if (sm) {
-          for (let k = 0; k < jT.length; k++) if (Math.abs(sm[k]) <= tolN) hitTime += jW[k];
+          for (let k = 0; k < jT.length; k++) if (Math.abs(eased(w, sm[k])) <= tolN) hitTime += jW[k];
         } else {
           // Median, not mean: a short pitch glitch shouldn't sink a short note.
-          if (Math.abs(median(D)!) <= tolN) hitTime = jW.reduce((x, y) => x + y, 0) + excused;
+          if (Math.abs(eased(w, median(D)!)) <= tolN) hitTime = jW.reduce((x, y) => x + y, 0) + excused;
         }
       }
       return clamp(hitTime / Math.max(1e-3, bodyDur - excused - consEx), 0, 1);
@@ -737,7 +777,7 @@ export class LiveScorer {
     const shortDev = median(shortReadings);
     if (sr && shortDev !== null) {
       medDev = shortDev;
-      if (Math.abs(shortDev) <= tolN) hitRatio = Math.max(hitRatio, Math.min(1, sr.cover / (SHORT_FULL_COVER * w.note.dur)));
+      if (Math.abs(eased(w, shortDev)) <= tolN) hitRatio = Math.max(hitRatio, Math.min(1, sr.cover / (SHORT_FULL_COVER * w.note.dur)));
     }
     const tol = tolN;
     let grade: Grade =
@@ -749,8 +789,8 @@ export class LiveScorer {
     // around the note (see swingsAround), is enough for "good" — as long as the note as a whole was
     // on this note and not on a neighbouring semitone (a voice sitting on the previous pitch, or on
     // a wrong note, passes through the target on its way to the next).
-    const onNote = shortDev === null || Math.abs(shortDev) < Math.min(ON_NOTE_MAX, ON_NOTE_TOL * tolN);
-    const moment = jD.some((d) => Math.abs(d) <= tolN) || swingsAround(shortReadings, tolN);
+    const onNote = shortDev === null || Math.abs(eased(w, shortDev)) < Math.min(ON_NOTE_MAX, ON_NOTE_TOL * tolN);
+    const moment = jD.some((d) => Math.abs(eased(w, d)) <= tolN) || swingsAround(shortReadings, tolN);
     if (w.short && onNote && moment && GRADE_RANK[grade] < GRADE_RANK.good) grade = 'good';
     // With octave tolerance on (the singer deliberately sings the part in their own octave),
     // folding is expected and not an error.
@@ -809,7 +849,7 @@ export class LiveScorer {
       // Any clear miss is sung, except readings in the subharmonic band (SUBHARMONIC_LOW…HIGH: the
       // tracker locking onto a third, a quarter … of the pitch) and an octave up on a low note (the
       // tracker's octave error on "oo", see OCTAVE_UP_HZ).
-      else if (unsure === 'short' && grade === 'miss' && shortDev !== null && Math.abs(shortDev) >= CLEAR_OFF_TOL * tolN
+      else if (unsure === 'short' && grade === 'miss' && shortDev !== null && Math.abs(eased(w, shortDev)) >= CLEAR_OFF_TOL * tolN
         && !(shortDev < SUBHARMONIC_HIGH && shortDev > SUBHARMONIC_LOW)
         && !(w.lowForOctave && Math.abs(shortDev - 1200) < CLEAR_OFF_TOL * tolN)) clearly = 'off';
     }
@@ -830,7 +870,7 @@ export class LiveScorer {
     }
     this._score += points;
     // Report deviation from the written (just-intonation: pure) target.
-    const cents = medDev === null ? null : medDev - (w.targetOffset / 2 - 0);
+    const cents = medDev === null ? null : medDev - w.targetOffset / 2;
     a.final = {
       index: w.index, grade, cents, hitRatio, voicedRatio, onsetMs: a.onsetMs, ...(consonantMs !== undefined ? { consonantMs } : {}), drift, scoop,
       targetOffset: w.targetOffset, points, ...(octave ? { octave: true } : {}),
@@ -850,7 +890,7 @@ export function judgedSpan(a: { w: NoteWindow; bT: number[]; bD: number[]; bW: n
   // A consonant sung on the beat moves the cap (see CONSONANT_FLOOR).
   const capStart = Math.max(w.bodyStart, Math.min(w.bodyEnd, a.consCap ?? w.start + Math.min(TRANSITION_MAX, 0.35 * w.note.dur)));
   // Arrived = three readings in a row within tolerance (~60 ms), not just passing through it.
-  const ok = (k: number) => k >= n || Math.abs(a.bD[k]) <= tol;
+  const ok = (k: number) => k >= n || Math.abs(eased(w, a.bD[k])) <= tol;
   let k0 = 0;
   while (k0 < n && a.bT[k0] <= capStart && !(ok(k0) && ok(k0 + 1) && ok(k0 + 2))) k0++;
   // Silence or gliding before the arrival is excused, up to the cap.

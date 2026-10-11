@@ -22,7 +22,8 @@ import { PITCH_CURRENT, PITCH_HEAD, trackOffline, type PitchImpl, type TrackRead
 import { offlinePlan, rawBlocks } from './quality';
 import type { InputFilterPlan } from '../../src/audio/inputFilter';
 import { REPO_ROOT } from './scores';
-import { attemptPasses, levelSpec } from '../../src/progress/ladder';
+import { attemptPasses, stepSpec } from '../../src/progress/ladder';
+import { harnessStep } from './harness';
 
 /**
  * The end-of-run policy of src/ui/screens/Play.tsx and src/ui/play/session.ts, read from the source
@@ -275,7 +276,7 @@ export function runSession(spec: PipelineSpec, setup: RunSetup, profile: Profile
     const idx = plain.notes.map((n) => n.index);
     const al = impl.scoreAligned({ ...ctx, range: [Math.min(...idx), Math.max(...idx)] }, samples, opts, {
       rate, latencyMs: latencyUsed, calibrated, ...(pol.liftSubharmonics ? { liftSubharmonics: !opts.octaveTolerant } : {}),
-      ...(pol.everyNoteLift ? { everyNote: levelSpec(level).everyNote } : {}),
+      ...(pol.everyNoteLift ? { everyNote: stepSpec(level, harnessStep(level)).everyNote } : {}),
       // The singer answers "Headphones on?" truthfully: yes unless the take bleeds the backing in.
       ...(pol.voiceOnly ? { voiceOnly: !take.speaker } : {}),
       // Play.tsx: the lag search never looks past a plausible total device delay (guide on: estimate + cap).
@@ -311,7 +312,7 @@ export function runSession(spec: PipelineSpec, setup: RunSetup, profile: Profile
   }
   if (medOnset === null) medOnset = curAlign.medianOnsetMs(result, rate, part);
   // The current app's mark (level 1: every note right, ladder.attemptPasses); the baseline app's was accuracy only.
-  const passed = (after ? attemptPasses(level, result) : result.accuracy >= L.pass) && timingFailMs === null;
+  const passed = (after ? attemptPasses(level, harnessStep(level), result) : result.accuracy >= L.pass) && timingFailMs === null;
 
   // The live cents bubble (drawn from the session's samples).
   const avail = readings.map((r) => r.centreSec + N / 2 / take.sampleRate);

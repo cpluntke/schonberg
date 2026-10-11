@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import type { AttemptResult, PitchSample, ScoringOptions, TuningMode } from '../../src/game/types';
 import type { ScoringContext } from '../../src/game/scoring';
 import { scoreAttempt as scoreCurrent } from '../../src/game/scoring';
-import { LEVELS, attemptPasses, effectiveTolerance, levelSpec, wrongNotes, type Strictness } from '../../src/progress/ladder';
+import { attemptPasses, effectiveTolerance, stepSpec, wrongNotes, type Step, type Strictness } from '../../src/progress/ladder';
 import { scoreAttempt as scoreHead } from './baseline/scoring';
 import { loadPiece, noteRangeFor } from './scores';
 import { trackOffline, type TrackOptions, type TrackReading } from './tracker';
@@ -54,9 +54,17 @@ export interface LevelSetup {
   guide: boolean;
 }
 
+/**
+ * The step a harness level stands for: the experiments were written for the old ladder, whose level 1
+ * was slow with every note right and whose higher levels were in tempo.
+ */
+export function harnessStep(level: number): Step {
+  return level <= 1 ? 'slow' : 'tempo';
+}
+
 export function levelSetup(level: number, strictness: Strictness = 'standard'): LevelSetup {
-  const spec = LEVELS[Math.min(4, Math.max(1, level)) - 1];
-  return { level: spec.level, rate: spec.rate, toleranceCents: effectiveTolerance(spec.level, strictness), pass: spec.pass, guide: spec.guide };
+  const spec = stepSpec(Math.min(4, Math.max(1, level)), harnessStep(level));
+  return { level: spec.level, rate: spec.rate, toleranceCents: effectiveTolerance(spec.level, spec.step, strictness), pass: spec.pass, guide: spec.guide };
 }
 
 /**
@@ -70,7 +78,7 @@ export function gradeLetter(acc: number, wrongAtEveryNote = false): string {
 
 /** The letter Results shows for `result` at `level`. */
 export function letterFor(level: number, result: AttemptResult): string {
-  return gradeLetter(result.accuracy, levelSpec(level).everyNote && wrongNotes(result).length > 0);
+  return gradeLetter(result.accuracy, stepSpec(level, harnessStep(level)).everyNote && wrongNotes(result).length > 0);
 }
 
 /** Results.tsx "avg ±N¢" (median of per-note cents within ±100). */
@@ -135,7 +143,7 @@ export interface ScoreOptions {
 }
 
 function passOf(level: number | undefined, result: AttemptResult): boolean | null {
-  return level && level >= 1 && level <= 5 ? attemptPasses(level, result) : null;
+  return level && level >= 1 && level <= 5 ? attemptPasses(level, harnessStep(level), result) : null;
 }
 
 /** Track + score mono PCM described by a sidecar. */
