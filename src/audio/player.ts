@@ -128,6 +128,23 @@ export function chordAt(score: Score, t: number): number[] {
   return out.sort((a, b) => a - b);
 }
 
+/**
+ * The starting chord for a run from `from` to `to`: the harmony where the singer comes in (their
+ * part's first note in the run), or, if they don't sing in it, where the first note of any part
+ * starts. A passage that opens on a rest (a pickup, an introduction) has nothing sounding at `from`.
+ */
+export function cueChord(score: Score, partId: string | undefined, from: number, to: number): number[] {
+  const part = score.parts.find((p) => p.id === partId);
+  let at = part?.notes.find((n) => n.start >= from - 1e-6 && n.start < to)?.start;
+  if (at === undefined) {
+    for (const p of score.parts) {
+      const n = p.notes.find((x) => x.start + x.dur > from + 1e-6 && x.start < to);
+      if (n) at = Math.min(at ?? Infinity, Math.max(from, n.start));
+    }
+  }
+  return at === undefined ? [] : chordAt(score, at);
+}
+
 export function firstNoteIn(part: Part | undefined, from: number, to: number): number | null {
   if (!part) return null;
   for (const n of part.notes) if (n.start >= from - 1e-6 && n.start < to) return n.midi;
@@ -273,7 +290,7 @@ export class ScorePlayer {
           ? [firstNoteIn(this.score.parts.find((p) => p.id === opts.cuePartId), from, to)].filter(
               (m): m is number => m != null,
             )
-          : chordAt(this.score, from);
+          : cueChord(this.score, opts.cuePartId, from, to);
       // Hold the cue until one beat before the entrance so there's time to breathe.
       const cueDur = Math.max(0.4, (nCount - 1) * beatReal);
       for (const m of midis) {

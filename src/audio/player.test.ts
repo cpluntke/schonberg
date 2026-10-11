@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Score } from '../music/types';
-import { beatGrid, beatSecAt, beatsInMeasure, chordAt, clampRate, clipNote, ctxTimeFromScore, firstNoteIn, scoreTimeFromCtx } from './player';
+import { beatGrid, beatSecAt, beatsInMeasure, chordAt, clampRate, clipNote, ctxTimeFromScore, cueChord, firstNoteIn, scoreTimeFromCtx } from './player';
 
 function mkScore(): Score {
   const measures = [0, 1, 2].map((i) => ({
@@ -67,6 +67,20 @@ describe('cues', () => {
     expect(chordAt(s, 0)).toEqual([48, 72]);
     expect(firstNoteIn(s.parts[0], 0.5, 6)).toBe(74);
     expect(firstNoteIn(s.parts[1], 4.5, 6)).toBeNull();
+  });
+
+  it('the starting chord is the harmony where the singer comes in, also after an opening rest', () => {
+    const s = mkScore();
+    expect(cueChord(s, 's', 0, 6)).toEqual([48, 72]);
+    // Every part rests at the start (a pickup bar of rests, as in Debussy's "Dieu! qu'il la fait").
+    for (const p of s.parts) for (const n of p.notes) n.start += 1;
+    expect(chordAt(s, 0)).toEqual([]);
+    expect(cueChord(s, 's', 0, 7)).toEqual([48, 72]);
+    // The singer comes in later than the others: the chord under their entry.
+    expect(cueChord(s, 's', 1.5, 7)).toEqual([48, 74]);
+    // A singer silent in the run: where the first part sounds (a note held over `from` counts from `from`).
+    expect(cueChord(s, 'x', 1.5, 7)).toEqual([48, 72]);
+    expect(cueChord(s, 's', 7, 8)).toEqual([]);
   });
 });
 
