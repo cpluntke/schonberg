@@ -1,22 +1,22 @@
-// The app's tabs (Today · Pieces · Train · Choir, plus Admin / Section for staff logins) and which
+// The app's tabs (Today · Pieces · Intonation · Train · Choir, plus Admin / Section for staff logins) and which
 // tab a screen belongs to. Pure functions: App.tsx draws the tab bar (a sidebar on wide screens).
 //
 // Rules (also in docs/architecture.md, "ui/ navigation"):
-// - The four tab roots (and the staff screens, for staff) show the tab bar on phones. Every other
+// - The tab roots (and the staff screens, for staff) show the tab bar on phones. Every other
 //   screen is a sub-screen with its own back arrow: no tab bar on phones, the sidebar stays on wide
 //   screens (with the tab it belongs to lit). Practice screens (Play, Results, the words, the
 //   lyrics quiz, the memory map) and voice setup have neither.
-// - A sub-screen lights the tab it belongs to: Ranks → Choir; Expert, the tuner, the drone, the
-//   courses (the intonation lab) → Train. Screens reached from several tabs light the tab they were opened from: a piece (Today,
+// - A sub-screen lights the tab it belongs to: Ranks → Choir; Expert → Train; the tuner, the drone,
+//   the explainer and the courses (the intonation lab) → Intonation. Screens reached from several tabs light the tab they were opened from: a piece (Today,
 //   Pieces or Choir; opened straight from a link: Pieces), Settings, Diagnostics and Your progress
 //   (from the avatar's "You" sheet, on every tab; opened from a link: Today). That tab is stamped on
 //   the screen's history entry, so back and forward across several tabs keep it.
 
 import type { Route } from './router';
 
-export type TabName = 'home' | 'pieces' | 'train' | 'choir';
-export const TAB_NAMES: readonly TabName[] = ['home', 'pieces', 'train', 'choir'];
-export const TAB_LABEL: Record<TabName, string> = { home: 'Today', pieces: 'Pieces', train: 'Train', choir: 'Choir' };
+export type TabName = 'home' | 'pieces' | 'tune' | 'train' | 'choir';
+export const TAB_NAMES: readonly TabName[] = ['home', 'pieces', 'tune', 'train', 'choir'];
+export const TAB_LABEL: Record<TabName, string> = { home: 'Today', pieces: 'Pieces', tune: 'Intonation', train: 'Train', choir: 'Choir' };
 
 export const isTab = (name: string): name is TabName => (TAB_NAMES as readonly string[]).includes(name);
 
@@ -27,11 +27,11 @@ export const isAdminRoute = (name: string) => ADMIN.includes(name);
 const PARENT: Partial<Record<Route['name'], TabName>> = {
   ranks: 'choir',
   expert: 'train',
-  tuner: 'train',
-  intonation: 'train',
-  courses: 'train',
-  drone: 'train',
-  tuning: 'train',
+  tuner: 'tune',
+  intonation: 'tune',
+  courses: 'tune',
+  drone: 'tune',
+  tuning: 'tune',
 };
 
 /** Screens reached from several tabs: they light the tab they were opened from, else this one. */

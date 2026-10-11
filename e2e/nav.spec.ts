@@ -112,13 +112,13 @@ test('mid-run, ← and back pause and open the sheet; leaving from it lands on t
   await expect(page).toHaveURL(/#\/$/);
 });
 
-// The tabs (src/ui/nav.ts): Today · Pieces · Train · Choir; Settings behind the avatar's You sheet.
-test('tabs: Today, Pieces, Train, Choir; old addresses land on the new homes; the lit tab follows where a piece was opened', async ({ page }) => {
+// The tabs (src/ui/nav.ts): Today · Pieces · Intonation · Train · Choir; Settings behind the avatar's You sheet.
+test('tabs: Today, Pieces, Intonation, Train, Choir; old addresses land on the new homes; the lit tab follows where a piece was opened', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await home(page);
   const nav = page.getByRole('navigation', { name: 'Main' });
-  await expect(nav.getByRole('button')).toHaveText(['Today', 'Pieces', 'Train', 'Choir']);
+  await expect(nav.getByRole('button')).toHaveText(['Today', 'Pieces', 'Intonation', 'Train', 'Choir']);
   await expect(nav.getByRole('button', { name: 'Today' })).toHaveAttribute('aria-current', 'page');
 
   await nav.getByRole('button', { name: 'Pieces' }).click();
@@ -138,11 +138,14 @@ test('tabs: Today, Pieces, Train, Choir; old addresses land on the new homes; th
 
   await nav.getByRole('button', { name: 'Train' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Train');
+  await nav.getByRole('button', { name: 'Intonation' }).click();
+  await expect(page).toHaveURL(/#\/tune$/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Intonation');
   await page.getByTestId('train-tuner').click();
   await expect(page).toHaveURL(/#\/tuner$/);
-  await expect(nav.getByRole('button', { name: 'Train' })).toHaveAttribute('aria-current', 'true');
+  await expect(nav.getByRole('button', { name: 'Intonation' })).toHaveAttribute('aria-current', 'true');
   await page.getByRole('button', { name: 'Back' }).click();
-  await expect(page).toHaveURL(/#\/train$/);
+  await expect(page).toHaveURL(/#\/tune$/);
 
   await nav.getByRole('button', { name: 'Choir' }).click();
   await expect(page).toHaveURL(/#\/choir$/);

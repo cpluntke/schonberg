@@ -9,7 +9,7 @@ export function TunerScreen() {
   return (
     <main className="screen">
       <div className="topbar">
-        <button className="icon-btn" aria-label="Back" onClick={() => back({ name: 'train' })}><IconBack /></button>
+        <button className="icon-btn" aria-label="Back" onClick={() => back({ name: 'tune' })}><IconBack /></button>
         <h1>Tuner</h1>
       </div>
       <Tuner notation={profile.notation} />

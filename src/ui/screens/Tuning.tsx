@@ -47,7 +47,7 @@ export function TuningScreen({ page }: { page: number }) {
   useEffect(() => { if (p === TUNING_PAGES) markSeen(); }, [p]);
   // (the pages replace each other: ← and the phone's back leave the explainer)
   const to = (n: number) => go(pageRoute(n), true);
-  const leave = () => back({ name: 'train' });
+  const leave = () => back({ name: 'tune' });
   const last = p === TUNING_PAGES;
   return (
     <main className="screen wide has-foot crs-page tun" data-testid="tuning" data-page={p}>

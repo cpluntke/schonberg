@@ -5,8 +5,10 @@ export type Route =
   | { name: 'home' }
   /** The Pieces tab (#/pieces; the old #/library lands here too). */
   | { name: 'pieces' }
-  /** The Train tab: the warm-up, the tuner, the drills (#/train). */
+  /** The Train tab: drills from your music, the challenge (#/train). */
   | { name: 'train' }
+  /** The Intonation tab: why choirs tune differently, the courses, the tuner and the drone (#/tune). */
+  | { name: 'tune' }
   | { name: 'piece'; pieceId: string }
   | {
     name: 'play'; pieceId: string; partId: string; sectionId: string; level: number; mode: '2d' | '3d'; from?: number; to?: number; words?: boolean;
@@ -68,6 +70,7 @@ export function parseHash(hash: string): Route {
     case 'pieces':
     case 'library': return { name: 'pieces' };
     case 'train': return { name: 'train' };
+    case 'tune': return { name: 'tune' };
     case 'piece': if (seg[1]) return { name: 'piece', pieceId: seg[1] }; break;
     case 'play':
     case 'arcade':

@@ -293,7 +293,7 @@ function CourseOverview({ iv, lab, root }: { iv: LabInterval; lab: LabProgress; 
   return (
     <main className="screen has-foot crs-page" data-testid="lab-ladder">
       <div className="topbar">
-        <button className="icon-btn filled" aria-label="Back" onClick={() => back({ name: 'train' })}><IconBack /></button>
+        <button className="icon-btn filled" aria-label="Back" onClick={() => back({ name: 'tune' })}><IconBack /></button>
         <span className="t16 muted grow">Train</span>
         {recommended && <span className="crs-rec" data-testid="lab-recommended">Your choir recommends</span>}
       </div>
@@ -457,7 +457,7 @@ function StepDoneSheet({ iv, rung, onKeep, redo }: { iv: LabInterval; rung: numb
           </>
         ) : (
           <>
-            <button className="btn primary block" data-testid="lab-to-train" onClick={() => go({ name: 'train' })}>Back to Train</button>
+            <button className="btn primary block" data-testid="lab-to-train" onClick={() => go({ name: 'tune' })}>Back to Intonation</button>
             <button className="btn block" data-testid="lab-keep" onClick={onKeep}>Keep practising this step</button>
             {next && <button className="link" data-testid="lab-go-next" onClick={() => go({ name: 'intonation', interval: iv, rung: next }, true)}>Or go on to step {next} now</button>}
           </>
@@ -571,7 +571,7 @@ function CourseDone({ iv, lab }: { iv: LabInterval; lab: LabProgress }) {
             {music
               ? <button className="btn primary block" data-testid="lab-sing-spot" onClick={sing}><IconPlay size={18} /> Sing {where} slowly</button>
               : otherOpen && <button className="btn primary block" data-testid="lab-next-course-go" onClick={toOther}>Start the {COURSES[other].title.toLowerCase()}</button>}
-            <button className="btn block" data-testid="lab-to-train" onClick={() => go({ name: 'train' })}>Back to Train</button>
+            <button className="btn block" data-testid="lab-to-train" onClick={() => go({ name: 'tune' })}>Back to Intonation</button>
           </>
         )}
       </div>
@@ -1125,11 +1125,11 @@ function CheckDone({ iv, kept, holds }: { iv: LabInterval; kept: boolean; holds:
         : `${checkLine(holds)}. One step again brings it back: sing it by ear, until it locks.`}</span>
       {kept ? (
         nx ? <button className="btn primary block two" data-testid="today-next" onClick={() => goStep(nx, true)}><span>Next: {stepShort(nx)}</span><span className="sub">step {ses!.nextIndex + 1} of {ses!.plan.steps.length} · {nx.minutes} min</span></button>
-          : <button className="btn primary block" data-testid="lab-to-train" onClick={() => go({ name: 'train' })}>Back to Train</button>
+          : <button className="btn primary block" data-testid="lab-to-train" onClick={() => go({ name: 'tune' })}>Back to Intonation</button>
       ) : (
         <>
           <button className="btn primary block" data-testid="lab-redo" onClick={() => go({ name: 'intonation', interval: iv, rung: 4 }, true)}>Sing it by ear, once more</button>
-          <button className="btn block" onClick={() => (nx ? goStep(nx, true) : go({ name: 'train' }))}>{nx ? 'Later: next step of today' : 'Later'}</button>
+          <button className="btn block" onClick={() => (nx ? goStep(nx, true) : go({ name: 'tune' }))}>{nx ? 'Later: next step of today' : 'Later'}</button>
         </>
       )}
     </div>

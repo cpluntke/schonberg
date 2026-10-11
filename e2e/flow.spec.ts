@@ -458,7 +458,7 @@ test('a flat simulated singer does not pass level 4', async ({ page }) => {
 test('all main screens render without errors', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
-  for (const h of ['#/', '#/pieces', '#/library', '#/train', '#/choir', '#/ranks', '#/settings', '#/progress', '#/expert', '#/setup', '#/tuner', '#/diagnostics']) {
+  for (const h of ['#/', '#/pieces', '#/library', '#/tune', '#/tuning', '#/train', '#/choir', '#/ranks', '#/settings', '#/progress', '#/expert', '#/setup', '#/tuner', '#/diagnostics']) {
     await page.goto('/' + h);
     await page.waitForTimeout(800);
   }

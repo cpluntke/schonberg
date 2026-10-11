@@ -6,10 +6,10 @@ import { adoptLibraryIds, useLibrary } from './library';
 import { upgradeAllFullRuns } from './plan';
 import { subscribe } from '../progress/store';
 import { useToast } from './hooks';
-import { IconEar, IconMusic, IconPeople, IconShield, IconSun } from './icons';
+import { IconEar, IconLoop, IconMusic, IconPeople, IconShield, IconSun } from './icons';
 import { Home } from './screens/Home';
 import { Pieces } from './screens/Pieces';
-import { AllCourses, DroneScreen, Train } from './screens/Train';
+import { AllCourses, DroneScreen, IntonationHome, Train } from './screens/Train';
 import { PieceScreen } from './screens/Piece';
 import { PlayScreen } from './screens/Play';
 import { Results } from './screens/Results';
@@ -44,7 +44,7 @@ import { retryPrivacyRemovals } from './play/privacy';
 import { useDisplaySync } from './theme';
 
 // Today · Pieces · Train · Choir (nav.ts: which screen lights which tab, where the tab bar shows).
-const TAB_ICON: Record<TabName, React.ReactNode> = { home: <IconSun />, pieces: <IconMusic />, train: <IconEar />, choir: <IconPeople /> };
+const TAB_ICON: Record<TabName, React.ReactNode> = { home: <IconSun />, pieces: <IconMusic />, tune: <IconEar />, train: <IconLoop />, choir: <IconPeople /> };
 
 export function App() {
   const route = useRoute();
@@ -147,6 +147,7 @@ export function App() {
       case 'home': body = <Home />; break;
       case 'pieces': body = <Pieces />; break;
       case 'train': body = <Train />; break;
+      case 'tune': body = <IntonationHome />; break;
       case 'piece': body = <PieceScreen key={route.pieceId} pieceId={route.pieceId} />; break;
       case 'play': body = <PlayScreen key={JSON.stringify(route)} route={route} />; break;
       case 'results': body = <Results />; break;

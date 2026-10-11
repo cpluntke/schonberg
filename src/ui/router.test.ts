@@ -218,3 +218,10 @@ describe('where a new screen opens', () => {
     expect(toTop).toHaveBeenCalledWith(0, 0);
   });
 });
+
+describe('the Intonation tab', () => {
+  it('lives at #/tune', () => {
+    expect(href({ name: 'tune' })).toBe('#/tune');
+    expect(parseHash('#/tune')).toEqual({ name: 'tune' });
+  });
+});

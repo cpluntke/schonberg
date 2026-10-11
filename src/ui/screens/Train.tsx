@@ -1,7 +1,7 @@
-// The Train tab (the UX review's C1): today's warm-up (the active course's next step), the tools (check
-// a note, a drone), the courses (the active one and one suggestion; all of them behind "All courses"),
-// drills from your music (the leap drill) and the Zwölfton row of the day. Also All courses and the
-// drone screen. The courses themselves are in IntonationLab.tsx (docs/INTONATION.md).
+// The Train tab: drills from your music (the leap drill) and the Zwölfton row of the day. The
+// Intonation tab (IntonationHome): why choirs tune differently, today's course step (the warm-up),
+// the courses (the active one and one suggestion; all of them behind "All courses") and the tools
+// (check a note, the drone). Also All courses and the drone screen. The courses themselves are in IntonationLab.tsx (docs/INTONATION.md).
 import React, { useEffect, useRef, useState } from 'react';
 import { back, go, setDrillHome } from '../router';
 import { useProfile, useStoreVersion } from '../hooks';
@@ -40,15 +40,9 @@ export function Train() {
   useProfile();
   useStoreVersion();
   useLibrary();
-  const lab = loadLab();
-  const recommended = courseRecommended();
   const leaps = cycleLeaps();
   const row = rowOfTheDay(new Date());
   const lastLeaps = lastLeapRun(loadLeapRuns());
-  const active = activeCourse(lab);
-  const suggested = suggestedCourse(lab, active);
-  const doneCourses = COURSE_IDS.filter((k) => courseStatus(lab[k]) === 'done');
-  const warm = useWarmUp(lab, recommended);
 
   function playLeaps() {
     const p = leapPiece();
@@ -65,32 +59,9 @@ export function Train() {
         <h1 className="hero">Train</h1>
         <YouButton />
       </div>
-      <span className="t16 muted" style={{ marginTop: -8 }}>Short courses and drills, a few minutes a day. They make every piece you sing sound better.</span>
+      <span className="t16 muted" style={{ marginTop: -8 }}>Drills built from your music, and a challenge, a few minutes a day.</span>
 
       <div className="lay train-cols">
-        <div className="col crs-col">
-          {warm && <WarmUpCard w={warm} />}
-          <div className="crs-tools">
-            <button className="btn crs-tool" data-testid="train-tuner" onClick={() => go({ name: 'tuner' })}><IconGauge size={20} /> Check a note</button>
-            <button className="btn crs-tool" data-testid="train-drone" onClick={() => go({ name: 'drone' })}><IconPulse size={20} /> Drone</button>
-          </div>
-
-          <section className="col crs-section" aria-labelledby="train-courses-h" data-testid="train-courses">
-            <div className="row between">
-              <h2 id="train-courses-h">Courses</h2>
-              <span className="t14 muted">one step a day</span>
-            </div>
-            <TuningEntry />
-            {active && <CourseCard iv={active} lab={lab} kind="active" recommended={recommended} />}
-            {suggested && <CourseCard iv={suggested} lab={lab} kind={active ? 'next' : 'start'} recommended={recommended} />}
-            {!active && !suggested && doneCourses.map((k) => <CourseCard key={k} iv={k} lab={lab} kind="done" recommended={recommended} />)}
-            <button className="link between crs-all" data-testid="train-all-courses" onClick={() => go({ name: 'courses' })}>
-              <span><span className="crs-alllabel">All courses ({COURSE_IDS.length})</span>{doneCourses.length > 0 && <span className="muted"> · incl. {doneCourses.map((k) => `${COURSES[k].title} ✓`).join(', ')}</span>}</span>
-              <IconChevron size={18} />
-            </button>
-          </section>
-        </div>
-
         <div className="col crs-col">
           <section className="col crs-section" aria-labelledby="train-music-h">
             <div className="row between">
@@ -119,7 +90,9 @@ export function Train() {
               </button>
             </div>
           </section>
+        </div>
 
+        <div className="col crs-col">
           <section className="col crs-section" aria-labelledby="train-challenge-h">
             <h2 id="train-challenge-h">Challenge</h2>
             <button className="card expert train-row" style={{ textAlign: 'left', color: 'inherit' }} data-testid="train-row" onClick={() => go({ name: 'expert' })}>
@@ -136,6 +109,61 @@ export function Train() {
                 <span className="t14" style={{ color: 'var(--expert-text)' }}>12 notes, no key · the same row for the whole choir today.</span>
               </span>
             </button>
+          </section>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+/**
+ * The Intonation tab: why choirs tune differently, today's course step (the warm-up), the courses,
+ * and the tools (check a note, the drone).
+ */
+export function IntonationHome() {
+  useProfile();
+  useStoreVersion();
+  const lab = loadLab();
+  const recommended = courseRecommended();
+  const active = activeCourse(lab);
+  const suggested = suggestedCourse(lab, active);
+  const doneCourses = COURSE_IDS.filter((k) => courseStatus(lab[k]) === 'done');
+  const warm = useWarmUp(lab, recommended);
+
+  return (
+    <main className="screen wide train" data-testid="intonation-home">
+      <div className="row between tab-head">
+        <h1 className="hero">Intonation</h1>
+        <YouButton />
+      </div>
+      <span className="t16 muted" style={{ marginTop: -8 }}>Hear and sing pure intervals, so the chords you sing ring. A few minutes a day.</span>
+
+      <div className="lay train-cols">
+        <div className="col crs-col">
+          <TuningEntry />
+          {warm && <WarmUpCard w={warm} />}
+          <section className="col crs-section" aria-labelledby="train-courses-h" data-testid="train-courses">
+            <div className="row between">
+              <h2 id="train-courses-h">Courses</h2>
+              <span className="t14 muted">one step a day</span>
+            </div>
+            {active && <CourseCard iv={active} lab={lab} kind="active" recommended={recommended} />}
+            {suggested && <CourseCard iv={suggested} lab={lab} kind={active ? 'next' : 'start'} recommended={recommended} />}
+            {!active && !suggested && doneCourses.map((k) => <CourseCard key={k} iv={k} lab={lab} kind="done" recommended={recommended} />)}
+            <button className="link between crs-all" data-testid="train-all-courses" onClick={() => go({ name: 'courses' })}>
+              <span><span className="crs-alllabel">All courses ({COURSE_IDS.length})</span>{doneCourses.length > 0 && <span className="muted"> · incl. {doneCourses.map((k) => `${COURSES[k].title} ✓`).join(', ')}</span>}</span>
+              <IconChevron size={18} />
+            </button>
+          </section>
+        </div>
+
+        <div className="col crs-col">
+          <section className="col crs-section" aria-labelledby="tune-tools-h">
+            <h2 id="tune-tools-h">Tools</h2>
+            <div className="crs-tools">
+              <button className="btn crs-tool" data-testid="train-tuner" onClick={() => go({ name: 'tuner' })}><IconGauge size={20} /> Check a note</button>
+              <button className="btn crs-tool" data-testid="train-drone" onClick={() => go({ name: 'drone' })}><IconPulse size={20} /> Drone</button>
+            </div>
           </section>
         </div>
       </div>
@@ -257,7 +285,7 @@ export function AllCourses() {
   return (
     <main className="screen crs-page" data-testid="all-courses">
       <div className="topbar">
-        <button className="icon-btn filled" aria-label="Back" onClick={() => back({ name: 'train' })}><IconBack /></button>
+        <button className="icon-btn filled" aria-label="Back" onClick={() => back({ name: 'tune' })}><IconBack /></button>
         <h1>All courses</h1>
       </div>
       <span className="t16 muted">Each course is a few short steps, about {COURSE_MINUTES} minutes in all: one step a day is plenty.{recommended ? ' Your choir recommends the intonation courses.' : ''}</span>
@@ -312,7 +340,7 @@ export function DroneScreen() {
   return (
     <main className="screen crs-page" data-testid="drone-screen">
       <div className="topbar">
-        <button className="icon-btn filled" aria-label="Back" onClick={() => back({ name: 'train' })}><IconBack /></button>
+        <button className="icon-btn filled" aria-label="Back" onClick={() => back({ name: 'tune' })}><IconBack /></button>
         <h1>Drone</h1>
       </div>
       <span className="t16 muted">A steady note to sing against: hold your note over it and listen for the pulse to stop.</span>

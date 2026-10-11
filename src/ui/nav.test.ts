@@ -10,11 +10,12 @@ describe('tabs', () => {
   it('sub-screens light the tab they belong to', () => {
     expect(tabOf({ name: 'ranks' })).toBe('choir');
     expect(tabOf({ name: 'expert' })).toBe('train');
-    expect(tabOf({ name: 'tuner' })).toBe('train');
-    expect(tabOf({ name: 'intonation' })).toBe('train');
-    expect(tabOf({ name: 'courses' })).toBe('train');
-    expect(tabOf({ name: 'drone' })).toBe('train');
-    expect(tabOf({ name: 'tuning' })).toBe('train');
+    expect(tabOf({ name: 'tuner' })).toBe('tune');
+    expect(tabOf({ name: 'intonation' })).toBe('tune');
+    expect(tabOf({ name: 'courses' })).toBe('tune');
+    expect(tabOf({ name: 'drone' })).toBe('tune');
+    expect(tabOf({ name: 'tuning' })).toBe('tune');
+    expect(tabOf({ name: 'tune' })).toBe('tune');
     // (whatever tab was shown before)
     expect(tabOf({ name: 'ranks' }, 'home')).toBe('choir');
   });

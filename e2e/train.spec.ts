@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 
-// The Train tab and the intonation courses (docs/INTONATION.md): courses for every singer, a course's
+// The Intonation tab and the intonation courses (docs/INTONATION.md): courses for every singer, a course's
 // page, a step, step done, the course done with its quick check, the drone, the leap drill's results.
 
 const PROFILE = { name: 'Clara Weber', voice: 'A', notation: 'letter', strictness: 'standard', tuning: 'equal', latencyMs: 120, latencySource: 'measured', onboarded: true, leaderboardOptIn: false, headphones: true, displayMigrated: true, scoreDefaultMigrated: true };
@@ -22,8 +22,8 @@ async function seeded(page: Page, url: string, lab?: (now: number) => unknown) {
 test('courses for every singer: Train, a course page, its first step; no warm-up until a course is started', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
-  await seeded(page, '/#/train');
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Train');
+  await seeded(page, '/#/tune');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Intonation');
   await expect(page.getByTestId('train-lab')).toHaveCount(0);
   const card = page.getByTestId('train-course-fifth');
   await expect(card).toContainText('Pure fifth');
@@ -33,7 +33,7 @@ test('courses for every singer: Train, a course page, its first step; no warm-up
   await page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Today' }).click();
   await expect(page.getByTestId('plan-card')).toBeVisible();
   await expect(page.getByTestId('plan-card')).not.toContainText('Warm-up');
-  await page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Train' }).click();
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Intonation' }).click();
 
   await page.getByTestId('train-course-fifth').click();
   await expect(page).toHaveURL(/#\/intonation\/fifth$/);
@@ -60,7 +60,7 @@ test('courses for every singer: Train, a course page, its first step; no warm-up
   await expect(page.getByTestId('lab-quiz-feedback')).toBeVisible();
   await expect(page.getByTestId('lab-tries')).toContainText('more to pass');
   // Started: the course is active on Train, and Today has its warm-up.
-  await page.goto('/#/train');
+  await page.goto('/#/tune');
   await expect(page.getByTestId('train-course-fifth')).toContainText('step 1 of 5');
   await expect(page.getByTestId('train-lab')).toContainText('Pure fifth · step 1 of 5');
   await page.goto('/#/');
@@ -82,7 +82,7 @@ test('a step done: the quiet card, back to Train; the next step waits for tomorr
   await expect(done).toContainText('Pure fifth · 5 of your last 6 answers right');
   await expect(done).toContainText('Step 2 of the course waits for tomorrow.');
   await done.getByTestId('lab-to-train').click();
-  await expect(page).toHaveURL(/#\/train$/);
+  await expect(page).toHaveURL(/#\/tune$/);
   // One step a day: no warm-up now; the course shows its next step.
   await expect(page.getByTestId('train-lab')).toHaveCount(0);
   await expect(page.getByTestId('train-course-fifth')).toContainText('Tune it by hand · 5 min');
@@ -113,7 +113,7 @@ test('course complete: what you can do now, the quick check a week later (Train 
   await expect(page.getByTestId('lab-next-course')).toContainText('Start step 1: Listen');
 
   // On its day: Train's warm-up is the quick check.
-  await seeded(page, '/#/train', (now) => ({ fifth: fifth(now, dayOf(now)), third: { rung: 1, logs: {} } }));
+  await seeded(page, '/#/tune', (now) => ({ fifth: fifth(now, dayOf(now)), third: { rung: 1, logs: {} } }));
   await expect(page.getByTestId('train-lab')).toContainText('Pure fifth · quick check');
   await page.getByTestId('train-lab-go').click();
   await expect(page).toHaveURL(/#\/intonation\/fifth\/check$/);
@@ -124,7 +124,7 @@ test('course complete: what you can do now, the quick check a week later (Train 
 });
 
 test('the drone and all courses', async ({ page }) => {
-  await seeded(page, '/#/train');
+  await seeded(page, '/#/tune');
   await page.getByTestId('train-drone').click();
   await expect(page).toHaveURL(/#\/drone$/);
   const note = await page.getByTestId('drone-note').innerText();
