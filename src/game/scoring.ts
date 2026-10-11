@@ -406,6 +406,36 @@ export function turnBlur(note: ScoreNote, prev: ScoreNote | null, next: ScoreNot
   return cents > 0 ? { cents: sign * cents, limit } : none;
 }
 
+/**
+ * A note read partly an octave up between readings at the right pitch: the tracker's octave error,
+ * not the voice (nobody leaves a note for the octave above and comes back within it). A vowel whose
+ * second harmonic is much stronger than the fundamental, with weak odd harmonics (a nasal "on" on
+ * A♯4: H2 15 dB over H1), looks periodic at twice the pitch. Those readings are folded down an octave
+ * before the note is judged, at any pitch (OCTAVE_UP_HZ lets off low notes read an octave up even
+ * without right readings). Needs right-octave readings (within OCTAVE_FLIP_NEAR tolerances, at least
+ * OCTAVE_FLIP_MIN of them and OCTAVE_FLIP_SHARE of the readings near either octave) and no neighbour
+ * near the octave above (an octave leap sung early or held late is the voice).
+ */
+export const OCTAVE_FLIP_NEAR = 2;
+export const OCTAVE_FLIP_MIN = 3;
+export const OCTAVE_FLIP_SHARE = 0.3;
+export function foldOctaveFlips(a: { w: NoteWindow; bD: number[]; devs: number[]; nD: number[]; octaveSamples: number }, tol: number): void {
+  const w = a.w;
+  const up = (d: number) => d > 600 && d < 1800;
+  const right = (d: number) => Math.abs(d) <= OCTAVE_FLIP_NEAR * tol;
+  const nUp = a.bD.filter(up).length;
+  if (nUp === 0) return;
+  const nRight = a.bD.filter(right).length;
+  if (nRight < OCTAVE_FLIP_MIN || nRight < OCTAVE_FLIP_SHARE * (nUp + nRight)) return;
+  const octaveAbove = (m: number | null) => m !== null && Math.abs(m - (w.note.midi + 12)) <= 2;
+  if (octaveAbove(w.legatoFrom) || octaveAbove(w.legatoTo)) return;
+  const fold = (d: number) => (up(d) ? d - 1200 : d);
+  a.bD = a.bD.map(fold);
+  a.devs = a.devs.map(fold);
+  a.nD = a.nD.map(fold);
+  a.octaveSamples = a.devs.filter((d) => Math.abs(d) > 600 && Math.abs(d - 1200 * Math.round(d / 1200)) <= Math.max(tol, 50)).length;
+}
+
 /** A deviation with a fast turn's allowance (NoteWindow.turn) taken off, for every in-tolerance check. */
 export function eased(w: { turn: number; turnLimit?: number }, d: number): number {
   if (!w.turn || d * w.turn <= 0 || Math.abs(d) >= (w.turnLimit ?? Infinity)) return d;
@@ -703,6 +733,7 @@ export class LiveScorer {
   private finalize(a: NoteAcc): void {
     if (a.final) return;
     const w = a.w;
+    if (!this.opts.octaveTolerant) foldOctaveFlips(a, this.tol + w.tolExtra);
     // A qualifying run that was cut short only by the end of a short note still marks its start.
     if (a.onsetMs === null && a.runStart !== null) a.onsetMs = Math.max(0, (a.runStart - w.start) * 1000);
     const tolN = this.tol + w.tolExtra;

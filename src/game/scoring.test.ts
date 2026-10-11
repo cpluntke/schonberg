@@ -246,3 +246,35 @@ describe('vibrato', () => {
     expect(r.counts.miss).toBe(8);
   });
 });
+
+describe('octave flips of the tracker', () => {
+  // A♯4 on a nasal "on": the tracker reads part of the note an octave up (H2 much stronger than H1).
+  const part = makePart('A', [[68, 1], [70, 1], [70, 1], [68, 1]], 120);
+  const ctx: ScoringContext = { score: makeScore([part], 120), part, range: [0, 3] };
+  const L1: ScoringOptions = { toleranceCents: 50, tuning: 'equal', octaveTolerant: false };
+  const take = (inNote: (t: number) => number) => {
+    const s = [];
+    for (const n of part.notes) for (let t = n.start + 0.01; t < n.start + n.dur; t += 0.024) {
+      s.push({ time: t, midi: n.midi + (n === part.notes[2] ? inNote((t - n.start) / n.dur) : 0), clarity: 0.95, rms: 0.1 });
+    }
+    return s;
+  };
+
+  it('readings an octave up between readings at the right pitch are the tracker, not a wrong octave', () => {
+    const r = scoreAttempt(ctx, take((u) => (u > 0.25 && u < 0.65 ? 12 : 0.2)), L1);
+    expect(r.notes[2].grade).toBe('perfect');
+    expect(r.notes[2].octave).toBeUndefined();
+    expect(r.insights.map((x) => x.kind)).not.toContain('octave');
+  });
+
+  it('a note sung an octave up all through is still a wrong octave', () => {
+    const r = scoreAttempt(ctx, take(() => 12), L1);
+    expect(r.notes[2].grade).toBe('miss');
+    expect(r.notes[2].octave).toBe(true);
+  });
+
+  it('only upward: readings an octave down stay wrong', () => {
+    const r = scoreAttempt(ctx, take((u) => (u > 0.2 && u < 0.9 ? -12 : 0)), L1);
+    expect(r.notes[2].grade).not.toBe('perfect');
+  });
+});
